@@ -1,34 +1,21 @@
 @import "tailwindcss";
 
-:root {
-  --brand-blue: #0A1C3A; /* navy */
-  --brand-deep: #071A33;
-  --brand-gold: #D4AF37;
-  --brand-white: #ffffff;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --text-primary: #071A33;
-  --text-secondary: #334155;
-  --card-bg: #ffffff;
-  --border-soft: rgba(10,28,58,0.06);
+@theme {
+  --color-brand-deep: #071A33;
+  --color-brand-cool: #0A1C3A;
+  --color-brand-gold: #D4AF37;
+  --color-brand-blue: #007BFF;
+  --color-brand-hover: #0057B8;
 }
 
-[data-theme="night"] {
-  --brand-blue: #06132a;
-  --brand-deep: #041027;
-  --brand-gold: #D4AF37;
-  --bg-primary: #071A33;
-  --bg-secondary: #06203a;
-  --text-primary: #ffffff;
-  --text-secondary: #dbeafe;
-  --card-bg: #0b2138;
-  --border-soft: rgba(212,175,55,0.12);
+@layer base {
+  :root.light-theme {
+    --color-brand-deep: #F8FAFC;
+    --color-brand-cool: #E2E8F0;
+    --color-brand-gold: #B8860B; 
+    --color-brand-blue: #0A4D9B;
+    --color-brand-hover: #0B3C73;
+    color: #0f172a;
+  }
 }
-
-/* Utility helpers for existing classnames that rely on CSS variables */
-.bg-brand-deep { background-color: var(--brand-deep) !important; }
-.bg-brand-cool { background-color: var(--brand-blue) !important; }
-.text-brand-gold { color: var(--brand-gold) !important; }
-.text-brand-blue { color: var(--brand-blue) !important; }
-.border-brand-gold { border-color: rgba(212,175,55,0.25) !important; }
 

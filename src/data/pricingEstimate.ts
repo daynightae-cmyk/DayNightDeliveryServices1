@@ -12,7 +12,29 @@ export const cities = [
   "Mohammed Bin Zayed City"
 ];
 
-export function getQuickEstimate(from?: string, to?: string) {
+export function getWeightSurcharge(weightKg: number | string | null) {
+  const weight = Number(weightKg);
+
+  if (!weight || weight <= 1) {
+    return { min: 0, max: 0, needsCustomQuote: false };
+  }
+
+  if (weight > 1 && weight <= 5) {
+    return { min: 5, max: 10, needsCustomQuote: false };
+  }
+
+  if (weight > 5 && weight <= 10) {
+    return { min: 15, max: 25, needsCustomQuote: false };
+  }
+
+  if (weight > 10 && weight <= 20) {
+    return { min: 30, max: 50, needsCustomQuote: false };
+  }
+
+  return { min: 0, max: 0, needsCustomQuote: true };
+}
+
+export function getQuickEstimate(from: string, to: string) {
   if (!from || !to) return null;
 
   if (from === to) {

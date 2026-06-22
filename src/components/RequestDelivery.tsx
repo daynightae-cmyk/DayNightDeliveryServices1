@@ -17,13 +17,18 @@ import {
   DollarSign, 
   Boxes 
 } from "lucide-react";
-import NotificationPermissionToggle from "./notifications/NotificationPermissionToggle";
+
+import { useAppContext } from "../lib/AppContext";
+import { translations } from "../data/translations";
 
 interface RequestDeliveryProps {
   onNavigate: (tab: string, trackingId?: string) => void;
 }
 
 export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
+  const { language } = useAppContext();
+  const t = translations[language];
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [successId, setSuccessId] = useState("");
@@ -431,9 +436,6 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               ></textarea>
             </div>
 
-            {/* Notifications Toggle (optional) */}
-            <NotificationPermissionToggle />
-
             {/* Calculations Detail Box */}
             <div className="bg-brand-deep/85 rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-sans font-medium text-right">
               <div className="p-2.5 bg-brand-gold/10 rounded-lg text-brand-gold border border-brand-gold/20 text-[10px] leading-relaxed max-w-xs text-right">
@@ -479,23 +481,39 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
             <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto animate-bounce" />
             
             <div className="space-y-2">
-              <h3 className="text-2xl font-extrabold text-white">تم تسجيل طلب التوصيل بنجاح!</h3>
-              <p className="text-white/40 text-sm">تم حفظ الطلب في قاعدة البيانات وبنظام التتبع لداي نايت.</p>
+              <h3 className="text-2xl font-extrabold text-white">{t.requestDelivery.requestSuccess}</h3>
+              <p className="text-white/40 text-sm">{t.requestDelivery.databaseSaved}</p>
+            </div>
+
+            {/* Notification toggle widget */}
+            <div className="max-w-sm mx-auto bg-brand-cool/50 rounded-xl p-4 border border-white/5 mt-4">
+               <label className={`flex items-center gap-3 cursor-pointer ${language === 'ar' ? 'text-right flex-row' : 'text-left flex-row-reverse'}`}>
+                 <span className="text-white/80 text-xs font-bold leading-relaxed">{t.notifications.label}</span>
+                 <input 
+                   type="checkbox" 
+                   className="w-4 h-4 rounded text-brand-gold bg-brand-deep border-white/20 shrink-0" 
+                   onChange={(e) => {
+                     if (e.target.checked && 'Notification' in window) {
+                       Notification.requestPermission();
+                     }
+                   }}
+                 />
+               </label>
             </div>
 
             <div className="bg-brand-deep border border-brand-gold/20 rounded-xl p-5 max-w-sm mx-auto space-y-2 text-center font-mono">
-              <p className="text-white/40 text-xs font-bold uppercase tracking-wider font-sans">رقم التتبع المعتمد للشحنة</p>
+              <p className="text-white/40 text-xs font-bold uppercase tracking-wider font-sans">{t.requestDelivery.trackingNumberLabel}</p>
               <p className="text-2xl font-extrabold text-brand-gold">{successId}</p>
               <p className="text-emerald-500 text-[11px] font-sans font-bold flex items-center justify-center gap-1">
-                <span>حالة الشحنة الحالية (Pending)</span>
+                <span>{language === 'ar' ? 'حالة الشحنة الحالية (Pending)' : 'Current Status (Pending)'}</span>
               </p>
             </div>
 
             <p className="text-white/60 text-xs leading-relaxed max-w-md mx-auto">
-              تم إرسال طردك لوكيل التوزيع، وسيصل سائق داي نايت لإجراء الاستلام في وقت قريب. يمكنك استخدام رقم التتبع أعلاه للمراقبة فورياً!
+              {language === 'ar' ? 'تم إرسال طردك لوكيل التوزيع، وسيصل سائق داي نايت لإجراء الاستلام في وقت قريب. يمكنك استخدام رقم التتبع أعلاه للمراقبة فورياً!' : 'Your package has been sent to the distribution agent. A driver will arrive for pickup soon. Use the tracking number to monitor.'}
             </p>
 
-            <div className="flex justify-center gap-3 pt-2">
+            <div className={`flex justify-center gap-3 pt-2 ${language === 'ar' ? 'flex-row' : 'flex-row-reverse'}`}>
               <button
                 id="success_new_btn"
                 onClick={() => {
@@ -513,14 +531,14 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                 }}
                 className="px-6 py-3 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-bold rounded-xl text-xs transition-transform cursor-pointer"
               >
-                إرسال طلب طرد جديد
+                {t.requestDelivery.title}
               </button>
               <button
                 id="success_track_btn"
                 onClick={() => onNavigate("tracking", successId)}
                 className="px-6 py-3 bg-brand-deep border border-white/10 hover:border-brand-gold text-white font-bold rounded-xl text-xs transition-transform cursor-pointer"
               >
-                تتبع هذه الشحنة بالمحور
+                {t.requestDelivery.trackNow}
               </button>
             </div>
           </div>

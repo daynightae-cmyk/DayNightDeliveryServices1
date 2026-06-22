@@ -1,118 +1,188 @@
-import React, { useRef, useState, useEffect } from 'react';
+﻿import { useRef, useState, useEffect } from "react";
+import { useAppContext } from "../../lib/AppContext";
+import { translations } from "../../data/translations";
+import { PenTool, XCircle, CheckCircle2 } from "lucide-react";
 
-type Props = {
-  orderId?: string;
-  trackingNumber?: string;
-  language?: 'en' | 'ar';
-  onSignatureSave?: (dataUrl: string) => void;
-};
+interface SignatureCaptureProps {
+  onSave?: (dataUrl: string) => void;
+  status?: string;
+}
 
-export default function SignatureCapture({ orderId, trackingNumber, language = 'en', onSignatureSave }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [drawing, setDrawing] = useState(false);
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
+export default function SignatureCapture({ onSave, status }: SignatureCaptureProps) {
+  const { language } = useAppContext();
+  const t = translations[language].signature;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  // Only show if status is 'delivered' or 'out for delivery'
+  const normalizedStatus = status ? status.toLowerCase().replace(/_/g, " ") : "";
+  if (normalizedStatus && !['delivered', 'out for delivery'].includes(normalizedStatus)) {
+     return null;
+  }
+
+  // Adjust canvas size for styling (mock implementation of responsiveness)
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const resize = () => {
-      const ratio = window.devicePixelRatio || 1;
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      canvas.width = Math.floor(w * ratio);
-      canvas.height = Math.floor(h * ratio);
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.scale(ratio, ratio);
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, []);
-
-  function getCtx() {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvas.getContext('2d');
-  }
-
-  function pointerDown(e: React.PointerEvent) {
-    const ctx = getCtx();
-    if (!ctx) return;
-    setDrawing(true);
-    ctx.beginPath();
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  }
-
-  function pointerMove(e: React.PointerEvent) {
-    if (!drawing) return;
-    const ctx = getCtx();
-    if (!ctx) return;
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#ffffff';
-    ctx.stroke();
-  }
-
-  function pointerUp() {
-    setDrawing(false);
-  }
-
-  function clearCanvas() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setDataUrl(null);
-  }
-
-  function saveSignature() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const url = canvas.toDataURL('image/png');
-    if (!url || url === '') {
-      alert(language === 'ar' ? 'يرجى إضافة التوقيع قبل الحفظ.' : 'Please add a signature before saving.');
-      return;
+    if (canvas) {
+      // Set actual internal dimensions to match the CSS styling
+      // to avoid drawing offset scale issues
+      const rect = canvas.parentElement?.getBoundingClientRect();
+      if (rect) {
+        canvas.width = rect.width;
+        canvas.height = 200; // Fixed visual height
+      }
+      
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "white"; // Or any base color
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#000000"; // Signature ink color
+      }
     }
-    setDataUrl(url);
-    if (onSignatureSave) onSignatureSave(url);
-    alert(language === 'ar' ? 'تم حفظ التوقيع بنجاح.' : 'Signature captured successfully.');
-  }
+  }, [savedSignature]); // Re-init on clear/reset
 
-  async function uploadSignatureToSupabase(signatureDataUrl: string) {
-    // TODO:
-    // 1. Convert dataURL to Blob
-    // 2. Upload to Supabase Storage bucket: "signatures"
-    // 3. Save signature URL to order record or delivery proof table
-    // 4. Store signed_at, tracking_number, and receiver confirmation
-    return null;
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
+    }
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    setIsDrawing(true);
+    setError(null);
+    const { x, y } = getCoordinates(e);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    e.preventDefault(); // Prevent scrolling while touching
+    const { x, y } = getCoordinates(e);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx) {
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+  };
+
+  const finishDrawing = () => {
+    setIsDrawing(false);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx) {
+      ctx.closePath();
+    }
+  };
+
+  const handleClear = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    setSavedSignature(null);
+    setError(null);
+  };
+
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      // Basic check if canvas is blank: checking pixel data could be heavier, but we can assume if they clicked save, and dataUrl matches blank, it's empty
+      // In a real app we might check the image data buffer.
+      const dataUrl = canvas.toDataURL("image/png");
+      setSavedSignature(dataUrl);
+      if (onSave) onSave(dataUrl);
+    }
+  };
+
+  if (savedSignature) {
+    return (
+      <div className="bg-brand-cool/20 border border-brand-gold/30 rounded-2xl p-6 mt-8">
+         <div className={`flex items-center gap-2 mb-4 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+             <CheckCircle2 className="w-5 h-5 text-green-500" />
+             <h3 className="text-white font-bold">{t.saved}</h3>
+         </div>
+         <div className="bg-white rounded-xl p-2 max-w-sm mx-auto border-2 border-brand-gold">
+            <img src={savedSignature} alt="Captured Signature" className="w-full h-auto" />
+         </div>
+         <div className={`mt-4 flex ${language === 'ar' ? 'justify-start' : 'justify-end'}`}>
+            <button 
+              onClick={handleClear}
+              className="text-white/50 text-xs hover:text-white underline"
+            >
+              Reset
+            </button>
+         </div>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-brand-cool/30 rounded-2xl p-4 border border-white/10">
-      <h4 className="font-bold text-white mb-2">{language === 'ar' ? 'توقيع الاستلام' : 'Delivery Signature'}</h4>
-      <p className="text-xs text-white/60 mb-3">{language === 'ar' ? 'يرجى التوقيع أدناه لتأكيد استلام الشحنة.' : 'Please sign below to confirm parcel delivery.'}</p>
-      <div className="w-full h-40 bg-white/5 rounded-md overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          onPointerDown={pointerDown}
-          onPointerMove={pointerMove}
-          onPointerUp={pointerUp}
-          onPointerLeave={pointerUp}
-          style={{ width: '100%', height: '100%', touchAction: 'none' }}
-        />
-      </div>
+    <div className="bg-brand-cool/20 border border-white/10 rounded-2xl p-6 mt-8 hover:border-brand-blue/30 transition-colors">
+       <div className={`flex items-center gap-2 mb-4 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+           <PenTool className="w-5 h-5 text-brand-gold" />
+           <div className={language === 'ar' ? 'text-right' : 'text-left'}>
+             <h3 className="text-white font-bold text-lg leading-tight">{t.title}</h3>
+             <p className="text-white/60 text-xs mt-1">{t.description}</p>
+           </div>
+       </div>
 
-      <div className="mt-3 flex gap-3">
-        <button onClick={clearCanvas} className="px-4 py-2 rounded-lg bg-rose-600 text-white font-bold">{language === 'ar' ? 'مسح' : 'Clear'}</button>
-        <button onClick={saveSignature} className="px-4 py-2 rounded-lg bg-brand-gold text-brand-deep font-bold">{language === 'ar' ? 'حفظ التوقيع' : 'Save Signature'}</button>
-      </div>
+       <div className="w-full rounded-xl overflow-hidden border-2 border-dashed border-white/20 relative touch-none bg-white">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={finishDrawing}
+            onMouseLeave={finishDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={finishDrawing}
+            className="w-full h-[200px] cursor-crosshair"
+          ></canvas>
+       </div>
 
-      <p className="text-xs text-white/50 mt-3 italic">{language === 'ar' ? 'مكان مخصص للربط لاحقًا مع Supabase Storage' : 'Supabase storage integration placeholder'}</p>
+       {error && (
+         <p className={`text-red-400 text-xs mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>{error}</p>
+       )}
+
+       <div className={`flex mt-5 gap-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <button 
+            onClick={handleSave}
+            className="flex-1 bg-brand-gold text-brand-deep font-bold py-3 rounded-xl hover:bg-brand-blue hover:text-white transition-colors"
+          >
+            {t.save}
+          </button>
+          <button 
+            onClick={handleClear}
+            className="px-5 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition-colors flex items-center gap-2"
+          >
+            <XCircle className="w-4 h-4" />
+            <span>{t.clear}</span>
+          </button>
+       </div>
     </div>
   );
 }

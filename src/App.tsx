@@ -4,6 +4,8 @@
  */
 
 import { useState, useEffect } from "react";
+import { useAppContext } from "./lib/AppContext";
+import { translations } from "./data/translations";
 import { 
   BrowserRouter, 
   Routes, 
@@ -38,27 +40,20 @@ import {
   Menu, 
   X, 
   PhoneCall, 
-  ShieldAlert, 
   Moon, 
-  Sun,
-  MapPin,
-  Globe2,
-  HelpCircle
+  Sun
 } from "lucide-react";
-import { useLanguage } from './context/LanguageContext';
-import companyMeta from './data/companyMeta';
-import { LanguageProvider } from './context/LanguageContext';
-import { ThemeProvider } from './context/ThemeContext';
-import UtilityBar from './components/common/UtilityBar';
+import companyMeta from "./data/companyMeta";
 
-// Official Logo Image URL
 const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
 
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-    const { lang } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const { theme, toggleTheme, language, toggleLanguage } = useAppContext();
+
+  const t = translations[language];
 
   // Synchronize legacy key actions with real production URLs
   function handleNavigate(tab: string, trackingId?: string) {
@@ -92,18 +87,18 @@ function AppContent() {
   const currentPath = location.pathname;
 
   const navLinks = [
-    { key: "home", path: "/", labelAr: "الرئيسية", labelEn: "Home" },
-    { key: "about", path: "/about", labelAr: "من نحن", labelEn: "About" },
-    { key: "services", path: "/services", labelAr: "خدماتنا", labelEn: "Services" },
-    { key: "suburbs", path: "/uae-delivery", labelAr: "التوصيل الإماراتي", labelEn: "UAE Delivery" },
-    { key: "international", path: "/international-shipping", labelAr: "الشحن الدولي", labelEn: "Global" },
-    { key: "ecommerce", path: "/ecommerce", labelAr: "حلول المتاجر", labelEn: "E-Commerce" },
-    { key: "corporate", path: "/corporate", labelAr: "الشركات والعقود", labelEn: "Corporate" },
-    { key: "pricing", path: "/pricing", labelAr: "الأسعار والحاسبة", labelEn: "Rates & Calc" },
-    { key: "request", path: "/request", labelAr: "احجز توصيل", labelEn: "Book Ship" },
-    { key: "tracking", path: "/tracking", labelAr: "تتبع شحنتك", labelEn: "Track" },
-    { key: "faqs", path: "/faq", labelAr: "الأسئلة المتكررة", labelEn: "FAQs" },
-    { key: "contact", path: "/contact", labelAr: "اتصل بنا", labelEn: "Contact Us" }
+    { key: "home", path: "/", label: t.nav.home },
+    { key: "about", path: "/about", label: t.nav.about },
+    { key: "services", path: "/services", label: t.nav.services },
+    { key: "suburbs", path: "/uae-delivery", label: t.nav.suburbs },
+    { key: "international", path: "/international-shipping", label: t.nav.international },
+    { key: "ecommerce", path: "/ecommerce", label: t.nav.ecommerce },
+    { key: "corporate", path: "/corporate", label: t.nav.corporate },
+    { key: "pricing", path: "/pricing", label: t.nav.pricing },
+    { key: "request", path: "/request", label: t.nav.booking },
+    { key: "tracking", path: "/tracking", label: t.nav.tracking },
+    { key: "faqs", path: "/faq", label: t.nav.faqs },
+    { key: "contact", path: "/contact", label: t.nav.contact }
   ];
 
   // Helper tracking parameter parser
@@ -124,14 +119,21 @@ function AppContent() {
           <span className="text-white/80">{companyMeta.sloganAr}</span>
         </div>
         <div className="flex items-center gap-4">
+          <button onClick={toggleTheme} className="hover:text-brand-gold transition-colors flex items-center gap-1 cursor-pointer">
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+          <span className="text-white/20">|</span>
+          <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider">
+            {language === 'ar' ? 'EN' : 'عربي'}
+          </button>
+          <span className="text-white/20">|</span>
           <a href={`tel:${companyMeta.phone}`} className="hover:text-brand-gold transition-colors flex items-center gap-1">
             <PhoneCall className="w-3.5 h-3.5 text-brand-gold" />
             <span>{companyMeta.phone}</span>
           </a>
-          <span className="text-white/20">|</span>
-          <p className="text-white/60">{lang === 'ar' ? 'نعمل على مدار الساعة' : '24/7 Delivery Support'}</p>
+          <span className="text-white/20 hidden md:inline">|</span>
+          <p className="text-white/60 hidden md:block">{t.footer.support}</p>
         </div>
-        <UtilityBar />
       </div>
 
       {/* Main Glassmorphic Header */}
@@ -156,7 +158,7 @@ function AppContent() {
               <h1 className="text-md sm:text-lg font-extrabold text-white leading-none uppercase font-sans tracking-tight">
                 DAY NIGHT <span className="text-brand-gold font-semibold font-sans text-xs">DELIVERY</span>
               </h1>
-              <p className="text-[10px] text-white/50 font-bold tracking-tight">داي نايت لخدمات التوصيل والشحن</p>
+              <p className="text-[10px] text-white/50 font-bold tracking-tight">{t.footer.company}</p>
             </div>
           </Link>
 
@@ -176,8 +178,7 @@ function AppContent() {
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <p className="leading-tight">{link.labelAr}</p>
-                  <p className="text-[9px] uppercase tracking-wide opacity-55 mt-0.5 font-mono">{link.labelEn}</p>
+                  <p className="leading-tight">{link.label}</p>
                 </Link>
               );
             })}
@@ -191,7 +192,7 @@ function AppContent() {
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="px-5 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-extrabold rounded-lg text-xs leading-none transition-all duration-300 cursor-pointer border border-brand-gold/10 hover:border-brand-blue shadow-lg shadow-brand-gold/5 hover:shadow-brand-blue/20"
             >
-              اطلب مندوب فوري
+              {t.header.requestBtn}
             </Link>
           </div>
 
@@ -227,8 +228,7 @@ function AppContent() {
                       : "text-white/70 hover:bg-white/5"
                   }`}
                 >
-                  <span>{link.labelAr}</span>
-                  <span className="font-mono text-[9px] uppercase tracking-wider opacity-60">({link.labelEn})</span>
+                  <span>{link.label}</span>
                 </Link>
               );
             })}
@@ -239,7 +239,7 @@ function AppContent() {
               onClick={() => setMobileMenuOpen(false)}
               className="w-full block py-3 bg-brand-gold text-brand-deep font-extrabold rounded-xl text-center text-xs mt-3 cursor-pointer hover:bg-brand-blue hover:text-white transition-all duration-200"
             >
-              احجز توصيل طرد الحين
+              {t.header.bookNowMobile}
             </Link>
             <a
               id="mobile_whatsapp_catalog"
@@ -249,7 +249,7 @@ function AppContent() {
               onClick={() => setMobileMenuOpen(false)}
               className="w-full block py-3 bg-amber-600 text-white font-extrabold rounded-xl text-center text-xs mt-2 cursor-pointer hover:bg-amber-500 transition-all duration-200"
             >
-              عرض كتالوج واتساب / View Catalog
+              {t.header.whatsappCatalog}
             </a>
           </div>
         )}
@@ -302,7 +302,7 @@ function AppContent() {
               </h3>
             </div>
             <p className="text-xs text-white/55 leading-relaxed">
-              داي نايت لخدمات التوصيل والشحن - شركة خدمات لوجستية ونقل بري رائدة في دولة الإمارات العربية المتحدة. نوفر توصيلاً آمناً وسريعاً للمتاجر والشركات والمستندات على مدار الساعة 24/7.
+              {t.footer.description}
             </p>
             <p className="text-xs font-mono font-bold text-brand-gold">
               Mussafah 40, Abu Dhabi, UAE
@@ -311,28 +311,19 @@ function AppContent() {
 
           {/* Quick Navigator Tabs Links */}
           <div className="md:col-span-4 space-y-4 text-right">
-            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5">روابط سريعة للتصفح</h4>
+            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5 rtl:border-r-4 rtl:border-l-0 ltr:border-l-4 ltr:border-r-0 ltr:pl-2.5 rtl:pr-2.5">{t.nav.quick_links}</h4>
             <div className="grid grid-cols-2 gap-2 text-xs text-white/60">
-              <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">الصفحة الرئيسية</Link>
-              <Link to="/about" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">من نحن وبروفايلنا</Link>
-              <Link to="/services" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">جميع الخدمات</Link>
-              <Link to="/uae-delivery" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">التوصيل الإماراتي</Link>
-              <Link to="/international-shipping" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">الشحن الدولي</Link>
-              <Link to="/ecommerce" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">حلول المتاجر</Link>
-              <Link to="/corporate" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">الشركات والعقود</Link>
-              <Link to="/pricing" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">الحاسبة والأسعار</Link>
-              <Link to="/tracking" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">تتبع حركي مباشر</Link>
-              <Link to="/policy" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">سياسات النقل</Link>
-              <Link to="/qr" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">روابط QR السريعة</Link>
-              <Link to="/contact" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-right hover:text-white transition-colors cursor-pointer text-xs">تواصل معنا</Link>
+              {navLinks.map(n => (
+                <Link key={n.key} to={n.path} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="rtl:text-right ltr:text-left hover:text-white transition-colors cursor-pointer text-xs">{n.label}</Link>
+              ))}
             </div>
           </div>
 
           {/* Contact Details Foot block */}
           <div className="md:col-span-4 space-y-4 text-right sm:border-r sm:border-white/10 sm:pr-6 md:border-r-0 md:pr-0">
-            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5">اتصال سريع ومباشر</h4>
+            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5 rtl:border-r-4 rtl:border-l-0 ltr:border-l-4 ltr:border-r-0 ltr:pl-2.5 rtl:pr-2.5">{t.nav.quick_contact}</h4>
             <div className="text-xs text-white/60 space-y-2.5">
-              <p>مكتب خدمة العملاء وتوجيه المندوبين متاح طوال ساعات الليل والنهار لتلبية رغباتكم.</p>
+              <p>{t.footer.support}</p>
               <p className="text-sm font-extrabold text-white font-sans">هاتف: +971 56 875 7331</p>
               <p className="text-[11px] font-mono text-white/40">البريد: Admin@daynight.ae</p>
               <a
@@ -342,14 +333,14 @@ function AppContent() {
                 rel="noopener noreferrer"
                 className="text-amber-400 hover:text-amber-300 text-[10px] sm:text-xs font-black block transition-colors mt-2 cursor-pointer bg-amber-950/20 border border-amber-500/25 px-3 py-2 rounded-xl text-center"
               >
-                عرض كتالوج واتساب / View WhatsApp Catalog 🖥️
+                {t.footer.catalog}
               </a>
               <Link 
                 to="/admin" 
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 className="text-rose-400/80 hover:text-rose-400 text-[10px] font-bold block transition-colors mt-2 cursor-pointer bg-red-950/10 border border-red-500/10 px-2 py-1 rounded w-full md:w-auto text-center"
               >
-                بوابة الكباتن والفرز اللوجستي
+                {t.footer.adminPortal}
               </Link>
             </div>
           </div>
@@ -357,10 +348,10 @@ function AppContent() {
 
         {/* Legal copy strip */}
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-white/40 text-[11px] font-sans font-bold text-center">
-          <p>© {new Date().getFullYear()} {companyMeta.nameAr}. جميع الحقوق محفوظة لـ {companyMeta.name}.</p>
+          <p>{t.footer.allRights}</p>
           <div className="flex gap-4">
             <span className="text-white/10">|</span>
-            <p>{companyMeta.sloganAr}</p>
+            <p>{t.footer.motto}</p>
           </div>
         </div>
       </footer>
@@ -371,11 +362,7 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <LanguageProvider>
-        <ThemeProvider>
-          <AppContent />
-        </ThemeProvider>
-      </LanguageProvider>
+      <AppContent />
     </BrowserRouter>
   );
 }

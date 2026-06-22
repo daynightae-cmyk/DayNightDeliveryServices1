@@ -16,14 +16,33 @@ import {
   ClipboardCheck, 
   BadgeCheck 
 } from "lucide-react";
-import QuickPriceEstimate from './pricing/QuickPriceEstimate';
-import TestimonialCarousel from './home/TestimonialCarousel';
+
+import { useAppContext } from "../lib/AppContext";
+import { translations } from "../data/translations";
+import { cities, getQuickEstimate, getWeightSurcharge } from "../data/pricingEstimate";
+import { useState } from "react";
+import TestimonialCarousel from "./home/TestimonialCarousel";
 
 interface HomeProps {
   onNavigate: (tab: string) => void;
 }
 
 export default function Home({ onNavigate }: HomeProps) {
+  const { language } = useAppContext();
+  const t = translations[language];
+  const tP = t.pricingWeight;
+  const [estimateFrom, setEstimateFrom] = useState(cities[1]);
+  const [estimateTo, setEstimateTo] = useState(cities[0]);
+  const [weight, setWeight] = useState<number | string>("");
+
+  const baseEstimate = getQuickEstimate(estimateFrom, estimateTo);
+  const surcharge = getWeightSurcharge(weight);
+
+  const totalEstimate = baseEstimate ? {
+    min: baseEstimate.min + surcharge.min,
+    max: baseEstimate.max + surcharge.max,
+  } : null;
+
   const strengths = [
     {
       icon: <Clock className="w-6 h-6 text-amber-500" />,
@@ -87,9 +106,9 @@ export default function Home({ onNavigate }: HomeProps) {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-tight leading-tight"
           >
-            خدمات توصيل وشحن احترافية <br />
+            {t.home.heroTitle} <br />
             <span className="text-brand-blue font-black tracking-normal">
-              داخل الإمارات وخارجها
+              {language === 'ar' ? "داخل الإمارات وخارجها" : "Across the UAE & Beyond"}
             </span>
           </motion.h1>
 
@@ -99,7 +118,7 @@ export default function Home({ onNavigate }: HomeProps) {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-white/70 text-lg max-w-2xl mx-auto leading-relaxed font-light"
           >
-            مع <span className="text-brand-gold font-bold">DAY NIGHT DELIVERY SERVICES</span> تحصل على خدمة توصيل سريعة، آمنة، وموثوقة على مدار الساعة، مع حلول مخصصة للأفراد، المتاجر الإلكترونية، الشركات، والمطاعم.
+            {t.home.heroSubtitle}
           </motion.p>
 
           <motion.div 
@@ -114,7 +133,7 @@ export default function Home({ onNavigate }: HomeProps) {
               className="px-6 py-3.5 bg-brand-gold text-brand-deep font-extrabold rounded-xl shadow-lg shadow-brand-gold/10 hover:shadow-brand-gold/20 hover:scale-105 hover:bg-brand-blue hover:text-white transition-all cursor-pointer flex items-center gap-2"
             >
               <Truck className="w-4 h-4" />
-              <span>اطلب توصيل الآن</span>
+              <span>{t.home.bookDelivery}</span>
             </button>
             <button 
               id="cta_view_pricing"
@@ -122,7 +141,7 @@ export default function Home({ onNavigate }: HomeProps) {
               className="px-6 py-3.5 bg-white/5 hover:bg-white/10 text-brand-gold font-bold rounded-xl border border-white/10 hover:border-brand-gold/50 hover:scale-105 transition-all cursor-pointer flex items-center gap-2"
             >
               <ClipboardCheck className="w-4 h-4 text-brand-gold" />
-              <span>شاهد الأسعار</span>
+              <span>{t.home.trackShipment}</span>
             </button>
             <a 
               id="cta_whatsapp_home"
@@ -159,6 +178,70 @@ export default function Home({ onNavigate }: HomeProps) {
               <p className="text-3xl font-black text-brand-gold font-mono">100%</p>
               <p className="text-xs text-white/50 font-medium">أمان في التعامل والضمان</p>
             </div>
+          </div>
+          
+          {/* Real-time quick price estimator widget */}
+          <div className="mt-8 bg-brand-deep/80 rounded-2xl border border-white/10 p-5 max-w-2xl mx-auto rtl:text-right ltr:text-left hover:border-brand-gold/30 transition-colors shadow-2xl relative overflow-hidden group">
+             <div className={`absolute top-0 ${language === 'ar' ? 'right-0' : 'left-0'} w-2 h-full bg-brand-gold`}></div>
+             <p className={`text-white font-bold mb-3 flex items-center gap-2 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
+               {language === 'en' && <MapPin className="w-4 h-4 text-brand-gold" />}
+               {t.pricingWidget.title}
+               {language === 'ar' && <MapPin className="w-4 h-4 text-brand-gold" />}
+             </p>
+             <p className="text-white/60 text-xs mb-4">{t.pricingWidget.description}</p>
+             <div className="flex flex-col sm:flex-row items-center gap-3">
+               <div className="w-full flex gap-2">
+                 <select value={estimateFrom} onChange={(e) => setEstimateFrom(e.target.value)} className="w-full bg-brand-cool/50 border border-white/10 rounded-lg p-2.5 text-white text-xs focus:border-brand-gold outline-none">
+                   <option value="" disabled>{t.pricingWidget.pickupCity}</option>
+                   {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                 </select>
+                 <select value={estimateTo} onChange={(e) => setEstimateTo(e.target.value)} className="w-full bg-brand-cool/50 border border-white/10 rounded-lg p-2.5 text-white text-xs focus:border-brand-gold outline-none">
+                   <option value="" disabled>{t.pricingWidget.deliveryCity}</option>
+                   {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                 </select>
+               </div>
+               
+               <div className="w-full sm:w-1/3 shrink-0">
+                 <input 
+                   type="number" 
+                   value={weight}
+                   onChange={(e) => setWeight(e.target.value)}
+                   placeholder={tP?.enterWeight || "Enter weight in kg"}
+                   className="w-full bg-brand-cool/50 border border-white/10 rounded-lg p-2.5 text-white text-xs focus:border-brand-gold outline-none"
+                   min="0.5"
+                   step="0.5"
+                 />
+               </div>
+             </div>
+
+             {/* Dynamic Cost Info */}
+             <div className={`mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+               <div className="flex justify-between items-center text-xs text-white/70">
+                 <span>{tP?.baseRange || "Base estimated range:"}</span>
+                 <span className="font-mono">{baseEstimate ? `${baseEstimate.min} - ${baseEstimate.max} AED` : "---"}</span>
+               </div>
+               <div className="flex justify-between items-center text-xs text-white/70">
+                 <span>{tP?.surchargeRange || "Weight surcharge estimate:"}</span>
+                 <span className="font-mono text-brand-gold">{surcharge.min === 0 && surcharge.max === 0 ? "0 AED" : `+${surcharge.min} - ${surcharge.max} AED`}</span>
+               </div>
+             </div>
+
+             <div className="mt-4 bg-brand-cool border border-brand-gold/20 rounded-lg px-6 py-3 flex justify-between items-center">
+                 <p className="text-xs text-white/50 uppercase">{tP?.totalRange || "Estimated total range:"}</p>
+                 <p className="text-brand-gold font-bold font-mono text-base">
+                   {totalEstimate ? `${totalEstimate.min} - ${totalEstimate.max} AED` : "---"}
+                 </p>
+             </div>
+             
+             {surcharge.needsCustomQuote && (
+               <p className={`mt-3 text-brand-gold text-xs italic ${language === 'ar' ? 'text-right' : 'text-left'}`}>{tP?.customQuote}</p>
+             )}
+             
+             <p className={`mt-2 text-white/40 text-[10px] ${language === 'ar' ? 'text-right' : 'text-left'}`}>{tP?.disclaimer}</p>
+
+             <div className={`mt-4 ${language === 'ar' ? 'text-left' : 'text-right'}`}>
+                <button onClick={() => onNavigate("pricing")} className="text-xs text-brand-blue hover:text-brand-gold underline font-bold transition-colors">{t.pricingWidget.continueBooking} &rarr;</button>
+             </div>
           </div>
         </div>
       </section>
@@ -226,6 +309,9 @@ export default function Home({ onNavigate }: HomeProps) {
         </div>
       </section>
 
+      {/* Testimonial Carousel */}
+      <TestimonialCarousel />
+
       {/* Visual Campaign Banner */}
       <section className="bg-gradient-to-br from-brand-cool via-brand-deep to-brand-cool rounded-3xl p-8 border border-white/10 text-white flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
         <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-brand-blue opacity-10 rounded-full blur-[80px] pointer-events-none"></div>
@@ -256,8 +342,6 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
       </section>
-      <TestimonialCarousel />
-      <QuickPriceEstimate />
     </div>
   );
 }

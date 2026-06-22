@@ -1,24 +1,100 @@
-import React from 'react';
-import { useLanguage } from '../../context/LanguageContext';
+﻿import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { mockLocations } from "../../data/mockLocations";
+import { useAppContext } from "../../lib/AppContext";
+import { translations } from "../../data/translations";
+import { MapPin } from "lucide-react";
 
-export default function TrackingMap({ pickupLocation, destinationLocation, status, language }: any) {
-  const { lang } = useLanguage();
+import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+
+L.Marker.prototype.options.icon = L.icon({
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  tooltipAnchor: [16, -28],
+  shadowSize: [41, 41],
+});
+
+const destinationIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+export default function TrackingMap() {
+  const { language } = useAppContext();
+  const t = translations[language].trackingMap;
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return <div className="h-64 bg-brand-deep rounded-2xl animate-pulse"></div>;
+
+  const pickup = mockLocations.mussafah;
+  const dest = mockLocations.abuDhabi;
+  const polylinePositions: [number, number][] = [
+    [pickup.lat, pickup.lng],
+    [dest.lat, dest.lng],
+  ];
 
   return (
-    <div className="bg-brand-cool/30 rounded-2xl p-4 border border-white/10">
-      <h4 className="font-bold text-white">{lang === 'ar' ? 'معاينة مسار الشحنة' : 'Shipment Route Preview'}</h4>
-      <p className="text-xs text-white/60">{lang === 'ar' ? 'نقطة الاستلام ونقطة التسليم مع معاينة المسار' : 'Pickup and destination with route preview'}</p>
-      <div className="mt-3 h-56 bg-white/5 rounded-md overflow-hidden">
-        <div className="w-full h-full flex flex-col items-center justify-center text-white/50 px-4 text-center">
-          <div className="font-semibold mb-2">{lang === 'ar' ? 'الخريطة قيد العرض التجريبي' : 'Map preview is currently in demo mode'}</div>
-          <div>{lang === 'ar' ? 'يمكن تفعيل العرض التفاعلي بعد تثبيت حزم الخرائط المناسبة.' : 'Interactive map support can be enabled after installing the map libraries.'}</div>
-        </div>
+    <div className="bg-brand-cool/20 rounded-2xl border border-white/10 p-5 mt-8 shadow-lg">
+      <div className={`flex flex-col mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+        <h3 className="text-white font-bold text-lg flex items-center gap-2 justify-start flex-row-reverse">
+          <span>{t.title}</span>
+          <MapPin className="w-5 h-5 text-brand-gold" />
+        </h3>
+        <p className="text-white/60 text-xs">{t.description}</p>
       </div>
-      <div className="mt-4 text-xs text-white/50 space-y-1">
-        <div><strong>{lang === 'ar' ? 'نقطة الاستلام:' : 'Pickup Point:'}</strong> {pickupLocation?.labelAr || pickupLocation?.labelEn || (lang === 'ar' ? 'مصفح' : 'Mussafah')}</div>
-        <div><strong>{lang === 'ar' ? 'نقطة التسليم:' : 'Destination Point:'}</strong> {destinationLocation?.labelAr || destinationLocation?.labelEn || (lang === 'ar' ? 'أبوظبي' : 'Abu Dhabi')}</div>
-        <div><strong>{lang === 'ar' ? 'الحالة الحالية:' : 'Current status:'}</strong> {status || (lang === 'ar' ? 'غير محددة' : 'Unknown')}</div>
+
+      <div className="h-64 sm:h-80 w-full rounded-xl overflow-hidden border border-brand-gold/20 relative z-0">
+        <MapContainer
+          center={[24.4063, 54.4300]}
+          zoom={11}
+          style={{ height: "100%", width: "100%" }}
+          scrollWheelZoom={false}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
+          />
+
+          <Marker position={[pickup.lat, pickup.lng]}>
+            <Popup>
+              <div className={`text-xs font-bold font-sans ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <p className="text-brand-blue uppercase">{t.pickupPoint}</p>
+                <p>{language === 'ar' ? pickup.labelAr : pickup.labelEn}</p>
+              </div>
+            </Popup>
+          </Marker>
+
+          <Marker position={[dest.lat, dest.lng]} icon={destinationIcon}>
+            <Popup>
+              <div className={`text-xs font-bold font-sans ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <p className="text-brand-gold uppercase">{t.destinationPoint}</p>
+                <p>{language === 'ar' ? dest.labelAr : dest.labelEn}</p>
+              </div>
+            </Popup>
+          </Marker>
+
+          <Polyline positions={polylinePositions} color="#EAB308" weight={3} dashArray="10, 10" opacity={0.8} />
+        </MapContainer>
       </div>
+      <p className={`mt-3 text-white/40 font-mono text-[10px] uppercase ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+        ⚡ {t.gpsSoon}
+      </p>
     </div>
   );
 }
