@@ -1,4 +1,9 @@
 ﻿User-agent: *
 Allow: /
-Sitemap: https://www.daynightae.com/sitemap.xml
 
+Disallow: /admin
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /login
+
+Sitemap: https://daynightae.com/sitemap.xml
