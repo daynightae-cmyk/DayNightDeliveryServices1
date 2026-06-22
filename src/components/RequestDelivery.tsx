@@ -69,12 +69,8 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   async function handleFormSubmit() {
     setLoading(true);
     setValidationError("");
-    // Generate secure target tracking ID
-    const randomId = Math.floor(10000 + Math.random() * 90000);
-    const trackingId = `DN-2026-${randomId}`;
 
-    const newOrder: Order = {
-      id: trackingId,
+    const newOrder: Partial<Order> = {
       sender_name: senderName || "مرسل مجهول",
       sender_phone: senderPhone || "+9710000000",
       sender_city: senderCity,
@@ -103,9 +99,13 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
     };
 
     try {
-      await insertNewOrder(newOrder);
-      setSuccessId(trackingId);
-      setStep(4);
+      const returnedId = await insertNewOrder(newOrder);
+      if (returnedId) {
+        setSuccessId(typeof returnedId === 'object' ? JSON.stringify(returnedId) : String(returnedId));
+        setStep(4);
+      } else {
+        setValidationError("حدث خطأ أثناء إنشاء الطلب في النظام. يرجى المحاولة لاحقاً.");
+      }
     } catch (e) {
       console.error(e);
       setValidationError("عذراً، حدث خطأ أثناء الاتصال بقاعدة البيانات. يرجى المحاولة لاحقاً.");

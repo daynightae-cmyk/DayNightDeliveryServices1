@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { fetchAllOrders } from "../supabase";
+import { trackOrderRpc } from "../supabase";
 import { Order } from "../types";
 import { 
   Search, 
@@ -43,11 +43,15 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
     setOrder(null);
 
     try {
-      const orders = await fetchAllOrders();
-      // Case insensitive match
-      const found = orders.find(o => o.id.toLowerCase() === key.toLowerCase());
+      const found = await trackOrderRpc(key);
       if (found) {
-        setOrder(found);
+        // Data returned from RPC may be wrapped depending on Postgres setup, e.g. an array or a single object.
+        // Usually, a function returning an order would give the object:
+        if (Array.isArray(found)) {
+           setOrder(found[0]);
+        } else {
+           setOrder(found);
+        }
       } else {
         setErrorMsg("لم يتم العثور على شحنة تطابق الرقم المدخل. يرجى التحقق وإعادة المحاولة.");
       }

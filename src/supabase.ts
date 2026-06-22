@@ -7,88 +7,19 @@ import { createClient } from "@supabase/supabase-js";
 import { Order } from "./types";
 import { calculateLocalPrice, calculateInternationalPrice } from "./lib/pricing";
 
-const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL || "https://ngdwybpgacauorygoedi.supabase.co").trim();
+const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL || "").trim();
 const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error("Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.");
+}
 
 export const supabase = createClient(
   SUPABASE_URL, 
-  SUPABASE_ANON_KEY || "empty_anon_key_please_configure_vite_env"
+  SUPABASE_ANON_KEY
 );
 
-// Fallback Local Storage keys to ensure seamless interactive state matching production
-const LOCAL_STORAGE_KEY = "daynight_delivery_orders_state_v2";
-
-export function getLocalOrders(): Order[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (!data) {
-    // Generate initial sample orders with CORRECT high-fidelity prices (31.50 AED for main cities, 52.50 AED for remote)
-    const initialOrders: Order[] = [
-      {
-        id: "DN-2026-89101",
-        sender_name: "أحمد بن راشد",
-        sender_phone: "+971501234567",
-        sender_city: "أبوظبي",
-        sender_address: "مصفح 40",
-        receiver_name: "مروان المري",
-        receiver_phone: "+971569876543",
-        receiver_city: "دبي",
-        receiver_address: "المرابع العربية",
-        package_type: "Documents",
-        weight: 0.5,
-        pieces: 1,
-        service_type: "express",
-        delivery_price: 31.5, // Corrected price (31.50 AED incl. VAT)
-        payment_method: "sender_pays",
-        status: "Delivered",
-        created_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-        status_history: [
-          { status: "Pending", date: new Date(Date.now() - 3 * 24 * 3600 * 1000).toLocaleString(), note: "تم إنشاء طلب التوصيل من العميل" },
-          { status: "Confirmed", date: new Date(Date.now() - 2.8 * 24 * 3600 * 1000).toLocaleString(), note: "تم تأكيد البيانات والسعر من الإدارة" },
-          { status: "Picked Up", date: new Date(Date.now() - 2.5 * 24 * 3600 * 1000).toLocaleString(), note: "تم استلام الشحنة بنجاح من الراسل" },
-          { status: "In Transit", date: new Date(Date.now() - 2.2 * 24 * 3600 * 1000).toLocaleString(), note: "الشحنة في الطريق إلى مجمع دبي اللوجستي" },
-          { status: "Out For Delivery", date: new Date(Date.now() - 2 * 24 * 3600 * 1000).toLocaleString(), note: "الشحنة مع مندوب التوصيل النهائي" },
-          { status: "Delivered", date: new Date(Date.now() - 1.9 * 24 * 3600 * 1000).toLocaleString(), note: "تم التسليم النهائي للعميل بنجاح" }
-        ]
-      },
-      {
-        id: "DN-2026-94025",
-        sender_name: "متجر الياسمين الإلكتروني",
-        sender_phone: "+971521112222",
-        sender_city: "الشارقة",
-        sender_address: "النهدة الشارقة",
-        receiver_name: "سارة المرزوقي",
-        receiver_phone: "+971542223333",
-        receiver_city: "العين",
-        receiver_address: "العين - الهيلي",
-        package_type: "Perfumes",
-        weight: 1.8,
-        pieces: 2,
-        service_type: "standard",
-        delivery_price: 52.5, // Corrected Remote price (52.50 AED incl. VAT)
-        payment_method: "cod",
-        cod_amount: 350,
-        status: "In Transit",
-        created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-        status_history: [
-          { status: "Pending", date: new Date(Date.now() - 24 * 3600 * 1000).toLocaleString(), note: "تم استلام بيانات طلب التوصيل" },
-          { status: "Confirmed", date: new Date(Date.now() - 22 * 3600 * 1000).toLocaleString(), note: "تم تأكيد طلب التوصيل بنجاح" },
-          { status: "Assigned", date: new Date(Date.now() - 18 * 3600 * 1000).toLocaleString(), note: "تم تعيين السائق لاستلام الشحنة" },
-          { status: "Picked Up", date: new Date(Date.now() - 15 * 3600 * 1000).toLocaleString(), note: "تم استلام الشحنة من مقر المتجر" },
-          { status: "In Transit", date: new Date(Date.now() - 5 * 3600 * 1000).toLocaleString(), note: "الشحنة في طريقها لمدينة العين" }
-        ]
-      }
-    ];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialOrders));
-    return initialOrders;
-  }
-  return JSON.parse(data);
-}
-
-export function saveLocalOrders(orders: Order[]): void {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(orders));
-}
-
-// Supabase RPC callers with robust local fallbacks as defined in instructions
+// Supabase RPC callers
 
 export async function calculateDeliveryPriceRpc(city: string, weight: number): Promise<any> {
   try {
@@ -128,8 +59,11 @@ export async function createPublicOrderRpc(orderData: any): Promise<any> {
     if (!error && data !== null) {
       return data;
     }
+    if (error) {
+       console.error("Supabase RPC error create_public_order:", error);
+    }
   } catch (e) {
-    console.warn("RPC create_public_order not available, inserting via standard from tables:", e);
+    console.warn("RPC create_public_order not available:", e);
   }
   return null;
 }
@@ -141,6 +75,9 @@ export async function trackOrderRpc(trackingCode: string): Promise<any> {
     });
     if (!error && data !== null) {
       return data;
+    }
+    if (error) {
+       console.error("Supabase RPC error track_order:", error);
     }
   } catch (e) {
     console.warn("RPC track_order not available:", e);
@@ -164,7 +101,6 @@ export async function searchChatbotAnswerRpc(queryText: string): Promise<any> {
 
 // Global Order Integration that talks directly to Supabase
 export async function fetchAllOrders(): Promise<Order[]> {
-  const localOrders = getLocalOrders();
   try {
     const { data, error } = await supabase
       .from("orders")
@@ -172,91 +108,111 @@ export async function fetchAllOrders(): Promise<Order[]> {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.warn("Supabase fetch output. Showing local orders database:", error.message);
-      return localOrders;
+      console.error("Supabase fetch output error:", error);
+      return [];
     }
 
     if (data && data.length > 0) {
-      // Merge with unique local orders to ensure responsive demo experience
-      const supabaseOrders = data as Order[];
-      const combined = [...supabaseOrders];
-      localOrders.forEach(lo => {
-        if (!combined.some(so => so.id === lo.id)) {
-          combined.push(lo);
-        }
-      });
-      return combined;
+      return data as Order[];
     }
   } catch (e) {
-    console.error("Supabase integration error, utilizing local storage fallbacks:", e);
+    console.error("Supabase fetch failure:", e);
   }
-  return localOrders;
+  return [];
 }
 
-export async function insertNewOrder(order: Order): Promise<boolean> {
-  // Always save in localStorage first
-  const localOrders = getLocalOrders();
-  localOrders.unshift(order);
-  saveLocalOrders(localOrders);
-
+export async function insertNewOrder(orderData: Partial<Order>): Promise<string | null> {
   // Attempt to submit via RPC first
-  const rpcResult = await createPublicOrderRpc(order);
+  const rpcResult = await createPublicOrderRpc(orderData);
   if (rpcResult) {
     console.log("Successfully saved order via public RPC handler!");
-    return true;
+    // The RPC might return just the string, or an object like { tracking_code: '...' } or { id: '...' }
+    if (typeof rpcResult === 'string') return rpcResult;
+    return rpcResult.tracking_code || rpcResult.id || rpcResult;
   }
 
   try {
-    const { error } = await supabase
+    const { data: insertedData, error } = await supabase
       .from("orders")
-      .insert([order]);
+      .insert([orderData])
+      .select();
 
-    if (!error) {
+    if (!error && insertedData && insertedData.length > 0) {
       console.log("Successfully saved order in remote Supabase cloud!");
-      return true;
+      return insertedData[0].id;
     } else {
-      console.warn("Save in remote cloud output error, kept in browser local storage:", error.message);
+      console.error("Save in remote cloud error:", error);
     }
   } catch (e) {
-    console.error("Supabase insert failure, kept in fallback browser db:", e);
+    console.error("Supabase insert failure:", e);
   }
-  return true;
+  return null;
 }
 
-export async function updateExistingOrderStatus(orderId: string, status: Order["status"], note?: string): Promise<Order[] | null> {
-  const localOrders = getLocalOrders();
-  const index = localOrders.findIndex(o => o.id === orderId);
-  if (index !== -1) {
-    const order = localOrders[index];
-    order.status = status;
-    const historyItem = {
-      status,
-      date: new Date().toLocaleString(),
-      note: note || `تحديث حالة الشحنة إلى: ${status}`
-    };
-    if (!order.status_history) {
-      order.status_history = [];
-    }
-    order.status_history.push(historyItem);
-    localOrders[index] = order;
-    saveLocalOrders(localOrders);
-  }
+export async function isAdminUser(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
 
+    if (error) {
+      // Fallback: check if the authenticated user has an admin email
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email?.toLowerCase();
+      if (email === 'admin@daynight.ae' || email === 'admin@day-night.ae') {
+        return true;
+      }
+      return false;
+    }
+    
+    return data?.role?.toLowerCase() === 'admin';
+  } catch (e) {
+    console.error("Admin check failed", e);
+    return false;
+  }
+}
+
+export async function updateExistingOrderStatus(orderId: string, status: Order["status"], note?: string): Promise<boolean> {
+
+  const historyItem = {
+    status,
+    date: new Date().toLocaleString(),
+    note: note || `تحديث حالة الشحنة إلى: ${status}`
+  };
+  
   // Sync to database
   try {
-    const orderToUpdate = localOrders.find(o => o.id === orderId);
-    if (orderToUpdate) {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: status, status_history: orderToUpdate.status_history })
-        .eq("id", orderId);
-      if (!error) {
-        console.log("Successfully updated order status in Supabase!");
-      }
+    // First fetch the order to get the current history
+    const { data: orderData, error: fetchError } = await supabase
+      .from("orders")
+      .select("status_history")
+      .eq("id", orderId)
+      .single();
+      
+    if (fetchError) {
+      console.error("Failed to fetch order for update:", fetchError);
+      return false;
+    }
+    
+    const currentHistory = orderData?.status_history || [];
+    const newHistory = [...currentHistory, historyItem];
+    
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: status, status_history: newHistory })
+      .eq("id", orderId);
+      
+    if (!error) {
+      console.log("Successfully updated order status in Supabase!");
+      return true;
+    } else {
+       console.error("Failed to update remote cloud order:", error);
     }
   } catch (e) {
-    console.warn("Failed to synchronize updated state in remote cloud:", e);
+    console.error("Failed to synchronize updated state in remote cloud:", e);
   }
 
-  return localOrders;
+  return false;
 }

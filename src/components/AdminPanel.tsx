@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { fetchAllOrders, updateExistingOrderStatus, saveLocalOrders, getLocalOrders } from "../supabase";
+import { fetchAllOrders, updateExistingOrderStatus, insertNewOrder } from "../supabase";
 import { Order } from "../types";
 import Auth from "./Auth";
 import { 
@@ -59,13 +59,9 @@ export default function AdminPanel() {
     }
   }
 
-  function handleCreateMockOrder() {
+  async function handleCreateMockOrder() {
     // Easily inject a beautiful mock order to let client test transitions immediately with Correct Price
-    const randomId = Math.floor(10000 + Math.random() * 90000);
-    const trackingId = `DN-2026-${randomId}`;
-
-    const mock: Order = {
-      id: trackingId,
+    const mock: Partial<Order> = {
       sender_name: "متجر الفضة والورد",
       sender_phone: "+971505554321",
       sender_city: "الشارقة",
@@ -92,10 +88,10 @@ export default function AdminPanel() {
       ]
     };
 
-    const localList = getLocalOrders();
-    localList.unshift(mock);
-    saveLocalOrders(localList);
-    loadOrders();
+    const success = await insertNewOrder(mock);
+    if (success) {
+      loadOrders();
+    }
   }
 
   // Render Auth Gate
