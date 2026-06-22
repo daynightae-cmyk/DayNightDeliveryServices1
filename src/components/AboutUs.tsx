@@ -5,76 +5,81 @@
 
 import { motion } from "motion/react";
 import { BadgeCheck, Target, Heart, Eye } from "lucide-react";
+import { useAppContext } from "../lib/AppContext";
+import { translations } from "../data/translations";
 
 export default function AboutUs() {
+  const { language } = useAppContext();
+  const t = translations[language].aboutUs;
+
   const sections = [
     {
       icon: <Eye className="w-8 h-8 text-amber-500" />,
-      title_ar: "رؤيتنا",
-      title_en: "Our Vision",
-      desc_ar: "أن تصبح DAY NIGHT لخدمات التوصيل والشحن واحدة من أكثر شركات اللوجستيات ثقة وانتشاراً في دولة الإمارات، والبديل الأسرع والأكثر شفافية للأفراد والمتاجر والشركات.",
-      desc_en: "To emerge as the premier, elite courier and shipping authority in the UAE, known for absolute trust, rapid response, smart dispatch, and flawless customer focus."
+      title_ar: translations.ar.aboutUs.visionTitle,
+      title_en: translations.en.aboutUs.visionTitle,
+      desc_ar: translations.ar.aboutUs.visionDesc,
+      desc_en: translations.en.aboutUs.visionDesc
     },
     {
       icon: <Target className="w-8 h-8 text-amber-500" />,
-      title_ar: "رسالتنا",
-      title_en: "Our Mission",
-      desc_ar: "تقديم خدمات شحن وتوصيل محلية ودولية بأساليب مرنة ومبتكرة تضع في صميمها الأمان والسرعة والتواصل السلس والدقيق على مدار الساعة.",
-      desc_en: "To unify shipping, packaging, courier, and direct storage workflows into an impeccable 24/7 client-centric framework with unmatched transit speeds and security."
+      title_ar: translations.ar.aboutUs.missionTitle,
+      title_en: translations.en.aboutUs.missionTitle,
+      desc_ar: translations.ar.aboutUs.missionDesc,
+      desc_en: translations.en.aboutUs.missionDesc
     },
     {
       icon: <Heart className="w-8 h-8 text-amber-500" />,
-      title_ar: "أهدافنا",
-      title_en: "Our Objectives",
-      desc_ar: "أن نوفر لكل شخص ومؤسسة شريك توصيل متكامل يمكن الاعتماد عليه في كل وقت وفي كل مكان، مع تقديم أسعار عادلة وحلول مدفوعة بالتكنولوجيا الفعالة.",
-      desc_en: "To bridge the gap between businesses and end consumers by providing secure transits, guaranteed COD turnarounds, and instant direct updates."
+      title_ar: translations.ar.aboutUs.goalTitle,
+      title_en: translations.en.aboutUs.goalTitle,
+      desc_ar: translations.ar.aboutUs.goalDesc,
+      desc_en: translations.en.aboutUs.goalDesc
     }
   ];
 
   return (
-    <div className="space-y-12 text-right">
+    <div className={`space-y-12 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
       {/* Intro section */}
       <section className="bg-brand-cool/40 backdrop-blur-md rounded-3xl p-8 sm:p-12 border border-white/10 flex flex-col lg:flex-row items-center gap-12">
         <div className="space-y-6 lg:w-1/2">
           <div className="inline-flex items-center gap-1.5 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-3 py-1 text-xs text-brand-gold font-bold uppercase">
-            <BadgeCheck className="w-4 h-4 text-brand-gold" />
-            <span>نبذة عن الشركة • Corporate Story</span>
+            <BadgeCheck className="w-4 h-4 text-brand-gold shrink-0" />
+            <span>{t.title}</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-            داي نايت لخدمات التوصيل والشحن
+            {t.companyName}
           </h2>
           <p className="text-white/70 leading-relaxed text-sm sm:text-base">
-            شركة إماراتية متميزة متخصصة في خدمات التوصيل، الشحن، النقل والكورير داخل دولة الإمارات وخارجها. نقدم حلولاً لوجستية مرنة تخدم الأفراد والشركات والمتاجر الإلكترونية على حد سواء. نعمل بجد وإخلاص طوال ساعات الليل والنهار لتوفير تجربة توصيل فريدة ومنظمة تبدأ من استلام الطلب، تدوينه، تأكيد البيانات والسعر، ثم المتابعة حتى التسليم النهائي بكل أمان وبأسعار نموذجية واضحة.
+            {t.introDesc}
           </p>
-          <p className="text-white/50 text-sm leading-relaxed italic border-r-4 border-brand-gold pr-4">
-            "نحن نؤمن بأن كل طرد أو مستند أو هدية لها قيمة معنوية أو تجارية بالغة عند صاحبها، لذا فإننا نتعامل مع كل طلب بعناية فائقة واحترافية من اللحظة الأولى للاتصال الهاتفي أو رسالة الواتساب وحتى توقيع الإغلاق النهائي."
+          <p className={`text-white/50 text-sm leading-relaxed italic ${language === 'ar' ? 'border-r-4 pr-4' : 'border-l-4 pl-4'} border-brand-gold`}>
+            {t.quote}
           </p>
         </div>
         <div className="lg:w-1/2 w-full">
           {/* Aesthetic grid presenting operational layout */}
           <div className="bg-brand-cool rounded-2xl p-8 border border-white/10 space-y-6">
-            <h3 className="text-brand-gold font-bold text-lg border-b border-white/10 pb-3">البطاقة الرسمية للنشاط</h3>
+            <h3 className={`text-brand-gold font-bold text-lg border-b border-white/10 pb-3 ${language === 'en' ? 'text-left' : 'text-right'}`}>{t.officialCard.title}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-sans">
-              <div className="p-3 bg-brand-deep/55 rounded-lg border border-white/10">
-                <p className="text-white/40 text-xs">الاسم الرسمي</p>
-                <p className="font-bold text-white mt-1">DAY NIGHT DELIVERY SERVICES</p>
+              <div className={`p-3 bg-brand-deep/55 rounded-lg border border-white/10 ${language === 'en' ? 'text-left' : 'text-right'}`}>
+                <p className="text-white/40 text-[11px] uppercase tracking-wider">{t.officialCard.legalName}</p>
+                <p className="font-bold text-white mt-1 uppercase">{t.officialCard.legalNameValue}</p>
               </div>
-              <div className="p-3 bg-brand-deep/55 rounded-lg border border-white/10">
-                <p className="text-white/40 text-xs font-mono">الاسم التجاري العربي</p>
-                <p className="font-bold text-white mt-1">داي نايت لخدمات التوصيل</p>
+              <div className={`p-3 bg-brand-deep/55 rounded-lg border border-white/10 ${language === 'en' ? 'text-left' : 'text-right'}`}>
+                <p className="text-white/40 text-[11px] uppercase tracking-wider">{t.officialCard.arabicName}</p>
+                <p className="font-bold text-white mt-1">{t.officialCard.arabicNameValue}</p>
               </div>
-              <div className="p-3 bg-brand-deep/55 rounded-lg border border-white/10">
-                <p className="text-white/40 text-xs font-sans">المقر الرئيسي</p>
-                <p className="font-bold text-white mt-1">الإمارات • أبوظبي • مصفح 40</p>
+              <div className={`p-3 bg-brand-deep/55 rounded-lg border border-white/10 ${language === 'en' ? 'text-left' : 'text-right'}`}>
+                <p className="text-white/40 text-[11px] uppercase tracking-wider">{t.officialCard.hq}</p>
+                <p className="font-bold text-white mt-1">{t.officialCard.hqValue}</p>
               </div>
-              <div className="p-3 bg-brand-deep/55 rounded-lg border border-white/10">
-                <p className="text-white/40 text-xs">نطاق التغطية</p>
-                <p className="font-bold text-white mt-1">كافة إمارات الدولة والشحن الدولي</p>
+              <div className={`p-3 bg-brand-deep/55 rounded-lg border border-white/10 ${language === 'en' ? 'text-left' : 'text-right'}`}>
+                <p className="text-white/40 text-[11px] uppercase tracking-wider">{t.officialCard.coverage}</p>
+                <p className="font-bold text-white mt-1">{t.officialCard.coverageValue}</p>
               </div>
             </div>
             <div className="bg-brand-deep/85 p-4 rounded-xl border border-white/10 text-center">
               <p className="text-brand-gold text-xs font-mono tracking-wider font-bold">SLOGANS</p>
-              <p className="text-white text-base font-bold mt-1">DELIVERY SERVICE 24/7</p>
+              <p className="text-white text-base font-bold mt-1 uppercase">DELIVERY SERVICE 24/7</p>
               <p className="text-white/75 text-xs italic mt-0.5">Swift • Secure • Exceptional | سرعة • أمان • تميز</p>
             </div>
           </div>
@@ -99,15 +104,28 @@ export default function AboutUs() {
                   {sec.icon}
                 </span>
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-white">{sec.title_ar}</h3>
-                <h4 className="text-xs text-brand-gold font-bold font-mono uppercase tracking-wider">{sec.title_en}</h4>
-                <p className="text-white/70 text-sm leading-relaxed">{sec.desc_ar}</p>
-                <p className="text-white/40 text-xs leading-relaxed italic">{sec.desc_en}</p>
+              <div className={`space-y-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <h3 className="text-xl font-bold text-white">{language === 'ar' ? sec.title_ar : sec.title_en}</h3>
+                <h4 className="text-xs text-brand-gold font-bold font-mono uppercase tracking-wider">{language === 'ar' ? sec.title_en : sec.title_ar}</h4>
+                <p className="text-white/70 text-sm leading-relaxed">{language === 'ar' ? sec.desc_ar : sec.desc_en}</p>
+                <p className="text-white/40 text-xs leading-relaxed italic">{language === 'ar' ? sec.desc_en : sec.desc_ar}</p>
               </div>
             </div>
           </motion.div>
         ))}
+      </section>
+
+      {/* Corporate Values */}
+      <section className="space-y-8 pt-8 border-t border-white/10">
+        <h3 className={`text-2xl font-bold text-white ${language === 'ar' ? 'text-right' : 'text-left'}`}>{t.valuesTitle}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {t.values.map((v: {title: string, desc: string}, i: number) => (
+            <div key={i} className={`p-5 bg-brand-deep/30 rounded-xl border border-white/10 hover:border-brand-gold/50 transition-colors ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+               <h4 className="font-bold text-brand-gold mb-2 text-lg">{v.title}</h4>
+               <p className="text-white/70 text-xs leading-relaxed">{v.desc}</p>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
