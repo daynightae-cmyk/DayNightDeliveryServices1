@@ -80,11 +80,16 @@ export default function SignatureCapture({ orderId, trackingNumber, language = '
     }
     setDataUrl(url);
     if (onSignatureSave) onSignatureSave(url);
-    // optional demo storage
-    try {
-      localStorage.setItem(`signature_${trackingNumber || orderId || 'demo'}`, url);
-    } catch (e) {}
     alert(language === 'ar' ? 'تم حفظ التوقيع بنجاح.' : 'Signature captured successfully.');
+  }
+
+  async function uploadSignatureToSupabase(signatureDataUrl: string) {
+    // TODO:
+    // 1. Convert dataURL to Blob
+    // 2. Upload to Supabase Storage bucket: "signatures"
+    // 3. Save signature URL to order record or delivery proof table
+    // 4. Store signed_at, tracking_number, and receiver confirmation
+    return null;
   }
 
   return (

@@ -11,17 +11,20 @@ const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL || "").trim();
 const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.");
+  console.warn("Supabase config missing. Supabase RPC and tracking will be disabled until VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are provided.");
 }
 
-export const supabase = createClient(
-  SUPABASE_URL, 
-  SUPABASE_ANON_KEY
-);
+export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 
 // Supabase RPC callers
 
 export async function calculateDeliveryPriceRpc(city: string, weight: number): Promise<any> {
+  if (!supabase) {
+    return calculateLocalPrice(city, weight);
+  }
+
   try {
     const { data, error } = await supabase.rpc("calculate_delivery_price", { 
       p_city_name: city, 
@@ -30,6 +33,9 @@ export async function calculateDeliveryPriceRpc(city: string, weight: number): P
     if (!error && data !== null) {
       return data;
     }
+    if (error) {
+      console.warn("Supabase RPC calculate_delivery_price error, using fallback:", error);
+    }
   } catch (e) {
     console.warn("RPC calculate_delivery_price not available, running fallback:", e);
   }
@@ -37,6 +43,10 @@ export async function calculateDeliveryPriceRpc(city: string, weight: number): P
 }
 
 export async function calculateInternationalPriceRpc(destination: string, weight: number): Promise<any> {
+  if (!supabase) {
+    return calculateInternationalPrice(destination, weight);
+  }
+
   try {
     const { data, error } = await supabase.rpc("calculate_international_price", {
       p_destination: destination,
@@ -44,6 +54,9 @@ export async function calculateInternationalPriceRpc(destination: string, weight
     });
     if (!error && data !== null) {
       return data;
+    }
+    if (error) {
+      console.warn("Supabase RPC calculate_international_price error, using fallback:", error);
     }
   } catch (e) {
     console.warn("RPC calculate_international_price not available, running fallback:", e);
