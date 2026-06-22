@@ -1,4 +1,5 @@
-﻿import { useRef, useState, useEffect } from "react";
+﻿import type React from "react";
+import { useRef, useState, useEffect } from "react";
 import { useAppContext } from "../../lib/AppContext";
 import { translations } from "../../data/translations";
 import { PenTool, XCircle, CheckCircle2 } from "lucide-react";
@@ -186,3 +187,4 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
     </div>
   );
 }
+
