@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "day-night-delivery-services",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "final:gate": "node scripts/daynight-final-gate.mjs",
+    "scan": "node scripts/daynight-scan.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
@@ -37,3 +39,4 @@
     "vite": "^6.2.3"
   }
 }
+

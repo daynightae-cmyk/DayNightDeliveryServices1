@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { Order } from "../types";
-import { insertNewOrder } from "../supabase";
+import { createPublicOrder } from "../supabase";
 import { calculateLocalPrice } from "../lib/pricing";
 import { 
   Truck, 
@@ -15,7 +15,9 @@ import {
   ArrowLeftRight, 
   Info, 
   DollarSign, 
-  Boxes 
+  Boxes,
+  Copy,
+  MessageSquare
 } from "lucide-react";
 
 import { useAppContext } from "../lib/AppContext";
@@ -72,49 +74,115 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const deliveryPricing = getCalculatedDeliveryPrice();
   const deliveryPrice = deliveryPricing.total;
 
+  function isValidUaePhone(phone: string) {
+    const compact = phone.replace(/[^\d+]/g, "");
+    const digits = compact.replace(/\D/g, "");
+    return /^9715\d{8}$/.test(digits) || /^05\d{8}$/.test(digits);
+  }
+
+  function validateOrderFields() {
+    if (!senderName.trim() || !senderPhone.trim() || !senderCity || !senderAddress.trim()) {
+      return "يرجى إكمال بيانات المرسل الأساسية قبل إرسال الطلب.";
+    }
+
+    if (!receiverName.trim() || !receiverPhone.trim() || !receiverCity || !receiverAddress.trim()) {
+      return "يرجى إكمال بيانات المستلم الأساسية قبل إرسال الطلب.";
+    }
+
+    if (!isValidUaePhone(senderPhone) || !isValidUaePhone(receiverPhone)) {
+      return "يرجى إدخال رقم هاتف إماراتي صحيح مثل +971 56 875 7331.";
+    }
+
+    if (!packageType || !serviceType || !paymentMethod) {
+      return "يرجى اختيار نوع الطرد والخدمة وطريقة الدفع.";
+    }
+
+    if (!Number.isFinite(Number(weight)) || Number(weight) <= 0) {
+      return "يرجى إدخال وزن صحيح أكبر من صفر.";
+    }
+
+    if (!Number.isFinite(Number(pieces)) || Number(pieces) < 1) {
+      return "يرجى إدخال عدد قطع صحيح.";
+    }
+
+    if (!Number.isFinite(deliveryPrice) || deliveryPrice <= 0) {
+      return "تعذر احتساب سعر التوصيل. يرجى مراجعة البيانات والمحاولة مجدداً.";
+    }
+
+    if (paymentMethod === "cod" && (!Number.isFinite(Number(codAmount)) || Number(codAmount) <= 0)) {
+      return "يرجى إدخال مبلغ تحصيل COD صحيح.";
+    }
+
+    if (!notes.trim()) {
+      return "يرجى إضافة ملاحظات الطلب قبل الإرسال.";
+    }
+
+    return "";
+  }
+
   async function handleFormSubmit() {
-    setLoading(true);
     setValidationError("");
 
-    const newOrder: Partial<Order> = {
-      sender_name: senderName || "مرسل مجهول",
-      sender_phone: senderPhone || "+9710000000",
+    const validationMessage = validateOrderFields();
+    if (validationMessage) {
+      setValidationError(validationMessage);
+      return;
+    }
+
+    setLoading(true);
+
+    const now = new Date().toISOString();
+    const statusHistory = [
+      {
+        status: "Pending",
+        date: new Date().toLocaleString(),
+        note: "تم استلام الطلب الكترونياً وجاري المراجعة والتأكيد من فريق داي نايت"
+      }
+    ];
+
+    const newOrder = {
+      sender_name: senderName.trim(),
+      sender_phone: senderPhone.trim(),
       sender_city: senderCity,
-      sender_address: senderAddress || "مقر مصفح",
-      receiver_name: receiverName || "مستلم مجهول",
-      receiver_phone: receiverPhone || "+9710000000",
+      sender_address: senderAddress.trim(),
+      receiver_name: receiverName.trim(),
+      receiver_phone: receiverPhone.trim(),
       receiver_city: receiverCity,
-      receiver_address: receiverAddress || "عنوان التوصيل المعتمد",
+      receiver_address: receiverAddress.trim(),
       package_type: packageType,
       weight: Number(weight) || 1,
       pieces: Number(pieces) || 1,
       service_type: serviceType,
       delivery_price: deliveryPrice,
+      subtotal: deliveryPricing.subtotal,
+      base_price: deliveryPricing.subtotal,
+      vat_amount: deliveryPricing.vat,
+      vat: deliveryPricing.vat,
+      tax_amount: deliveryPricing.vat,
+      total: deliveryPricing.total,
+      total_price: deliveryPricing.total,
+      amount: deliveryPricing.total,
+      price: deliveryPricing.total,
+      currency: "AED",
       payment_method: paymentMethod,
-      cod_amount: paymentMethod === "cod" ? Number(codAmount) : undefined,
-      notes: notes || undefined,
+      cod_amount: paymentMethod === "cod" ? Number(codAmount) : null,
+      notes: notes.trim(),
       status: "Pending",
-      created_at: new Date().toISOString(),
-      status_history: [
-        {
-          status: "Pending",
-          date: new Date().toLocaleString(),
-          note: "تم استلام الطلب الكترونياً وجاري المراجعة والتأكيد من فريق داي نايت"
-        }
-      ]
+      created_at: now,
+      status_history: statusHistory
     };
 
     try {
-      const returnedId = await insertNewOrder(newOrder);
+      const returnedId = await createPublicOrder(newOrder);
       if (returnedId) {
         setSuccessId(typeof returnedId === 'object' ? JSON.stringify(returnedId) : String(returnedId));
         setStep(4);
       } else {
-        setValidationError("حدث خطأ أثناء إنشاء الطلب في النظام. يرجى المحاولة لاحقاً.");
+        setValidationError("تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.");
       }
     } catch (e) {
       console.error(e);
-      setValidationError("عذراً، حدث خطأ أثناء الاتصال بقاعدة البيانات. يرجى المحاولة لاحقاً.");
+      setValidationError("تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.");
     } finally {
       setLoading(false);
     }
@@ -172,7 +240,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                   required
                   value={senderPhone}
                   onChange={(e) => { setSenderPhone(e.target.value); setValidationError(""); }}
-                  placeholder="مثال: +971 50 123 4567"
+                  placeholder="مثال: +971 56 875 7331"
                   className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all placeholder:text-white/20 text-left font-sans"
                 />
               </div>
@@ -255,7 +323,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                   required
                   value={receiverPhone}
                   onChange={(e) => { setReceiverPhone(e.target.value); setValidationError(""); }}
-                  placeholder="مثال: +971 56 987 6543"
+                  placeholder="مثال: +971 56 875 7331"
                   className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all placeholder:text-white/20 text-left font-sans"
                 />
               </div>
@@ -507,6 +575,29 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               <p className="text-emerald-500 text-[11px] font-sans font-bold flex items-center justify-center gap-1">
                 <span>{language === 'ar' ? 'حالة الشحنة الحالية (Pending)' : 'Current Status (Pending)'}</span>
               </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                id="success_copy_tracking_btn"
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(successId)}
+                className="px-5 py-3 bg-white/5 border border-white/10 hover:border-brand-gold text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2"
+                aria-label="Copy tracking code"
+              >
+                <Copy className="w-4 h-4 text-brand-gold" />
+                <span>{language === "ar" ? "نسخ رقم التتبع" : "Copy tracking code"}</span>
+              </button>
+              <a
+                id="success_whatsapp_tracking_btn"
+                href={`https://wa.me/971568757331?text=${encodeURIComponent(`Tracking code: ${successId}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>WhatsApp</span>
+              </a>
             </div>
 
             <p className="text-white/60 text-xs leading-relaxed max-w-md mx-auto">

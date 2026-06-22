@@ -5,6 +5,7 @@
 
 import { motion } from "motion/react";
 import { BadgeCheck, Sparkles, Instagram, Code, HeartHandshake, RefreshCw } from "lucide-react";
+import { businessContent } from "../data/businessContent";
 
 interface ECommerceProps {
   onNavigate: (tab: string) => void;
@@ -46,6 +47,8 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
     }
   ];
 
+  const ecommerceFeatures = businessContent.ecommerce.features;
+
   return (
     <div className="space-y-12 text-right">
       {/* Intro section */}
@@ -57,8 +60,17 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
           توصيل منظم يعزز ثقة عملاء متجرك الإلكتروني
         </h2>
         <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
-          نجاح متجرك الإلكتروني يبدأ بجودة منتجك، وينتهي بالانطباع الإيجابي لعملية التوصيل. عندما يصل الطرد لعميلك سريعاً وبصورة مرتبة، فإن الثقة تتضاعف وعميلك يكرر الشراء مراراً. مع داي نايت، ركز على مبيعاتك ونحن سنتولى استلام وتوصيل طرودك بكل سلامة وأمان.
+          {businessContent.ecommerce.summaryAr}
         </p>
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {ecommerceFeatures.map((feature) => (
+          <div key={feature} className="bg-brand-cool/30 border border-white/10 rounded-2xl p-4 flex items-center justify-end gap-3">
+            <span className="text-white/80 text-sm font-bold text-right">{feature}</span>
+            <BadgeCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+          </div>
+        ))}
       </section>
 
       {/* Target Audiences */}

@@ -4,9 +4,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { fetchAllOrders, updateExistingOrderStatus, insertNewOrder } from "../supabase";
+import { fetchAllOrders, updateExistingOrderStatus, supabase } from "../supabase";
 import { Order } from "../types";
-import Auth from "./Auth";
 import { 
   Users, 
   Search, 
@@ -22,8 +21,9 @@ import {
 } from "lucide-react";
 
 export default function AdminPanel() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pricingOverview, setPricingOverview] = useState<any[]>([]);
+  const [settingsOverview, setSettingsOverview] = useState<any[]>([]);
   const [searchQuery, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -31,11 +31,8 @@ export default function AdminPanel() {
   const [statusNote, setStatusNote] = useState("");
 
   useEffect(() => {
-    const isAuthed = sessionStorage.getItem("dn_admin_authenticated") === "true";
-    setIsAuthenticated(isAuthed);
-    if (isAuthed) {
-      loadOrders();
-    }
+    loadOrders();
+    loadOverview();
   }, []);
 
   async function loadOrders() {
@@ -50,6 +47,18 @@ export default function AdminPanel() {
     }
   }
 
+  async function loadOverview() {
+    if (!supabase) return;
+
+    const [{ data: pricingData }, { data: settingsData }] = await Promise.all([
+      supabase.from("daynight_pricing_master").select("pricing_key, label_en, base_price, first_kg, additional_kg, vat_rate, currency").eq("active", true),
+      supabase.from("admin_settings").select("setting_key, setting_value").limit(8)
+    ]);
+
+    setPricingOverview(pricingData || []);
+    setSettingsOverview(settingsData || []);
+  }
+
   async function handleStatusUpdate(orderId: string, status: Order["status"]) {
     const updated = await updateExistingOrderStatus(orderId, status, statusNote);
     if (updated) {
@@ -59,50 +68,8 @@ export default function AdminPanel() {
     }
   }
 
-  async function handleCreateMockOrder() {
-    // Easily inject a beautiful mock order to let client test transitions immediately with Correct Price
-    const mock: Partial<Order> = {
-      sender_name: "متجر الفضة والورد",
-      sender_phone: "+971505554321",
-      sender_city: "الشارقة",
-      sender_address: "مجمع الغوير التجاري",
-      receiver_name: "راشد الفركاوي",
-      receiver_phone: "+971569991111",
-      receiver_city: "العين (Al Ain)",
-      receiver_address: "العين - الهير فيلا 9",
-      package_type: "Perfumes",
-      weight: 1.2,
-      pieces: 1,
-      service_type: "standard",
-      delivery_price: 52.5, // Corrected price 52.50 AED
-      payment_method: "cod",
-      cod_amount: 180,
-      status: "Pending",
-      created_at: new Date().toISOString(),
-      status_history: [
-        {
-          status: "Pending",
-          date: new Date().toLocaleString(),
-          note: "تم إنشاء طلب تجريبي للاختبار ومراقبة الحالة"
-        }
-      ]
-    };
+  
 
-    const success = await insertNewOrder(mock);
-    if (success) {
-      loadOrders();
-    }
-  }
-
-  // Render Auth Gate
-  if (!isAuthenticated) {
-    return (
-      <Auth onAuthSuccess={() => {
-        setIsAuthenticated(true);
-        loadOrders();
-      }} />
-    );
-  }
 
   // Filtered orders list
   const filteredOrders = orders.filter(o => {
@@ -119,7 +86,7 @@ export default function AdminPanel() {
 
   // Calculate Metrics
   const pendingCount = orders.filter(o => o.status === "Pending").length;
-  const transitCount = orders.filter(o => o.status === "In Transit" || o.status === "Out For Delivery").length;
+  const transitCount = orders.filter(o => o.status === "In Transit" || o.status === "Out for Delivery" || o.status === "Out For Delivery").length;
   const completedCount = orders.filter(o => o.status === "Delivered").length;
   const codCollectedSum = orders
     .filter(o => o.status === "Delivered" && o.payment_method === "cod" && o.cod_amount)
@@ -195,10 +162,11 @@ export default function AdminPanel() {
           >
             <option value="all">كل الطلبات وحالات الشحن</option>
             <option value="pending">Pending (قيد الانتظار)</option>
-            <option value="confirmed">Confirmed (مؤكد)</option>
+            <option value="accepted">Accepted (مقبول)</option>
+            <option value="driver assigned">Driver Assigned (تم تعيين السائق)</option>
             <option value="picked up">Picked Up (تم الاستلام)</option>
             <option value="in transit">In Transit (في الطريق)</option>
-            <option value="out for delivery">Out For Delivery (قيد التوصيل)</option>
+            <option value="out for delivery">Out for Delivery (قيد التوصيل)</option>
             <option value="delivered">Delivered (سلمت بنجاح)</option>
             <option value="cancelled">Cancelled (ملغي)</option>
           </select>
@@ -206,14 +174,7 @@ export default function AdminPanel() {
 
         {/* Action Button */}
         <div className="flex items-center gap-2 self-end md:self-auto font-sans">
-          <button
-            id="admin_mock_btn"
-            onClick={handleCreateMockOrder}
-            className="px-4 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-[0_4px_12px_rgba(235,188,4,0.15)]"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>حقن طلب تجريبي جديد</span>
-          </button>
+          {/* Production: removed unsafe test-order button */}
           
           <button
             id="admin_reload_btn"
@@ -224,6 +185,34 @@ export default function AdminPanel() {
             <RefreshCw className="w-4 h-4" />
             <span>تحديث الجدول</span>
           </button>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-brand-cool/30 p-5 rounded-2xl border border-white/10 space-y-3">
+          <h3 className="text-white font-extrabold text-sm">Pricing overview</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {pricingOverview.slice(0, 6).map((row) => (
+              <div key={row.pricing_key} className="bg-brand-deep/70 border border-white/10 rounded-xl p-3 text-xs">
+                <p className="text-brand-gold font-mono font-bold">{row.pricing_key}</p>
+                <p className="text-white/70">{row.label_en}</p>
+                <p className="text-white/45 font-mono" dir="ltr">
+                  {row.base_price ? `${row.base_price} ${row.currency}` : `${row.first_kg} + ${row.additional_kg}/kg ${row.currency}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-brand-cool/30 p-5 rounded-2xl border border-white/10 space-y-3">
+          <h3 className="text-white font-extrabold text-sm">Settings overview</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {settingsOverview.map((row) => (
+              <div key={row.setting_key} className="bg-brand-deep/70 border border-white/10 rounded-xl p-3 text-xs">
+                <p className="text-brand-gold font-mono font-bold">{row.setting_key}</p>
+                <p className="text-white/60 truncate">{JSON.stringify(row.setting_value)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -274,7 +263,7 @@ export default function AdminPanel() {
                     <td className="p-4">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                         o.status === "Pending" ? "bg-brand-gold/10 text-brand-gold border border-brand-gold/20" :
-                        o.status === "Confirmed" ? "bg-brand-blue/10 text-brand-blue border border-brand-blue/20" :
+                        (o.status === "Accepted" || o.status === "Confirmed") ? "bg-brand-blue/10 text-brand-blue border border-brand-blue/20" :
                         o.status === "Delivered" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-550/20" :
                         "bg-white/5 text-white/60 border border-white/10"
                       }`}>
@@ -324,11 +313,11 @@ export default function AdminPanel() {
                   className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-xs focus:outline-none focus:border-brand-gold [color-scheme:dark]"
                 >
                   <option value="Pending">Pending (قيد استلام الطلب)</option>
-                  <option value="Confirmed">Confirmed (تم تأكيد البيانات)</option>
-                  <option value="Assigned">Assigned (تم تعيين كابتن التوصيل)</option>
+                  <option value="Accepted">Accepted (تم قبول الطلب)</option>
+                  <option value="Driver Assigned">Driver Assigned (تم تعيين كابتن التوصيل)</option>
                   <option value="Picked Up">Picked Up (تأكيد استلام الطرد)</option>
                   <option value="In Transit">In Transit (الشحنة في وسيلة النقل)</option>
-                  <option value="Out For Delivery">Out For Delivery (الموزع في الطريق للعميل)</option>
+                  <option value="Out for Delivery">Out for Delivery (الموزع في الطريق للعميل)</option>
                   <option value="Delivered">Delivered (تم تسليم السلعة بنجاح)</option>
                   <option value="Failed">Failed Delivery (فشل التسليم والمحاولة)</option>
                   <option value="Cancelled">Cancelled (تم إلغاء الطلب من الراسل)</option>

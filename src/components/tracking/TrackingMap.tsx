@@ -1,8 +1,8 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { mockLocations } from "../../data/mockLocations";
+import { defaultLocations } from "../../data/defaultLocations";
 import { useAppContext } from "../../lib/AppContext";
 import { translations } from "../../data/translations";
 import { MapPin } from "lucide-react";
@@ -42,8 +42,8 @@ export default function TrackingMap() {
 
   if (!isMounted) return <div className="h-64 bg-brand-deep rounded-2xl animate-pulse"></div>;
 
-  const pickup = mockLocations.mussafah;
-  const dest = mockLocations.abuDhabi;
+  const pickup = defaultLocations.mussafah;
+  const dest = defaultLocations.abuDhabi;
   const polylinePositions: [number, number][] = [
     [pickup.lat, pickup.lng],
     [dest.lat, dest.lng],

@@ -1,0 +1,9 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "Test-Path": true,
+        "/^node --check scripts/daynight-final-gate\\.mjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

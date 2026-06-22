@@ -73,17 +73,19 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
 
 
 
+  const orderTrackingCode = order ? (order.tracking_code || order.tracking_number || order.id) : "";
   const statusMilestones: { status: Order["status"]; key: keyof typeof shipmentStatuses; descAr: string; descEn: string }[] = [
     { status: "Pending", key: "Pending", descAr: "تم تدوين بيانات طلب الشحن وجاري مراجعة الإدارة", descEn: "The shipping request details have been recorded and are being reviewed." },
-    { status: "Confirmed", key: "Confirmed", descAr: "تم التحقق وتأكيد تفاصيل الشحن والوجهة بنجاح", descEn: "Shipping details and destination have been verified and confirmed." },
-    { status: "Assigned", key: "Assigned", descAr: "تم تخصيص كابتن التوصيل لجمع الشحنة من المرسل", descEn: "A delivery captain has been assigned to collect the shipment." },
+    { status: "Accepted", key: "Accepted", descAr: "تم التحقق وتأكيد تفاصيل الشحن والوجهة بنجاح", descEn: "Shipping details and destination have been verified and confirmed." },
+    { status: "Driver Assigned", key: "Driver Assigned", descAr: "تم تخصيص كابتن التوصيل لجمع الشحنة من المرسل", descEn: "A delivery captain has been assigned to collect the shipment." },
     { status: "Picked Up", key: "Picked Up", descAr: "تم استلام السلعة رسمياً ودخولها مخازن الفرز", descEn: "The item has been officially picked up and entered into sorting." },
     { status: "In Transit", key: "In Transit", descAr: "الشحنة في وسيلة النقل متجهة لمدينة الاستلام", descEn: "The shipment is in transit heading to the delivery city." },
-    { status: "Out For Delivery", key: "Out For Delivery", descAr: "الشحنة مع مندوب التوزيع الأخير للتسليم اليوم", descEn: "The shipment is with the final delivery agent for delivery today." },
+    { status: "Out for Delivery", key: "Out for Delivery", descAr: "الشحنة مع مندوب التوزيع الأخير للتسليم اليوم", descEn: "The shipment is with the final delivery agent for delivery today." },
     { status: "Delivered", key: "Delivered", descAr: "تم تسليم السلعة مغلقة ومستوفاة وتوقيع العميل", descEn: "The item has been successfully delivered and signed for." }
   ];
 
   // Derive active index
+              <p className="text-[10px] text-white/50 uppercase tracking-wider font-bold">{t.tracking.trackingLabel || "Tracking"}: <span className="text-brand-gold font-mono">{orderTrackingCode}</span></p>
   const activeIndex = order ? statusMilestones.findIndex(m => m.status === order.status) : -1;
 
   return (
@@ -154,7 +156,7 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
                   <p className={`text-white/40 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 font-sans ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                     {language === 'en' && <MapPin className="w-4 h-4 text-white/40" />}
                     <span>{t.tracking.route}</span>
-                    {language === 'ar' && <MapPin className="w-4 h-4 text-white/40" />}
+                  <p className="text-xl font-extrabold text-brand-gold font-mono">{orderTrackingCode}</p>
                   </p>
                   <p className="text-base font-extrabold text-white">{language === 'ar' ? `من ${order.sender_city} إلى ${order.receiver_city}` : `From ${order.sender_city} to ${order.receiver_city}`}</p>
                   <p className="text-xs text-brand-gold">{t.tracking.payment}: {order.payment_method === "cod" ? `${language === 'ar' ? `تحصيل COD بمبلغ ${order.cod_amount} درهم` : `COD amount ${order.cod_amount} AED`}` : (language === 'ar' ? "مدفوع مسبقاً" : "Prepaid")}</p>
@@ -168,6 +170,7 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
                   </p>
                   <p className="text-xl font-extrabold text-brand-gold font-mono">{order.id}</p>
                   <p className="text-xs text-white/40 font-sans tracking-wide">{t.tracking.packageType}: {order.package_type}</p>
+                  <p className="text-xs text-white/40 font-sans tracking-wide" dir="ltr">{order.weight} kg • {order.delivery_price} AED</p>
                 </div>
               </div>
 

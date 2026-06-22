@@ -30,6 +30,7 @@ export default function QuickPriceEstimate() {
 
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
   const positionClass = dir === 'rtl' ? 'left-4' : 'right-4';
+  const formatAed = (amount: number) => lang === 'ar' ? `${amount.toFixed(2)} درهم` : `${amount.toFixed(2)} AED`;
 
   return (
     <div className={`fixed bottom-6 ${positionClass} z-50 transition-all`} style={{ direction: dir }}>
@@ -89,17 +90,17 @@ export default function QuickPriceEstimate() {
                   <div className="text-rose-500">{t.missingFields}</div>
                 ) : deliveryEstimate ? (
                   <div className="space-y-2">
-                    <div className="font-extrabold">{t.estimatedRange}: AED {deliveryEstimate.min.toFixed(2)}</div>
+                    <div className="font-extrabold">{t.estimatedRange}: <span dir="ltr">{formatAed(deliveryEstimate.min)}</span></div>
                     <div className="text-white/90 text-sm">{lang === 'ar' ? 'ÙØ¦Ø© Ø§Ù„ØªØ³Ø¹ÙŠØ±' : 'Pricing category'}: {deliveryEstimate.category}</div>
                     <div className="text-white/90 text-sm">{lang === 'ar' ? 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª' : 'Notes'}: {deliveryEstimate.notes}</div>
                     {surcharge && !surcharge.needsCustomQuote ? (
-                      <div className="text-white/90 text-sm">{lang === 'ar' ? 'ØªÙ‚Ø¯ÙŠØ± Ø±Ø³ÙˆÙ… Ø§Ù„ÙˆØ²Ù† Ø§Ù„Ø¥Ø¶Ø§ÙÙŠØ©' : 'Weight surcharge estimate'}: AED {surcharge.min} â€“ AED {surcharge.max}</div>
+                      <div className="text-white/90 text-sm">{lang === 'ar' ? 'لا توجد رسوم وزن إضافية ضمن التعرفة المحلية الرسمية' : 'No additional local weight surcharge'}: <span dir="ltr">{formatAed(surcharge.min)}</span></div>
                     ) : surcharge && surcharge.needsCustomQuote ? (
                       <div className="text-yellow-300 text-sm">{lang === 'ar' ? 'Ù„Ù„Ø´Ø­Ù†Ø§Øª Ø§Ù„ØªÙŠ ØªØ²ÙŠØ¯ Ø¹Ù† 20 ÙƒØ¬Ù…ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„Ù…ØªØ§Ø¨Ø¹Ø© Ø¥Ù„Ù‰ Ø§Ù„Ø­Ø¬Ø² Ø§Ù„ÙƒØ§Ù…Ù„ Ù„Ù„Ø­ØµÙˆÙ„ Ø¹Ù„Ù‰ Ø³Ø¹Ø± Ù…Ø®ØµØµ.' : 'For shipments above 20 kg, please continue to full booking for a custom quote.'}</div>
                     ) : null}
 
                     {surcharge && !surcharge.needsCustomQuote && (
-                      <div className="font-extrabold">{lang === 'ar' ? 'Ø§Ù„Ù†Ø·Ø§Ù‚ Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…ØªÙˆÙ‚Ø¹' : 'Estimated total range'}: AED {(deliveryEstimate.min + surcharge.min).toFixed(2)}</div>
+                      <div className="font-extrabold">{lang === 'ar' ? 'الإجمالي التقديري' : 'Estimated total'}: <span dir="ltr">{formatAed(deliveryEstimate.min + surcharge.min)}</span></div>
                     )}
 
                     <div className="text-xs text-white/50 mt-2">{lang === 'ar' ? 'Ù‡Ø°Ø§ ØªÙ‚Ø¯ÙŠØ± Ù‚Ø§Ø¦Ù… Ø¹Ù„Ù‰ ÙØ¦Ø© Ø§Ù„Ø£Ø³Ø¹Ø§Ø± Ø§Ù„Ø±Ø³Ù…ÙŠØ© ÙˆØ±Ø³ÙˆÙ… Ø§Ù„ÙˆØ²Ù†. Ø§Ù„Ø³Ø¹Ø± Ø§Ù„Ù†Ù‡Ø§Ø¦ÙŠ Ù‚Ø¯ ÙŠØ®ØªÙ„Ù Ø­Ø³Ø¨ Ø­Ø¬Ù… Ø§Ù„Ø´Ø­Ù†Ø© ÙˆÙ†ÙˆØ¹ Ø§Ù„Ø®Ø¯Ù…Ø© ÙˆÙˆÙ‚Øª Ø§Ù„ØªØ³Ù„ÙŠÙ….' : 'This estimate is based on official pricing categories and weight surcharge. Final price may vary based on package size, service type, and delivery timing.'}</div>

@@ -21,7 +21,19 @@ export interface Order {
   payment_method: "sender_pays" | "cod" | "receiver_pays";
   cod_amount?: number;
   notes?: string;
-  status: "Pending" | "Confirmed" | "Assigned" | "Picked Up" | "In Transit" | "Out For Delivery" | "Delivered" | "Failed" | "Cancelled";
+  status:
+    | "Pending"
+    | "Accepted"
+    | "Driver Assigned"
+    | "Picked Up"
+    | "In Transit"
+    | "Out for Delivery"
+    | "Delivered"
+    | "Cancelled"
+    | "Failed"
+    | "Confirmed"
+    | "Assigned"
+    | "Out For Delivery";
   created_at: string;
   status_history?: { status: string; date: string; note?: string }[];
 }

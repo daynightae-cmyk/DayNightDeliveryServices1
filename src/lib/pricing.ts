@@ -1,93 +1,153 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-export const VAT_RATE = 0.05;
-export const LOCAL_MAIN_CITY_PRICE = 30;
-export const LOCAL_EXTENDED_AREA_PRICE = 50;
-export const GCC_FIRST_KG_PRICE = 95;
-export const GCC_ADDITIONAL_KG_PRICE = 45;
-export const WORLDWIDE_FIRST_KG_PRICE = 190;
-export const WORLDWIDE_ADDITIONAL_KG_PRICE = 90;
+import { coverageAreas, isExtendedCoverage } from "../data/coverage";
+import { CURRENCY, domesticPricing, internationalDestinations, internationalPricing, VAT_RATE } from "../data/pricingData";
 
 export interface PricingResult {
   subtotal: number;
+  vatRate: number;
+  vatAmount: number;
   vat: number;
   total: number;
   currency: string;
   pricingCategory: string;
   billableWeight: number;
+  requiresCustomQuote: boolean;
+  breakdown: string[];
   notes: string;
 }
 
-// Check if area is an extended/remote area
-export function isExtendedArea(cityArOrEn: string): boolean {
-  const normalized = cityArOrEn.toLowerCase().trim();
-  const remoteKeywords = [
-    "العين", "ختم", "زينة", "سد", "قافرة", "مزيد", "قوع", "هير", "بوكرية", "سماح", "سويحان", "سمع العام", "رماة", "ناهل",
-    "al ain", "khatim", "zeina", "sadd", "qafra", "mezyad", "quaa", "heyer", "samah", "sweihan", "nahil",
-    "السلع", "الشويهات", "الظنة", "المرفأ", "بدع زايد", "بدع مطاوعة", "بينونة", "حبشان", "حميم", "عصب", "غياثي", "ليوا",
-    "sila", "shweihat", "dhannah", "mirfa", "madaid", "madinat zayed", "liwa", "ghayathi", "habshan", "hameem", "asab",
-    "الغربية"
-  ];
+export type DomesticPriceInput = {
+  pickupCity?: string | null;
+  deliveryCity?: string | null;
+  weight?: number | string | null;
+  serviceType?: "standard" | "express" | string | null;
+};
 
-  // Exception: Al Ruwais is main UAE price (30) as per request (section 11.3)
-  if (normalized.includes("الرويس") || normalized.includes("ruwais")) {
-    return false;
+export type InternationalPriceInput = {
+  countryCode?: string | null;
+  destination?: string | null;
+  weight?: number | string | null;
+};
+
+export const LOCAL_MAIN_CITY_PRICE = domesticPricing.main.base;
+export const LOCAL_EXTENDED_AREA_PRICE = domesticPricing.extended.base;
+export const EXPRESS_SURCHARGE = domesticPricing.expressSurcharge.amount;
+export const GCC_FIRST_KG_PRICE = internationalPricing.gcc.firstKg;
+export const GCC_ADDITIONAL_KG_PRICE = internationalPricing.gcc.additionalKg;
+export const WORLDWIDE_FIRST_KG_PRICE = internationalPricing.worldwide.firstKg;
+export const WORLDWIDE_ADDITIONAL_KG_PRICE = internationalPricing.worldwide.additionalKg;
+
+function normalizeWeight(weight: number | string | null | undefined) {
+  const parsed = Number(weight);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
   }
+  return Math.max(1, Math.ceil(parsed));
+}
 
-  return remoteKeywords.some(keyword => normalized.includes(keyword));
+export function calculateVat(subtotal: number) {
+  return Number((subtotal * VAT_RATE).toFixed(2));
+}
+
+export function formatAED(amount: number) {
+  return `${Number(amount).toFixed(2)} AED`;
+}
+
+export function isExtendedArea(cityArOrEn: string | null | undefined): boolean {
+  return isExtendedCoverage(cityArOrEn);
+}
+
+function resolveDomesticZone(input: DomesticPriceInput) {
+  return isExtendedArea(input.pickupCity) || isExtendedArea(input.deliveryCity) ? "extended" : "main";
+}
+
+export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult {
+  const billableWeight = normalizeWeight(input.weight);
+  const zone = resolveDomesticZone(input);
+  const basePrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
+  const express = input.serviceType === "express" ? EXPRESS_SURCHARGE : 0;
+  const subtotal = basePrice + express;
+  const vatAmount = calculateVat(subtotal);
+  const total = Number((subtotal + vatAmount).toFixed(2));
+  const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
+  const requiresCustomQuote = billableWeight > 50;
+
+  return {
+    subtotal,
+    vatRate: VAT_RATE,
+    vatAmount,
+    vat: vatAmount,
+    total,
+    currency: CURRENCY,
+    pricingCategory: category,
+    billableWeight,
+    requiresCustomQuote,
+    breakdown: [
+      `${category}: ${formatAED(basePrice)}`,
+      ...(express ? [`Express surcharge: ${formatAED(express)}`] : []),
+      `VAT 5%: ${formatAED(vatAmount)}`
+    ],
+    notes: requiresCustomQuote
+      ? "Large shipments may require operational confirmation before pickup."
+      : zone === "extended"
+        ? "Extended UAE area delivery price."
+        : "Main UAE city delivery price."
+  };
+}
+
+function resolveInternationalDestination(input: InternationalPriceInput) {
+  const raw = (input.countryCode || input.destination || "").trim().toLowerCase();
+  return internationalDestinations.find((destination) => {
+    return destination.countryCode.toLowerCase() === raw ||
+      destination.countryNameEn.toLowerCase() === raw ||
+      destination.countryNameAr.toLowerCase() === raw;
+  }) || internationalDestinations.find((destination) => destination.countryCode === "WORLD")!;
+}
+
+export function calculateInternationalPrice(inputOrDestination: InternationalPriceInput | string, weightKg?: number): PricingResult {
+  const input = typeof inputOrDestination === "string"
+    ? { destination: inputOrDestination, weight: weightKg }
+    : inputOrDestination;
+  const destination = resolveInternationalDestination(input);
+  const billableWeight = normalizeWeight(input.weight);
+  const firstKg = destination.firstKg;
+  const additionalKg = destination.additionalKg;
+  const subtotal = firstKg + ((billableWeight - 1) * additionalKg);
+  const vatAmount = calculateVat(subtotal);
+  const total = Number((subtotal + vatAmount).toFixed(2));
+  const requiresCustomQuote = billableWeight > 70;
+
+  return {
+    subtotal,
+    vatRate: VAT_RATE,
+    vatAmount,
+    vat: vatAmount,
+    total,
+    currency: CURRENCY,
+    pricingCategory: destination.region,
+    billableWeight,
+    requiresCustomQuote,
+    breakdown: [
+      `First kg: ${formatAED(firstKg)}`,
+      `Additional kg: ${formatAED(additionalKg)} x ${Math.max(0, billableWeight - 1)}`,
+      `VAT 5%: ${formatAED(vatAmount)}`
+    ],
+    notes: `${destination.countryNameEn} shipping estimate. Estimated delivery: ${destination.estimatedDays}.`
+  };
 }
 
 export function calculateLocalPrice(cityArOrEn: string, weightKg: number): PricingResult {
-  const billableWeight = Math.max(1, Math.ceil(weightKg));
-  const isRemote = isExtendedArea(cityArOrEn);
-  const basePrice = isRemote ? LOCAL_EXTENDED_AREA_PRICE : LOCAL_MAIN_CITY_PRICE;
-  
-  const subtotal = basePrice;
-  const vat = parseFloat((subtotal * VAT_RATE).toFixed(2));
-  const total = parseFloat((subtotal + vat).toFixed(2));
-
-  return {
-    subtotal,
-    vat,
-    total,
-    currency: "AED",
-    pricingCategory: isRemote ? "Extended UAE Area (مناطق ممتدة)" : "Main UAE City (مدن رئيسية)",
-    billableWeight,
-    notes: isRemote 
-      ? "توصيل للمناطق الممتدة والبعيدة في العين والمنطقة الغربية"
-      : "توصيل للمدن ومراكز الإمارات الرئيسية"
-  };
+  return calculateDomesticPrice({
+    deliveryCity: cityArOrEn,
+    weight: weightKg,
+    serviceType: "standard"
+  });
 }
 
-export function calculateInternationalPrice(destination: string, weightKg: number): PricingResult {
-  const billableWeight = Math.max(1, Math.ceil(weightKg));
-  const gccCountries = [
-    "saudi arabia", "qatar", "kuwait", "oman", "bahrain", "gcc",
-    "المملكة العربية السعودية", "السعودية", "قطر", "الكويت", "سلطنة عمان", "عمان", "البحرين"
-  ];
-  
-  const normalized = destination.toLowerCase().trim();
-  const isGcc = gccCountries.some(country => normalized.includes(country));
-
-  const firstKgPrice = isGcc ? GCC_FIRST_KG_PRICE : WORLDWIDE_FIRST_KG_PRICE;
-  const extraKgPrice = isGcc ? GCC_ADDITIONAL_KG_PRICE : WORLDWIDE_ADDITIONAL_KG_PRICE;
-
-  const subtotal = firstKgPrice + ((billableWeight - 1) * extraKgPrice);
-  const vat = parseFloat((subtotal * VAT_RATE).toFixed(2));
-  const total = parseFloat((subtotal + vat).toFixed(2));
-
-  return {
-    subtotal,
-    vat,
-    total,
-    currency: "AED",
-    pricingCategory: isGcc ? "GCC Shipping (شحن لدول الخليج)" : "Worldwide Global (شحن دولي عالمي)",
-    billableWeight,
-    notes: isGcc
-      ? `أول كجم: ${GCC_FIRST_KG_PRICE} درهم، كل كجم إضافي: ${GCC_ADDITIONAL_KG_PRICE} درهم`
-      : `أول كجم: ${WORLDWIDE_FIRST_KG_PRICE} درهم، كل كجم إضافي: ${WORLDWIDE_ADDITIONAL_KG_PRICE} درهم`
-  };
+export function getCoverageOptions() {
+  return coverageAreas.map((area) => ({
+    value: area.nameEn,
+    labelEn: area.nameEn,
+    labelAr: area.nameAr,
+    zoneType: area.zoneType
+  }));
 }

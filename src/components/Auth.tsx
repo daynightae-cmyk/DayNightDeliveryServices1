@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
 import { Lock, Mail, KeyRound, CheckCircle, ShieldAlert } from "lucide-react";
 
@@ -19,6 +19,12 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setSuccessMsg("");
     setLoading(true);
 
+    if (!supabase) {
+      setErrorMsg("تعذر الاتصال بخدمة المصادقة. يرجى التحقق من إعدادات البيئة.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -26,33 +32,28 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       });
 
       if (error) {
-        setErrorMsg(`Ø®Ø·Ø£ ÙÙŠ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„: ${error.message}`);
+        setErrorMsg(`خطأ في تسجيل الدخول: ${error.message}`);
       } else if (data?.user) {
         const id = data.user.id;
-        
-        setSuccessMsg("ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¨Ù†Ø¬Ø§Ø­! Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ù…Ø´Ø±ÙÙŠÙ†...");
-        
-        // Check admin role
+
+        setSuccessMsg("تم تسجيل الدخول بنجاح. جاري التحقق من صلاحيات الإدارة...");
+
         const isAdmin = await isAdminUser(id);
-        
+
         if (!isAdmin) {
-          setErrorMsg("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙƒÙ…Ø³Ø¤ÙˆÙ„.");
+          setErrorMsg("ليس لديك صلاحية الدخول كمسؤول.");
           await supabase.auth.signOut();
           setSuccessMsg("");
           setLoading(false);
           return;
         }
 
-        // Save auth session info securely
-        sessionStorage.setItem("dn_admin_authenticated", "true");
-        sessionStorage.setItem("dn_user_id", id);
-        
         setTimeout(() => {
           onAuthSuccess();
         }, 1000);
       }
-    } catch (err: any) {
-      setErrorMsg("Ø­Ø¯Ø« Ø®Ø·Ø£ ØªÙ‚Ù†ÙŠ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹ Ø£Ø«Ù†Ø§Ø¡ Ù…Ø­Ø§ÙˆÙ„Ø© Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„Ø®Ø§Ø¯Ù….");
+    } catch {
+      setErrorMsg("حدث خطأ تقني غير متوقع أثناء محاولة الاتصال بالخادم.");
     } finally {
       if (!successMsg) {
         setLoading(false);
@@ -67,9 +68,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       </div>
 
       <div className="text-center pt-6 pb-2 space-y-2">
-        <h2 className="text-2xl font-black text-white">Ø¨ÙˆØ§Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø±ÙƒØ²ÙŠØ© (Supabase)</h2>
+        <h2 className="text-2xl font-black text-white">بوابة الإدارة المركزية (Supabase)</h2>
         <p className="text-xs text-white/50 leading-relaxed font-sans">
-          Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù…Ø®ØµØµ Ù„Ù„Ù…Ø³Ø¤ÙˆÙ„ÙŠÙ† Ø¨ØµÙ„Ø§Ø­ÙŠØ© Admin ÙÙ‚Ø· Ø¨Ù†Ø§Ø¡ Ø¹Ù„Ù‰ Ù‚ÙŠÙˆØ¯ Supabase RLS.
+          الدخول مخصص للمسؤولين بصلاحية Admin فقط بناءً على قيود Supabase RLS.
         </p>
       </div>
 
@@ -89,7 +90,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
       <form onSubmit={handleSupabaseLogin} className="space-y-4 text-right mt-6">
         <div className="space-y-1.5 pt-2">
-          <label className="text-white/80 text-xs font-bold font-sans">Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ Ù„Ù„Ø¥Ø¯Ø§Ø±Ø©</label>
+          <label className="text-white/80 text-xs font-bold font-sans">البريد الإلكتروني للإدارة</label>
           <div className="relative">
             <input
               type="email"
@@ -104,7 +105,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-white/80 text-xs font-bold font-sans">ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ù…Ø´ÙØ±Ø©</label>
+          <label className="text-white/80 text-xs font-bold font-sans">كلمة المرور المشفرة</label>
           <div className="relative">
             <input
               type="password"
@@ -125,9 +126,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer"
           >
             {loading ? (
-               <span>Ø¬Ø§Ø±ÙŠ Ø§Ù„Ù…ØµØ§Ø¯Ù‚Ø© Ø§Ù„Ø£Ù…Ù†ÙŠØ©...</span>
+              <span>جاري المصادقة الأمنية...</span>
             ) : (
-               <span>ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù„Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ</span>
+              <span>تسجيل الدخول للنظام الأساسي</span>
             )}
           </button>
         </div>

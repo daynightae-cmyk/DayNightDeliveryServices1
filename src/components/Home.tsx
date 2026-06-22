@@ -43,6 +43,13 @@ export default function Home({ onNavigate }: HomeProps) {
     max: baseEstimate.max + surcharge.max,
   } : null;
 
+  function formatAedRange(min: number, max: number) {
+    if (language === "ar") {
+      return min === max ? `${min} درهم` : `من ${min} إلى ${max} درهم`;
+    }
+    return min === max ? `${min} AED` : `${min} to ${max} AED`;
+  }
+
   const strengths = [
     {
       icon: <Clock className="w-6 h-6 text-amber-500" />,
@@ -218,18 +225,18 @@ export default function Home({ onNavigate }: HomeProps) {
              <div className={`mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                <div className="flex justify-between items-center text-xs text-white/70">
                  <span>{tP?.baseRange || "Base estimated range:"}</span>
-                 <span className="font-mono">{baseEstimate ? `${baseEstimate.min} - ${baseEstimate.max} AED` : "---"}</span>
+                 <span className="font-mono" dir="ltr">{baseEstimate ? formatAedRange(baseEstimate.min, baseEstimate.max) : "---"}</span>
                </div>
                <div className="flex justify-between items-center text-xs text-white/70">
                  <span>{tP?.surchargeRange || "Weight surcharge estimate:"}</span>
-                 <span className="font-mono text-brand-gold">{surcharge.min === 0 && surcharge.max === 0 ? "0 AED" : `+${surcharge.min} - ${surcharge.max} AED`}</span>
+                 <span className="font-mono text-brand-gold" dir="ltr">{surcharge.min === 0 && surcharge.max === 0 ? (language === "ar" ? "0 درهم" : "0 AED") : formatAedRange(surcharge.min, surcharge.max)}</span>
                </div>
              </div>
 
              <div className="mt-4 bg-brand-cool border border-brand-gold/20 rounded-lg px-6 py-3 flex justify-between items-center">
                  <p className="text-xs text-white/50 uppercase">{tP?.totalRange || "Estimated total range:"}</p>
                  <p className="text-brand-gold font-bold font-mono text-base">
-                   {totalEstimate ? `${totalEstimate.min} - ${totalEstimate.max} AED` : "---"}
+                   {totalEstimate ? formatAedRange(totalEstimate.min, totalEstimate.max) : "---"}
                  </p>
              </div>
              

@@ -7,7 +7,15 @@ export const shipmentStatuses: Record<string, { en: string, ar: string }> = {
     en: "Pickup Scheduled",
     ar: "تم جدولة الاستلام"
   },
+  "Confirmed": {
+    en: "Pickup Scheduled",
+    ar: "تم جدولة الاستلام"
+  },
   "Driver Assigned": {
+    en: "Driver Assigned",
+    ar: "تم تعيين السائق"
+  },
+  "Assigned": {
     en: "Driver Assigned",
     ar: "تم تعيين السائق"
   },
@@ -20,6 +28,10 @@ export const shipmentStatuses: Record<string, { en: string, ar: string }> = {
     ar: "الشحنة في الطريق"
   },
   "Out for Delivery": {
+    en: "Out for Delivery",
+    ar: "في الطريق للتسليم"
+  },
+  "Out For Delivery": {
     en: "Out for Delivery",
     ar: "في الطريق للتسليم"
   },

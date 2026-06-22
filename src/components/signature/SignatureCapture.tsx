@@ -1,4 +1,4 @@
-﻿import type React from "react";
+import type React from "react";
 import { useRef, useState, useEffect } from "react";
 import { useAppContext } from "../../lib/AppContext";
 import { translations } from "../../data/translations";
@@ -23,7 +23,7 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
      return null;
   }
 
-  // Adjust canvas size for styling (mock implementation of responsiveness)
+  // Adjust canvas size for styling (responsive canvas sizing)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -115,6 +115,7 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
       // In a real app we might check the image data buffer.
       const dataUrl = canvas.toDataURL("image/png");
       setSavedSignature(dataUrl);
+      // Future Supabase storage integration for delivery signatures.
       if (onSave) onSave(dataUrl);
     }
   };
@@ -132,6 +133,7 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
          <div className={`mt-4 flex ${language === 'ar' ? 'justify-start' : 'justify-end'}`}>
             <button 
               onClick={handleClear}
+              aria-label="Reset saved signature"
               className="text-white/50 text-xs hover:text-white underline"
             >
               Reset
@@ -154,6 +156,8 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
        <div className="w-full rounded-xl overflow-hidden border-2 border-dashed border-white/20 relative touch-none bg-white">
           <canvas
             ref={canvasRef}
+            role="img"
+            aria-label={language === "ar" ? "لوحة توقيع المستلم" : "Recipient signature canvas"}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={finishDrawing}
@@ -172,12 +176,14 @@ export default function SignatureCapture({ onSave, status }: SignatureCapturePro
        <div className={`flex mt-5 gap-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
           <button 
             onClick={handleSave}
+            aria-label={language === "ar" ? "حفظ التوقيع" : "Save signature"}
             className="flex-1 bg-brand-gold text-brand-deep font-bold py-3 rounded-xl hover:bg-brand-blue hover:text-white transition-colors"
           >
             {t.save}
           </button>
           <button 
             onClick={handleClear}
+            aria-label={language === "ar" ? "مسح التوقيع" : "Clear signature"}
             className="px-5 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition-colors flex items-center gap-2"
           >
             <XCircle className="w-4 h-4" />

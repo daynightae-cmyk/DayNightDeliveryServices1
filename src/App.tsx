@@ -44,6 +44,7 @@ import {
   Sun
 } from "lucide-react";
 import companyMeta from "./data/companyMeta";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
 
@@ -124,7 +125,7 @@ function AppContent() {
           </button>
           <span className="text-white/20">|</span>
           <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider">
-            {language === 'ar' ? 'EN' : 'عربي'}
+            {language === 'ar' ? 'EN' : 'Ø¹Ø±Ø¨ÙŠ'}
           </button>
           <span className="text-white/20">|</span>
           <a href={`tel:${companyMeta.phone}`} className="hover:text-brand-gold transition-colors flex items-center gap-1">
@@ -274,7 +275,7 @@ function AppContent() {
           <Route path="/policy" element={<Policy />} />
           <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
           <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
-          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -324,8 +325,8 @@ function AppContent() {
             <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5 rtl:border-r-4 rtl:border-l-0 ltr:border-l-4 ltr:border-r-0 ltr:pl-2.5 rtl:pr-2.5">{t.nav.quick_contact}</h4>
             <div className="text-xs text-white/60 space-y-2.5">
               <p>{t.footer.support}</p>
-              <p className="text-sm font-extrabold text-white font-sans">هاتف: +971 56 875 7331</p>
-              <p className="text-[11px] font-mono text-white/40">البريد: Admin@daynight.ae</p>
+              <p className="text-sm font-extrabold text-white font-sans">Ù‡Ø§ØªÙ: +971 56 875 7331</p>
+              <p className="text-[11px] font-mono text-white/40">Ø§Ù„Ø¨Ø±ÙŠØ¯: Admin@daynightae.com</p>
               <a
                 id="footer_whatsapp_catalog"
                 href="https://wa.me/c/971568757331"
@@ -366,3 +367,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

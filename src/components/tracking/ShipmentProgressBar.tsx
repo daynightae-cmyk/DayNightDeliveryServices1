@@ -15,7 +15,7 @@ export default function ShipmentProgressBar({ status }: ShipmentProgressBarProps
 
   let stepIndex = 0;
   if (["processing", "confirmed", "accepted", "pickup scheduled", "driver assigned", "picked up", "in transit", "assigned"].includes(normalizedStatus)) stepIndex = 1;
-  if (["out for delivery"].includes(normalizedStatus)) stepIndex = 2;
+  if (["out for delivery", "out for delivery"].includes(normalizedStatus)) stepIndex = 2;
   if (["delivered"].includes(normalizedStatus)) stepIndex = 3;
 
   const steps = [

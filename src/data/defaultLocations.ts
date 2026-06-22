@@ -1,4 +1,4 @@
-export const mockLocations = {
+export const defaultLocations = {
   abuDhabi: {
     labelEn: "Abu Dhabi",
     labelAr: "أبوظبي",

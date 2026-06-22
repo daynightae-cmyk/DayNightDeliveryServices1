@@ -15,65 +15,15 @@ export const cities = [
 export function getWeightSurcharge(weightKg: number | string | null) {
   const weight = Number(weightKg);
 
-  if (!weight || weight <= 1) {
-    return { min: 0, max: 0, needsCustomQuote: false };
-  }
-
-  if (weight > 1 && weight <= 5) {
-    return { min: 5, max: 10, needsCustomQuote: false };
-  }
-
-  if (weight > 5 && weight <= 10) {
-    return { min: 15, max: 25, needsCustomQuote: false };
-  }
-
-  if (weight > 10 && weight <= 20) {
-    return { min: 30, max: 50, needsCustomQuote: false };
-  }
-
-  return { min: 0, max: 0, needsCustomQuote: true };
+  return { min: 0, max: 0, needsCustomQuote: Number.isFinite(weight) && weight > 50 };
 }
 
 export function getQuickEstimate(from: string, to: string) {
   if (!from || !to) return null;
 
-  if (from === to) {
-    return { min: 30, max: 35 };
-  }
+  const extendedAreas = ["Al Ain", "Western Region"];
+  const isExtended = extendedAreas.includes(from) || extendedAreas.includes(to);
+  const price = isExtended ? 50 : 30;
 
-  const abuDhabiArea = [
-    "Abu Dhabi",
-    "Mussafah",
-    "Khalifa City",
-    "Mohammed Bin Zayed City",
-    "Al Ain"
-  ];
-
-  const northernEmirates = [
-    "Sharjah",
-    "Ajman",
-    "Umm Al Quwain",
-    "Ras Al Khaimah",
-    "Fujairah"
-  ];
-
-  if (abuDhabiArea.includes(from) && abuDhabiArea.includes(to)) {
-    return { min: 30, max: 50 };
-  }
-
-  if (
-    (from === "Abu Dhabi" && to === "Dubai") ||
-    (from === "Dubai" && to === "Abu Dhabi")
-  ) {
-    return { min: 50, max: 85 };
-  }
-
-  if (
-    (abuDhabiArea.includes(from) && northernEmirates.includes(to)) ||
-    (northernEmirates.includes(from) && abuDhabiArea.includes(to))
-  ) {
-    return { min: 70, max: 120 };
-  }
-
-  return { min: 45, max: 70 };
+  return { min: price, max: price };
 }
