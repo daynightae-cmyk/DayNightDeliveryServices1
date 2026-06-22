@@ -17,7 +17,11 @@ import {
   CalendarDays,
   Barcode
 } from "lucide-react";
+import { useLanguage } from '../context/LanguageContext';
 import MiniStatusBar from './tracking/MiniStatusBar';
+import ShipmentProgressBar from './tracking/ShipmentProgressBar';
+import TrackingMap from './tracking/TrackingMap';
+import SignatureCapture from './signature/SignatureCapture';
 
 interface TrackingProps {
   initialTrackingId?: string;
@@ -28,6 +32,7 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
   const [order, setOrder] = useState<Order | null>(null);
   const [searched, setSearched] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const { lang } = useLanguage();
 
   useEffect(() => {
     if (initialTrackingId) {
@@ -174,6 +179,16 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <ShipmentProgressBar currentStatus={order.status} language={(order && order.language) || 'en'} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TrackingMap pickupLocation={order.pickup_location || null} destinationLocation={order.destination_location || null} status={order.status} language={(order && order.language) || 'en'} />
+                  {(order.status === 'Out For Delivery' || order.status === 'Delivered' || order.status === 'Out For Delivery') && (
+                    <SignatureCapture orderId={order.id} trackingNumber={order.id} language={(order && order.language) || 'en'} onSignatureSave={(d)=>{console.log('signature saved', d)}} />
+                  )}
                 </div>
               </div>
  

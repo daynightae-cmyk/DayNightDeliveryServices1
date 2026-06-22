@@ -15,6 +15,8 @@ import {
   CheckCircle,
   Clock
 } from "lucide-react";
+import companyMeta from '../data/companyMeta';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ContactUs() {
   const [formData, setFormData] = useState({
@@ -25,6 +27,8 @@ export default function ContactUs() {
     message: ""
   });
   const [submitted, setSubmitted] = useState(false);
+
+  const { lang } = useLanguage();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,17 +49,17 @@ export default function ContactUs() {
   const socialLinks = [
     {
       name: "فيسبوك Facebook",
-      url: "https://www.facebook.com/profile.php?id=61590600606676",
+      url: companyMeta.socials.facebook,
       icon: <Facebook className="w-5 h-5 text-blue-600" />
     },
     {
       name: "إنستغرام Instagram",
-      url: "https://www.instagram.com/day_night_delivery_services",
+      url: companyMeta.socials.instagram,
       icon: <Instagram className="w-5 h-5 text-pink-600" />
     },
     {
       name: "تيك توك TikTok",
-      url: "https://www.tiktok.com/@daynight4767",
+      url: companyMeta.socials.tiktok,
       icon: <MessageSquare className="w-5 h-5 text-slate-800" />
     }
   ];
@@ -90,8 +94,8 @@ export default function ContactUs() {
                 </div>
                 <div>
                   <p className="text-white/40 text-xs font-bold font-sans">رقم الهاتف الرسمي والطلب</p>
-                  <a href="tel:+971568757331" className="text-white font-extrabold text-base hover:text-brand-gold mt-0.5 inline-block font-sans">
-                    +971 56 875 7331
+                  <a href={`tel:${companyMeta.phone}`} className="text-white font-extrabold text-base hover:text-brand-gold mt-0.5 inline-block font-sans">
+                    {companyMeta.phone}
                   </a>
                 </div>
               </div>
@@ -104,13 +108,13 @@ export default function ContactUs() {
                 <div>
                   <p className="text-white/40 text-xs font-bold font-sans">تواصل سريع عبر واتساب</p>
                   <a 
-                    href="https://wa.me/971568757331" 
+                    href={companyMeta.whatsapp} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     referrerPolicy="no-referrer"
                     className="text-emerald-400 font-extrabold text-base hover:underline mt-0.5 inline-block font-sans"
                   >
-                    https://wa.me/971568757331
+                    {companyMeta.whatsapp}
                   </a>
                 </div>
               </div>
@@ -123,7 +127,7 @@ export default function ContactUs() {
                 <div>
                   <p className="text-white/40 text-xs font-bold font-sans">عرض كتالوج الخدمات والأسعار</p>
                   <a 
-                    href="https://wa.me/c/971568757331" 
+                    href={companyMeta.whatsappCatalog} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     referrerPolicy="no-referrer"
@@ -141,8 +145,8 @@ export default function ContactUs() {
                 </div>
                 <div>
                   <p className="text-white/40 text-xs font-bold font-sans">البريد الإلكتروني المعتمد</p>
-                  <a href="mailto:Admin@daynight.ae" className="text-white font-bold text-sm hover:text-brand-gold mt-0.5 inline-block font-sans leading-none">
-                    Admin@daynight.ae
+                  <a href={`mailto:${companyMeta.email}`} className="text-white font-bold text-sm hover:text-brand-gold mt-0.5 inline-block font-sans leading-none">
+                    {companyMeta.email}
                   </a>
                 </div>
               </div>
@@ -155,16 +159,16 @@ export default function ContactUs() {
                 <div>
                   <p className="text-white/40 text-xs font-bold font-sans">العنوان الرسمي للمقر</p>
                   <p className="text-white/80 font-bold text-sm leading-relaxed mt-0.5">
-                    UAE – Abu Dhabi – Mussafah 40 <br />
-                    الإمارات العربية المتحدة – أبوظبي – مصفح 40
+                    {companyMeta.addressEn} <br />
+                    {companyMeta.addressAr}
                   </p>
                   <a
-                    href="https://maps.app.goo.gl/PCTjMCQpZuR3ns2J7"
+                    href={companyMeta.mapUrl}
                     target="_blank"
                     referrerPolicy="no-referrer"
                     className="text-brand-gold font-bold text-xs mt-1.5 inline-flex items-center gap-1 hover:underline"
                   >
-                    <span>افتح مقرنا على خرائط جوجل</span>
+                    <span>{lang === 'ar' ? 'افتح مقرنا على خرائط جوجل' : 'Open our location on Google Maps'}</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>

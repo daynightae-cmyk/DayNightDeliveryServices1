@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import translations from '../../data/translations';
 import { cities, getQuickEstimate } from '../../data/pricingEstimate';
+import getWeightSurcharge from '../../utils/pricing/getWeightSurcharge';
 import { Calculator, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -14,6 +15,8 @@ export default function QuickPriceEstimate() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const result = useMemo(() => getQuickEstimate(from, to), [from, to]);
+  const [weight, setWeight] = useState<string | number>('1');
+  const surcharge = useMemo(() => getWeightSurcharge(weight), [weight]);
 
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
   const positionClass = dir === 'rtl' ? 'left-4' : 'right-4';
@@ -45,7 +48,28 @@ export default function QuickPriceEstimate() {
               </select>
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              <label className="text-xs text-white/60">{t.weightLabel}</label>
+              <div className="flex gap-2">
+                <select value={String(weight)} onChange={(e) => setWeight(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border">
+                  <option value="0.5">0.5 {t.weightUnit}</option>
+                  <option value="1">1 {t.weightUnit}</option>
+                  <option value="2">2 {t.weightUnit}</option>
+                  <option value="3">3 {t.weightUnit}</option>
+                  <option value="5">5 {t.weightUnit}</option>
+                  <option value="10">10 {t.weightUnit}</option>
+                  <option value="15">15 {t.weightUnit}</option>
+                  <option value="20">20 {t.weightUnit}</option>
+                  <option value="other">Other</option>
+                </select>
+                {String(weight) === 'other' ? (
+                  <input type="number" min="0.1" step="0.1" placeholder={t.weightPlaceholder} value={''} onChange={(e) => setWeight(Number(e.target.value))} className="w-28 px-3 py-2 rounded-lg border" />
+                ) : (
+                  <div className="w-28 px-3 py-2 rounded-lg border bg-white/5 text-center">{String(weight)} {t.weightUnit}</div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
               <button onClick={() => {}} className={`flex-1 px-3 py-2 rounded-lg font-bold ${theme === 'night' ? 'bg-brand-gold text-brand-deep' : 'bg-blue-600 text-white'}`}>{t.estimateButton}</button>
               <Link to="/pricing" className="text-xs text-slate-500 hover:underline flex items-center gap-1"><span>{t.continueBooking}</span> <ArrowRight className="w-3 h-3"/></Link>
             </div>
@@ -54,7 +78,20 @@ export default function QuickPriceEstimate() {
               {(!from || !to) ? (
                 <div className="text-rose-500">{t.missingFields}</div>
               ) : result ? (
-                <div className="font-extrabold">{t.estimatedRange}: AED {result.min} – AED {result.max}</div>
+                <div className="space-y-2">
+                  <div className="font-extrabold">{t.estimatedRange}: AED {result.min} – AED {result.max}</div>
+                  {surcharge && !surcharge.needsCustomQuote ? (
+                    <div className="text-white/90 text-sm">{lang === 'ar' ? 'تقدير رسوم الوزن الإضافية' : 'Weight surcharge estimate'}: AED {surcharge.min} – AED {surcharge.max}</div>
+                  ) : surcharge && surcharge.needsCustomQuote ? (
+                    <div className="text-yellow-300 text-sm">{lang === 'ar' ? 'للشحنات التي تزيد عن 20 كجم، يرجى المتابعة إلى الحجز الكامل للحصول على سعر مخصص.' : 'For shipments above 20 kg, please continue to full booking for a custom quote.'}</div>
+                  ) : null}
+
+                  {surcharge && !surcharge.needsCustomQuote && (
+                    <div className="font-extrabold">{lang === 'ar' ? 'النطاق الإجمالي المتوقع' : 'Estimated total range'}: AED {result.min + surcharge.min} – AED {result.max + surcharge.max}</div>
+                  )}
+
+                  <div className="text-xs text-white/50 mt-2">{lang === 'ar' ? 'هذا نطاق سعري تقديري. قد يختلف السعر النهائي حسب حجم الشحنة، نوع الخدمة، ووقت التوصيل.' : 'This is an estimated price range. Final pricing may vary based on package size, service type, and delivery timing.'}</div>
+                </div>
               ) : (
                 <div className="text-white/60">—</div>
               )}

@@ -45,6 +45,8 @@ import {
   Globe2,
   HelpCircle
 } from "lucide-react";
+import { useLanguage } from './context/LanguageContext';
+import companyMeta from './data/companyMeta';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
 import UtilityBar from './components/common/UtilityBar';
@@ -55,6 +57,7 @@ const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.pn
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
+    const { lang } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Synchronize legacy key actions with real production URLs
@@ -116,17 +119,17 @@ function AppContent() {
       {/* Upper Slogan / Utility Bar */}
       <div className="bg-brand-cool text-white text-[11px] font-sans py-2.5 px-4 sm:px-8 border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2.5 font-bold">
         <div className="flex items-center gap-3">
-          <span className="text-brand-gold font-mono tracking-wider">• Swift • Secure • Exceptional</span>
+          <span className="text-brand-gold font-mono tracking-wider">{companyMeta.sloganEn}</span>
           <span className="text-white/20 font-sans">|</span>
-          <span className="text-white/80">سرعة • أمان • تميز</span>
+          <span className="text-white/80">{companyMeta.sloganAr}</span>
         </div>
         <div className="flex items-center gap-4">
-          <a href="tel:+971568757331" className="hover:text-brand-gold transition-colors flex items-center gap-1">
+          <a href={`tel:${companyMeta.phone}`} className="hover:text-brand-gold transition-colors flex items-center gap-1">
             <PhoneCall className="w-3.5 h-3.5 text-brand-gold" />
-            <span>+971 56 875 7331</span>
+            <span>{companyMeta.phone}</span>
           </a>
           <span className="text-white/20">|</span>
-          <p className="text-white/60">نعمل على مدار الساعة 24/7 Delivery Support</p>
+          <p className="text-white/60">{lang === 'ar' ? 'نعمل على مدار الساعة' : '24/7 Delivery Support'}</p>
         </div>
         <UtilityBar />
       </div>
@@ -354,10 +357,10 @@ function AppContent() {
 
         {/* Legal copy strip */}
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-white/40 text-[11px] font-sans font-bold text-center">
-          <p>© 2026 داي نايت لخدمات التوصيل والشحن. جميع الحقوق محفوظة لشركة Day Night Delivery.</p>
+          <p>© {new Date().getFullYear()} {companyMeta.nameAr}. جميع الحقوق محفوظة لـ {companyMeta.name}.</p>
           <div className="flex gap-4">
             <span className="text-white/10">|</span>
-            <p>سرعة • أمان • تميز</p>
+            <p>{companyMeta.sloganAr}</p>
           </div>
         </div>
       </footer>

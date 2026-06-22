@@ -17,6 +17,7 @@ import {
   BadgeCheck 
 } from "lucide-react";
 import QuickPriceEstimate from './pricing/QuickPriceEstimate';
+import TestimonialCarousel from './home/TestimonialCarousel';
 
 interface HomeProps {
   onNavigate: (tab: string) => void;
@@ -255,6 +256,7 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
       </section>
+      <TestimonialCarousel />
       <QuickPriceEstimate />
     </div>
   );
