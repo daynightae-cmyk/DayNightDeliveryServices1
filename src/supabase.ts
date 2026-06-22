@@ -8,9 +8,12 @@ import { Order } from "./types";
 import { calculateLocalPrice, calculateInternationalPrice } from "./lib/pricing";
 
 const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL || "https://ngdwybpgacauorygoedi.supabase.co").trim();
-const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nZHd5YnBnYWNhdW9yeWdvZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4NzQ0ODksImV4cCI6MjA5NzQ1MDQ4OX0.XnxcHmWfpcpV9P6FJY0riGE0BQfHWC-WsISywyle5KQ").trim();
+const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(
+  SUPABASE_URL, 
+  SUPABASE_ANON_KEY || "empty_anon_key_please_configure_vite_env"
+);
 
 // Fallback Local Storage keys to ensure seamless interactive state matching production
 const LOCAL_STORAGE_KEY = "daynight_delivery_orders_state_v2";
