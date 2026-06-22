@@ -17,6 +17,7 @@ import {
   DollarSign, 
   Boxes 
 } from "lucide-react";
+import NotificationPermissionToggle from "./notifications/NotificationPermissionToggle";
 
 interface RequestDeliveryProps {
   onNavigate: (tab: string, trackingId?: string) => void;
@@ -429,6 +430,9 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                 className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold"
               ></textarea>
             </div>
+
+            {/* Notifications Toggle (optional) */}
+            <NotificationPermissionToggle />
 
             {/* Calculations Detail Box */}
             <div className="bg-brand-deep/85 rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-sans font-medium text-right">

@@ -16,6 +16,7 @@ import {
   ClipboardCheck, 
   BadgeCheck 
 } from "lucide-react";
+import QuickPriceEstimate from './pricing/QuickPriceEstimate';
 
 interface HomeProps {
   onNavigate: (tab: string) => void;
@@ -254,6 +255,7 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
       </section>
+      <QuickPriceEstimate />
     </div>
   );
 }

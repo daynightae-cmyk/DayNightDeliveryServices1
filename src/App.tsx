@@ -45,6 +45,9 @@ import {
   Globe2,
   HelpCircle
 } from "lucide-react";
+import { LanguageProvider } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeContext';
+import UtilityBar from './components/common/UtilityBar';
 
 // Official Logo Image URL
 const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
@@ -125,6 +128,7 @@ function AppContent() {
           <span className="text-white/20">|</span>
           <p className="text-white/60">نعمل على مدار الساعة 24/7 Delivery Support</p>
         </div>
+        <UtilityBar />
       </div>
 
       {/* Main Glassmorphic Header */}
@@ -364,7 +368,11 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <LanguageProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }

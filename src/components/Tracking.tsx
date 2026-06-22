@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Barcode
 } from "lucide-react";
+import MiniStatusBar from './tracking/MiniStatusBar';
 
 interface TrackingProps {
   initialTrackingId?: string;
@@ -78,6 +79,7 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-12 text-right">
+      <MiniStatusBar trackingNo={initialTrackingId || undefined} />
       {/* Search Widget */}
       <section className="bg-brand-cool/40 border border-white/10 p-6 sm:p-10 rounded-3xl text-white space-y-6 relative overflow-hidden text-center">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-gold/5 rounded-full blur-3xl"></div>
