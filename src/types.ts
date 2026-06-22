@@ -3,6 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "assigned"
+  | "picked_up"
+  | "in_transit"
+  | "delivered"
+  | "cancelled"
+  | "returned";
+
 export interface Order {
   id: string; // Tracking Number e.g., DN-491026-X
   sender_name: string;
@@ -21,7 +31,7 @@ export interface Order {
   payment_method: "sender_pays" | "cod" | "receiver_pays";
   cod_amount?: number;
   notes?: string;
-  status: "Pending" | "Confirmed" | "Assigned" | "Picked Up" | "In Transit" | "Out For Delivery" | "Delivered" | "Failed" | "Cancelled";
+  status: OrderStatus;
   created_at: string;
   status_history?: { status: string; date: string; note?: string }[];
 }

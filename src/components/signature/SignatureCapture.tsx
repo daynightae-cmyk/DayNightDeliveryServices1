@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useAppContext } from "../../lib/AppContext";
 import { translations } from "../../data/translations";
 import { PenTool, XCircle, CheckCircle2 } from "lucide-react";

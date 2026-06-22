@@ -76,15 +76,32 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
     setLoading(true);
     setValidationError("");
 
+    // Require all fields
+    if (!senderName.trim() || !senderPhone.trim() || !senderAddress.trim()) {
+      setValidationError("يرجى ملء جميع بيانات المرسل الإلزامية");
+      setLoading(false);
+      return;
+    }
+    if (!receiverName.trim() || !receiverPhone.trim() || !receiverAddress.trim()) {
+      setValidationError("يرجى ملء جميع بيانات المستلم الإلزامية");
+      setLoading(false);
+      return;
+    }
+    if (paymentMethod === "cod" && (!codAmount || Number(codAmount) <= 0)) {
+      setValidationError("يرجى إدخال مبلغ التحصيل COD");
+      setLoading(false);
+      return;
+    }
+
     const newOrder: Partial<Order> = {
-      sender_name: senderName || "مرسل مجهول",
-      sender_phone: senderPhone || "+9710000000",
+      sender_name: senderName.trim(),
+      sender_phone: senderPhone.trim(),
       sender_city: senderCity,
-      sender_address: senderAddress || "مقر مصفح",
-      receiver_name: receiverName || "مستلم مجهول",
-      receiver_phone: receiverPhone || "+9710000000",
+      sender_address: senderAddress.trim(),
+      receiver_name: receiverName.trim(),
+      receiver_phone: receiverPhone.trim(),
       receiver_city: receiverCity,
-      receiver_address: receiverAddress || "عنوان التوصيل المعتمد",
+      receiver_address: receiverAddress.trim(),
       package_type: packageType,
       weight: Number(weight) || 1,
       pieces: Number(pieces) || 1,
@@ -92,12 +109,12 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       delivery_price: deliveryPrice,
       payment_method: paymentMethod,
       cod_amount: paymentMethod === "cod" ? Number(codAmount) : undefined,
-      notes: notes || undefined,
-      status: "Pending",
+      notes: notes.trim() || undefined,
+      status: "pending",
       created_at: new Date().toISOString(),
       status_history: [
         {
-          status: "Pending",
+          status: "pending",
           date: new Date().toLocaleString(),
           note: "تم استلام الطلب الكترونياً وجاري المراجعة والتأكيد من فريق داي نايت"
         }
@@ -110,7 +127,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
         setSuccessId(typeof returnedId === 'object' ? JSON.stringify(returnedId) : String(returnedId));
         setStep(4);
       } else {
-        setValidationError("حدث خطأ أثناء إنشاء الطلب في النظام. يرجى المحاولة لاحقاً.");
+        setValidationError("حدث خطأ أثناء إنشاء الطلب في النظام. يرجى المحاولة لاحقاً أو التواصل عبر واتساب.");
       }
     } catch (e) {
       console.error(e);
@@ -505,7 +522,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               <p className="text-white/40 text-xs font-bold uppercase tracking-wider font-sans">{t.requestDelivery.trackingNumberLabel}</p>
               <p className="text-2xl font-extrabold text-brand-gold">{successId}</p>
               <p className="text-emerald-500 text-[11px] font-sans font-bold flex items-center justify-center gap-1">
-                <span>{language === 'ar' ? 'حالة الشحنة الحالية (Pending)' : 'Current Status (Pending)'}</span>
+                <span>{language === 'ar' ? 'الحالة الحالية: قيد المراجعة' : 'Current Status: Pending Review'}</span>
               </p>
             </div>
 
@@ -513,7 +530,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               {language === 'ar' ? 'تم إرسال طردك لوكيل التوزيع، وسيصل سائق داي نايت لإجراء الاستلام في وقت قريب. يمكنك استخدام رقم التتبع أعلاه للمراقبة فورياً!' : 'Your package has been sent to the distribution agent. A driver will arrive for pickup soon. Use the tracking number to monitor.'}
             </p>
 
-            <div className={`flex justify-center gap-3 pt-2 ${language === 'ar' ? 'flex-row' : 'flex-row-reverse'}`}>
+            <div className={`flex flex-wrap justify-center gap-3 pt-2`}>
               <button
                 id="success_new_btn"
                 onClick={() => {
@@ -540,6 +557,14 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               >
                 {t.requestDelivery.trackNow}
               </button>
+              <a
+                href={`https://wa.me/971568757331?text=${encodeURIComponent(`طلب توصيل جديد - رقم التتبع: ${successId}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                واتساب للمتابعة
+              </a>
             </div>
           </div>
         )}

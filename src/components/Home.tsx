@@ -19,7 +19,8 @@ import {
 
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
-import { cities, getQuickEstimate, getWeightSurcharge } from "../data/pricingEstimate";
+import { cities, getOfficialLocalPrice } from "../data/pricingEstimate";
+import { VAT_RATE } from "../lib/pricing";
 import { useState } from "react";
 import TestimonialCarousel from "./home/TestimonialCarousel";
 
@@ -35,13 +36,9 @@ export default function Home({ onNavigate }: HomeProps) {
   const [estimateTo, setEstimateTo] = useState(cities[0]);
   const [weight, setWeight] = useState<number | string>("");
 
-  const baseEstimate = getQuickEstimate(estimateFrom, estimateTo);
-  const surcharge = getWeightSurcharge(weight);
-
-  const totalEstimate = baseEstimate ? {
-    min: baseEstimate.min + surcharge.min,
-    max: baseEstimate.max + surcharge.max,
-  } : null;
+  const basePrice = getOfficialLocalPrice(estimateTo);
+  const vat = parseFloat((basePrice * VAT_RATE).toFixed(2));
+  const totalPrice = parseFloat((basePrice + vat).toFixed(2));
 
   const strengths = [
     {
@@ -217,27 +214,26 @@ export default function Home({ onNavigate }: HomeProps) {
              {/* Dynamic Cost Info */}
              <div className={`mt-4 pt-4 border-t border-white/10 flex flex-col space-y-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                <div className="flex justify-between items-center text-xs text-white/70">
-                 <span>{tP?.baseRange || "Base estimated range:"}</span>
-                 <span className="font-mono">{baseEstimate ? `${baseEstimate.min} - ${baseEstimate.max} AED` : "---"}</span>
+                 <span>{tP?.baseRange || "السعر الأساسي:"}</span>
+                 <span className="font-mono">{basePrice} AED</span>
                </div>
                <div className="flex justify-between items-center text-xs text-white/70">
-                 <span>{tP?.surchargeRange || "Weight surcharge estimate:"}</span>
-                 <span className="font-mono text-brand-gold">{surcharge.min === 0 && surcharge.max === 0 ? "0 AED" : `+${surcharge.min} - ${surcharge.max} AED`}</span>
+                 <span>{tP?.surchargeRange || "ضريبة القيمة المضافة (5%):"}</span>
+                 <span className="font-mono text-brand-gold">+{vat} AED</span>
                </div>
              </div>
 
              <div className="mt-4 bg-brand-cool border border-brand-gold/20 rounded-lg px-6 py-3 flex justify-between items-center">
-                 <p className="text-xs text-white/50 uppercase">{tP?.totalRange || "Estimated total range:"}</p>
+                 <p className="text-xs text-white/50 uppercase">{tP?.totalRange || "الإجمالي:"}</p>
                  <p className="text-brand-gold font-bold font-mono text-base">
-                   {totalEstimate ? `${totalEstimate.min} - ${totalEstimate.max} AED` : "---"}
+                   {totalPrice} AED
                  </p>
              </div>
              
-             {surcharge.needsCustomQuote && (
-               <p className={`mt-3 text-brand-gold text-xs italic ${language === 'ar' ? 'text-right' : 'text-left'}`}>{tP?.customQuote}</p>
-             )}
-             
-             <p className={`mt-2 text-white/40 text-[10px] ${language === 'ar' ? 'text-right' : 'text-left'}`}>{tP?.disclaimer}</p>
+             <p className={`mt-2 text-amber-400/70 text-[10px] font-bold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+               تقدير غير نهائي — السعر الرسمي يظهر بعد حساب النظام
+             </p>
+             <p className={`mt-1 text-white/40 text-[10px] ${language === 'ar' ? 'text-right' : 'text-left'}`}>{tP?.disclaimer}</p>
 
              <div className={`mt-4 ${language === 'ar' ? 'text-left' : 'text-right'}`}>
                 <button onClick={() => onNavigate("pricing")} className="text-xs text-brand-blue hover:text-brand-gold underline font-bold transition-colors">{t.pricingWidget.continueBooking} &rarr;</button>
