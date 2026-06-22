@@ -10,66 +10,84 @@ export interface StatusConfig {
 }
 
 export const STATUS_LABELS: Record<string, StatusConfig> = {
-  Pending: {
-    labelAr: "قيد الانتظار",
-    labelEn: "Pending",
+  pending: {
+    labelAr: "قيد المراجعة",
+    labelEn: "Pending Review",
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
     descriptionAr: "تم استلام الطلب وبانتظار التأكيد من الإدارة"
   },
-  Confirmed: {
+  confirmed: {
     labelAr: "تم التأكيد",
     labelEn: "Confirmed",
     color: "text-blue-400",
     bgColor: "bg-blue-400/10",
     descriptionAr: "تم تأكيد طلب الشحن وجاري تنسيق الاستلام"
   },
-  Assigned: {
-    labelAr: "تم التعيين للكابتن",
-    labelEn: "Assigned",
+  assigned: {
+    labelAr: "تم تعيين السائق",
+    labelEn: "Driver Assigned",
     color: "text-indigo-400",
     bgColor: "bg-indigo-400/10",
     descriptionAr: "تم تعيين مندوب التوصيل لاستلام الشحنة"
   },
-  "Picked Up": {
-    labelAr: "تم استلام الشحنة",
+  picked_up: {
+    labelAr: "تم الاستلام",
     labelEn: "Picked Up",
     color: "text-orange-400",
     bgColor: "bg-orange-400/10",
     descriptionAr: "تم استلام الطرد بنجاح من المرسل"
   },
-  "In Transit": {
-    labelAr: "في الطريق",
+  in_transit: {
+    labelAr: "قيد التوصيل",
     labelEn: "In Transit",
     color: "text-sky-400",
     bgColor: "bg-sky-400/10",
-    descriptionAr: "الشحنة في طريقها إلى المركز اللوجستي للتوزيع"
+    descriptionAr: "الشحنة في طريقها إلى عنوان التسليم"
   },
-  "Out For Delivery": {
-    labelAr: "مع المندوب للتوصيل",
-    labelEn: "Out For Delivery",
-    color: "text-purple-400",
-    bgColor: "bg-purple-400/10",
-    descriptionAr: "الشحنة خارجة مع كابتن التوزيع النهائي"
-  },
-  Delivered: {
-    labelAr: "تم التسليم بنجاح",
+  delivered: {
+    labelAr: "تم التسليم",
     labelEn: "Delivered",
     color: "text-emerald-500",
     bgColor: "bg-emerald-500/10",
     descriptionAr: "تم تسليم الطرد للمستلم بنجاح"
   },
-  Cancelled: {
-    labelAr: "ملغي",
+  cancelled: {
+    labelAr: "تم الإلغاء",
     labelEn: "Cancelled",
     color: "text-rose-500",
     bgColor: "bg-rose-500/10",
-    descriptionAr: "تم إلغاء طلب التوصيل من قبل المرسل أو الإدارة"
+    descriptionAr: "تم إلغاء طلب التوصيل"
+  },
+  returned: {
+    labelAr: "مرتجع",
+    labelEn: "Returned",
+    color: "text-purple-400",
+    bgColor: "bg-purple-400/10",
+    descriptionAr: "تم إرجاع الشحنة إلى المرسل"
   }
 };
 
+/** Normalize legacy PascalCase statuses to snake_case */
+function normalizeStatus(status: string): string {
+  const map: Record<string, string> = {
+    "Pending": "pending",
+    "Confirmed": "confirmed",
+    "Assigned": "assigned",
+    "Picked Up": "picked_up",
+    "In Transit": "in_transit",
+    "Out For Delivery": "in_transit",
+    "Delivered": "delivered",
+    "Failed": "cancelled",
+    "Cancelled": "cancelled",
+    "Returned": "returned"
+  };
+  return map[status] || status.toLowerCase().replace(/ /g, "_");
+}
+
 export function getStatusConfig(status: string): StatusConfig {
-  return STATUS_LABELS[status] || {
+  const normalized = normalizeStatus(status);
+  return STATUS_LABELS[normalized] || {
     labelAr: status,
     labelEn: status,
     color: "text-white/60",

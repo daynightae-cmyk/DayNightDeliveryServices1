@@ -161,7 +161,7 @@ export async function isAdminUser(userId: string): Promise<boolean> {
       // Fallback: check if the authenticated user has an admin email
       const { data: userData } = await supabase.auth.getUser();
       const email = userData?.user?.email?.toLowerCase();
-      if (email === 'admin@daynight.ae' || email === 'admin@day-night.ae') {
+      if (email === 'admin@daynightae.com' || email === 'admin@daynight.ae') {
         return true;
       }
       return false;
@@ -174,7 +174,7 @@ export async function isAdminUser(userId: string): Promise<boolean> {
   }
 }
 
-export async function updateExistingOrderStatus(orderId: string, status: Order["status"], note?: string): Promise<boolean> {
+export async function updateExistingOrderStatus(orderId: string, status: string, note?: string): Promise<boolean> {
 
   const historyItem = {
     status,

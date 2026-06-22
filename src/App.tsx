@@ -339,13 +339,6 @@ function AppContent() {
               >
                 {t.footer.catalog}
               </a>
-              <Link 
-                to="/admin" 
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-rose-400/80 hover:text-rose-400 text-[10px] font-bold block transition-colors mt-2 cursor-pointer bg-red-950/10 border border-red-500/10 px-2 py-1 rounded w-full md:w-auto text-center"
-              >
-                {t.footer.adminPortal}
-              </Link>
             </div>
           </div>
         </div>

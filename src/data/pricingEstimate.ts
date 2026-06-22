@@ -1,3 +1,8 @@
+/**
+ * Official pricing data for DAY NIGHT DELIVERY SERVICES
+ * All estimates are clearly marked as non-final.
+ * For official prices use src/lib/pricing.ts constants.
+ */
 export const cities = [
   "Abu Dhabi",
   "Dubai",
@@ -12,68 +17,16 @@ export const cities = [
   "Mohammed Bin Zayed City"
 ];
 
-export function getWeightSurcharge(weightKg: number | string | null) {
-  const weight = Number(weightKg);
-
-  if (!weight || weight <= 1) {
-    return { min: 0, max: 0, needsCustomQuote: false };
-  }
-
-  if (weight > 1 && weight <= 5) {
-    return { min: 5, max: 10, needsCustomQuote: false };
-  }
-
-  if (weight > 5 && weight <= 10) {
-    return { min: 15, max: 25, needsCustomQuote: false };
-  }
-
-  if (weight > 10 && weight <= 20) {
-    return { min: 30, max: 50, needsCustomQuote: false };
-  }
-
-  return { min: 0, max: 0, needsCustomQuote: true };
+/**
+ * Returns an official price (not a range) based on city classification.
+ * Local main cities: 30 AED
+ * Extended areas (Al Ain, western region): 50 AED
+ * Note: Old ranges (50-85, 70-120) have been removed — they were incorrect.
+ */
+export function getOfficialLocalPrice(city: string): number {
+  const extendedAreaKeywords = ["al ain", "العين", "western", "غربية", "liwa", "ليوا", "ghayathi", "غياثي"];
+  const normalized = city.toLowerCase();
+  const isExtended = extendedAreaKeywords.some(k => normalized.includes(k));
+  return isExtended ? 50 : 30;
 }
 
-export function getQuickEstimate(from: string, to: string) {
-  if (!from || !to) return null;
-
-  if (from === to) {
-    return { min: 30, max: 35 };
-  }
-
-  const abuDhabiArea = [
-    "Abu Dhabi",
-    "Mussafah",
-    "Khalifa City",
-    "Mohammed Bin Zayed City",
-    "Al Ain"
-  ];
-
-  const northernEmirates = [
-    "Sharjah",
-    "Ajman",
-    "Umm Al Quwain",
-    "Ras Al Khaimah",
-    "Fujairah"
-  ];
-
-  if (abuDhabiArea.includes(from) && abuDhabiArea.includes(to)) {
-    return { min: 30, max: 50 };
-  }
-
-  if (
-    (from === "Abu Dhabi" && to === "Dubai") ||
-    (from === "Dubai" && to === "Abu Dhabi")
-  ) {
-    return { min: 50, max: 85 };
-  }
-
-  if (
-    (abuDhabiArea.includes(from) && northernEmirates.includes(to)) ||
-    (northernEmirates.includes(from) && abuDhabiArea.includes(to))
-  ) {
-    return { min: 70, max: 120 };
-  }
-
-  return { min: 45, max: 70 };
-}

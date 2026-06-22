@@ -5,21 +5,17 @@
 
 import { useState, useEffect } from "react";
 import { trackOrderRpc } from "../supabase";
-import { Order } from "../types";
+import type { Order } from "../types";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
 import { shipmentStatuses, getStatusTranslation } from "../data/shipmentStatusMap";
 import TrackingMap from "./tracking/TrackingMap";
 import ShipmentProgressBar from "./tracking/ShipmentProgressBar";
-import SignatureCapture from "./signature/SignatureCapture";
 import { 
   Search, 
   MapPin, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle,
+  AlertCircle,
   Truck,
-  Package,
   CalendarDays,
   Barcode,
   PackageCheck
@@ -73,14 +69,13 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
 
 
 
-  const statusMilestones: { status: Order["status"]; key: keyof typeof shipmentStatuses; descAr: string; descEn: string }[] = [
-    { status: "Pending", key: "Pending", descAr: "تم تدوين بيانات طلب الشحن وجاري مراجعة الإدارة", descEn: "The shipping request details have been recorded and are being reviewed." },
-    { status: "Confirmed", key: "Confirmed", descAr: "تم التحقق وتأكيد تفاصيل الشحن والوجهة بنجاح", descEn: "Shipping details and destination have been verified and confirmed." },
-    { status: "Assigned", key: "Assigned", descAr: "تم تخصيص كابتن التوصيل لجمع الشحنة من المرسل", descEn: "A delivery captain has been assigned to collect the shipment." },
-    { status: "Picked Up", key: "Picked Up", descAr: "تم استلام السلعة رسمياً ودخولها مخازن الفرز", descEn: "The item has been officially picked up and entered into sorting." },
-    { status: "In Transit", key: "In Transit", descAr: "الشحنة في وسيلة النقل متجهة لمدينة الاستلام", descEn: "The shipment is in transit heading to the delivery city." },
-    { status: "Out For Delivery", key: "Out For Delivery", descAr: "الشحنة مع مندوب التوزيع الأخير للتسليم اليوم", descEn: "The shipment is with the final delivery agent for delivery today." },
-    { status: "Delivered", key: "Delivered", descAr: "تم تسليم السلعة مغلقة ومستوفاة وتوقيع العميل", descEn: "The item has been successfully delivered and signed for." }
+  const statusMilestones: { status: string; key: keyof typeof shipmentStatuses; descAr: string; descEn: string }[] = [
+    { status: "pending", key: "pending", descAr: "تم تدوين بيانات طلب الشحن وجاري مراجعة الإدارة", descEn: "The shipping request details have been recorded and are being reviewed." },
+    { status: "confirmed", key: "confirmed", descAr: "تم التحقق وتأكيد تفاصيل الشحن والوجهة بنجاح", descEn: "Shipping details and destination have been verified and confirmed." },
+    { status: "assigned", key: "assigned", descAr: "تم تخصيص كابتن التوصيل لجمع الشحنة من المرسل", descEn: "A delivery captain has been assigned to collect the shipment." },
+    { status: "picked_up", key: "picked_up", descAr: "تم استلام السلعة رسمياً ودخولها مخازن الفرز", descEn: "The item has been officially picked up and entered into sorting." },
+    { status: "in_transit", key: "in_transit", descAr: "الشحنة في وسيلة النقل متجهة لمدينة الاستلام", descEn: "The shipment is in transit heading to the delivery city." },
+    { status: "delivered", key: "delivered", descAr: "تم تسليم السلعة مغلقة ومستوفاة وتوقيع العميل", descEn: "The item has been successfully delivered and signed for." }
   ];
 
   // Derive active index
@@ -174,8 +169,6 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
               <ShipmentProgressBar status={order.status} />
 
               <TrackingMap />
-
-              <SignatureCapture status={order.status} />
 
               {/* Status Details / History log */}
               {order.status_history && order.status_history.length > 0 && (
