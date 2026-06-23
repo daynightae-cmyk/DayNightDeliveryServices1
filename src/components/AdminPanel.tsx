@@ -3,9 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchAllOrders, updateExistingOrderStatus, supabase } from "../supabase";
 import { Order } from "../types";
+import { subscribeToNewOrdersForAdmin, subscribeToOrderStatusChanges, type AppNotification } from "../lib/notifications";
+import AdminSearch from "./admin/AdminSearch";
+import Analytics from "./admin/Analytics";
 import { 
   Users, 
   Search, 
@@ -22,8 +25,10 @@ import {
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [visibleOrders, setVisibleOrders] = useState<Order[]>([]);
   const [pricingOverview, setPricingOverview] = useState<any[]>([]);
   const [settingsOverview, setSettingsOverview] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [searchQuery, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -33,6 +38,18 @@ export default function AdminPanel() {
   useEffect(() => {
     loadOrders();
     loadOverview();
+
+    const onNotify = (item: AppNotification) => {
+      setNotifications((prev) => [item, ...prev].slice(0, 12));
+    };
+
+    const stopNew = subscribeToNewOrdersForAdmin(onNotify);
+    const stopStatus = subscribeToOrderStatusChanges(onNotify);
+
+    return () => {
+      stopNew();
+      stopStatus();
+    };
   }, []);
 
   async function loadOrders() {
@@ -40,6 +57,7 @@ export default function AdminPanel() {
     try {
       const all = await fetchAllOrders();
       setOrders(all);
+      setVisibleOrders(all);
     } catch (e) {
       console.error(e);
     } finally {
@@ -71,6 +89,10 @@ export default function AdminPanel() {
   
 
 
+  const handleFilteredOrders = useCallback((next: Order[]) => {
+    setVisibleOrders(next);
+  }, []);
+
   // Filtered orders list
   const filteredOrders = orders.filter(o => {
     const term = searchQuery.toLowerCase();
@@ -94,6 +116,26 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-10 text-right">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AdminSearch orders={orders} onFiltered={handleFilteredOrders} />
+        <Analytics orders={orders} />
+      </section>
+
+      {notifications.length > 0 && (
+        <section className="bg-brand-cool/20 border border-white/10 rounded-2xl p-4 space-y-3">
+          <h3 className="text-white font-extrabold text-sm">Realtime Notifications</h3>
+          <div className="space-y-2 max-h-56 overflow-auto">
+            {notifications.map((note) => (
+              <div key={note.id} className="bg-brand-deep/60 border border-white/10 rounded-xl p-3 text-xs">
+                <p className="text-brand-gold font-bold">{note.title}</p>
+                <p className="text-white/70">{note.body}</p>
+                <p className="text-white/40">{new Date(note.created_at).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Metrics Banner */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-brand-cool/30 p-5 rounded-2xl border border-white/10 flex items-center justify-between gap-4">
@@ -238,8 +280,8 @@ export default function AdminPanel() {
                     جاري تحميل الطلبات وتعديلاتها من قاعدة البيانات...
                   </td>
                 </tr>
-              ) : filteredOrders.length > 0 ? (
-                filteredOrders.map((o) => (
+              ) : visibleOrders.length > 0 ? (
+                visibleOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-white/5 transition-colors">
                     <td className="p-4 font-mono font-extrabold text-brand-gold">{o.id}</td>
                     <td className="p-4">

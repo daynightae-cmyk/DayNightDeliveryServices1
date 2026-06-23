@@ -28,7 +28,7 @@ interface QRProps {
 export default function QR({ onNavigate }: QRProps) {
   const [copied, setCopied] = useState(false);
 
-  const websiteUrl = "https://www.daynightae.com";
+  const websiteUrl = "https://daynightae.com";
   const logoUrl = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
   const qrUrl = "https://i.postimg.cc/P5KCWNMd/qr-code-1000-1000.png";
 

@@ -10,7 +10,10 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "final:gate": "node scripts/daynight-final-gate.mjs",
-    "scan": "node scripts/daynight-scan.mjs"
+    "scan": "node scripts/daynight-scan.mjs",
+    "test:pricing": "node scripts/daynight-pricing-tests.mjs",
+    "enterprise:audit": "node scripts/daynight-enterprise-audit.mjs",
+    "full:test": "node scripts/daynight-full-test-suite.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

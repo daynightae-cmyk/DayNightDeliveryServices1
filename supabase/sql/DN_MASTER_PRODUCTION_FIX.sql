@@ -1,6 +1,7 @@
 -- DAY NIGHT DELIVERY SERVICES
 -- Master production hardening pack for Supabase.
 -- Run in Supabase SQL Editor with an owner/admin database role.
+-- DO NOT USE service_role IN FRONTEND.
 
 create extension if not exists pgcrypto;
 
@@ -432,6 +433,34 @@ begin
     raise exception 'Invalid payment_method: %', v_payment_method;
   end if;
 
+  -- Enforce canonical enum-compatible values before insert.
+  -- This preserves compatibility with projects where orders.payment_method/orders.status are enum columns.
+  if exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'payment_method'
+      and t.typtype = 'e'
+  ) then
+    execute 'select ($1)::public.payment_method::text'
+      into v_payment_method
+      using v_payment_method;
+  end if;
+
+  if exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'order_status'
+      and t.typtype = 'e'
+  ) then
+    execute 'select ($1)::public.order_status::text'
+      into v_status
+      using v_status;
+  end if;
+
   v_price := public.calculate_delivery_price(v_payload->>'sender_city', v_payload->>'receiver_city', (v_payload->>'weight')::numeric);
   v_subtotal := coalesce(nullif(v_payload->>'subtotal', '')::numeric, (v_price->>'subtotal')::numeric);
 
@@ -668,7 +697,9 @@ end $$;
 
 notify pgrst, 'reload schema';
 
--- Final verification queries
+-- =============================
+-- VERIFICATION (SAFE CHECKS)
+-- =============================
 select public.calculate_delivery_price(null, null, 1) as domestic_main_expected_31_50;
 select public.calculate_delivery_price(null, 'Al Ain', 1) as domestic_extended_expected_52_50;
 select public.calculate_international_price('SA', 3) as saudi_3kg_expected_194_25;

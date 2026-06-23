@@ -1,5 +1,6 @@
 -- DAY NIGHT DELIVERY SERVICES
 -- Business seed data pack. Run after DN_MASTER_PRODUCTION_FIX.sql.
+-- DO NOT USE service_role IN FRONTEND.
 
 grant usage on schema public to anon, authenticated;
 
@@ -249,6 +250,9 @@ grant select on public.admin_settings to anon, authenticated;
 
 notify pgrst, 'reload schema';
 
+-- =============================
+-- VERIFICATION (SAFE COUNTS)
+-- =============================
 select 'zones' as check_name, count(*) as total from public.zones
 union all
 select 'cities', count(*) from public.cities

@@ -5,6 +5,8 @@
 
 export interface Order {
   id: string; // Tracking Number e.g., DN-491026-X
+  tracking_code?: string;
+  tracking_number?: string;
   sender_name: string;
   sender_phone: string;
   sender_city: string;

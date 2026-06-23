@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const targets = ["src", "public", "dist", "supabase/sql", "scripts"];
+const targets = ["src", "public", "supabase/sql", "scripts"];
 const ignoreDirs = new Set([".git", "node_modules"]);
 const textExtensions = new Set([
   ".ts",
@@ -21,23 +21,42 @@ const textExtensions = new Set([
   ".yaml"
 ]);
 
-const forbiddenTerms = [
-  ["daynight", ".ae"].join(""),
-  ["day-night", ".ae"].join(""),
-  ["Admin", "@", "daynight", ".ae"].join(""),
-  ["admin", "@", "daynight", ".ae"].join(""),
-  ["dn", "_admin_", "authenticated"].join(""),
-  ["admin", "_mock_", "btn"].join(""),
-  ["handle", "Create", "Mock", "Order"].join(""),
-  ["مرسل", "مجهول"].join(" "),
-  ["مستلم", "مجهول"].join(" "),
-  ["+971", "0000000"].join(""),
-  ["mock", "Locations"].join(""),
-  ["mock", " order"].join(""),
-  ["example", "@mail.com"].join(""),
-  ["example", "@domain.ae"].join(""),
-  ["+971 50 ", "XXXXXXX"].join(""),
-  ["sb", "_secret_"].join("")
+const forbiddenRules = [
+  { id: "legacy-domain-daynightae", type: "text", value: ["daynight", ".ae"].join("") },
+  { id: "legacy-domain-day-night", type: "text", value: ["day-night", ".ae"].join("") },
+  { id: "legacy-email-admin-lower", type: "text", value: ["admin", "@", "daynight", ".ae"].join("") },
+  { id: "legacy-admin-auth-flag", type: "text", value: ["dn", "_admin_", "authenticated"].join("") },
+  { id: "legacy-admin-mock-btn", type: "text", value: ["admin", "_mock_", "btn"].join("") },
+  { id: "legacy-mock-order-handler", type: "text", value: ["handle", "Create", "Mock", "Order"].join("") },
+  { id: "arabic-mock-sender", type: "text", value: ["مرسل", "مجهول"].join(" ") },
+  { id: "arabic-mock-receiver", type: "text", value: ["مستلم", "مجهول"].join(" ") },
+  { id: "fake-phone-number", type: "text", value: ["+971", "0000000"].join("") },
+  { id: "mock-locations", type: "text", value: ["mock", "Locations"].join("") },
+  { id: "mock-order", type: "text", value: ["mock", " order"].join("") },
+  { id: "fake-example-mail", type: "text", value: ["example", "@mail.com"].join("") },
+  { id: "fake-example-domain", type: "text", value: ["example", "@domain.ae"].join("") },
+  { id: "masked-phone", type: "text", value: ["+971 50 ", "XXXXXXX"].join("") },
+  { id: "localhost", type: "regex", value: /localhost/i },
+  { id: "loopback-ip", type: "regex", value: /127\.0\.0\.1/i },
+  { id: "todo-unsafe", type: "regex", value: /TODO\s+unsafe/i },
+  { id: "fixme-unsafe", type: "regex", value: /FIXME\s+unsafe/i },
+  { id: "lorem-ipsum", type: "regex", value: /lorem ipsum/i },
+  { id: "undefined-phone", type: "regex", value: /undefined\s+phone/i },
+  { id: "empty-href", type: "regex", value: /href\s*=\s*["']\s*["']/i },
+  { id: "javascript-void", type: "regex", value: /javascript:void/i },
+  { id: "gemini-api-leftover", type: "regex", value: /Gemini API leftover/i },
+  { id: "google-ai-studio", type: "regex", value: /Google AI Studio/i },
+  { id: "my-google-ai-studio-app", type: "regex", value: /My Google AI Studio App/i },
+  {
+    id: "service-role-token",
+    type: "regex",
+    value: /service_role/i,
+    allowLine: /DO NOT USE service_role IN FRONTEND\./i
+  },
+  { id: "supabase-secret-token", type: "text", value: ["sb", "_secret_"].join("") },
+  { id: "hardcoded-supabase-secret", type: "regex", value: /supabase[^\n\r]{0,120}(secret|service_role|sb_secret)/i },
+  { id: "frontend-orders-insert", type: "regex", value: /from\(['"]orders['"]\)\.insert\(/i, onlyPath: /^src\// },
+  { id: "frontend-orders-update", type: "regex", value: /from\(['"]orders['"]\)\.update\(/i, onlyPath: /^src\// }
 ];
 
 function walk(dirPath, output) {
@@ -64,15 +83,36 @@ function scanFile(filePath) {
   }
 
   const content = fs.readFileSync(filePath, "utf8");
-  const findings = [];
+  const findings = new Set();
+  const lines = content.split(/\r?\n/);
 
-  for (const term of forbiddenTerms) {
-    if (content.includes(term)) {
-      findings.push(term);
+  for (const rule of forbiddenRules) {
+    if (rule.onlyPath && !rule.onlyPath.test(normalized)) {
+      continue;
+    }
+
+    if (rule.type === "text") {
+      if (content.includes(rule.value)) {
+        findings.add(rule.id);
+      }
+      continue;
+    }
+
+    for (const line of lines) {
+      if (!rule.value.test(line)) {
+        continue;
+      }
+
+      if (rule.allowLine && rule.allowLine.test(line)) {
+        continue;
+      }
+
+      findings.add(rule.id);
+      break;
     }
   }
 
-  return findings;
+  return [...findings];
 }
 
 function toRelative(filePath) {

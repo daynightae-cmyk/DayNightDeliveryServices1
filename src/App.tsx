@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { useAppContext } from "./lib/AppContext";
 import { translations } from "./data/translations";
 import { 
@@ -17,34 +17,37 @@ import {
   useParams 
 } from "react-router-dom";
 
-import Home from "./components/Home";
-import AboutUs from "./components/AboutUs";
-import Services from "./components/Services";
-import DeliveryUAE from "./components/DeliveryUAE";
-import DeliveryInternational from "./components/DeliveryInternational";
-import ECommerce from "./components/ECommerce";
-import CorporateSolutions from "./components/CorporateSolutions";
-import Pricing from "./components/Pricing";
-import RequestDelivery from "./components/RequestDelivery";
-import Tracking from "./components/Tracking";
-import Faqs from "./components/Faqs";
-import ContactUs from "./components/ContactUs";
-import Policy from "./components/Policy";
-import QR from "./components/QR";
-import AdminPanel from "./components/AdminPanel";
+const Home = lazy(() => import("./components/Home"));
+const AboutUs = lazy(() => import("./components/AboutUs"));
+const Services = lazy(() => import("./components/Services"));
+const DeliveryUAE = lazy(() => import("./components/DeliveryUAE"));
+const DeliveryInternational = lazy(() => import("./components/DeliveryInternational"));
+const ECommerce = lazy(() => import("./components/ECommerce"));
+const CorporateSolutions = lazy(() => import("./components/CorporateSolutions"));
+const Pricing = lazy(() => import("./components/Pricing"));
+const RequestDelivery = lazy(() => import("./components/RequestDelivery"));
+const Tracking = lazy(() => import("./components/Tracking"));
+const Faqs = lazy(() => import("./components/Faqs"));
+const ContactUs = lazy(() => import("./components/ContactUs"));
+const Policy = lazy(() => import("./components/Policy"));
+const QR = lazy(() => import("./components/QR"));
+const AdminPanel = lazy(() => import("./components/AdminPanel"));
+const InternationalShippingAdvanced = lazy(() => import("./components/InternationalShippingAdvanced"));
+const DriverMobileView = lazy(() => import("./components/driver/DriverMobileView"));
+const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboard"));
 import SmartChat from "./components/SmartChat";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
+import ThemeToggle from "./components/ThemeToggle";
 
 import { 
   Menu, 
   X, 
-  PhoneCall, 
-  Moon, 
-  Sun
+  PhoneCall
 } from "lucide-react";
 import companyMeta from "./data/companyMeta";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import { trackPageLoad } from "./lib/monitoring";
 
 const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
 
@@ -52,7 +55,7 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const { theme, toggleTheme, language, toggleLanguage } = useAppContext();
+  const { language, toggleLanguage } = useAppContext();
 
   const t = translations[language];
 
@@ -87,6 +90,10 @@ function AppContent() {
 
   const currentPath = location.pathname;
 
+  useEffect(() => {
+    trackPageLoad(location.pathname || "/");
+  }, [location.pathname]);
+
   const navLinks = [
     { key: "home", path: "/", label: t.nav.home },
     { key: "about", path: "/about", label: t.nav.about },
@@ -120,9 +127,7 @@ function AppContent() {
           <span className="text-white/80">{companyMeta.sloganAr}</span>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={toggleTheme} className="hover:text-brand-gold transition-colors flex items-center gap-1 cursor-pointer">
-            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          </button>
+          <ThemeToggle />
           <span className="text-white/20">|</span>
           <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider">
             {language === 'ar' ? 'EN' : 'Ø¹Ø±Ø¨ÙŠ'}
@@ -258,26 +263,31 @@ function AppContent() {
 
       {/* Main Page Area Wrapper */}
       <main className="flex-1 py-12 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
-        <Routes>
-          <Route path="/" element={<Home onNavigate={handleNavigate} />} />
-          <Route path="/about" element={<AboutUs />} />
-          <Route path="/services" element={<Services onNavigate={handleNavigate} />} />
-          <Route path="/uae-delivery" element={<DeliveryUAE />} />
-          <Route path="/international-shipping" element={<DeliveryInternational />} />
-          <Route path="/ecommerce" element={<ECommerce onNavigate={handleNavigate} />} />
-          <Route path="/corporate" element={<CorporateSolutions />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/request" element={<RequestDelivery onNavigate={handleNavigate} />} />
-          <Route path="/tracking" element={<TrackingRouteWrapper />} />
-          <Route path="/tracking/:code" element={<TrackingRouteWrapper />} />
-          <Route path="/faq" element={<Faqs />} />
-          <Route path="/contact" element={<ContactUs />} />
-          <Route path="/policy" element={<Policy />} />
-          <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
-          <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
-          <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<div className="text-center text-white/70 py-10">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<Home onNavigate={handleNavigate} />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/services" element={<Services onNavigate={handleNavigate} />} />
+            <Route path="/uae-delivery" element={<DeliveryUAE />} />
+            <Route path="/international-shipping" element={<DeliveryInternational />} />
+            <Route path="/international-advanced" element={<InternationalShippingAdvanced />} />
+            <Route path="/ecommerce" element={<ECommerce onNavigate={handleNavigate} />} />
+            <Route path="/corporate" element={<CorporateSolutions />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/request" element={<RequestDelivery onNavigate={handleNavigate} />} />
+            <Route path="/tracking" element={<TrackingRouteWrapper />} />
+            <Route path="/tracking/:code" element={<TrackingRouteWrapper />} />
+            <Route path="/faq" element={<Faqs />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="/policy" element={<Policy />} />
+            <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
+            <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
+            <Route path="/driver" element={<DriverMobileView orders={[]} onStatusChange={() => {}} />} />
+            <Route path="/customer" element={<CustomerDashboard customerPhone="" orders={[]} onReorder={() => {}} />} />
+            <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* Smart Chat Floating Agent Widget */}

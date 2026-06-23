@@ -7,15 +7,14 @@ import { useState } from "react";
 import { Order } from "../types";
 import { createPublicOrder } from "../supabase";
 import { calculateLocalPrice } from "../lib/pricing";
+import { canSubmitDeliveryRequest } from "../lib/security";
+import { reportError, trackApiCall } from "../lib/monitoring";
+import QRGenerator from "./QRGenerator";
+import Invoice from "./Invoice";
+import ShippingLabel from "./ShippingLabel";
 import { 
-  Truck, 
-  MapPin, 
   CheckCircle, 
   ChevronRight, 
-  ArrowLeftRight, 
-  Info, 
-  DollarSign, 
-  Boxes,
   Copy,
   MessageSquare
 } from "lucide-react";
@@ -34,7 +33,40 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [successId, setSuccessId] = useState("");
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [validationError, setValidationError] = useState("");
+
+  const i18n = {
+    ar: {
+      senderRequired: "يرجى إكمال بيانات المرسل الأساسية قبل إرسال الطلب.",
+      receiverRequired: "يرجى إكمال بيانات المستلم الأساسية قبل إرسال الطلب.",
+      invalidPhone: "يرجى إدخال رقم هاتف إماراتي صحيح مثل +971 56 875 7331.",
+      basicSelections: "يرجى اختيار نوع الطرد والخدمة وطريقة الدفع.",
+      invalidWeight: "يرجى إدخال وزن صحيح أكبر من صفر.",
+      invalidPieces: "يرجى إدخال عدد قطع صحيح.",
+      invalidPrice: "تعذر احتساب سعر التوصيل. يرجى مراجعة البيانات والمحاولة مجدداً.",
+      invalidCod: "يرجى إدخال مبلغ تحصيل COD صحيح.",
+      notesRequired: "يرجى إضافة ملاحظات الطلب قبل الإرسال.",
+      orderCreateFailed: "تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.",
+      senderStepRequired: "يرجى ملء كافة تفاصيل المرسل الإلزامية للمتابعة",
+      receiverStepRequired: "يرجى تعبئة كافة بيانات المستلم الإلزامية للمتابعة"
+    },
+    en: {
+      senderRequired: "Please complete sender details before submitting the request.",
+      receiverRequired: "Please complete receiver details before submitting the request.",
+      invalidPhone: "Please enter a valid UAE phone number, for example +971 56 875 7331.",
+      basicSelections: "Please choose package type, service type, and payment method.",
+      invalidWeight: "Please enter a valid weight greater than zero.",
+      invalidPieces: "Please enter a valid pieces count.",
+      invalidPrice: "Unable to calculate delivery price. Please review the data and try again.",
+      invalidCod: "Please enter a valid COD amount.",
+      notesRequired: "Please add order notes before submission.",
+      orderCreateFailed: "Unable to create order right now. Please retry or contact WhatsApp support.",
+      senderStepRequired: "Please complete all required sender details to continue.",
+      receiverStepRequired: "Please complete all required receiver details to continue."
+    }
+  };
+  const tr = language === "ar" ? i18n.ar : i18n.en;
 
   const [senderName, setSenderName] = useState("");
   const [senderPhone, setSenderPhone] = useState("");
@@ -82,39 +114,39 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
 
   function validateOrderFields() {
     if (!senderName.trim() || !senderPhone.trim() || !senderCity || !senderAddress.trim()) {
-      return "يرجى إكمال بيانات المرسل الأساسية قبل إرسال الطلب.";
+      return tr.senderRequired;
     }
 
     if (!receiverName.trim() || !receiverPhone.trim() || !receiverCity || !receiverAddress.trim()) {
-      return "يرجى إكمال بيانات المستلم الأساسية قبل إرسال الطلب.";
+      return tr.receiverRequired;
     }
 
     if (!isValidUaePhone(senderPhone) || !isValidUaePhone(receiverPhone)) {
-      return "يرجى إدخال رقم هاتف إماراتي صحيح مثل +971 56 875 7331.";
+      return tr.invalidPhone;
     }
 
     if (!packageType || !serviceType || !paymentMethod) {
-      return "يرجى اختيار نوع الطرد والخدمة وطريقة الدفع.";
+      return tr.basicSelections;
     }
 
     if (!Number.isFinite(Number(weight)) || Number(weight) <= 0) {
-      return "يرجى إدخال وزن صحيح أكبر من صفر.";
+      return tr.invalidWeight;
     }
 
     if (!Number.isFinite(Number(pieces)) || Number(pieces) < 1) {
-      return "يرجى إدخال عدد قطع صحيح.";
+      return tr.invalidPieces;
     }
 
     if (!Number.isFinite(deliveryPrice) || deliveryPrice <= 0) {
-      return "تعذر احتساب سعر التوصيل. يرجى مراجعة البيانات والمحاولة مجدداً.";
+      return tr.invalidPrice;
     }
 
     if (paymentMethod === "cod" && (!Number.isFinite(Number(codAmount)) || Number(codAmount) <= 0)) {
-      return "يرجى إدخال مبلغ تحصيل COD صحيح.";
+      return tr.invalidCod;
     }
 
     if (!notes.trim()) {
-      return "يرجى إضافة ملاحظات الطلب قبل الإرسال.";
+      return tr.notesRequired;
     }
 
     return "";
@@ -130,6 +162,13 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
     }
 
     setLoading(true);
+
+    const limitCheck = canSubmitDeliveryRequest();
+    if (!limitCheck.allowed) {
+      setLoading(false);
+      setValidationError(language === "ar" ? "تجاوزت الحد اليومي المسموح لمحاولات طلب التوصيل. يرجى المحاولة لاحقاً." : "You reached the daily delivery request limit. Please try later.");
+      return;
+    }
 
     const now = new Date().toISOString();
     const statusHistory = [
@@ -173,16 +212,21 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
     };
 
     try {
-      const returnedId = await createPublicOrder(newOrder);
+      const returnedId = await trackApiCall("create_public_order", () => createPublicOrder(newOrder));
       if (returnedId) {
-        setSuccessId(typeof returnedId === 'object' ? JSON.stringify(returnedId) : String(returnedId));
+        const trackingCode = String(returnedId);
+        setSuccessId(trackingCode);
+        setCreatedOrder({
+          id: trackingCode,
+          ...(newOrder as Omit<Order, "id">)
+        });
         setStep(4);
       } else {
-        setValidationError("تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.");
+        setValidationError(tr.orderCreateFailed);
       }
     } catch (e) {
-      console.error(e);
-      setValidationError("تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.");
+      reportError(e, "request_delivery_submit");
+      setValidationError(tr.orderCreateFailed);
     } finally {
       setLoading(false);
     }
@@ -283,7 +327,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                 id="req_step_next_1"
                 onClick={() => {
                   if (!senderName || !senderPhone || !senderAddress) {
-                    setValidationError("يرجى ملء كافة تفاصيل المرسل الإلزامية للمتابعة");
+                    setValidationError(tr.senderStepRequired);
                     return;
                   }
                   setValidationError("");
@@ -373,7 +417,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                 id="req_step_next_2"
                 onClick={() => {
                   if (!receiverName || !receiverPhone || !receiverAddress) {
-                    setValidationError("يرجى تعبئة كافة بيانات المستلم الإلزامية للمتابعة");
+                    setValidationError(tr.receiverStepRequired);
                     return;
                   }
                   setValidationError("");
@@ -537,7 +581,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                 disabled={loading}
                 className="px-10 py-3.5 bg-brand-gold hover:bg-brand-blue disabled:bg-white/10 text-brand-deep hover:text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <span>{loading ? "جاري الحفظ والإنشار..." : "أرسل طلب التوصيل الآن"}</span>
+                <span>{loading ? (language === "ar" ? "جاري الحفظ والإرسال..." : "Submitting order...") : (language === "ar" ? "أرسل طلب التوصيل الآن" : "Submit delivery request")}</span>
                 <CheckCircle className="w-4 h-4" />
               </button>
             </div>
@@ -577,6 +621,14 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               </p>
             </div>
 
+            {createdOrder && (
+              <div className="space-y-4 max-w-2xl mx-auto text-left">
+                <QRGenerator trackingCode={successId} />
+                <Invoice order={createdOrder} />
+                <ShippingLabel order={createdOrder} />
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 id="success_copy_tracking_btn"
@@ -611,6 +663,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                   setStep(1);
                   setValidationError("");
                   setSuccessId("");
+                  setCreatedOrder(null);
                   setSenderName("");
                   setSenderPhone("");
                   setSenderAddress("");
