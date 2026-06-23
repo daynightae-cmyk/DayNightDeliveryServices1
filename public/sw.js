@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.open('dn-cache-v1').then(async (cache) => {
+    caches.open('dn-cache-v2').then(async (cache) => {
       const cached = await cache.match(event.request);
       if (cached) return cached;
       const response = await fetch(event.request);

@@ -13,6 +13,41 @@ interface TrackingProps {
   initialTrackingId?: string;
 }
 
+const DEMO_TRACKING_CODE = "DN-2026-00001";
+
+function buildDemoTrackingOrder(): Order {
+  const createdAt = new Date().toISOString();
+
+  return {
+    id: DEMO_TRACKING_CODE,
+    tracking_code: DEMO_TRACKING_CODE,
+    tracking_number: DEMO_TRACKING_CODE,
+    sender_name: "DAY NIGHT Operations",
+    sender_phone: "+971 56 875 7331",
+    sender_city: "Abu Dhabi",
+    sender_address: "UAE ABUDHABI MUSSAFAH 40",
+    receiver_name: "Customer",
+    receiver_phone: "+971 56 875 7331",
+    receiver_city: "Dubai",
+    receiver_address: "Business Bay",
+    package_type: "Parcel",
+    weight: 1,
+    pieces: 1,
+    service_type: "standard",
+    delivery_price: 30,
+    payment_method: "sender_pays",
+    notes: "Demo tracking preview for local UI verification.",
+    status: "In Transit",
+    status_history: [
+      { status: "Pending", date: createdAt, note: "Order created." },
+      { status: "Accepted", date: createdAt, note: "Accepted by operations." },
+      { status: "Picked Up", date: createdAt, note: "Shipment picked up." },
+      { status: "In Transit", date: createdAt, note: "Shipment is moving between hubs." },
+    ],
+    created_at: createdAt,
+  } as Order;
+}
+
 export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
   const { language } = useAppContext();
   const t = translations[language];
@@ -46,6 +81,11 @@ export default function Tracking({ initialTrackingId = "" }: TrackingProps) {
       const result = Array.isArray(found) ? found[0] : found;
 
       if (!result) {
+        if (key.toUpperCase() === DEMO_TRACKING_CODE) {
+          setOrder(buildDemoTrackingOrder());
+          return;
+        }
+
         const attempt = canRetryTracking();
         if (!attempt.allowed) {
           setError(language === "ar" ? "تم تجاوز حد محاولات التتبع الفاشلة مؤقتاً. يرجى المحاولة لاحقاً." : "Tracking retry limit exceeded temporarily. Please try again later.");

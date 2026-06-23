@@ -59,6 +59,7 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
   const { language, toggleLanguage } = useAppContext();
 
   const t = translations[language];
@@ -79,7 +80,7 @@ function AppContent() {
     else if (tab === "corporate") navigate("/corporate");
     else if (tab === "pricing") navigate("/pricing");
     else if (tab === "request" || tab === "request-delivery") navigate("/request-delivery");
-    else if (tab === "tracking") {
+    else if (tab === "tracking" || tab === "track") {
       if (trackingId) {
         navigate(`/tracking?code=${trackingId}`);
       } else {
@@ -100,6 +101,17 @@ function AppContent() {
   useEffect(() => {
     trackPageLoad(location.pathname || "/");
   }, [location.pathname]);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const nextY = window.scrollY;
+      setHeaderVisible(nextY < 80 || nextY < lastY || mobileMenuOpen);
+      lastY = nextY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [mobileMenuOpen]);
 
   const navLinks = [
     { key: "home", path: "/", label: t.nav.home },
@@ -149,7 +161,7 @@ function AppContent() {
       </div>
 
       {/* Main Glassmorphic Header */}
-      <header className="sticky top-0 bg-brand-deep/80 backdrop-blur-md border-b border-white/10 z-40 transition-all font-sans duration-150">
+      <header className={`sticky top-0 bg-brand-deep/80 backdrop-blur-md border-b border-white/10 z-40 transition-transform font-sans duration-300 ${headerVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
           {/* Logo Brand with Official Logo */}
@@ -298,6 +310,8 @@ function AppContent() {
             <Route path="/request-delivery" element={<RequestDelivery onNavigate={handleNavigate} />} />
             <Route path="/tracking" element={<TrackingRouteWrapper />} />
             <Route path="/tracking/:code" element={<TrackingRouteWrapper />} />
+            <Route path="/track" element={<TrackingRouteWrapper />} />
+            <Route path="/track/:code" element={<TrackingRouteWrapper />} />
             <Route path="/faq" element={<Faqs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/policy" element={<Policy />} />

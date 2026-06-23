@@ -270,8 +270,8 @@ export default function UltimateGalleryV2() {
           text: companyMeta.sloganEn,
           url: image,
         });
-      } catch (error) {
-        console.log("Share cancelled");
+      } catch {
+        return;
       }
     } else {
       await navigator.clipboard.writeText(image);

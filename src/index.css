@@ -1,11 +1,50 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-deep: #071A33;
+  --color-brand-deep: #020817;
   --color-brand-cool: #0A1C3A;
   --color-brand-gold: #D4AF37;
-  --color-brand-blue: #007BFF;
+  --color-brand-blue: #1E90FF;
   --color-brand-hover: #0057B8;
+}
+
+@layer base {
+  :root {
+    --bg-main: #020817;
+    --bg-deep: #030B18;
+    --bg-navy: #061225;
+    --bg-royal: #0A1C3A;
+    --bg-panel: #0D1D34;
+    --bg-card: #10233F;
+    --bg-card-soft: #132A49;
+    --blue-electric: #1E90FF;
+    --blue-cyan: #2BB8FF;
+    --blue-neon: #00A8FF;
+    --blue-soft: #5BCBFF;
+    --blue-muted: #2F6FA8;
+    --blue-glow: rgba(43, 184, 255, 0.35);
+    --blue-border: rgba(56, 139, 253, 0.28);
+    --gold-main: #D4AF37;
+    --gold-bright: #F6C94A;
+    --gold-marker: #FFD35A;
+    --gold-soft: #E8BE45;
+    --gold-glow: rgba(246, 201, 74, 0.45);
+    --gold-border: rgba(212, 175, 55, 0.35);
+    --text-main: #F8FAFC;
+    --text-soft: #DCE7F5;
+    --text-secondary: #B8C4D6;
+    --text-muted: #7F8EA3;
+    --text-gold: #F6C94A;
+    --text-blue: #5BCBFF;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 70% 20%, rgba(30,144,255,0.16), transparent 35%),
+      radial-gradient(circle at 20% 80%, rgba(212,175,55,0.10), transparent 30%),
+      linear-gradient(135deg, #020817 0%, #061225 45%, #0A1C3A 100%);
+    min-height: 100vh;
+  }
 }
 
 /* ============================================================
@@ -23,7 +62,10 @@
 
   /* Light mode body background */
   :root.light-theme body {
-    background: linear-gradient(145deg, #D4E4F7 0%, #E8F0FE 50%, #EEF3FB 100%);
+    background:
+      radial-gradient(circle at 70% 20%, rgba(30,144,255,0.16), transparent 34%),
+      radial-gradient(circle at 18% 78%, rgba(212,175,55,0.12), transparent 30%),
+      linear-gradient(145deg, #D4E4F7 0%, #E8F0FE 50%, #EEF3FB 100%);
     min-height: 100vh;
   }
 
@@ -68,14 +110,15 @@
    ============================================================ */
 @layer utilities {
   .glass {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1.5rem;
+    background: linear-gradient(145deg, rgba(16, 35, 63, 0.88), rgba(6, 18, 37, 0.72));
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(56, 139, 253, 0.25);
+    border-radius: 28px;
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      0 24px 80px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 40px rgba(30, 144, 255, 0.12);
   }
 
   :root.light-theme .glass {
@@ -103,16 +146,16 @@
 
   .glass-premium {
     background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(212, 175, 55, 0.04) 100%
+      145deg,
+      rgba(18, 43, 78, 0.92),
+      rgba(10, 28, 58, 0.82)
     );
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(246, 201, 74, 0.28);
     box-shadow:
-      0 16px 48px rgba(0, 0, 0, 0.25),
-      0 4px 16px rgba(0, 0, 0, 0.15),
+      0 0 32px rgba(246, 201, 74, 0.16),
+      0 20px 60px rgba(0, 0, 0, 0.35),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
@@ -239,4 +282,3 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-

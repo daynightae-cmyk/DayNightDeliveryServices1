@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Truck } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
+import companyMeta from "../data/companyMeta";
 
 interface SplashProps {
   onComplete?: () => void;
 }
 
-const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
 const SESSION_KEY = "dn_splash_shown";
 
 export default function Splash({ onComplete }: SplashProps) {
@@ -129,13 +128,11 @@ export default function Splash({ onComplete }: SplashProps) {
                   }`}
                 >
                   <img
-                    src={LOGO_IMAGE_URL}
+                    src={companyMeta.logoUrl}
                     alt="DAY NIGHT DELIVERY SERVICES"
                     referrerPolicy="no-referrer"
-                    className="absolute inset-0 w-full h-full object-cover opacity-80"
+                    className="absolute inset-0 w-full h-full object-cover opacity-95"
                   />
-                  <div className={`absolute inset-0 ${isLight ? "bg-brand-deep/10" : "bg-brand-deep/20"}`} />
-                  <Truck className="relative w-11 h-11 text-brand-gold drop-shadow-[0_0_16px_rgba(212,175,55,0.9)]" />
                 </div>
               </div>
             </motion.div>

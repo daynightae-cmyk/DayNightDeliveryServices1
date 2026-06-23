@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Copy,
   Share2,
@@ -23,6 +23,7 @@ import { useAppContext } from "../lib/AppContext";
 import { pageCopy } from "../data/pageCopy";
 import SectionHeader from "./ui/SectionHeader";
 import GlassCard from "./ui/GlassCard";
+import { buildQrDataUrl, downloadQr } from "../lib/qrGenerator";
 
 interface QRProps {
   onNavigate?: (tab: string) => void;
@@ -33,6 +34,17 @@ export default function QR({ onNavigate }: QRProps) {
   const isArabic = language === "ar";
   const t = pageCopy[language].qrPage;
   const [copied, setCopied] = useState(false);
+  const [siteQr, setSiteQr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    buildQrDataUrl(companyMeta.website).then((dataUrl) => {
+      if (!cancelled) setSiteQr(dataUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(companyMeta.website);
@@ -58,7 +70,7 @@ export default function QR({ onNavigate }: QRProps) {
   };
 
   const actions = [
-    { label: t.requestDelivery, icon: Truck, path: "/request" },
+    { label: t.requestDelivery, icon: Truck, path: "/request-delivery" },
     { label: t.trackShipment, icon: QrCode, path: "/tracking" },
     { label: t.viewPricing, icon: DollarSign, path: "/pricing" }
   ];
@@ -78,7 +90,11 @@ export default function QR({ onNavigate }: QRProps) {
         <GlassCard className="lg:col-span-5 p-8 flex flex-col items-center text-center space-y-6">
           <h3 className="text-lg font-bold text-white">{t.scanTitle}</h3>
           <div className="p-4 bg-white rounded-2xl shadow-xl">
-            <img src={companyMeta.qrUrl} alt="DAY NIGHT QR" className="w-48 h-48 sm:w-56 sm:h-56 object-contain" loading="lazy" />
+            {siteQr ? (
+              <img src={siteQr} alt="DAY NIGHT official website QR" className="w-48 h-48 sm:w-56 sm:h-56 object-contain" loading="lazy" />
+            ) : (
+              <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-xl bg-brand-deep/10 animate-pulse" />
+            )}
           </div>
           <img src={companyMeta.logoUrl} alt={companyMeta.name} className="h-12 object-contain" loading="lazy" />
           <p className="text-brand-gold font-bold text-sm" dir="ltr">{companyMeta.displayWebsite}</p>
@@ -90,6 +106,10 @@ export default function QR({ onNavigate }: QRProps) {
             <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-xl text-xs font-bold hover:bg-white/15 transition-colors">
               <Share2 className="w-4 h-4" />
               {t.share}
+            </button>
+            <button disabled={!siteQr} onClick={() => downloadQr(siteQr, "daynightae.com-qr.png")} className="flex items-center gap-2 px-4 py-2 bg-brand-blue/20 text-white rounded-xl text-xs font-bold hover:bg-brand-blue/30 transition-colors disabled:opacity-50">
+              <QrCode className="w-4 h-4" />
+              PNG
             </button>
           </div>
         </GlassCard>
