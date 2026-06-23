@@ -42,7 +42,9 @@ function normalizeWeight(weight: number | string | null | undefined) {
 }
 
 export function formatAED(amount: number) {
-  return `${Number(amount).toFixed(2)} AED`;
+  const numericAmount = Number(amount);
+  const formatted = Number.isInteger(numericAmount) ? String(numericAmount) : numericAmount.toFixed(2);
+  return `${formatted} AED`;
 }
 
 export function isExtendedArea(cityArOrEn: string | null | undefined): boolean {

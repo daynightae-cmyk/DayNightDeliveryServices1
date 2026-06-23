@@ -5,7 +5,7 @@ function waLink(message: string) {
 }
 
 export function whatsappOrderConfirmation(trackingCode: string) {
-  return waLink(`Order confirmed. Tracking code: ${trackingCode}. Track: https://daynightae.com/tracking?code=${trackingCode}`);
+  return waLink(`Order confirmed. Tracking code: ${trackingCode}. Track: https://www.daynightae.com/tracking?code=${trackingCode}`);
 }
 
 export function whatsappStatusUpdate(trackingCode: string, status: string) {

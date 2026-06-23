@@ -295,16 +295,22 @@ function AppContent() {
             <Route path="/corporate" element={<CorporateSolutions />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/request" element={<RequestDelivery onNavigate={handleNavigate} />} />
+            <Route path="/request-delivery" element={<RequestDelivery onNavigate={handleNavigate} />} />
             <Route path="/tracking" element={<TrackingRouteWrapper />} />
             <Route path="/tracking/:code" element={<TrackingRouteWrapper />} />
             <Route path="/faq" element={<Faqs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/policy" element={<Policy />} />
+            <Route path="/privacy" element={<Policy />} />
+            <Route path="/terms" element={<Policy />} />
+            <Route path="/shipping-policy" element={<Policy />} />
+            <Route path="/refund-policy" element={<Policy />} />
+            <Route path="/trust" element={<Policy />} />
             <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
             <Route path="/gallery" element={<UltimateGalleryV2 />} />
             <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
             <Route path="/driver" element={<DriverPortal />} />
-            <Route path="/customer" element={<CustomerDashboard customerPhone="" orders={[]} onReorder={() => {}} />} />
+            <Route path="/customer" element={<Auth onAuthSuccess={() => navigate("/customer")} />} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
