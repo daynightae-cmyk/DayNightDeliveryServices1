@@ -1,9 +1,4 @@
 ﻿User-agent: *
 Allow: /
 
-Disallow: /admin
-Disallow: /auth
-Disallow: /dashboard
-Disallow: /login
-
 Sitemap: https://daynightae.com/sitemap.xml
