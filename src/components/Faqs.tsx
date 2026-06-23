@@ -124,10 +124,10 @@ export default function Faqs() {
             WhatsApp
           </a>
           <a
-            href="mailto:Admin@daynightae.com"
+            href="mailto:Admin@daynight.ae"
             className="px-6 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-bold rounded-lg text-xs transition-colors inline-block cursor-pointer font-sans"
           >
-            Admin@daynightae.com
+            Admin@daynight.ae
           </a>
         </div>
       </section>

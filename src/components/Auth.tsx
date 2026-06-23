@@ -97,7 +97,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Admin@daynightae.com"
+              placeholder="Admin@daynight.ae"
               className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-cool transition-all placeholder:text-white/20 text-right font-sans"
               dir="rtl"
             />

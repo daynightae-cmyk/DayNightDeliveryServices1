@@ -23,6 +23,10 @@ export interface Order {
   payment_method: "sender_pays" | "cod" | "receiver_pays";
   cod_amount?: number;
   notes?: string;
+  package_description?: string;
+  price?: number;
+  driver_code?: string;
+  driver_phone?: string;
   status:
     | "Pending"
     | "Accepted"

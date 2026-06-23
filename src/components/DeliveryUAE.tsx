@@ -5,8 +5,13 @@
 
 import { useState } from "react";
 import { Search, MapPin, BadgeCheck, CheckCircle } from "lucide-react";
+import { useAppContext } from "../lib/AppContext";
+import { pageCopy } from "../data/pageCopy";
 
 export default function DeliveryUAE() {
+  const { language } = useAppContext();
+  const isArabic = language === "ar";
+  const lp = pageCopy[language].localDeliveryPage;
   const [searchQuery, setSearchTerm] = useState("");
 
   const mainCities = [
@@ -44,18 +49,15 @@ export default function DeliveryUAE() {
   );
 
   return (
-    <div className="space-y-12 text-right">
-      {/* Page Header */}
+    <div className="space-y-12" dir={isArabic ? "rtl" : "ltr"}>
       <section className="text-center max-w-2xl mx-auto space-y-4">
-        <span className="bg-brand-blue/15 border border-brand-blue/35 text-brand-blue text-xs px-3.5 py-1 rounded-full font-bold uppercase font-mono tracking-widest inline-block">
-          Local Dispatching • التوصيل المحلى الشامل
+        <span className="bg-brand-blue/15 border border-brand-blue/35 text-brand-blue text-xs px-3.5 py-1 rounded-full font-bold uppercase tracking-widest inline-block">
+          {lp.title}
         </span>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-          تغطية شاملة لكافة إمارات الدولة بأسعار واضحة
+          {isArabic ? "تغطية شاملة لكافة إمارات الدولة بأسعار واضحة" : "Full UAE coverage with clear pricing"}
         </h2>
-        <p className="text-white/60 text-sm">
-          نغطي المدن والبلديات الرئيسية بـ 30 درهم فقط، وهناك خدمات مخصصة للمناطق الممتدة في العين والمنطقة الغربية بـ 50 درهم، لضمان أعلى مستويات الالتزام والتغطية.
-        </p>
+        <p className="text-white/60 text-sm">{lp.subtitle}</p>
       </section>
 
       {/* Main Cities List */}

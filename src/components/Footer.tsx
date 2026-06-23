@@ -6,10 +6,8 @@ import {
   Facebook,
   Instagram,
   MessageSquare,
-  Zap,
   Heart,
-  Clock,
-  Shield,
+  ExternalLink,
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
@@ -42,16 +40,24 @@ export default function Footer() {
     { key: "home", label: tf.home, path: "/" },
     { key: "about", label: tf.about, path: "/about" },
     { key: "services", label: t.nav.services, path: "/services" },
+    { key: "gallery", label: tf.gallery || t.nav.gallery, path: "/gallery" },
     { key: "pricing", label: tf.pricing, path: "/pricing" },
     { key: "tracking", label: tf.tracking, path: "/tracking" },
+    { key: "faq", label: tf.faq || t.nav.faqs, path: "/faq" },
     { key: "contact", label: t.nav.contact, path: "/contact" },
   ];
 
   const serviceLinks = [
-    { key: "uae", label: tf.uaeDelivery, path: "/uae-delivery" },
+    { key: "uae", label: tf.localDelivery || tf.uaeDelivery, path: "/uae-delivery" },
     { key: "global", label: tf.globalShipping, path: "/international-shipping" },
     { key: "ecommerce", label: tf.ecommerce, path: "/ecommerce" },
     { key: "corporate", label: tf.corporate, path: "/corporate" },
+    { key: "request", label: t.header.requestBtn, path: "/request" },
+  ];
+
+  const legalLinks = [
+    { key: "policy", label: tf.policy, path: "/policy" },
+    { key: "qr", label: isArabic ? "روابط QR" : "QR Links", path: "/qr" },
   ];
 
   const socialLinks = [
@@ -91,28 +97,23 @@ export default function Footer() {
           }`}
         >
           <div
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border ${
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border overflow-hidden ${
               isLight
-                ? "bg-gradient-to-br from-brand-gold to-brand-gold/70 border-brand-gold/30"
-                : "bg-gradient-to-br from-brand-gold to-brand-gold/60 border-brand-gold/20"
+                ? "bg-white border-brand-gold/30"
+                : "bg-brand-cool border-brand-gold/20"
             }`}
           >
-            <Zap className="w-8 h-8 text-brand-deep" />
+            <img src={companyMeta.logoUrl} alt={companyMeta.name} className="w-full h-full object-cover" loading="lazy" />
           </div>
-          <div className={`text-center md:${isArabic ? "text-right" : "text-left"}`}>
-            <h3
-              className={`text-2xl font-black tracking-tight ${
-                isLight ? "text-brand-deep" : "text-white"
-              }`}
-            >
+          <div className={`text-center md:${isArabic ? "text-right" : "text-left"} flex-1`}>
+            <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isLight ? "text-brand-deep" : "text-white"}`}>
               {companyMeta.name}
             </h3>
-            <p className="text-brand-gold font-bold text-sm mb-2">{tf.slogan}</p>
-            <p
-              className={`max-w-2xl text-sm leading-relaxed ${
-                isLight ? "text-brand-deep/70" : "text-white/70"
-              }`}
-            >
+            <p className="text-brand-gold font-bold text-sm mb-1">{isArabic ? companyMeta.legalNameAr : tf.slogan}</p>
+            <a href={companyMeta.website} target="_blank" rel="noopener noreferrer" className="text-xs text-white/50 hover:text-brand-gold font-mono" dir="ltr">
+              {companyMeta.displayWebsite}
+            </a>
+            <p className={`max-w-2xl text-sm leading-relaxed mt-2 ${isLight ? "text-brand-deep/70" : "text-white/70"}`}>
               {tf.description}
             </p>
           </div>
@@ -124,7 +125,7 @@ export default function Footer() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 py-12"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-6 py-12"
         >
           {/* Navigation */}
           <div className={isArabic ? "text-right" : "text-left"}>
@@ -233,42 +234,36 @@ export default function Footer() {
                   <span>{isArabic ? companyMeta.addressAr : companyMeta.addressEn}</span>
                 </div>
               </li>
+              <li>
+                <a href={companyMeta.website} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 text-sm transition-colors ${isArabic ? "flex-row-reverse" : ""} ${isLight ? "text-brand-deep/70 hover:text-brand-gold" : "text-white/60 hover:text-brand-gold"}`}>
+                  <ExternalLink className="w-4 h-4 text-brand-gold shrink-0" />
+                  <span dir="ltr">{companyMeta.displayWebsite}</span>
+                </a>
+              </li>
+              <li>
+                <a href={companyMeta.mapUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 text-sm transition-colors ${isArabic ? "flex-row-reverse" : ""} ${isLight ? "text-brand-deep/70 hover:text-brand-gold" : "text-white/60 hover:text-brand-gold"}`}>
+                  <MapPin className="w-4 h-4 text-brand-gold shrink-0" />
+                  <span>{tf.maps || "Google Maps"}</span>
+                </a>
+              </li>
             </ul>
           </div>
 
-          {/* Why Us */}
+          {/* Legal */}
           <div className={isArabic ? "text-right" : "text-left"}>
-            <h4
-              className={`text-sm font-bold uppercase tracking-wider mb-5 ${
-                isLight ? "text-brand-deep" : "text-white/90"
-              }`}
-            >
-              {tf.whyUs}
+            <h4 className={`text-sm font-bold uppercase tracking-wider mb-5 ${isLight ? "text-brand-deep" : "text-white/90"}`}>
+              {tf.legal || (isArabic ? "قانوني" : "Legal")}
             </h4>
-            <div className="space-y-4">
-              <div className={`flex items-start gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
-                <Clock className="w-5 h-5 text-brand-gold mt-0.5 shrink-0" />
-                <div>
-                  <p className={`text-sm font-semibold ${isLight ? "text-brand-deep" : "text-white/80"}`}>
-                    {tf.service24_7}
-                  </p>
-                  <p className={`text-xs ${isLight ? "text-brand-deep/50" : "text-white/50"}`}>
-                    {tf.roundTheClock}
-                  </p>
-                </div>
-              </div>
-              <div className={`flex items-start gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
-                <Shield className="w-5 h-5 text-brand-gold mt-0.5 shrink-0" />
-                <div>
-                  <p className={`text-sm font-semibold ${isLight ? "text-brand-deep" : "text-white/80"}`}>
-                    {tf.premiumCare}
-                  </p>
-                  <p className={`text-xs ${isLight ? "text-brand-deep/50" : "text-white/50"}`}>
-                    {tf.safetyFirst}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ul className="space-y-3">
+              {legalLinks.map((link) => (
+                <li key={link.key}>
+                  <Link to={link.path} className={`group flex items-center gap-2 text-sm transition-colors ${isArabic ? "flex-row-reverse" : ""} ${isLight ? "text-brand-deep/70 hover:text-brand-gold" : "text-white/60 hover:text-brand-gold"}`}>
+                    <Arrow className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                    <span>{link.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </motion.div>
 

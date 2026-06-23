@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MapPin, Navigation, Route, Truck } from "lucide-react";
+import { MapPin, Navigation, Route, Truck, Globe2 } from "lucide-react";
 import { coverageAreas } from "../../data/coverage";
 import { useAppContext } from "../../lib/AppContext";
 
@@ -9,83 +9,109 @@ type MapPoint = {
   nameAr: string;
   emirate: string;
   zoneType: "main" | "extended";
-  x: number;
-  y: number;
+  cx: number;
+  cy: number;
 };
 
-const featuredPoints: MapPoint[] = [
-  { id: "abu-dhabi", nameEn: "Abu Dhabi", nameAr: "أبوظبي", emirate: "Abu Dhabi", zoneType: "main", x: 36, y: 66 },
-  { id: "mussafah", nameEn: "Mussafah", nameAr: "مصفح", emirate: "Abu Dhabi", zoneType: "main", x: 40, y: 70 },
-  { id: "al-ain", nameEn: "Al Ain", nameAr: "العين", emirate: "Abu Dhabi", zoneType: "extended", x: 67, y: 78 },
-  { id: "al-dhafra", nameEn: "Al Dhafra", nameAr: "الظفرة", emirate: "Abu Dhabi", zoneType: "extended", x: 18, y: 78 },
-  { id: "dubai", nameEn: "Dubai", nameAr: "دبي", emirate: "Dubai", zoneType: "main", x: 61, y: 43 },
-  { id: "sharjah", nameEn: "Sharjah", nameAr: "الشارقة", emirate: "Sharjah", zoneType: "main", x: 66, y: 37 },
-  { id: "ajman", nameEn: "Ajman", nameAr: "عجمان", emirate: "Ajman", zoneType: "main", x: 69, y: 33 },
-  { id: "rak", nameEn: "Ras Al Khaimah", nameAr: "رأس الخيمة", emirate: "Ras Al Khaimah", zoneType: "main", x: 73, y: 18 },
-  { id: "fujairah", nameEn: "Fujairah", nameAr: "الفجيرة", emirate: "Fujairah", zoneType: "main", x: 84, y: 35 }
+const mapPoints: MapPoint[] = [
+  { id: "abu-dhabi", nameEn: "Abu Dhabi", nameAr: "أبوظبي", emirate: "Abu Dhabi", zoneType: "main", cx: 118, cy: 198 },
+  { id: "mussafah", nameEn: "Mussafah", nameAr: "مصفح", emirate: "Abu Dhabi", zoneType: "main", cx: 108, cy: 210 },
+  { id: "al-dhafra", nameEn: "Al Dhafra / Western Region", nameAr: "الظفرة / المنطقة الغربية", emirate: "Abu Dhabi", zoneType: "extended", cx: 48, cy: 228 },
+  { id: "al-ruwais", nameEn: "Al Ruwais", nameAr: "الرويس", emirate: "Abu Dhabi", zoneType: "main", cx: 28, cy: 218 },
+  { id: "al-ain", nameEn: "Al Ain", nameAr: "العين", emirate: "Abu Dhabi", zoneType: "extended", cx: 188, cy: 228 },
+  { id: "dubai", nameEn: "Dubai", nameAr: "دبي", emirate: "Dubai", zoneType: "main", cx: 168, cy: 118 },
+  { id: "sharjah", nameEn: "Sharjah", nameAr: "الشارقة", emirate: "Sharjah", zoneType: "main", cx: 178, cy: 98 },
+  { id: "ajman", nameEn: "Ajman", nameAr: "عجمان", emirate: "Ajman", zoneType: "main", cx: 186, cy: 82 },
+  { id: "uaq", nameEn: "Umm Al Quwain", nameAr: "أم القيوين", emirate: "Umm Al Quwain", zoneType: "main", cx: 192, cy: 68 },
+  { id: "rak", nameEn: "Ras Al Khaimah", nameAr: "رأس الخيمة", emirate: "Ras Al Khaimah", zoneType: "main", cx: 200, cy: 48 },
+  { id: "fujairah", nameEn: "Fujairah", nameAr: "الفجيرة", emirate: "Fujairah", zoneType: "main", cx: 228, cy: 108 },
+  { id: "khorfakkan", nameEn: "Khorfakkan", nameAr: "خورفكان", emirate: "Sharjah", zoneType: "extended", cx: 238, cy: 92 }
 ];
+
+const UAE_OUTLINE =
+  "M 24 228 L 38 210 L 52 218 L 68 205 L 88 215 L 98 200 L 118 195 L 138 175 L 158 145 L 172 118 L 188 95 L 200 72 L 212 58 L 228 72 L 238 95 L 242 118 L 248 138 L 252 118 L 258 98 L 268 88 L 278 102 L 282 128 L 276 148 L 262 162 L 248 178 L 232 195 L 218 210 L 198 228 L 178 238 L 148 242 L 118 238 L 88 232 L 58 235 L 34 238 Z";
+
+function priceLabel(zoneType: "main" | "extended", isArabic: boolean) {
+  if (zoneType === "extended") {
+    return isArabic ? "52.50 درهم (50 + VAT)" : "52.50 AED (50 + VAT)";
+  }
+  return isArabic ? "31.50 درهم (30 + VAT)" : "31.50 AED (30 + VAT)";
+}
 
 export default function UAEInteractiveMap() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
   const [selectedId, setSelectedId] = useState("abu-dhabi");
 
-  const selectedPoint = featuredPoints.find((point) => point.id === selectedId) || featuredPoints[0];
-  const coveredAreas = useMemo(() => coverageAreas.filter((area) => area.active).length, []);
+  const selectedPoint = mapPoints.find((p) => p.id === selectedId) || mapPoints[0];
+  const coveredAreas = useMemo(() => coverageAreas.filter((a) => a.active).length, []);
 
   return (
     <section className="glass-premium rounded-[28px] p-5 sm:p-7 border border-white/10 overflow-hidden relative" dir={isArabic ? "rtl" : "ltr"}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(24,168,232,0.16),transparent_38%),radial-gradient(circle_at_75%_70%,rgba(212,175,55,0.14),transparent_42%)] pointer-events-none" />
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 items-stretch">
-        <div className="relative min-h-[360px] rounded-3xl border border-white/10 bg-brand-deep/65 overflow-hidden shadow-2xl">
-          <div className="absolute inset-6 rounded-[38%_62%_48%_52%/42%_40%_60%_58%] bg-gradient-to-br from-brand-blue/30 via-brand-cool/70 to-brand-gold/15 border border-brand-gold/20 shadow-[0_0_70px_rgba(24,168,232,0.2)] rotate-[-10deg]" />
-          <div className="absolute inset-10 rounded-[44%_56%_50%_50%/54%_45%_55%_46%] border border-white/10 rotate-[-10deg]" />
-          <div className="absolute left-[30%] top-[66%] right-[30%] h-px bg-brand-gold/50 shadow-[0_0_18px_rgba(212,175,55,0.7)] rotate-[-9deg]" />
-          <div className="absolute left-[58%] top-[44%] right-[18%] h-px bg-sky-300/45 shadow-[0_0_18px_rgba(24,168,232,0.7)] rotate-[-23deg]" />
 
-          {featuredPoints.map((point) => {
-            const isSelected = point.id === selectedPoint.id;
-            return (
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-6 items-stretch">
+        <div className="relative min-h-[340px] sm:min-h-[400px] rounded-3xl border border-white/10 bg-gradient-to-br from-[#071A33] via-[#0A1C3A] to-[#071A33] overflow-hidden shadow-2xl">
+          <svg viewBox="0 0 300 260" className="absolute inset-0 w-full h-full" aria-label={isArabic ? "خريطة الإمارات" : "UAE map"}>
+            <defs>
+              <linearGradient id="uaeFill" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0057B8" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#18A8E8" stopOpacity="0.15" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            <path d={UAE_OUTLINE} fill="url(#uaeFill)" stroke="rgba(212,175,55,0.45)" strokeWidth="1.5" />
+            <path d="M 118 198 L 168 118" stroke="rgba(24,168,232,0.55)" strokeWidth="1.2" strokeDasharray="4 3" filter="url(#glow)" />
+            <path d="M 108 210 L 178 98" stroke="rgba(212,175,55,0.45)" strokeWidth="1" strokeDasharray="3 3" />
+            <path d="M 118 198 L 188 228" stroke="rgba(24,168,232,0.4)" strokeWidth="1" strokeDasharray="3 3" />
+            <path d="M 178 98 L 228 108" stroke="rgba(212,175,55,0.35)" strokeWidth="1" strokeDasharray="3 3" />
+            {mapPoints.map((point) => {
+              const active = point.id === selectedId;
+              return (
+                <g key={point.id} onClick={() => setSelectedId(point.id)} className="cursor-pointer">
+                  {active && <circle cx={point.cx} cy={point.cy} r="14" fill="rgba(212,175,55,0.25)" className="animate-pulse" />}
+                  <circle cx={point.cx} cy={point.cy} r={active ? 7 : 5} fill={active ? "#D4AF37" : "#18A8E8"} stroke="#fff" strokeWidth="1.2" />
+                </g>
+              );
+            })}
+          </svg>
+          <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-2">
+            {mapPoints.slice(0, 6).map((p) => (
               <button
-                key={point.id}
+                key={p.id}
                 type="button"
-                onClick={() => setSelectedId(point.id)}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 group focus:outline-none ${isSelected ? "z-20" : "z-10"}`}
-                style={{ left: `${point.x}%`, top: `${point.y}%` }}
-                aria-label={isArabic ? point.nameAr : point.nameEn}
+                onClick={() => setSelectedId(p.id)}
+                className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${selectedId === p.id ? "bg-brand-gold text-brand-deep border-brand-gold" : "bg-brand-deep/80 text-white/70 border-white/15 hover:border-brand-gold/40"}`}
               >
-                <span className={`absolute inset-0 -m-3 rounded-full ${point.zoneType === "extended" ? "bg-brand-gold/20" : "bg-sky-400/20"} animate-ping`} />
-                <span className={`relative flex w-9 h-9 items-center justify-center rounded-full border ${isSelected ? "border-brand-gold bg-brand-gold text-brand-deep" : "border-white/25 bg-brand-cool/85 text-brand-gold"} shadow-lg transition-all group-hover:scale-110`}>
-                  <MapPin className="w-4 h-4" />
-                </span>
-                <span className="absolute top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-brand-deep/90 px-2 py-1 text-[10px] font-bold text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {isArabic ? point.nameAr : point.nameEn}
-                </span>
+                {isArabic ? p.nameAr : p.nameEn}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
         <div className="glass rounded-3xl p-5 border border-white/10 flex flex-col justify-between gap-5">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/10 px-3 py-1 text-xs font-bold text-brand-gold">
-              <Navigation className="w-4 h-4" />
-              <span>{isArabic ? "خريطة التغطية التفاعلية" : "Interactive Coverage Map"}</span>
+              <Globe2 className="w-4 h-4" />
+              <span>{isArabic ? "خريطة التغطية — الإمارات" : "UAE Coverage Map"}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-              {isArabic ? "نقاط تشغيل نشطة عبر الإمارات" : "Active Dispatch Points Across The UAE"}
+              {isArabic ? "نقاط تشغيل نشطة عبر الإمارات" : "Active Operating Points Across the UAE"}
             </h2>
             <p className="text-white/65 text-sm leading-relaxed">
               {isArabic
-                ? "اضغط على أي مدينة لمعرفة نوع التغطية والسعر النهائي المرتبط بها. الخريطة تعرض المسارات الأساسية من أبوظبي ومصفح نحو باقي الإمارات."
-                : "Select a city to view coverage type and final delivery price. The map highlights core routes from Abu Dhabi and Mussafah across the Emirates."}
+                ? "اختر مدينة أو منطقة لمعرفة فئة التسعير والسعر النهائي شامل ضريبة 5%."
+                : "Select a city or area to view pricing category and final price including 5% VAT."}
             </p>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-brand-deep/70 p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <Truck className="w-8 h-8 text-brand-gold" />
-              <div className={isArabic ? "text-right" : "text-left"}>
+              <Truck className="w-8 h-8 text-brand-gold shrink-0" />
+              <div className={isArabic ? "text-right flex-1" : "text-left flex-1"}>
                 <p className="text-white/45 text-xs font-bold uppercase">{selectedPoint.emirate}</p>
                 <h3 className="text-xl font-extrabold text-white">{isArabic ? selectedPoint.nameAr : selectedPoint.nameEn}</h3>
               </div>
@@ -97,7 +123,7 @@ export default function UAEInteractiveMap() {
               </div>
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                 <p className="text-white/45">{isArabic ? "السعر النهائي" : "Final price"}</p>
-                <p className="text-brand-gold font-black" dir="ltr">{selectedPoint.zoneType === "extended" ? "50 AED" : "30 AED"}</p>
+                <p className="text-brand-gold font-black text-sm" dir="ltr">{priceLabel(selectedPoint.zoneType, isArabic)}</p>
               </div>
             </div>
           </div>
@@ -112,6 +138,17 @@ export default function UAEInteractiveMap() {
               <p className="text-xs text-white/55">{isArabic ? "مسارات يومية نشطة" : "Active daily routes"}</p>
             </div>
           </div>
+
+          <ul className="space-y-2 max-h-32 overflow-y-auto text-xs text-white/60">
+            {mapPoints.map((p) => (
+              <li key={p.id}>
+                <button type="button" onClick={() => setSelectedId(p.id)} className={`w-full flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-white/5 ${selectedId === p.id ? "text-brand-gold" : ""}`}>
+                  <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" />{isArabic ? p.nameAr : p.nameEn}</span>
+                  <span dir="ltr">{p.zoneType === "extended" ? "50" : "30"} AED</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

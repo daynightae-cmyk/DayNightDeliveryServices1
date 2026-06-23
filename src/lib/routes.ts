@@ -24,7 +24,7 @@ export const ROUTE_LABELS = [
   { path: ROUTES.HOME, labelAr: "الرئيسية", labelEn: "Home" },
   { path: ROUTES.ABOUT, labelAr: "من نحن", labelEn: "About" },
   { path: ROUTES.SERVICES, labelAr: "خدماتنا", labelEn: "Services" },
-  { path: ROUTES.UAE_DELIVERY, labelAr: "التوصيل الإماراتي", labelEn: "UAE Delivery" },
+  { path: ROUTES.UAE_DELIVERY, labelAr: "التوصيل المحلي", labelEn: "Local Delivery" },
   { path: ROUTES.INTERNATIONAL, labelAr: "الشحن الدولي", labelEn: "Global Shipping" },
   { path: ROUTES.ECOMMERCE, labelAr: "حلول المتاجر", labelEn: "E-Commerce" },
   { path: ROUTES.CORPORATE, labelAr: "الشركات والعقود", labelEn: "Corporate" },

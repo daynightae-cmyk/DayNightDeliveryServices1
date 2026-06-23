@@ -6,7 +6,7 @@ export const CONTACT_INFO = {
   companyNameAr: "داي نايت لخدمات التوصيل والشحن",
   phone: "+971 56 875 7331",
   phoneFormatted: "+971 56 875 7331",
-  email: "Admin@daynightae.com",
+  email: "Admin@daynight.ae",
   domain: "https://daynightae.com",
   addressAr: "الإمارات العربية المتحدة - أبوظبي - مصفح 40",
   addressEn: "UAE ABUDHABI MUSSAFAH 40",

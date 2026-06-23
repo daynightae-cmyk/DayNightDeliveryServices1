@@ -3,17 +3,20 @@ export const companyMeta = {
   legalNameEn: "DAY NIGHT DELIVERY SERVICES",
   legalNameAr: "داي نايت لخدمات التوصيل والشحن",
   brandName: "DAY NIGHT",
-  domain: "https://daynightae.com",
-  website: "https://daynightae.com",
-  email: "Admin@daynightae.com",
+  domain: "https://www.daynightae.com",
+  website: "https://www.daynightae.com",
+  displayWebsite: "www.daynightae.com",
+  email: "Admin@daynight.ae",
   phone: "+971 56 875 7331",
   whatsappNumber: "971568757331",
   whatsappUrl: "https://wa.me/971568757331",
   whatsapp: "https://wa.me/971568757331",
   whatsappCatalog: "https://wa.me/c/971568757331",
   mapUrl: "https://maps.app.goo.gl/PCTjMCQpZuR3ns2J7",
-  addressEn: "UAE ABUDHABI MUSSAFAH 40",
-  addressAr: "الإمارات العربية المتحدة - أبوظبي - مصفح 40",
+  addressEn: "UAE – Abu Dhabi – Mussafah 40",
+  addressAr: "الإمارات العربية المتحدة – أبوظبي – مصفح 40",
+  logoUrl: "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png",
+  qrUrl: "https://i.postimg.cc/P5KCWNMd/qr-code-1000-1000.png",
   slogans: {
     en: ["Fast • Reliable • Every Time", "Your Comfort.. Our Priority"],
     ar: ["نصل إليك في كل وقت", "خدمة على مدار الساعة 24/7", "سريع.. آمن.. موثوق", "راحتكم أولويتنا"]
@@ -24,13 +27,17 @@ export const companyMeta = {
   shortTagAr: "خدمة على مدار الساعة 24/7",
   brandColors: {
     navy: "#071A33",
-    royalBlue: "#0B4DBA",
-    skyBlue: "#38BDF8",
+    deepNavy: "#0A1C3A",
+    royalBlue: "#0057B8",
+    brightBlue: "#007BFF",
+    skyBlue: "#18A8E8",
     gold: "#D4AF37",
-    white: "#FFFFFF"
+    warmGold: "#F5B700",
+    white: "#FFFFFF",
+    whatsappGreen: "#25D366"
   },
   seo: {
-    title: "DAY NIGHT DELIVERY SERVICES | UAE Delivery & Shipping",
+    title: "DAY NIGHT DELIVERY SERVICES | UAE Delivery & International Shipping",
     titleAr: "داي نايت لخدمات التوصيل والشحن | توصيل وشحن داخل الإمارات وخارجها",
     description:
       "Fast, reliable delivery and shipping services across the UAE and international destinations.",

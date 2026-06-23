@@ -33,7 +33,7 @@ const Policy = lazy(() => import("./components/Policy"));
 const QR = lazy(() => import("./components/QR"));
 const AdminPanel = lazy(() => import("./components/AdminPanel"));
 const InternationalShippingAdvanced = lazy(() => import("./components/InternationalShippingAdvanced"));
-const DriverMobileView = lazy(() => import("./components/driver/DriverMobileView"));
+const DriverPortal = lazy(() => import("./components/driver/DriverPortal"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboard"));
 const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGalleryV2"));
 import SmartChat from "./components/SmartChat";
@@ -51,8 +51,9 @@ import {
 import companyMeta from "./data/companyMeta";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { trackPageLoad } from "./lib/monitoring";
+import usePageSEO from "./hooks/usePageSEO";
 
-const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
+const LOGO_IMAGE_URL = companyMeta.logoUrl;
 
 function AppContent() {
   const navigate = useNavigate();
@@ -61,6 +62,8 @@ function AppContent() {
   const { language, toggleLanguage } = useAppContext();
 
   const t = translations[language];
+
+  usePageSEO();
 
   // Synchronize legacy key actions with real production URLs
   function handleNavigate(tab: string, trackingId?: string) {
@@ -107,10 +110,8 @@ function AppContent() {
     { key: "ecommerce", path: "/ecommerce", label: t.nav.ecommerce },
     { key: "corporate", path: "/corporate", label: t.nav.corporate },
     { key: "pricing", path: "/pricing", label: t.nav.pricing },
-    { key: "request", path: "/request", label: t.nav.booking },
-    { key: "tracking", path: "/tracking", label: t.nav.tracking },
-    { key: "faqs", path: "/faq", label: t.nav.faqs },
     { key: "gallery", path: "/gallery", label: t.nav.gallery },
+    { key: "tracking", path: "/tracking", label: t.nav.tracking },
     { key: "contact", path: "/contact", label: t.nav.contact }
   ];
 
@@ -174,7 +175,7 @@ function AppContent() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden xl:flex items-center gap-1.5 text-xs font-semibold">
+          <nav className="hidden lg:flex flex-1 items-center justify-center gap-0.5 xl:gap-1 text-[11px] xl:text-xs font-semibold max-w-4xl mx-auto overflow-x-auto no-scrollbar">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
@@ -183,7 +184,7 @@ function AppContent() {
                   key={link.key}
                   to={link.path}
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-right cursor-pointer ${
+                  className={`px-2 xl:px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
                     isActive 
                       ? "bg-brand-blue text-white font-extrabold shadow-md shadow-brand-blue/20" 
                       : "text-white/70 hover:text-white hover:bg-white/5"
@@ -195,20 +196,27 @@ function AppContent() {
             })}
           </nav>
 
-          {/* Call to action book Button */}
-          <div className="hidden sm:flex items-center gap-3">
+          {/* Call to action buttons */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            <Link
+              to="/tracking"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="px-3 py-2 border border-white/20 hover:border-brand-gold/50 text-white/80 hover:text-white font-bold rounded-lg text-[11px] transition-all"
+            >
+              {t.header.trackBtn}
+            </Link>
             <Link
               id="header_cta_btn"
               to="/request"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="px-5 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-extrabold rounded-lg text-xs leading-none transition-all duration-300 cursor-pointer border border-brand-gold/10 hover:border-brand-blue shadow-lg shadow-brand-gold/5 hover:shadow-brand-blue/20"
+              className="px-4 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-extrabold rounded-lg text-[11px] leading-none transition-all duration-300 cursor-pointer border border-brand-gold/10 hover:border-brand-blue shadow-lg shadow-brand-gold/5"
             >
               {t.header.requestBtn}
             </Link>
           </div>
 
           {/* Mobile hamburger toggle */}
-          <div className="xl:hidden flex items-center">
+          <div className="lg:hidden flex items-center gap-2">
             <button
               id="mobile_menu_trigger"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -221,7 +229,7 @@ function AppContent() {
 
         {/* Mobile Navigation overlay drawer */}
         {mobileMenuOpen && (
-          <div className="xl:hidden bg-brand-cool border-t border-white/10 text-right py-4 px-4 space-y-2 animate-in slide-in-from-top-4 duration-200">
+          <div className="lg:hidden bg-brand-cool border-t border-white/10 py-4 px-4 space-y-1 animate-in slide-in-from-top-4 duration-200 max-h-[70vh] overflow-y-auto">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
@@ -244,6 +252,13 @@ function AppContent() {
               );
             })}
             
+            <Link
+              to="/tracking"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full block py-3 border border-white/20 text-white font-bold rounded-xl text-center text-xs mt-2"
+            >
+              {t.header.trackBtn}
+            </Link>
             <Link
               id="mobile_cta_book"
               to="/request"
@@ -288,7 +303,7 @@ function AppContent() {
             <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
             <Route path="/gallery" element={<UltimateGalleryV2 />} />
             <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
-            <Route path="/driver" element={<DriverMobileView orders={[]} onStatusChange={() => {}} />} />
+            <Route path="/driver" element={<DriverPortal />} />
             <Route path="/customer" element={<CustomerDashboard customerPhone="" orders={[]} onReorder={() => {}} />} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
             <Route path="*" element={<NotFound />} />
