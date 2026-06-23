@@ -297,79 +297,8 @@ function AppContent() {
       {/* Smart Chat Floating Agent Widget */}
       <SmartChat />
 
-      {/* Premium Dark Slogan Footer */}
-      <footer className="bg-brand-cool text-white border-t border-white/10 pt-16 pb-8 px-4 sm:px-6 lg:px-8 font-sans">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 border-b border-white/10 pb-12 mb-10">
-          
-          {/* Logo & Slogan Column */}
-          <div className="md:col-span-4 space-y-4 text-right">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 bg-brand-deep rounded-xl flex items-center justify-center border border-brand-gold/20 overflow-hidden">
-                <img 
-                  src={LOGO_IMAGE_URL} 
-                  alt="Day Night Footer Logo" 
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover scale-110" 
-                />
-              </div>
-              <h3 className="text-base font-extrabold tracking-tight uppercase">
-                DAY NIGHT <span className="text-brand-gold font-semibold text-[11px] font-sans">DELIVERY</span>
-              </h3>
-            </div>
-            <p className="text-xs text-white/55 leading-relaxed">
-              {t.footer.description}
-            </p>
-            <p className="text-xs font-mono font-bold text-brand-gold">
-              Mussafah 40, Abu Dhabi, UAE
-            </p>
-          </div>
-
-          {/* Quick Navigator Tabs Links */}
-          <div className="md:col-span-4 space-y-4 text-right">
-            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5 rtl:border-r-4 rtl:border-l-0 ltr:border-l-4 ltr:border-r-0 ltr:pl-2.5 rtl:pr-2.5">{t.nav.quick_links}</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs text-white/60">
-              {navLinks.map(n => (
-                <Link key={n.key} to={n.path} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="rtl:text-right ltr:text-left hover:text-white transition-colors cursor-pointer text-xs">{n.label}</Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Contact Details Foot block */}
-          <div className="md:col-span-4 space-y-4 text-right sm:border-r sm:border-white/10 sm:pr-6 md:border-r-0 md:pr-0">
-            <h4 className="font-extrabold text-sm text-slate-200 uppercase tracking-wider font-sans border-r-4 border-brand-gold pr-2.5 rtl:border-r-4 rtl:border-l-0 ltr:border-l-4 ltr:border-r-0 ltr:pl-2.5 rtl:pr-2.5">{t.nav.quick_contact}</h4>
-            <div className="text-xs text-white/60 space-y-2.5">
-              <p>{t.footer.support}</p>
-              <p className="text-sm font-extrabold text-white font-sans">Ù‡Ø§ØªÙ: +971 56 875 7331</p>
-              <p className="text-[11px] font-mono text-white/40">Ø§Ù„Ø¨Ø±ÙŠØ¯: Admin@daynightae.com</p>
-              <a
-                id="footer_whatsapp_catalog"
-                href="https://wa.me/c/971568757331"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-amber-400 hover:text-amber-300 text-[10px] sm:text-xs font-black block transition-colors mt-2 cursor-pointer bg-amber-950/20 border border-amber-500/25 px-3 py-2 rounded-xl text-center"
-              >
-                {t.footer.catalog}
-              </a>
-              <Link 
-                to="/admin" 
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-rose-400/80 hover:text-rose-400 text-[10px] font-bold block transition-colors mt-2 cursor-pointer bg-red-950/10 border border-red-500/10 px-2 py-1 rounded w-full md:w-auto text-center"
-              >
-                {t.footer.adminPortal}
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Legal copy strip */}
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-white/40 text-[11px] font-sans font-bold text-center">
-          <p>{t.footer.allRights}</p>
-          <div className="flex gap-4">
-            <span className="text-white/10">|</span>
-            <p>{t.footer.motto}</p>
-          </div>
-        </div>
-      </footer>
+      {/* Premium Footer Component */}
+      <Footer />
     </div>
   );
 }

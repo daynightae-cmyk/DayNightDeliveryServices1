@@ -31,30 +31,39 @@ export default function Footer() {
             </p>
             {/* Social Links */}
             <div className="flex items-center gap-3">
-              {companyMeta.socials
-                .filter((s) => ["facebook", "instagram", "linkedin", "twitter"].includes(s.id))
-                .map((social) => {
-                  const IconComponent =
-                    social.id === "facebook"
-                      ? Facebook
-                      : social.id === "instagram"
-                        ? Instagram
-                        : social.id === "linkedin"
-                          ? Linkedin
-                          : Twitter;
-                  return (
-                    <a
-                      key={social.id}
-                      href={social.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-brand-gold transition-all duration-300 border border-white/10 hover:border-brand-gold/30"
-                      aria-label={social.nameEn}
-                    >
-                      <IconComponent className="w-4 h-4" />
-                    </a>
-                  );
-                })}
+              {companyMeta.socials.facebook && (
+                <a
+                  href={companyMeta.socials.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-brand-gold transition-all duration-300 border border-white/10 hover:border-brand-gold/30"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="w-4 h-4" />
+                </a>
+              )}
+              {companyMeta.socials.instagram && (
+                <a
+                  href={companyMeta.socials.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-brand-gold transition-all duration-300 border border-white/10 hover:border-brand-gold/30"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="w-4 h-4" />
+                </a>
+              )}
+              {companyMeta.socials.tiktok && (
+                <a
+                  href={companyMeta.socials.tiktok}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-brand-gold transition-all duration-300 border border-white/10 hover:border-brand-gold/30"
+                  aria-label="TikTok"
+                >
+                  <Twitter className="w-4 h-4" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -177,7 +186,7 @@ export default function Footer() {
           {/* Bottom Section */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-white/50 text-center md:text-left">
-              © 2024-2026 {companyMeta.companyName}. {language === "en" ? "All rights reserved." : "جميع الحقوق محفوظة."}
+              © 2024-2026 {companyMeta.name}. {language === "en" ? "All rights reserved." : "جميع الحقوق محفوظة."}
             </p>
             <p className="text-xs text-brand-gold/80 font-semibold text-center">
               {language === "en"

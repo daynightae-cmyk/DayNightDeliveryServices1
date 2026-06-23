@@ -83,8 +83,7 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
     requiresCustomQuote,
     breakdown: [
       `${category}: ${formatAED(basePrice)}`,
-      ...(express ? [`Express surcharge: ${formatAED(express)}`] : []),
-      `VAT 5%: ${formatAED(vatAmount)}`
+      ...(express ? [`Express surcharge: ${formatAED(express)}`] : [])
     ],
     notes: requiresCustomQuote
       ? "Large shipments may require operational confirmation before pickup."
@@ -128,8 +127,7 @@ export function calculateInternationalPrice(inputOrDestination: InternationalPri
     requiresCustomQuote,
     breakdown: [
       `First kg: ${formatAED(firstKg)}`,
-      `Additional kg: ${formatAED(additionalKg)} x ${Math.max(0, billableWeight - 1)}`,
-      `VAT 5%: ${formatAED(vatAmount)}`
+      `Additional kg: ${formatAED(additionalKg)} x ${Math.max(0, billableWeight - 1)}`
     ],
     notes: `${destination.countryNameEn} shipping estimate. Estimated delivery: ${destination.estimatedDays}.`
   };
