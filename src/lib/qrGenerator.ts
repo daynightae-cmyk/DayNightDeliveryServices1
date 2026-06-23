@@ -1,5 +1,5 @@
 export function buildTrackingQrUrl(trackingCode: string) {
-  const encoded = encodeURIComponent(`https://daynightae.com/tracking?code=${trackingCode}`);
+  const encoded = encodeURIComponent(`https://www.daynightae.com/tracking?code=${trackingCode}`);
   return `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encoded}`;
 }
 

@@ -8,7 +8,7 @@ interface SplashProps {
   onComplete?: () => void;
 }
 
-const LOGO_IMAGE_URL = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
+const LOGO_IMAGE_URL = "/logo-daynight.svg";
 const SESSION_KEY = "dn_splash_shown";
 
 export default function Splash({ onComplete }: SplashProps) {

@@ -1,13 +1,20 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://daynightae.com/</loc></url>
-  <url><loc>https://daynightae.com/pricing</loc></url>
-  <url><loc>https://daynightae.com/services</loc></url>
-  <url><loc>https://daynightae.com/delivery-uae</loc></url>
-  <url><loc>https://daynightae.com/delivery-international</loc></url>
-  <url><loc>https://daynightae.com/corporate</loc></url>
-  <url><loc>https://daynightae.com/gallery</loc></url>
-  <url><loc>https://daynightae.com/tracking</loc></url>
-  <url><loc>https://daynightae.com/contact</loc></url>
-  <url><loc>https://daynightae.com/about</loc></url>
+  <url><loc>https://www.daynightae.com/</loc></url>
+  <url><loc>https://www.daynightae.com/about</loc></url>
+  <url><loc>https://www.daynightae.com/services</loc></url>
+  <url><loc>https://www.daynightae.com/uae-delivery</loc></url>
+  <url><loc>https://www.daynightae.com/international-shipping</loc></url>
+  <url><loc>https://www.daynightae.com/ecommerce</loc></url>
+  <url><loc>https://www.daynightae.com/corporate</loc></url>
+  <url><loc>https://www.daynightae.com/pricing</loc></url>
+  <url><loc>https://www.daynightae.com/request</loc></url>
+  <url><loc>https://www.daynightae.com/tracking</loc></url>
+  <url><loc>https://www.daynightae.com/gallery</loc></url>
+  <url><loc>https://www.daynightae.com/contact</loc></url>
+  <url><loc>https://www.daynightae.com/faq</loc></url>
+  <url><loc>https://www.daynightae.com/policy</loc></url>
+  <url><loc>https://www.daynightae.com/privacy</loc></url>
+  <url><loc>https://www.daynightae.com/terms</loc></url>
+  <url><loc>https://www.daynightae.com/trust</loc></url>
 </urlset>

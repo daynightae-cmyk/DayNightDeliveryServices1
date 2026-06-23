@@ -18,19 +18,19 @@ export const aiAgentKnowledge = {
     maps: companyMeta.mapUrl
   },
   prices: {
-    domesticMain: "Main UAE cities: 30 AED + 5% VAT = 31.50 AED total",
-    domesticMainAr: "المدن الرئيسية: 30 درهم + ضريبة 5% = 31.50 درهم",
-    domesticExtended: "Extended UAE areas: 50 AED + 5% VAT = 52.50 AED total",
-    domesticExtendedAr: "المناطق الممتدة: 50 درهم + ضريبة 5% = 52.50 درهم",
-    alAin: "Al Ain: extended area — 50 AED + VAT = 52.50 AED",
-    westernRegion: "Western Region / Al Dhafra: extended — 50 AED + VAT = 52.50 AED",
-    alRuwais: "Al Ruwais (main area): 30 AED + VAT = 31.50 AED",
+    domesticMain: "Main UAE cities: 31.50 AED final customer price",
+    domesticMainAr: "المدن الرئيسية: 31.50 درهم السعر النهائي للعميل",
+    domesticExtended: "Extended UAE areas: 52.50 AED final customer price",
+    domesticExtendedAr: "المناطق الممتدة: 52.50 درهم السعر النهائي للعميل",
+    alAin: "Al Ain: extended area — 52.50 AED final",
+    westernRegion: "Western Region / Al Dhafra: extended — 52.50 AED final",
+    alRuwais: "Al Ruwais (main area): 31.50 AED final",
     express: "Express surcharge: +15 AED",
-    gcc: "GCC: 95 AED first kg + 45 AED each additional kg + 5% VAT",
+    gcc: "GCC final prices start from 99.75 AED for the first kg; additional kg pricing is shown as a final quote by destination",
     gccExamples: "GCC 1kg=99.75 | 2kg=147.00 | 3kg=194.25 AED",
-    worldwide: "Worldwide: 190 AED first kg + 90 AED each additional kg + 5% VAT",
+    worldwide: "Worldwide final prices start from 199.50 AED for the first kg; additional kg pricing is shown as a final quote by destination",
     worldwideExamples: "Worldwide 1kg=199.50 | 2kg=294.00 | 3kg=388.50 AED",
-    vat: "All prices subject to 5% UAE VAT unless stated as final inclusive total."
+    vat: "Customer-facing prices show the final payable total only. Legal tax details are handled internally when required."
   },
   uaeCoverage: [
     "Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain",
@@ -53,12 +53,12 @@ export const aiAgentKnowledge = {
 
 export const chatKnowledgeEntries = [
   { keys: ["price", "pricing", "سعر", "أسعار", "تكلفة", "31.50", "52.50"], en: aiAgentKnowledge.prices.domesticMain + "\n" + aiAgentKnowledge.prices.domesticExtended + "\n" + aiAgentKnowledge.prices.vat, ar: aiAgentKnowledge.prices.domesticMainAr + "\n" + aiAgentKnowledge.prices.domesticExtendedAr + "\n" + aiAgentKnowledge.prices.vat },
-  { keys: ["al ain", "العين", "عين"], en: aiAgentKnowledge.prices.alAin, ar: "العين: منطقة ممتدة — 50 درهم + ضريبة = 52.50 درهم" },
-  { keys: ["western", "dhafra", "الظفرة", "غرب"], en: aiAgentKnowledge.prices.westernRegion, ar: "المنطقة الغربية / الظفرة: 50 درهم + ضريبة = 52.50 درهم" },
-  { keys: ["ruwais", "الرويس"], en: aiAgentKnowledge.prices.alRuwais, ar: "الرويس (منطقة رئيسية): 30 درهم + ضريبة = 31.50 درهم" },
-  { keys: ["gcc", "gulf", "خليج", "سعود", "قطر", "kuwait", "oman", "bahrain"], en: aiAgentKnowledge.prices.gcc + "\n" + aiAgentKnowledge.prices.gccExamples, ar: "الخليج: 95 درهم أول كilo + 45 درهم لكل كilo إضافي + ضريبة 5%\nأمثلة: 1كilo=99.75 | 2كilo=147.00 | 3كilo=194.25 درهم" },
-  { keys: ["world", "international", "global", "دولي", "عالمي", "أوروب", "أمريك"], en: aiAgentKnowledge.prices.worldwide + "\n" + aiAgentKnowledge.prices.worldwideExamples, ar: "عالمي: 190 درهم أول كilo + 90 درهم إضافي + ضريبة 5%\nأمثلة: 1كilo=199.50 | 2كilo=294.00 | 3كilo=388.50 درهم" },
-  { keys: ["vat", "tax", "ضريبة"], en: aiAgentKnowledge.prices.vat, ar: "جميع الأسعار تشمل أو تُحسب مع ضريبة القيمة المضافة 5% حسب نوع الخدمة." },
+  { keys: ["al ain", "العين", "عين"], en: aiAgentKnowledge.prices.alAin, ar: "العين: منطقة ممتدة — 52.50 درهم السعر النهائي" },
+  { keys: ["western", "dhafra", "الظفرة", "غرب"], en: aiAgentKnowledge.prices.westernRegion, ar: "المنطقة الغربية / الظفرة: 52.50 درهم السعر النهائي" },
+  { keys: ["ruwais", "الرويس"], en: aiAgentKnowledge.prices.alRuwais, ar: "الرويس (منطقة رئيسية): 31.50 درهم السعر النهائي" },
+  { keys: ["gcc", "gulf", "خليج", "سعود", "قطر", "kuwait", "oman", "bahrain"], en: aiAgentKnowledge.prices.gcc + "\n" + aiAgentKnowledge.prices.gccExamples, ar: "الخليج: السعر النهائي يبدأ من 99.75 درهم لأول كيلوجرام، ويتم عرض الوزن الإضافي كعرض نهائي حسب الوجهة\nأمثلة: 1كilo=99.75 | 2كilo=147.00 | 3كilo=194.25 درهم" },
+  { keys: ["world", "international", "global", "دولي", "عالمي", "أوروب", "أمريك"], en: aiAgentKnowledge.prices.worldwide + "\n" + aiAgentKnowledge.prices.worldwideExamples, ar: "عالمي: السعر النهائي يبدأ من 199.50 درهم لأول كيلوجرام، ويتم عرض الوزن الإضافي كعرض نهائي حسب الوجهة\nأمثلة: 1كilo=199.50 | 2كilo=294.00 | 3كilo=388.50 درهم" },
+  { keys: ["vat", "tax", "ضريبة"], en: aiAgentKnowledge.prices.vat, ar: "كل الأسعار الظاهرة للعميل هي أسعار نهائية فقط، والتفاصيل القانونية الداخلية متاحة عند الحاجة." },
   { keys: ["track", "tracking", "تتبع", "رقم"], en: "Open the Tracking page, enter your DN tracking code, and view live status timeline.", ar: "افتح صفحة تتبع شحنة، أدخل رقم التتبع DN، واطلع على الحالة والتسلسل الزمني." },
   { keys: ["request", "book", "order", "طلب", "احجز", "توصيل"], en: "Use Request Delivery: select cities, confirm price via calculator, fill details, submit for real tracking number.", ar: "استخدم صفحة اطلب توصيل: اختر المدن، أكد السعر، أدخل البيانات، واحصل على رقم تتبع حقيقي." },
   { keys: ["whatsapp", "واتساب", "wa.me"], en: `WhatsApp: ${companyMeta.whatsappUrl}\nPhone: ${companyMeta.phone}`, ar: `واتساب: ${companyMeta.whatsappUrl}\nهاتف: ${companyMeta.phone}` },

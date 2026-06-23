@@ -33,9 +33,9 @@ const UAE_OUTLINE =
 
 function priceLabel(zoneType: "main" | "extended", isArabic: boolean) {
   if (zoneType === "extended") {
-    return isArabic ? "52.50 درهم (50 + VAT)" : "52.50 AED (50 + VAT)";
+    return isArabic ? "52.50 درهم السعر النهائي" : "52.50 AED final";
   }
-  return isArabic ? "31.50 درهم (30 + VAT)" : "31.50 AED (30 + VAT)";
+  return isArabic ? "31.50 درهم السعر النهائي" : "31.50 AED final";
 }
 
 export default function UAEInteractiveMap() {
@@ -103,8 +103,8 @@ export default function UAEInteractiveMap() {
             </h2>
             <p className="text-white/65 text-sm leading-relaxed">
               {isArabic
-                ? "اختر مدينة أو منطقة لمعرفة فئة التسعير والسعر النهائي شامل ضريبة 5%."
-                : "Select a city or area to view pricing category and final price including 5% VAT."}
+                ? "اختر مدينة أو منطقة لمعرفة فئة التسعير والسعر النهائي المعروض للعميل."
+                : "Select a city or area to view the pricing category and final customer price."}
             </p>
           </div>
 
