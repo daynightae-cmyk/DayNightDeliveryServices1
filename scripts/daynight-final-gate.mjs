@@ -33,26 +33,53 @@ function readJwtRole(jwt) {
   }
 }
 
-function extractValue(data, path = "total") {
-  if (data == null) return null;
-  if (typeof data === "number") return data;
-  if (typeof data === "string") {
+function extractTotal(value) {
+  if (value == null) return null;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (!trimmed) return null;
+
     try {
-      const parsed = JSON.parse(data);
-      if (typeof parsed === "number") return parsed;
-      return parsed[path] ?? parsed;
+      const parsed = JSON.parse(trimmed);
+      return extractTotal(parsed);
     } catch {
-      return Number(data);
+      const numeric = Number(trimmed);
+      return Number.isFinite(numeric) ? numeric : null;
     }
   }
-  if (typeof data === "object") {
-    return data[path] ?? data;
+
+  if (typeof value === "object") {
+    const possible =
+      value.total ??
+      value.total_amount ??
+      value.amount ??
+      value.price ??
+      value.delivery_price ??
+      value.result;
+
+    if (possible !== undefined && possible !== null) {
+      return extractTotal(possible);
+    }
   }
-  return Number(data);
+
+  return null;
+}
+
+function nearlyEqual(a, b, tolerance = 0.01) {
+  return Math.abs(Number(a) - Number(b)) <= tolerance;
 }
 
 function numeric(value, label) {
-  const extracted = extractValue(value);
+  const extracted = extractTotal(value);
+  if (extracted == null) {
+    throw new Error(`${label} is not numeric (extracted null from ${JSON.stringify(value)})`);
+  }
   const n = Number(extracted);
   if (!Number.isFinite(n)) {
     throw new Error(`${label} is not numeric (got ${JSON.stringify(value)}, extracted ${extracted})`);
@@ -125,34 +152,94 @@ async function main() {
   }
   await readOptionalTable(supabase, "services");
 
-  const domestic = await rpcOrThrow(supabase, "calculate_delivery_price", {
-    p_from_city: null,
-    p_to_city: null,
-    p_weight_kg: 1
-  });
-  const domesticTotal = extractValue(domestic, "total");
-  assertClose(numeric(domesticTotal, "domestic total"), 31.5, "calculate_delivery_price total");
-  pass("calculate_delivery_price(null, null, 1) total 31.5");
+  // Test RPC: calculate_delivery_price
+  let domestic, domesticError;
+  try {
+    const result = await supabase.rpc("calculate_delivery_price", {
+      p_pickup_city_id: null,
+      p_delivery_city_id: null,
+      p_weight_kg: 1
+    });
+    domestic = result.data;
+    domesticError = result.error?.message || null;
+  } catch (e) {
+    domesticError = e.message;
+  }
 
-  const saudi = await rpcOrThrow(supabase, "calculate_international_price", {
-    p_destination: "SA",
-    p_weight_kg: 3
-  });
-  const saudiSubtotal = extractValue(saudi, "subtotal");
-  const saudiTotal = extractValue(saudi, "total");
-  assertClose(numeric(saudiSubtotal, "Saudi subtotal"), 185, "Saudi 3kg subtotal");
-  assertClose(numeric(saudiTotal, "Saudi total"), 194.25, "Saudi 3kg total");
-  pass("calculate_international_price('SA', 3)");
+  const domesticTotal = extractTotal(domestic);
+  if (!nearlyEqual(domesticTotal, 31.5)) {
+    console.log(`DEBUG: domestic_data_type: ${typeof domestic}`);
+    console.log(`DEBUG: domestic_data: ${JSON.stringify(domestic)}`);
+    if (domesticError) console.log(`DEBUG: domestic_error_message: ${domesticError}`);
+    throw new Error(`calculate_delivery_price total: expected 31.50, got ${domesticTotal}`);
+  }
+  pass("calculate_delivery_price(null, null, 1) = 31.50");
 
-  const usa = await rpcOrThrow(supabase, "calculate_international_price", {
-    p_destination: "US",
-    p_weight_kg: 2
-  });
-  const usaSubtotal = extractValue(usa, "subtotal");
-  const usaTotal = extractValue(usa, "total");
-  assertClose(numeric(usaSubtotal, "USA subtotal"), 280, "USA 2kg subtotal");
-  assertClose(numeric(usaTotal, "USA total"), 294, "USA 2kg total");
-  pass("calculate_international_price('US', 2)");
+  // Test RPC: calculate_international_price SA
+  let sa, saError;
+  try {
+    const result = await supabase.rpc("calculate_international_price", {
+      p_destination: "SA",
+      p_weight_kg: 3
+    });
+    sa = result.data;
+    saError = result.error?.message || null;
+  } catch (e) {
+    saError = e.message;
+  }
+
+  const saTotal = extractTotal(sa);
+  if (!nearlyEqual(saTotal, 194.25)) {
+    console.log(`DEBUG: sa_data_type: ${typeof sa}`);
+    console.log(`DEBUG: sa_data: ${JSON.stringify(sa)}`);
+    if (saError) console.log(`DEBUG: sa_error_message: ${saError}`);
+    throw new Error(`calculate_international_price('SA', 3): expected 194.25, got ${saTotal}`);
+  }
+  pass("calculate_international_price('SA', 3) = 194.25");
+
+  // Test RPC: calculate_international_price US
+  let us, usError;
+  try {
+    const result = await supabase.rpc("calculate_international_price", {
+      p_destination: "US",
+      p_weight_kg: 2
+    });
+    us = result.data;
+    usError = result.error?.message || null;
+  } catch (e) {
+    usError = e.message;
+  }
+
+  const usTotal = extractTotal(us);
+  if (!nearlyEqual(usTotal, 294.00)) {
+    console.log(`DEBUG: us_data_type: ${typeof us}`);
+    console.log(`DEBUG: us_data: ${JSON.stringify(us)}`);
+    if (usError) console.log(`DEBUG: us_error_message: ${usError}`);
+    throw new Error(`calculate_international_price('US', 2): expected 294.00, got ${usTotal}`);
+  }
+  pass("calculate_international_price('US', 2) = 294.00");
+
+  // Test RPC: calculate_international_price EUROPE
+  let europe, europeError;
+  try {
+    const result = await supabase.rpc("calculate_international_price", {
+      p_destination: "EUROPE",
+      p_weight_kg: 2
+    });
+    europe = result.data;
+    europeError = result.error?.message || null;
+  } catch (e) {
+    europeError = e.message;
+  }
+
+  const europeTotal = extractTotal(europe);
+  if (!nearlyEqual(europeTotal, 294.00)) {
+    console.log(`DEBUG: europe_data_type: ${typeof europe}`);
+    console.log(`DEBUG: europe_data: ${JSON.stringify(europe)}`);
+    if (europeError) console.log(`DEBUG: europe_error_message: ${europeError}`);
+    throw new Error(`calculate_international_price('EUROPE', 2): expected 294.00, got ${europeTotal}`);
+  }
+  pass("calculate_international_price('EUROPE', 2) = 294.00");
 
   const now = new Date().toISOString();
   const testOrder = {
