@@ -9,10 +9,6 @@ function maskPhone(phone?: string | null) {
   return `${phone.slice(0, 4)}****${digits.slice(-2)}`;
 }
 
-function calcVat(subtotal: number) {
-  return Math.round(subtotal * 0.05 * 100) / 100;
-}
-
 export function generateInvoiceNumber(date = new Date()) {
   const year = date.getUTCFullYear();
   const serial = String(Math.floor(10000 + Math.random() * 90000));
@@ -20,9 +16,7 @@ export function generateInvoiceNumber(date = new Date()) {
 }
 
 export function buildInvoiceData(order: Order, lang: "en" | "ar" = "en") {
-  const subtotal = Number(order.delivery_price || order.price || 0);
-  const vat = calcVat(subtotal);
-  const total = Math.round((subtotal + vat) * 100) / 100;
+  const total = Number(order.delivery_price || order.price || 0);
   const invoiceNo = generateInvoiceNumber();
 
   return {
@@ -57,8 +51,6 @@ export function buildInvoiceData(order: Order, lang: "en" | "ar" = "en") {
       codAmount: order.cod_amount ?? null
     },
     financials: {
-      subtotal: subtotal.toFixed(2),
-      vat: vat.toFixed(2),
       total: total.toFixed(2),
       currency: "AED"
     }
@@ -80,12 +72,11 @@ function invoiceHtml(invoice: ReturnType<typeof buildInvoiceData>) {
         package: "نوع الشحنة",
         weight: "الوزن",
         service: "نوع الخدمة",
-        subtotal: "المجموع الفرعي",
-        vat: "ضريبة 5%",
+        finalPrice: "السعر النهائي",
         total: "الإجمالي",
         payment: "طريقة الدفع",
         status: "الحالة",
-        terms: "الشروط: الأسعار تشمل ضريبة القيمة المضافة حيث ينطبق. للاستفسارات تواصل معنا."
+        terms: "الشروط: السعر النهائي معروض للعميل. للاستفسارات القانونية أو الضريبية تواصل مع الإدارة."
       }
     : {
         invoice: "Invoice",
@@ -98,12 +89,11 @@ function invoiceHtml(invoice: ReturnType<typeof buildInvoiceData>) {
         package: "Package Type",
         weight: "Weight",
         service: "Service",
-        subtotal: "Subtotal",
-        vat: "VAT 5%",
+        finalPrice: "Final price",
         total: "Total",
         payment: "Payment",
         status: "Status",
-        terms: "Terms: Prices include VAT where applicable. Contact us for support."
+        terms: "Terms: the customer-facing invoice shows the final price only. Contact administration for legal or tax details."
       };
 
   return `<!DOCTYPE html>
@@ -163,19 +153,17 @@ function invoiceHtml(invoice: ReturnType<typeof buildInvoiceData>) {
   </div>
 
   <table>
-    <thead><tr><th>${labels.package}</th><th>${labels.service}</th><th>${labels.subtotal}</th></tr></thead>
+    <thead><tr><th>${labels.package}</th><th>${labels.service}</th><th>${labels.finalPrice}</th></tr></thead>
     <tbody>
       <tr>
         <td>${invoice.shipment.description}</td>
         <td>${invoice.shipment.serviceType}</td>
-        <td>${invoice.financials.subtotal} ${invoice.financials.currency}</td>
+        <td>${invoice.financials.total} ${invoice.financials.currency}</td>
       </tr>
     </tbody>
   </table>
 
   <div class="totals">
-    <div><span>${labels.subtotal}</span><span>${invoice.financials.subtotal} ${invoice.financials.currency}</span></div>
-    <div><span>${labels.vat}</span><span>${invoice.financials.vat} ${invoice.financials.currency}</span></div>
     <div class="total-row"><span>${labels.total}</span><span>${invoice.financials.total} ${invoice.financials.currency}</span></div>
     <div><span>${labels.payment}</span><span>${invoice.shipment.paymentMethod}${invoice.shipment.codAmount ? ` (COD: ${invoice.shipment.codAmount})` : ""}</span></div>
   </div>

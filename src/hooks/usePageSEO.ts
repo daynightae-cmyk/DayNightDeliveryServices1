@@ -9,11 +9,11 @@ const routeMeta: Record<string, { title: string; description: string; noindex?: 
   },
   "/pricing": {
     title: "أسعار التوصيل والشحن | DAY NIGHT DELIVERY SERVICES",
-    description: "Official pricing: local delivery from 30 AED, GCC from 95 AED, worldwide from 190 AED. VAT included breakdown."
+    description: "Official final prices: UAE delivery from 31.50 AED, GCC from 99.75 AED, worldwide from 199.50 AED. Customer view shows final price only."
   },
   "/uae-delivery": {
     title: "التوصيل المحلي داخل الإمارات | DAY NIGHT DELIVERY SERVICES",
-    description: "Local delivery across all UAE emirates. Main cities 31.50 AED, extended areas 52.50 AED including VAT."
+    description: "Local delivery across all UAE emirates. Main cities 31.50 AED and extended areas 52.50 AED as final customer prices."
   },
   "/international-shipping": {
     title: "الشحن الدولي من الإمارات | DAY NIGHT DELIVERY SERVICES",
@@ -47,6 +47,23 @@ const routeMeta: Record<string, { title: string; description: string; noindex?: 
     title: "صفحة السائق | DAY NIGHT DELIVERY SERVICES",
     description: "Driver portal for assigned orders and delivery status updates.",
     noindex: true
+  },
+  "/customer": {
+    title: "Customer Login | DAY NIGHT DELIVERY SERVICES",
+    description: "Protected customer order access.",
+    noindex: true
+  },
+  "/privacy": {
+    title: "Privacy Policy | DAY NIGHT DELIVERY SERVICES",
+    description: "Privacy and data handling policy for DAY NIGHT delivery customers."
+  },
+  "/terms": {
+    title: "Terms & Conditions | DAY NIGHT DELIVERY SERVICES",
+    description: "Service terms, delivery policies, returns, cancellation, and prohibited items."
+  },
+  "/trust": {
+    title: "Trust & Safety | DAY NIGHT DELIVERY SERVICES",
+    description: "Security, tracking, confidentiality, proof of delivery, and official contact channels."
   },
   "/admin": {
     title: "Admin | DAY NIGHT DELIVERY SERVICES",
