@@ -29,7 +29,7 @@ export default function QR({ onNavigate }: QRProps) {
   const [copied, setCopied] = useState(false);
 
   const websiteUrl = "https://www.daynightae.com";
-  const logoUrl = "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png";
+  const logoUrl = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
   const qrUrl = "https://i.postimg.cc/P5KCWNMd/qr-code-1000-1000.png";
 
   const handleCopy = () => {
