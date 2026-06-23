@@ -40,6 +40,8 @@ import SmartChat from "./components/SmartChat";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
+import Splash from "./components/Splash";
+import Footer from "./components/Footer";
 
 import { 
   Menu, 
@@ -373,8 +375,11 @@ function AppContent() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <BrowserRouter>
+      {showSplash && <Splash onComplete={() => setShowSplash(false)} />}
       <AppContent />
     </BrowserRouter>
   );

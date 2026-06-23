@@ -42,15 +42,15 @@ export default function Pricing() {
           أسعار واضحة من DAY NIGHT DELIVERY SERVICES
         </h2>
         <p className="text-white/60 text-sm leading-relaxed">
-          التعرفة النهائية تشمل ضريبة القيمة المضافة 5%، وتدعم التوصيل المحلي والشحن الدولي إلى الخليج وأوروبا وأمريكا وكندا والوجهات العالمية.
+          أسعار نهائية واضحة للتوصيل المحلي والشحن الدولي إلى الخليج وأوروبا وأمريكا وكندا والوجهات العالمية.
         </p>
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         {[
-          ["UAE Main Areas", "المناطق الرئيسية", domesticPricing.main.total, "incl. VAT"],
-          ["UAE Extended Areas", "المناطق الممتدة", domesticPricing.extended.total, "incl. VAT"],
-          ["Express Surcharge", "الخدمة السريعة", domesticPricing.expressSurcharge.amount, "before VAT"],
+          ["UAE Main Areas", "المناطق الرئيسية", domesticPricing.main.total, "Final Price"],
+          ["UAE Extended Areas", "المناطق الممتدة", domesticPricing.extended.total, "Final Price"],
+          ["Express Surcharge", "الخدمة السريعة", domesticPricing.expressSurcharge.amount, "Additional"],
           ["GCC First Kg", "أول كيلو خليجي", internationalPricing.gcc.firstKg, "then 45 AED/kg"],
           ["Worldwide First Kg", "أول كيلو عالمي", internationalPricing.worldwide.firstKg, "then 90 AED/kg"]
         ].map(([title, subtitle, amount, note]) => (
@@ -76,7 +76,7 @@ export default function Pricing() {
             <Truck className="w-8 h-8 text-brand-gold" />
             <div>
               <h3 className="text-xl font-extrabold text-white">حاسبة التوصيل داخل الإمارات</h3>
-              <p className="text-white/45 text-xs">Main areas: 31.50 AED incl. VAT • Extended: 52.50 AED incl. VAT</p>
+              <p className="text-white/45 text-xs">Main areas: 30 AED • Extended: 50 AED</p>
             </div>
           </div>
 
@@ -114,7 +114,7 @@ export default function Pricing() {
               </div>
             ))}
             <div className="border-t border-white/10 pt-3 flex items-center justify-between">
-              <span className="text-white font-bold">الإجمالي شامل VAT</span>
+              <span className="text-white font-bold">Total Price</span>
               <span className="text-3xl text-brand-gold font-black font-mono" dir="ltr">{formatAED(domestic.total)}</span>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function Pricing() {
               </div>
             ))}
             <div className="border-t border-white/10 pt-3 flex items-center justify-between">
-              <span className="text-white font-bold">الإجمالي شامل VAT</span>
+              <span className="text-white font-bold">Total Price</span>
               <span className="text-3xl text-brand-gold font-black font-mono" dir="ltr">{formatAED(international.total)}</span>
             </div>
           </div>
