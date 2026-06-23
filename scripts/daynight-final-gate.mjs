@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
+import ws from "ws";
 import { createClient } from "@supabase/supabase-js";
 
 const envPath = path.resolve(process.cwd(), ".env");
@@ -144,7 +145,8 @@ async function main() {
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: ws }
   });
 
   for (const tableName of ["cities", "zones", "pricing_rules", "admin_settings"]) {
