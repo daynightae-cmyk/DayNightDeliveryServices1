@@ -1,0 +1,1 @@
+import{j as e}from"./index-Y3l_-R1a.js";function d({children:r,className:a="",variant:s="default"}){const o=s==="gold"?"glass-gold":s==="premium"?"glass-premium":"glass";return e.jsx("div",{className:`${o} rounded-2xl border border-white/12 backdrop-blur-[16px] ${a}`,children:r})}export{d as G};
