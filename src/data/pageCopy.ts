@@ -130,9 +130,9 @@ export const pageCopy = {
       title: "DAY NIGHT Support",
       subtitle: "Official answers about pricing, tracking, and services",
       placeholder: "Ask about pricing, tracking, delivery...",
-      welcome: "Welcome to DAY NIGHT smart assistant. Ask about local delivery, international shipping, tracking, VAT, contracts, or contact options.",
+      welcome: "Welcome to DAY NIGHT smart assistant. Ask about local delivery, international shipping, tracking, final prices, contracts, or contact options.",
       unknown: "I could not find an exact answer. Please continue on WhatsApp for personal assistance.",
-      quickReplies: ["Local prices", "GCC shipping", "Track shipment", "Request delivery", "VAT", "WhatsApp contact", "Corporate quote", "COD", "Prohibited items"]
+      quickReplies: ["Local prices", "GCC shipping", "Track shipment", "Request delivery", "Final prices", "WhatsApp contact", "Corporate quote", "COD", "Prohibited items"]
     },
     localDeliveryPage: {
       title: "Local Delivery",
@@ -269,9 +269,9 @@ export const pageCopy = {
       title: "دعم داي نايت",
       subtitle: "إجابات رسمية عن الأسعار والتتبع والخدمات",
       placeholder: "اسأل عن الأسعار، التتبع، التوصيل...",
-      welcome: "مرحباً بك في مساعد داي نايت الذكي. اسأل عن التوصيل المحلي، الشحن الدولي، التتبع، ضريبة القيمة المضافة، العقود، أو طرق التواصل.",
+      welcome: "مرحباً بك في مساعد داي نايت الذكي. اسأل عن التوصيل المحلي، الشحن الدولي، التتبع، الأسعار النهائية، العقود، أو طرق التواصل.",
       unknown: "لم أجد إجابة دقيقة. يرجى المتابعة عبر واتساب للمساعدة الشخصية.",
-      quickReplies: ["أسعار محلية", "شحن خليجي", "تتبع شحنة", "طلب توصيل", "ضريبة VAT", "تواصل واتساب", "عرض شركات", "COD", "مواد ممنوعة"]
+      quickReplies: ["أسعار محلية", "شحن خليجي", "تتبع شحنة", "طلب توصيل", "أسعار نهائية", "تواصل واتساب", "عرض شركات", "COD", "مواد ممنوعة"]
     },
     localDeliveryPage: {
       title: "التوصيل المحلي",

@@ -9,11 +9,11 @@ const routeMeta: Record<string, { title: string; description: string; noindex?: 
   },
   "/pricing": {
     title: "أسعار التوصيل والشحن | DAY NIGHT DELIVERY SERVICES",
-    description: "Official pricing: local delivery from 30 AED, GCC from 95 AED, worldwide from 190 AED. VAT included breakdown."
+    description: "Official final pricing: local delivery from 30 AED, GCC from 95 AED, worldwide from 190 AED."
   },
   "/uae-delivery": {
     title: "التوصيل المحلي داخل الإمارات | DAY NIGHT DELIVERY SERVICES",
-    description: "Local delivery across all UAE emirates. Main cities 31.50 AED, extended areas 52.50 AED including VAT."
+    description: "Local delivery across all UAE emirates. Main areas 30 AED and extended areas 50 AED final price."
   },
   "/international-shipping": {
     title: "الشحن الدولي من الإمارات | DAY NIGHT DELIVERY SERVICES",

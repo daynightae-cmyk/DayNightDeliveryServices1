@@ -78,7 +78,7 @@ function AppContent() {
     else if (tab === "ecommerce") navigate("/ecommerce");
     else if (tab === "corporate") navigate("/corporate");
     else if (tab === "pricing") navigate("/pricing");
-    else if (tab === "request") navigate("/request");
+    else if (tab === "request" || tab === "request-delivery") navigate("/request-delivery");
     else if (tab === "tracking") {
       if (trackingId) {
         navigate(`/tracking?code=${trackingId}`);
@@ -295,6 +295,7 @@ function AppContent() {
             <Route path="/corporate" element={<CorporateSolutions />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/request" element={<RequestDelivery onNavigate={handleNavigate} />} />
+            <Route path="/request-delivery" element={<RequestDelivery onNavigate={handleNavigate} />} />
             <Route path="/tracking" element={<TrackingRouteWrapper />} />
             <Route path="/tracking/:code" element={<TrackingRouteWrapper />} />
             <Route path="/faq" element={<Faqs />} />

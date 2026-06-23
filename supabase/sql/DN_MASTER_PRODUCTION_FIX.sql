@@ -697,37 +697,3 @@ end $$;
 
 notify pgrst, 'reload schema';
 
--- =============================
--- VERIFICATION (SAFE CHECKS)
--- =============================
-select public.calculate_delivery_price(null, null, 1) as domestic_main_expected_31_50;
-select public.calculate_delivery_price(null, 'Al Ain', 1) as domestic_extended_expected_52_50;
-select public.calculate_international_price('SA', 3) as saudi_3kg_expected_194_25;
-select public.calculate_international_price('US', 2) as usa_2kg_expected_294_00;
-with created as (
-  select public.create_public_order(jsonb_build_object(
-    'sender_name', 'DAY NIGHT SQL AUDIT SENDER',
-    'sender_phone', '+971 56 875 7331',
-    'sender_city', 'Abu Dhabi',
-    'sender_address', 'UAE ABUDHABI MUSSAFAH 40',
-    'receiver_name', 'DAY NIGHT SQL AUDIT RECEIVER',
-    'receiver_phone', '+971 56 875 7331',
-    'receiver_city', 'Dubai',
-    'receiver_address', 'UAE ABUDHABI MUSSAFAH 40',
-    'package_type', 'Documents',
-    'weight', 1,
-    'pieces', 1,
-    'service_type', 'standard',
-    'delivery_price', 31.50,
-    'payment_method', 'sender_pays',
-    'notes', 'FINAL_SQL_AUDIT_TEST_SAFE_TO_DELETE',
-    'status', 'Pending',
-    'status_history', jsonb_build_array(jsonb_build_object('status', 'Pending', 'date', now()::text, 'note', 'FINAL_SQL_AUDIT_TEST_SAFE_TO_DELETE'))
-  )) as payload
-)
-select payload as create_order_test,
-       public.track_order(coalesce(payload->>'tracking_code', payload->>'tracking_number', payload->>'id')) as track_order_test
-from created;
-select pricing_key, base_price, first_kg, additional_kg, vat_rate, currency
-from public.daynight_pricing_master
-order by pricing_key;

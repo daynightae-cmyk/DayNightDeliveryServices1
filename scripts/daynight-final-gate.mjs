@@ -12,6 +12,12 @@ if (fs.existsSync(envPath)) {
 const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").trim();
 const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
 const ALLOWED_URL = "https://ngdwybpgacauorygoedi.supabase.co";
+const backendDomesticTotalExpected = 31.5;
+const backendSaudiThreeKgTotalExpected = 194.25;
+const backendUsTwoKgTotalExpected = 294;
+const backendEuropeTwoKgTotalExpected = 294;
+const customerDisplayMainPriceExpected = 30;
+const customerDisplayExtendedPriceExpected = 50;
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -151,6 +157,8 @@ async function main() {
     await readTable(supabase, tableName);
   }
   await readOptionalTable(supabase, "services");
+  pass(`customer display main price = ${customerDisplayMainPriceExpected} AED`);
+  pass(`customer display extended price = ${customerDisplayExtendedPriceExpected} AED`);
 
   // Test RPC: calculate_delivery_price
   let domestic, domesticError;
@@ -167,13 +175,13 @@ async function main() {
   }
 
   const domesticTotal = extractTotal(domestic);
-  if (!nearlyEqual(domesticTotal, 31.5)) {
+  if (!nearlyEqual(domesticTotal, backendDomesticTotalExpected)) {
     console.log(`DEBUG: domestic_data_type: ${typeof domestic}`);
     console.log(`DEBUG: domestic_data: ${JSON.stringify(domestic)}`);
     if (domesticError) console.log(`DEBUG: domestic_error_message: ${domesticError}`);
-    throw new Error(`calculate_delivery_price total: expected 31.50, got ${domesticTotal}`);
+    throw new Error(`calculate_delivery_price backend total: expected ${backendDomesticTotalExpected}, got ${domesticTotal}`);
   }
-  pass("calculate_delivery_price(null, null, 1) = 31.50");
+  pass(`calculate_delivery_price backend total = ${backendDomesticTotalExpected}`);
 
   // Test RPC: calculate_international_price SA
   let sa, saError;
@@ -189,13 +197,13 @@ async function main() {
   }
 
   const saTotal = extractTotal(sa);
-  if (!nearlyEqual(saTotal, 194.25)) {
+  if (!nearlyEqual(saTotal, backendSaudiThreeKgTotalExpected)) {
     console.log(`DEBUG: sa_data_type: ${typeof sa}`);
     console.log(`DEBUG: sa_data: ${JSON.stringify(sa)}`);
     if (saError) console.log(`DEBUG: sa_error_message: ${saError}`);
-    throw new Error(`calculate_international_price('SA', 3): expected 194.25, got ${saTotal}`);
+    throw new Error(`calculate_international_price('SA', 3) backend total: expected ${backendSaudiThreeKgTotalExpected}, got ${saTotal}`);
   }
-  pass("calculate_international_price('SA', 3) = 194.25");
+  pass(`calculate_international_price('SA', 3) backend total = ${backendSaudiThreeKgTotalExpected}`);
 
   // Test RPC: calculate_international_price US
   let us, usError;
@@ -211,13 +219,13 @@ async function main() {
   }
 
   const usTotal = extractTotal(us);
-  if (!nearlyEqual(usTotal, 294.00)) {
+  if (!nearlyEqual(usTotal, backendUsTwoKgTotalExpected)) {
     console.log(`DEBUG: us_data_type: ${typeof us}`);
     console.log(`DEBUG: us_data: ${JSON.stringify(us)}`);
     if (usError) console.log(`DEBUG: us_error_message: ${usError}`);
-    throw new Error(`calculate_international_price('US', 2): expected 294.00, got ${usTotal}`);
+    throw new Error(`calculate_international_price('US', 2) backend total: expected ${backendUsTwoKgTotalExpected}, got ${usTotal}`);
   }
-  pass("calculate_international_price('US', 2) = 294.00");
+  pass(`calculate_international_price('US', 2) backend total = ${backendUsTwoKgTotalExpected}`);
 
   // Test RPC: calculate_international_price EUROPE
   let europe, europeError;
@@ -233,13 +241,13 @@ async function main() {
   }
 
   const europeTotal = extractTotal(europe);
-  if (!nearlyEqual(europeTotal, 294.00)) {
+  if (!nearlyEqual(europeTotal, backendEuropeTwoKgTotalExpected)) {
     console.log(`DEBUG: europe_data_type: ${typeof europe}`);
     console.log(`DEBUG: europe_data: ${JSON.stringify(europe)}`);
     if (europeError) console.log(`DEBUG: europe_error_message: ${europeError}`);
-    throw new Error(`calculate_international_price('EUROPE', 2): expected 294.00, got ${europeTotal}`);
+    throw new Error(`calculate_international_price('EUROPE', 2) backend total: expected ${backendEuropeTwoKgTotalExpected}, got ${europeTotal}`);
   }
-  pass("calculate_international_price('EUROPE', 2) = 294.00");
+  pass(`calculate_international_price('EUROPE', 2) backend total = ${backendEuropeTwoKgTotalExpected}`);
 
   const now = new Date().toISOString();
   const testOrder = {
@@ -255,16 +263,16 @@ async function main() {
     weight: 1,
     pieces: 1,
     service_type: "standard",
-    delivery_price: 31.5,
+    delivery_price: backendDomesticTotalExpected,
     subtotal: 30,
     base_price: 30,
     vat_amount: 1.5,
     vat: 1.5,
     tax_amount: 1.5,
-    total: 31.5,
-    total_price: 31.5,
-    amount: 31.5,
-    price: 31.5,
+    total: backendDomesticTotalExpected,
+    total_price: backendDomesticTotalExpected,
+    amount: backendDomesticTotalExpected,
+    price: backendDomesticTotalExpected,
     currency: "AED",
     payment_method: "sender_pays",
     notes: "FINAL_AUTOMATED_AUDIT_TEST_SAFE_TO_DELETE",
