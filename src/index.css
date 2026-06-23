@@ -8,14 +8,210 @@
   --color-brand-hover: #0057B8;
 }
 
+/* ============================================================
+   LIGHT MODE — Premium navy-tinted, not washed-out white
+   ============================================================ */
 @layer base {
   :root.light-theme {
-    --color-brand-deep: #F8FAFC;
-    --color-brand-cool: #E2E8F0;
-    --color-brand-gold: #B8860B; 
+    --color-brand-deep: #EEF3FB;
+    --color-brand-cool: #DDE7F5;
+    --color-brand-gold: #A07808;
     --color-brand-blue: #0A4D9B;
     --color-brand-hover: #0B3C73;
-    color: #0f172a;
+    color: #071A33;
   }
+
+  /* Light mode body background */
+  :root.light-theme body {
+    background: linear-gradient(145deg, #DDE7F5 0%, #EEF3FB 50%, #E4EDF8 100%);
+    min-height: 100vh;
+  }
+
+  /* Light mode text contrast override */
+  :root.light-theme .text-white {
+    color: #071A33 !important;
+  }
+  :root.light-theme .text-white\/70,
+  :root.light-theme .text-white\/60 {
+    color: rgba(7, 26, 51, 0.7) !important;
+  }
+  :root.light-theme .text-white\/50,
+  :root.light-theme .text-white\/45,
+  :root.light-theme .text-white\/40 {
+    color: rgba(7, 26, 51, 0.55) !important;
+  }
+  :root.light-theme .border-white\/10 {
+    border-color: rgba(7, 26, 51, 0.1) !important;
+  }
+  :root.light-theme .border-white\/20 {
+    border-color: rgba(7, 26, 51, 0.15) !important;
+  }
+
+  /* Light mode glass cards */
+  :root.light-theme .bg-white\/5 {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+  }
+  :root.light-theme .bg-white\/10 {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+  }
+
+  /* Smooth theme transitions */
+  * {
+    transition-property: background-color, border-color, color;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
+}
+
+/* ============================================================
+   GLASSMORPHISM UTILITY CLASSES
+   ============================================================ */
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.5rem;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-gold {
+    background: rgba(212, 175, 55, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    box-shadow:
+      0 8px 32px rgba(212, 175, 55, 0.05),
+      inset 0 1px 0 rgba(212, 175, 55, 0.05);
+  }
+
+  .glass-premium {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(212, 175, 55, 0.04) 100%
+    );
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.25),
+      0 4px 16px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Neon gold glow effect */
+  .glow-gold {
+    box-shadow:
+      0 0 20px rgba(212, 175, 55, 0.3),
+      0 0 40px rgba(212, 175, 55, 0.15),
+      0 0 80px rgba(212, 175, 55, 0.05);
+  }
+
+  .glow-gold-sm {
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+  }
+
+  /* Text glow */
+  .text-glow-gold {
+    text-shadow:
+      0 0 10px rgba(212, 175, 55, 0.6),
+      0 0 20px rgba(212, 175, 55, 0.3);
+  }
+}
+
+/* ============================================================
+   KEYFRAME ANIMATIONS
+   ============================================================ */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes loading-bar {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { transform: translateX(150%); width: 60%; }
+  100% { transform: translateX(300%); width: 40%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.25); }
+  50%       { box-shadow: 0 0 40px rgba(212, 175, 55, 0.55), 0 0 80px rgba(212, 175, 55, 0.2); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes entrance-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes entrance-left {
+  from { opacity: 0; transform: translateX(-30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@layer utilities {
+  .animate-fade-in        { animation: fade-in 0.8s ease-out both; }
+  .animate-fade-in-scale  { animation: fade-in-scale 0.6s ease-out both; }
+  .animate-loading-bar    { animation: loading-bar 2s ease-in-out infinite; }
+  .animate-float          { animation: float 3s ease-in-out infinite; }
+  .animate-glow-pulse     { animation: glow-pulse 2.5s ease-in-out infinite; }
+  .animate-spin-slow      { animation: spin-slow 6s linear infinite; }
+  .animate-entrance-up    { animation: entrance-up 0.7s ease-out both; }
+  .animate-entrance-left  { animation: entrance-left 0.7s ease-out both; }
+
+  /* Shimmer gradient text */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #D4AF37 0%, #F5E27B 30%, #D4AF37 60%, #B8960A 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+}
+
+/* ============================================================
+   SCROLLBAR — premium dark style
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0A1C3A; }
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(212, 175, 55, 0.7); }
+
+/* ============================================================
+   SELECTION COLOR
+   ============================================================ */
+::selection {
+  background: rgba(212, 175, 55, 0.25);
+  color: #FFFFFF;
 }
 

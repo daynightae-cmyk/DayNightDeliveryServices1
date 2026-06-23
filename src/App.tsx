@@ -132,8 +132,8 @@ function AppContent() {
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <span className="text-white/20">|</span>
-          <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider">
-            {language === 'ar' ? 'EN' : 'Ø¹Ø±Ø¨ÙŠ'}
+          <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider px-2 py-0.5 rounded border border-white/20 hover:border-brand-gold/50 text-xs font-bold">
+            {language === 'ar' ? 'EN' : 'عربي'}
           </button>
           <span className="text-white/20">|</span>
           <a href={`tel:${companyMeta.phone}`} className="hover:text-brand-gold transition-colors flex items-center gap-1">
