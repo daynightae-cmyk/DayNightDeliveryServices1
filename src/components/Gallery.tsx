@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ZoomIn, Download, Share2 } from "lucide-react";
-import GlassCard from "../ui/GlassCard";
+import GlassCard from "./ui/GlassCard";
 
 interface GalleryImage {
   id: string;

@@ -7,7 +7,7 @@ export const SEO_METADATA = {
   keywords: "داي نايت, توصيل داي نايت, شحن دبي, شحن أبوظبي, توصيل العين, توصيل سريع الإمارات, شحن دولي الخليج",
   ogType: "website",
   url: "https://www.daynightae.com",
-  image: "https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png"
+  image: "/logo-daynight.png"
 };
 
 export function updateMetaTags(title?: string, description?: string) {
