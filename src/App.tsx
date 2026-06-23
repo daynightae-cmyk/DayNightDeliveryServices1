@@ -133,8 +133,13 @@ function AppContent() {
           <span className="text-white/80">سرعة • أمان • تميز</span>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={toggleTheme} className="hover:text-brand-gold transition-colors flex items-center gap-1 cursor-pointer">
-            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          {/* Theme Toggle with 3 modes: Dark -> Light -> System */}
+          <button 
+            onClick={toggleTheme} 
+            className="hover:text-brand-gold transition-colors flex items-center gap-1 cursor-pointer"
+            title={theme === 'dark' ? 'Switch to Light' : theme === 'light' ? 'Switch to System' : 'Switch to Dark'}
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : theme === 'light' ? <Moon className="w-3.5 h-3.5" /> : <Globe2 className="w-3.5 h-3.5" />}
           </button>
           <span className="text-white/20">|</span>
           <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider">
