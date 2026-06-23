@@ -9,6 +9,7 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "Set-Clipboard": true
+        "Set-Clipboard": true,
+        "ForEach-Object": true
     }
 }

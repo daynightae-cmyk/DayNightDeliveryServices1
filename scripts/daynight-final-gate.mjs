@@ -33,10 +33,29 @@ function readJwtRole(jwt) {
   }
 }
 
+function extractValue(data, path = "total") {
+  if (data == null) return null;
+  if (typeof data === "number") return data;
+  if (typeof data === "string") {
+    try {
+      const parsed = JSON.parse(data);
+      if (typeof parsed === "number") return parsed;
+      return parsed[path] ?? parsed;
+    } catch {
+      return Number(data);
+    }
+  }
+  if (typeof data === "object") {
+    return data[path] ?? data;
+  }
+  return Number(data);
+}
+
 function numeric(value, label) {
-  const n = Number(value);
+  const extracted = extractValue(value);
+  const n = Number(extracted);
   if (!Number.isFinite(n)) {
-    throw new Error(`${label} is not numeric`);
+    throw new Error(`${label} is not numeric (got ${JSON.stringify(value)}, extracted ${extracted})`);
   }
   return n;
 }
@@ -111,23 +130,28 @@ async function main() {
     p_to_city: null,
     p_weight_kg: 1
   });
-  assertClose(numeric(domestic?.total, "domestic total"), 31.5, "calculate_delivery_price total");
+  const domesticTotal = extractValue(domestic, "total");
+  assertClose(numeric(domesticTotal, "domestic total"), 31.5, "calculate_delivery_price total");
   pass("calculate_delivery_price(null, null, 1) total 31.5");
 
   const saudi = await rpcOrThrow(supabase, "calculate_international_price", {
     p_destination: "SA",
     p_weight_kg: 3
   });
-  assertClose(numeric(saudi?.subtotal, "Saudi subtotal"), 185, "Saudi 3kg subtotal");
-  assertClose(numeric(saudi?.total, "Saudi total"), 194.25, "Saudi 3kg total");
+  const saudiSubtotal = extractValue(saudi, "subtotal");
+  const saudiTotal = extractValue(saudi, "total");
+  assertClose(numeric(saudiSubtotal, "Saudi subtotal"), 185, "Saudi 3kg subtotal");
+  assertClose(numeric(saudiTotal, "Saudi total"), 194.25, "Saudi 3kg total");
   pass("calculate_international_price('SA', 3)");
 
   const usa = await rpcOrThrow(supabase, "calculate_international_price", {
     p_destination: "US",
     p_weight_kg: 2
   });
-  assertClose(numeric(usa?.subtotal, "USA subtotal"), 280, "USA 2kg subtotal");
-  assertClose(numeric(usa?.total, "USA total"), 294, "USA 2kg total");
+  const usaSubtotal = extractValue(usa, "subtotal");
+  const usaTotal = extractValue(usa, "total");
+  assertClose(numeric(usaSubtotal, "USA subtotal"), 280, "USA 2kg subtotal");
+  assertClose(numeric(usaTotal, "USA total"), 294, "USA 2kg total");
   pass("calculate_international_price('US', 2)");
 
   const now = new Date().toISOString();
