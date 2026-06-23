@@ -169,15 +169,15 @@ async function main() {
   }
 
   const domesticTotal = extractTotal(domestic);
-  if (!nearlyEqual(domesticTotal, 31.5)) {
+  if (!nearlyEqual(domesticTotal, 30)) {
     console.log(`DEBUG: domestic_data_type: ${typeof domestic}`);
     console.log(`DEBUG: domestic_data: ${JSON.stringify(domestic)}`);
     if (domesticError) console.log(`DEBUG: domestic_error_message: ${domesticError}`);
-    throw new Error(`calculate_delivery_price total: expected 31.50, got ${domesticTotal}`);
+    throw new Error(`calculate_delivery_price total: expected 30 AED (clean price), got ${domesticTotal}`);
   }
-  pass("calculate_delivery_price(null, null, 1) = 31.50");
+  pass("calculate_delivery_price(null, null, 1) = 30 AED");
 
-  // Test RPC: calculate_international_price SA
+  // Test RPC: calculate_international_price SA (GCC: 95 + 45*2 = 185)
   let sa, saError;
   try {
     const result = await supabase.rpc("calculate_international_price", {
@@ -191,15 +191,15 @@ async function main() {
   }
 
   const saTotal = extractTotal(sa);
-  if (!nearlyEqual(saTotal, 194.25)) {
+  if (!nearlyEqual(saTotal, 185)) {
     console.log(`DEBUG: sa_data_type: ${typeof sa}`);
     console.log(`DEBUG: sa_data: ${JSON.stringify(sa)}`);
     if (saError) console.log(`DEBUG: sa_error_message: ${saError}`);
-    throw new Error(`calculate_international_price('SA', 3): expected 194.25, got ${saTotal}`);
+    throw new Error(`calculate_international_price('SA', 3): expected 185 AED (95+45*2), got ${saTotal}`);
   }
-  pass("calculate_international_price('SA', 3) = 194.25");
+  pass("calculate_international_price('SA', 3) = 185 AED");
 
-  // Test RPC: calculate_international_price US
+  // Test RPC: calculate_international_price US (Worldwide: 190 + 90*1 = 280)
   let us, usError;
   try {
     const result = await supabase.rpc("calculate_international_price", {
@@ -213,15 +213,15 @@ async function main() {
   }
 
   const usTotal = extractTotal(us);
-  if (!nearlyEqual(usTotal, 294.00)) {
+  if (!nearlyEqual(usTotal, 280)) {
     console.log(`DEBUG: us_data_type: ${typeof us}`);
     console.log(`DEBUG: us_data: ${JSON.stringify(us)}`);
     if (usError) console.log(`DEBUG: us_error_message: ${usError}`);
-    throw new Error(`calculate_international_price('US', 2): expected 294.00, got ${usTotal}`);
+    throw new Error(`calculate_international_price('US', 2): expected 280 AED (190+90), got ${usTotal}`);
   }
-  pass("calculate_international_price('US', 2) = 294.00");
+  pass("calculate_international_price('US', 2) = 280 AED");
 
-  // Test RPC: calculate_international_price EUROPE
+  // Test RPC: calculate_international_price EUROPE (Worldwide: 190 + 90*1 = 280)
   let europe, europeError;
   try {
     const result = await supabase.rpc("calculate_international_price", {
@@ -235,13 +235,13 @@ async function main() {
   }
 
   const europeTotal = extractTotal(europe);
-  if (!nearlyEqual(europeTotal, 294.00)) {
+  if (!nearlyEqual(europeTotal, 280)) {
     console.log(`DEBUG: europe_data_type: ${typeof europe}`);
     console.log(`DEBUG: europe_data: ${JSON.stringify(europe)}`);
     if (europeError) console.log(`DEBUG: europe_error_message: ${europeError}`);
-    throw new Error(`calculate_international_price('EUROPE', 2): expected 294.00, got ${europeTotal}`);
+    throw new Error(`calculate_international_price('EUROPE', 2): expected 280 AED (190+90), got ${europeTotal}`);
   }
-  pass("calculate_international_price('EUROPE', 2) = 294.00");
+  pass("calculate_international_price('EUROPE', 2) = 280 AED");
 
   const now = new Date().toISOString();
   const testOrder = {

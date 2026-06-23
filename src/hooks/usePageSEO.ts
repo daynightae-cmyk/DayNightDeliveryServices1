@@ -9,11 +9,11 @@ const routeMeta: Record<string, { title: string; description: string; noindex?: 
   },
   "/pricing": {
     title: "أسعار التوصيل والشحن | DAY NIGHT DELIVERY SERVICES",
-    description: "Official final prices: UAE delivery from 31.50 AED, GCC from 99.75 AED, worldwide from 199.50 AED. Customer view shows final price only."
+    description: "Official final prices: UAE delivery from 30 AED (main) / 50 AED (extended), GCC from 95 AED first kg + 45 AED additional, worldwide from 190 AED first kg + 90 AED additional. Customer view shows final price only."
   },
   "/uae-delivery": {
     title: "التوصيل المحلي داخل الإمارات | DAY NIGHT DELIVERY SERVICES",
-    description: "Local delivery across all UAE emirates. Main cities 31.50 AED and extended areas 52.50 AED as final customer prices."
+    description: "Local delivery across all UAE emirates. Main cities 30 AED and extended areas 50 AED as final customer prices."
   },
   "/international-shipping": {
     title: "الشحن الدولي من الإمارات | DAY NIGHT DELIVERY SERVICES",
