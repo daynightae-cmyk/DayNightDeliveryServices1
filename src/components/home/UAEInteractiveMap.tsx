@@ -33,9 +33,9 @@ const UAE_OUTLINE =
 
 function priceLabel(zoneType: "main" | "extended", isArabic: boolean) {
   if (zoneType === "extended") {
-    return isArabic ? "52.50 درهم السعر النهائي" : "52.50 AED final";
+    return isArabic ? "50 درهم السعر النهائي" : "50 AED final";
   }
-  return isArabic ? "31.50 درهم السعر النهائي" : "31.50 AED final";
+  return isArabic ? "30 درهم السعر النهائي" : "30 AED final";
 }
 
 export default function UAEInteractiveMap() {
