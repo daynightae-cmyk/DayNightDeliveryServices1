@@ -35,6 +35,7 @@ const AdminPanel = lazy(() => import("./components/AdminPanel"));
 const InternationalShippingAdvanced = lazy(() => import("./components/InternationalShippingAdvanced"));
 const DriverMobileView = lazy(() => import("./components/driver/DriverMobileView"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboard"));
+const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGalleryV2"));
 import SmartChat from "./components/SmartChat";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
@@ -281,6 +282,7 @@ function AppContent() {
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/policy" element={<Policy />} />
             <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
+            <Route path="/gallery" element={<UltimateGalleryV2 />} />
             <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
             <Route path="/driver" element={<DriverMobileView orders={[]} onStatusChange={() => {}} />} />
             <Route path="/customer" element={<CustomerDashboard customerPhone="" orders={[]} onReorder={() => {}} />} />
