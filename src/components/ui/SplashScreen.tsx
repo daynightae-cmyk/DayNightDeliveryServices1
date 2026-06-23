@@ -50,7 +50,7 @@ export default function SplashScreen({ isLoading, onComplete }: SplashScreenProp
             className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-brand-gold/40 shadow-[0_0_40px_rgba(212,175,55,0.3)] bg-brand-deep"
           >
             <img
-              src="https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png"
+              src="/logo-daynight.png"
               alt="Day Night Logo"
               className="w-full h-full object-cover"
             />

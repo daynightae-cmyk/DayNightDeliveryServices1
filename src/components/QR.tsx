@@ -29,8 +29,9 @@ export default function QR({ onNavigate }: QRProps) {
   const [copied, setCopied] = useState(false);
 
   const websiteUrl = "https://www.daynightae.com";
-  const logoUrl = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
-  const qrUrl = "https://i.postimg.cc/P5KCWNMd/qr-code-1000-1000.png";
+  const logoUrl = "/logo-daynight.png";
+  // Generate QR code dynamically using a reliable API
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(websiteUrl)}&color=0a1c3a&bgcolor=ffffff&qzone=2`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(websiteUrl);

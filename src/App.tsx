@@ -51,8 +51,8 @@ import {
   HelpCircle
 } from "lucide-react";
 
-// Official Logo Image URL - Updated per requirements
-const LOGO_IMAGE_URL = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
+// Official Logo Image URL - Updated per requirements (local asset)
+const LOGO_IMAGE_URL = "/logo-daynight.png";
 
 function AppContent() {
   const navigate = useNavigate();
