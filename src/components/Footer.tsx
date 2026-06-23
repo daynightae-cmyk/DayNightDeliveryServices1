@@ -5,7 +5,7 @@ import {
   Phone,
   Facebook,
   Instagram,
-  Globe,
+  MessageSquare,
   Zap,
   Heart,
   Clock,
@@ -219,7 +219,7 @@ export default function Footer() {
                     isArabic ? "flex-row-reverse" : ""
                   } ${isLight ? "text-brand-deep/70 hover:text-brand-gold" : "text-white/60 hover:text-brand-gold"}`}
                 >
-                  <Globe className="w-4 h-4 text-brand-gold shrink-0" />
+                  <MessageSquare className="w-4 h-4 text-brand-gold shrink-0" />
                   <span>{tf.whatsapp}</span>
                 </a>
               </li>

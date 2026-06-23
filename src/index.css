@@ -23,7 +23,7 @@
 
   /* Light mode body background */
   :root.light-theme body {
-    background: linear-gradient(145deg, #DDE7F5 0%, #EEF3FB 50%, #E4EDF8 100%);
+    background: linear-gradient(145deg, #D4E4F7 0%, #E8F0FE 50%, #EEF3FB 100%);
     min-height: 100vh;
   }
 
@@ -33,26 +33,26 @@
   }
   :root.light-theme .text-white\/70,
   :root.light-theme .text-white\/60 {
-    color: rgba(7, 26, 51, 0.7) !important;
+    color: rgba(7, 26, 51, 0.75) !important;
   }
   :root.light-theme .text-white\/50,
   :root.light-theme .text-white\/45,
   :root.light-theme .text-white\/40 {
-    color: rgba(7, 26, 51, 0.55) !important;
+    color: rgba(7, 26, 51, 0.6) !important;
   }
   :root.light-theme .border-white\/10 {
-    border-color: rgba(7, 26, 51, 0.1) !important;
+    border-color: rgba(7, 26, 51, 0.12) !important;
   }
   :root.light-theme .border-white\/20 {
-    border-color: rgba(7, 26, 51, 0.15) !important;
+    border-color: rgba(7, 26, 51, 0.18) !important;
   }
 
   /* Light mode glass cards */
   :root.light-theme .bg-white\/5 {
-    background-color: rgba(255, 255, 255, 0.6) !important;
+    background-color: rgba(255, 255, 255, 0.65) !important;
   }
   :root.light-theme .bg-white\/10 {
-    background-color: rgba(255, 255, 255, 0.75) !important;
+    background-color: rgba(255, 255, 255, 0.8) !important;
   }
 
   /* Smooth theme transitions */
@@ -78,6 +78,14 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
+  :root.light-theme .glass {
+    background: rgba(255, 255, 255, 0.65);
+    border-color: rgba(7, 26, 51, 0.1);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
   .glass-gold {
     background: rgba(212, 175, 55, 0.08);
     backdrop-filter: blur(20px);
@@ -86,6 +94,11 @@
     box-shadow:
       0 8px 32px rgba(212, 175, 55, 0.05),
       inset 0 1px 0 rgba(212, 175, 55, 0.05);
+  }
+
+  :root.light-theme .glass-gold {
+    background: rgba(212, 175, 55, 0.1);
+    border-color: rgba(212, 175, 55, 0.3);
   }
 
   .glass-premium {

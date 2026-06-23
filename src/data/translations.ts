@@ -238,17 +238,6 @@ export const translations = {
       customQuote: "For shipments above 20 kg, please continue to full booking for a custom quote.",
       disclaimer: "This is an estimated price range. Final pricing may vary based on package size, service type, and delivery timing."
     },
-    footer: {
-      company: "DAY NIGHT DELIVERY SERVICES",
-      slogan: "Your Comfort.. Our Priority",
-      support: "24/7 Delivery Support",
-      address: "UAE ABUDHABI MUSSAFAH 40",
-      description: "Day Night Delivery Services - A leading logistics and road transport company in the UAE. We provide secure and fast delivery for stores, companies, and documents 24/7.",
-      catalog: "View WhatsApp Catalog 🖥️",
-      adminPortal: "Captains & Logistics Portal",
-      allRights: "© 2026 Day Night Delivery Services. All Rights Reserved.",
-      motto: "Speed • Security • Excellence"
-    },
     header: {
       requestBtn: "Request Instant Courier",
       whatsappCatalog: "View WhatsApp Catalog",
@@ -495,17 +484,6 @@ export const translations = {
       totalRange: "النطاق الإجمالي المتوقع:",
       customQuote: "للشحنات التي تزيد عن 20 كجم، يرجى المتابعة إلى الحجز الكامل للحصول على سعر مخصص.",
       disclaimer: "هذا نطاق سعري تقديري. قد يختلف السعر النهائي حسب حجم الشحنة، نوع الخدمة، ووقت التوصيل."
-    },
-    footer: {
-      company: "داي نايت لخدمات التوصيل والشحن",
-      slogan: "راحتكم أولويتنا",
-      support: "دعم التوصيل على مدار الساعة",
-      address: "الإمارات، أبوظبي، مصفح 40",
-      description: "داي نايت لخدمات التوصيل والشحن - شركة خدمات لوجستية ونقل بري رائدة في دولة الإمارات العربية المتحدة. نوفر توصيلاً آمناً وسريعاً للمتاجر والشركات والمستندات على مدار الساعة 24/7.",
-      catalog: "عرض كتالوج واتساب / View Catalog 🖥️",
-      adminPortal: "بوابة الكباتن والفرز اللوجستي",
-      allRights: "© 2026 داي نايت لخدمات التوصيل والشحن. جميع الحقوق محفوظة لشركة Day Night Delivery.",
-      motto: "سرعة • أمان • تميز"
     },
     header: {
       requestBtn: "اطلب مندوب فوري",
