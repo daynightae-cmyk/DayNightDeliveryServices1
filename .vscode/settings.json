@@ -10,6 +10,8 @@
             "matchCommandLine": true
         },
         "Set-Clipboard": true,
-        "ForEach-Object": true
+        "ForEach-Object": true,
+        "git add": true,
+        "git commit": true
     }
 }
