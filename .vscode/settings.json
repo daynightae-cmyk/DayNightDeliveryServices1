@@ -4,6 +4,11 @@
         "/^node --check scripts/daynight-final-gate\\.mjs$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "/^cd \"D:\\\\New folder \\(2\\)\\\\day-night-delivery-services\\\\DayNightDeliveryServices1\"; Get-Content \"\\.\\\\supabase\\\\sql\\\\DN_FINAL_POSTER_PRICING_FIX\\.sql\" -Raw \\| Set-Clipboard; Write-Host \"✅ COPIED: DN_FINAL_POSTER_PRICING_FIX\\.sql\" -ForegroundColor Green$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "Set-Clipboard": true
     }
 }
