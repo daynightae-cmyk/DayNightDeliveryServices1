@@ -5,15 +5,38 @@ node_modules/
 # Build outputs
 dist/
 build/
-*.js.map
-*.css.map
+.next/
+.nuxt/
+public/dist/
+*.min.js
+*.min.css
 
 # Environment variables
 .env
 .env.local
-*.env.*
+.env.*
+!.env.example
 
-# Python related
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -22,56 +45,64 @@ __pycache__/
 env/
 venv/
 .venv/
-.ENV
-
-# Logs
-*.log
-
-# Coverage reports
-coverage/
-htmlcov/
-
-# Temporary files
-*.tmp
-*.temp
-*~
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Testing
-.pytest_cache/
-.mypy_cache/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
 .coverage
+.nox/
+*.so
+*.egg-info/
+.eggs/
+mypy_cache/
+.pytest_cache/
+.hypothesis/
 
-# Compressed files
-*.zip
-*.gz
-*.tar
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+node_modules/
+jspm_packages/
+*.js.map
+*.mjs.map
+*.cjs.map
+*.tsbuildinfo
+.nyc_output/
+coverage/
+.nyc_output/
+istanbul/
+.lintcache/
+.commitlint.cache
+.eslintcache
+.node_repl_history
 *.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+
+# TypeScript
+*.tsbuildinfo
+*.bak
+
+# Compiled JavaScript
+lib/
+es/
+dist/
+tmp/
+temp/
+
+# Next.js
+.next/
+out/
+build/
+
+# React
+*.hot-update.json
+*.hot-update.js
+
+# Bundler cache (varying by system environment)
+.cache/
+.svelte-kit/
+.svelte/
+.craft/
+.vercel/
+.now/
+netlify/
 ```

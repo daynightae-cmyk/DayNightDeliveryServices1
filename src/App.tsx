@@ -35,6 +35,9 @@ import AdminPanel from "./components/AdminPanel";
 import SmartChat from "./components/SmartChat";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
+import Gallery from "./components/Gallery";
+import SplashScreen from "./components/ui/SplashScreen";
+import UAEInteractiveMap from "./components/home/UAEInteractiveMap";
 
 import { 
   Menu, 
@@ -55,7 +58,14 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [splashLoading, setSplashLoading] = useState<boolean>(true);
   const { theme, toggleTheme, language, toggleLanguage } = useAppContext();
+
+  useEffect(() => {
+    // Hide splash after initial load
+    const timer = setTimeout(() => setSplashLoading(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const t = translations[language];
 
@@ -277,11 +287,16 @@ function AppContent() {
           <Route path="/contact" element={<ContactUs />} />
           <Route path="/policy" element={<Policy />} />
           <Route path="/qr" element={<QR onNavigate={handleNavigate} />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/map" element={<UAEInteractiveMap />} />
           <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+
+      {/* Splash Screen */}
+      <SplashScreen isLoading={splashLoading} onComplete={() => setSplashLoading(false)} />
 
       {/* Smart Chat Floating Agent Widget */}
       <SmartChat />
