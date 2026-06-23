@@ -87,6 +87,7 @@ function AppContent() {
     else if (tab === "contact") navigate("/contact");
     else if (tab === "policy") navigate("/policy");
     else if (tab === "qr") navigate("/qr");
+    else if (tab === "gallery") navigate("/gallery");
     else if (tab === "auth") navigate("/auth");
     else if (tab === "admin") navigate("/admin");
   }
@@ -109,6 +110,7 @@ function AppContent() {
     { key: "request", path: "/request", label: t.nav.booking },
     { key: "tracking", path: "/tracking", label: t.nav.tracking },
     { key: "faqs", path: "/faq", label: t.nav.faqs },
+    { key: "gallery", path: "/gallery", label: t.nav.gallery },
     { key: "contact", path: "/contact", label: t.nav.contact }
   ];
 

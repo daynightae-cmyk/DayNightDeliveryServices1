@@ -44,31 +44,31 @@ async function run() {
   } = await loadPricingModule();
 
   const main = calculateDomesticPrice({ deliveryCity: "Abu Dhabi", weight: 1, serviceType: "standard" });
-  assertEqual(main.total, 31.5, "local main total");
+  assertEqual(main.total, 30, "local main total");
 
   const extended = calculateDomesticPrice({ deliveryCity: "Al Ain", weight: 1, serviceType: "standard" });
-  assertEqual(extended.total, 52.5, "local extended total");
+  assertEqual(extended.total, 50, "local extended total");
 
   const mainExpress = calculateDomesticPrice({ deliveryCity: "Dubai", weight: 1, serviceType: "express" });
-  assertEqual(mainExpress.total, 47.25, "main express total");
+  assertEqual(mainExpress.total, 45, "main express total");
 
   const sa1 = calculateInternationalPrice({ countryCode: "SA", weight: 1 });
-  assertEqual(sa1.total, 99.75, "SA 1kg total");
+  assertEqual(sa1.total, 95, "SA 1kg total");
 
   const sa2 = calculateInternationalPrice({ countryCode: "SA", weight: 2 });
-  assertEqual(sa2.total, 147, "SA 2kg total");
+  assertEqual(sa2.total, 140, "SA 2kg total");
 
   const sa3 = calculateInternationalPrice({ countryCode: "SA", weight: 3 });
-  assertEqual(sa3.total, 194.25, "SA 3kg total");
+  assertEqual(sa3.total, 185, "SA 3kg total");
 
   const us1 = calculateInternationalPrice({ countryCode: "US", weight: 1 });
-  assertEqual(us1.total, 199.5, "US 1kg total");
+  assertEqual(us1.total, 190, "US 1kg total");
 
   const us2 = calculateInternationalPrice({ countryCode: "US", weight: 2 });
-  assertEqual(us2.total, 294, "US 2kg total");
+  assertEqual(us2.total, 280, "US 2kg total");
 
   const us3 = calculateInternationalPrice({ countryCode: "US", weight: 3 });
-  assertEqual(us3.total, 388.5, "US 3kg total");
+  assertEqual(us3.total, 370, "US 3kg total");
 
   const negativeWeight = calculateInternationalPrice({ countryCode: "US", weight: -5 });
   if (negativeWeight.billableWeight < 1) {

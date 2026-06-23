@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, X, ZoomIn, Download, Share2, Heart, Truck, Globe, Camera, MapPin, Package } from 'lucide-react';
 
 // All image URLs organized by category

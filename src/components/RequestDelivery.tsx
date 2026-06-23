@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Order } from "../types";
 import { createPublicOrder } from "../supabase";
-import { calculateLocalPrice } from "../lib/pricing";
+import { calculateDomesticPrice } from "../lib/pricing";
 import { canSubmitDeliveryRequest } from "../lib/security";
 import { reportError, trackApiCall } from "../lib/monitoring";
 import QRGenerator from "./QRGenerator";
@@ -92,15 +92,12 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const expensiveCitiesAr = ["العين (Al Ain)", "المنطقة الغربية (Western Region)", "السلع", "الرويس", "غياثي", "ليوا"];
   
   function getCalculatedDeliveryPrice() {
-    const pricing = calculateLocalPrice(receiverCity, weight);
-    let base = pricing.subtotal;
-    // Express adds an extra premium
-    if (serviceType === "express") {
-       base += 15;
-    }
-    const vat = parseFloat((base * 0.05).toFixed(2));
-    const total = parseFloat((base + vat).toFixed(2));
-    return { subtotal: base, vat, total };
+    const pricing = calculateDomesticPrice({
+      deliveryCity: receiverCity,
+      weight,
+      serviceType
+    });
+    return { subtotal: pricing.subtotal, total: pricing.total };
   }
 
   const deliveryPricing = getCalculatedDeliveryPrice();
@@ -195,9 +192,6 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       delivery_price: deliveryPrice,
       subtotal: deliveryPricing.subtotal,
       base_price: deliveryPricing.subtotal,
-      vat_amount: deliveryPricing.vat,
-      vat: deliveryPricing.vat,
-      tax_amount: deliveryPricing.vat,
       total: deliveryPricing.total,
       total_price: deliveryPricing.total,
       amount: deliveryPricing.total,
@@ -551,15 +545,14 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
             {/* Calculations Detail Box */}
             <div className="bg-brand-deep/85 rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-sans font-medium text-right">
               <div className="p-2.5 bg-brand-gold/10 rounded-lg text-brand-gold border border-brand-gold/20 text-[10px] leading-relaxed max-w-xs text-right">
-                سيتم تأكيد رسوم التحصيل والدفع بدقة من الإدارة بمجرد معالجة الطلب الكترونياً. الضريبة 5% مضافة تلقائياً.
+                سيتم تأكيد رسوم التحصيل والدفع بدقة من الإدارة بمجرد معالجة الطلب الكترونياً. الأسعار المعروضة نهائية وواضحة.
               </div>
               <div className="space-y-1 w-full sm:w-auto text-right">
                 <span className="text-white/40 text-xs font-bold font-sans">بيان قيمة رسوم التوصيل</span>
                 <div className="text-xs text-white/60 space-y-0.5">
-                  <p>الأساسي: <span className="font-mono text-white">{deliveryPricing.subtotal.toFixed(2)} AED</span></p>
-                  <p>الضريبة (5%): <span className="font-mono text-white">{deliveryPricing.vat.toFixed(2)} AED</span></p>
+                  <p>سعر الخدمة: <span className="font-mono text-white">{deliveryPricing.subtotal.toFixed(2)} AED</span></p>
                 </div>
-                <p className="text-xl font-extrabold text-brand-gold font-mono leading-none pt-1 border-t border-white/5">{deliveryPricing.total.toFixed(2)} AED شاملة</p>
+                <p className="text-xl font-extrabold text-brand-gold font-mono leading-none pt-1 border-t border-white/5">{deliveryPricing.total.toFixed(2)} AED نهائي</p>
                 <p className="text-[10px] text-white/40 font-bold">
                   {expensiveCitiesAr.includes(receiverCity) ? "* منطقة بعيدة/50 درهم أساسي." : "* سعر موحد/30 درهم أساسي."} 
                   {serviceType === "express" && " مضاف رسوم خدمة سريعة (15 درهم)."}

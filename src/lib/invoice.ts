@@ -9,8 +9,7 @@ export function generateInvoiceNumber(date = new Date()) {
 
 export function buildInvoiceData(order: Order) {
   const invoiceNo = generateInvoiceNumber();
-  const subtotal = Number(order.delivery_price / 1.05).toFixed(2);
-  const vat = Number(order.delivery_price - Number(subtotal)).toFixed(2);
+  const subtotal = Number(order.delivery_price).toFixed(2);
 
   return {
     invoiceNo,
@@ -31,7 +30,6 @@ export function buildInvoiceData(order: Order) {
     },
     financials: {
       subtotal,
-      vat,
       total: Number(order.delivery_price).toFixed(2)
     }
   };

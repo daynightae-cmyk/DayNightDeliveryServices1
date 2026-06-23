@@ -22,6 +22,8 @@ import { translations } from "../data/translations";
 import { cities, getQuickEstimate, getWeightSurcharge } from "../data/pricingEstimate";
 import { useState } from "react";
 import TestimonialCarousel from "./home/TestimonialCarousel";
+import UAEInteractiveMap from "./home/UAEInteractiveMap";
+import WorldClock from "./home/WorldClock";
 
 interface HomeProps {
   onNavigate: (tab: string) => void;
@@ -252,6 +254,9 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
       </section>
+
+      <WorldClock />
+      <UAEInteractiveMap />
 
       {/* Main Pitch & Strengths */}
       <section className="space-y-10">

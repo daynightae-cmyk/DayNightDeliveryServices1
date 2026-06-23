@@ -24,6 +24,14 @@
         "/^powershell -Command \"Start-Sleep -Seconds 3\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^cd \"D:\\\\New folder \\(2\\)\\\\day-night-delivery-services\\\\DayNightDeliveryServices1\" ; python scripts/write_splash\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pwsh -NoProfile -Command \"cd 'D:\\\\New folder \\(2\\)\\\\day-night-delivery-services\\\\DayNightDeliveryServices1'; npm run lint\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

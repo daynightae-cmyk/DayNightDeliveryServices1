@@ -54,14 +54,14 @@ export default function DeliveryUAE() {
           تغطية شاملة لكافة إمارات الدولة بأسعار واضحة
         </h2>
         <p className="text-white/60 text-sm">
-          نغطي المدن والبلديات الرئيسية بـ 30 درهم فقط (31.50 شامل الضريبة)، وهناك خدمات مخصصة للمناطق البعيدة في العين والمنطقة الغربية بـ 50 درهم (52.50 شامل الضريبة)، لضمان أعلى مستويات الالتزام والتغطية.
+          نغطي المدن والبلديات الرئيسية بـ 30 درهم فقط، وهناك خدمات مخصصة للمناطق الممتدة في العين والمنطقة الغربية بـ 50 درهم، لضمان أعلى مستويات الالتزام والتغطية.
         </p>
       </section>
 
       {/* Main Cities List */}
       <section className="space-y-6">
         <h3 className="text-xl font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3 justify-end">
-          <span>المدن والمناطق الرئيسية (السعر الموحد: 30 درهم • 31.50 AED شامل الضريبة)</span>
+          <span>المدن والمناطق الرئيسية (السعر النهائي: 30 درهم)</span>
           <CheckCircle className="w-5 h-5 text-brand-gold" />
         </h3>
         
@@ -72,7 +72,7 @@ export default function DeliveryUAE() {
                 <p className="text-white/40 text-xs font-mono font-bold tracking-wider">{city.name}</p>
                 <h4 className="text-xl font-extrabold text-white">{city.ar}</h4>
               </div>
-              <p className="text-brand-gold font-extrabold text-sm mt-3 pt-3 border-t border-white/5">30 AED <span className="text-[10px] text-white/50 block font-normal">(31.50 AED شامل الضريبة)</span></p>
+              <p className="text-brand-gold font-extrabold text-sm mt-3 pt-3 border-t border-white/5">30 AED <span className="text-[10px] text-white/50 block font-normal">سعر نهائي</span></p>
             </div>
           ))}
         </div>
@@ -94,7 +94,7 @@ export default function DeliveryUAE() {
           </div>
 
           <div className="space-y-1 text-right">
-            <h3 className="text-lg font-bold text-white">المناطق البعيدة وتوصيلات الطواقم الخاصة (50 درهم • 52.50 AED شامل الضريبة)</h3>
+            <h3 className="text-lg font-bold text-white">المناطق الممتدة وتوصيلات الطواقم الخاصة (50 درهم نهائي)</h3>
             <p className="text-white/50 text-xs">ابحث عن منطقتك للتحقق من التغطية المناسبة في العين والمنطقة الغربية.</p>
           </div>
         </div>

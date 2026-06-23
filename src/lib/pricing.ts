@@ -1,11 +1,8 @@
 import { coverageAreas, isExtendedCoverage } from "../data/coverage";
-import { CURRENCY, domesticPricing, internationalDestinations, internationalPricing, VAT_RATE } from "../data/pricingData";
+import { CURRENCY, domesticPricing, internationalDestinations, internationalPricing } from "../data/pricingData";
 
 export interface PricingResult {
   subtotal: number;
-  vatRate: number;
-  vatAmount: number;
-  vat: number;
   total: number;
   currency: string;
   pricingCategory: string;
@@ -44,10 +41,6 @@ function normalizeWeight(weight: number | string | null | undefined) {
   return Math.max(1, Math.ceil(parsed));
 }
 
-export function calculateVat(subtotal: number) {
-  return Number((subtotal * VAT_RATE).toFixed(2));
-}
-
 export function formatAED(amount: number) {
   return `${Number(amount).toFixed(2)} AED`;
 }
@@ -66,16 +59,12 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
   const basePrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
   const express = input.serviceType === "express" ? EXPRESS_SURCHARGE : 0;
   const subtotal = basePrice + express;
-  const vatAmount = calculateVat(subtotal);
-  const total = Number((subtotal + vatAmount).toFixed(2));
+  const total = Number(subtotal.toFixed(2));
   const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
   const requiresCustomQuote = billableWeight > 50;
 
   return {
     subtotal,
-    vatRate: VAT_RATE,
-    vatAmount,
-    vat: vatAmount,
     total,
     currency: CURRENCY,
     pricingCategory: category,
@@ -111,15 +100,11 @@ export function calculateInternationalPrice(inputOrDestination: InternationalPri
   const firstKg = destination.firstKg;
   const additionalKg = destination.additionalKg;
   const subtotal = firstKg + ((billableWeight - 1) * additionalKg);
-  const vatAmount = calculateVat(subtotal);
-  const total = Number((subtotal + vatAmount).toFixed(2));
+  const total = Number(subtotal.toFixed(2));
   const requiresCustomQuote = billableWeight > 70;
 
   return {
     subtotal,
-    vatRate: VAT_RATE,
-    vatAmount,
-    vat: vatAmount,
     total,
     currency: CURRENCY,
     pricingCategory: destination.region,

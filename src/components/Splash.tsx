@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Zap } from "lucide-react";
+import { Truck } from "lucide-react";
 
 interface SplashProps {
   onComplete?: () => void;
@@ -12,7 +12,7 @@ export default function Splash({ onComplete }: SplashProps) {
     const timer = setTimeout(() => {
       setIsVisible(false);
       onComplete?.();
-    }, 2400);
+    }, 3200);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
@@ -20,48 +20,56 @@ export default function Splash({ onComplete }: SplashProps) {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-brand-deep via-brand-cool to-brand-deep flex items-center justify-center overflow-hidden">
-      {/* Animated background gradient circles */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-brand-gold/5 rounded-full blur-3xl animate-pulse" />
+    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-brand-deep via-brand-cool to-brand-deep flex items-center justify-center overflow-hidden animate-splash-shell">
+      <div className="absolute top-0 left-0 w-96 h-96 bg-sky-400/10 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-0 right-0 w-[32rem] h-[32rem] bg-brand-gold/10 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute inset-8 border border-brand-gold/10 rounded-[36px]" />
 
-      {/* Main splash content */}
       <div className="relative z-10 text-center px-6">
-        {/* Logo container with glow effect */}
         <div className="mb-8 flex justify-center">
           <div className="relative">
-            {/* Outer glow ring */}
-            <div className="absolute inset-0 bg-gradient-to-r from-brand-gold/20 to-blue-500/20 rounded-2xl blur-2xl animate-pulse" />
-
-            {/* Main logo box */}
-            <div className="relative w-24 h-24 bg-gradient-to-br from-brand-gold to-brand-gold/60 rounded-2xl flex items-center justify-center shadow-2xl">
-              <Zap className="w-12 h-12 text-brand-deep animate-bounce" style={{ animationDuration: "1.5s" }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-brand-gold/30 to-sky-400/20 rounded-3xl blur-2xl animate-pulse" />
+            <div className="relative w-28 h-28 bg-white/5 backdrop-blur-2xl border border-brand-gold/30 rounded-3xl flex items-center justify-center shadow-2xl overflow-hidden">
+              <img
+                src="https://i.postimg.cc/tC3sSs24/178129358239a5-modified.png"
+                alt="DAY NIGHT DELIVERY SERVICES"
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover opacity-80"
+              />
+              <div className="absolute inset-0 bg-brand-deep/20" />
+              <Truck className="relative w-11 h-11 text-brand-gold drop-shadow-[0_0_16px_rgba(212,175,55,0.9)]" />
             </div>
           </div>
         </div>
 
-        {/* Company name */}
         <div className="mb-6">
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2 animate-fade-in">
-            DAY NIGHT
+          <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-3 animate-fade-in">
+            DAY NIGHT DELIVERY SERVICES
           </h1>
-          <p className="text-lg md:text-xl text-brand-gold font-bold animate-fade-in" style={{ animationDelay: "0.2s" }}>
-            DELIVERY SERVICES
+          <p className="text-lg md:text-2xl text-brand-gold font-extrabold animate-fade-in" style={{ animationDelay: "0.2s" }}>
+            نصل إليك في كل وقت
           </p>
         </div>
 
-        {/* Tagline */}
         <p className="text-white/70 text-sm md:text-base mb-8 max-w-xs mx-auto animate-fade-in" style={{ animationDelay: "0.4s" }}>
-          Fast • Reliable • Professional
+          Fast • Reliable • Every Time
         </p>
 
-        {/* Loading bar */}
-        <div className="w-32 h-1 bg-white/10 rounded-full mx-auto overflow-hidden">
+        <div className="w-44 h-1 bg-white/10 rounded-full mx-auto overflow-hidden border border-white/10">
           <div className="h-full bg-gradient-to-r from-transparent via-brand-gold to-transparent animate-loading-bar" />
         </div>
       </div>
 
       <style>{`
+        @keyframes splash-shell {
+          0%, 82% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+
         @keyframes fade-in {
           from {
             opacity: 0;
@@ -89,8 +97,12 @@ export default function Splash({ onComplete }: SplashProps) {
           animation: fade-in 0.8s ease-out forwards;
         }
 
+        .animate-splash-shell {
+          animation: splash-shell 3.2s ease-in-out forwards;
+        }
+
         .animate-loading-bar {
-          animation: loading-bar 2s ease-in-out infinite;
+          animation: loading-bar 1.8s ease-in-out infinite;
         }
       `}</style>
     </div>

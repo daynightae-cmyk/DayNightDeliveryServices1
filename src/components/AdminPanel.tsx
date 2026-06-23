@@ -69,7 +69,7 @@ export default function AdminPanel() {
     if (!supabase) return;
 
     const [{ data: pricingData }, { data: settingsData }] = await Promise.all([
-      supabase.from("daynight_pricing_master").select("pricing_key, label_en, base_price, first_kg, additional_kg, vat_rate, currency").eq("active", true),
+      supabase.from("daynight_pricing_master").select("pricing_key, label_en, base_price, first_kg, additional_kg, currency").eq("active", true),
       supabase.from("admin_settings").select("setting_key, setting_value").limit(8)
     ]);
 

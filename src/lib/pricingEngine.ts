@@ -67,8 +67,7 @@ export function calculateAdvancedPrice(input: AdvancedPricingInput) {
   const bestDiscountPercent = Math.max(activePromoDiscount(input.promoCode), corporateDiscount(input.corporateContractId));
   const discountAmount = Number(((subtotal * bestDiscountPercent) / 100).toFixed(2));
   const discountedSubtotal = Number((subtotal - discountAmount).toFixed(2));
-  const vat = Number((discountedSubtotal * 0.05).toFixed(2));
-  const total = Number((discountedSubtotal + vat).toFixed(2));
+  const total = discountedSubtotal;
 
   return {
     ...base,
@@ -78,8 +77,6 @@ export function calculateAdvancedPrice(input: AdvancedPricingInput) {
     subtotal: discountedSubtotal,
     discountPercent: bestDiscountPercent,
     discountAmount,
-    vatAmount: vat,
-    vat,
     total,
     pricingRulesSource: "pricing_rules",
     breakdown: [
@@ -100,28 +97,24 @@ export async function syncPricingRulesToSupabase() {
       pricing_key: `promo_${rule.code.toLowerCase()}`,
       rule_name: rule.title,
       base_price: -Math.abs(rule.discountPercent),
-      vat_rate: 0.05,
       active: rule.active
     })),
     ...corporatePricingRules.map((rule) => ({
       pricing_key: `corp_${rule.contractId.toLowerCase()}`,
       rule_name: rule.companyName,
       base_price: -Math.abs(rule.discountPercent),
-      vat_rate: 0.05,
       active: rule.active
     })),
     {
       pricing_key: "hazardous_surcharge",
       rule_name: "Hazardous surcharge",
       base_price: hazardousSurcharge,
-      vat_rate: 0.05,
       active: true
     },
     {
       pricing_key: "special_packaging",
       rule_name: "Special packaging",
       base_price: packagingFees.special,
-      vat_rate: 0.05,
       active: true
     }
   ];

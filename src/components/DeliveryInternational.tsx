@@ -85,11 +85,10 @@ export default function DeliveryInternational() {
             <div className="space-y-2 border-y border-white/10 py-4">
               <p className="flex justify-between text-xs text-white/60"><span dir="ltr">{formatAED(currentCountry.firstKg)}</span><span>أول كيلو:</span></p>
               <p className="flex justify-between text-xs text-white/60"><span dir="ltr">{formatAED(currentCountry.additionalKg)}</span><span>كل كيلو إضافي:</span></p>
-              <p className="flex justify-between text-xs text-white/60"><span dir="ltr">{formatAED(price.vatAmount)}</span><span>VAT 5%:</span></p>
             </div>
             <div className="flex justify-between items-center text-sm text-brand-gold font-bold">
               <span className="text-2xl font-black font-mono" dir="ltr">{formatAED(price.total)}</span>
-              <span>الإجمالي شامل الضريبة:</span>
+              <span>الإجمالي النهائي:</span>
             </div>
           </div>
 

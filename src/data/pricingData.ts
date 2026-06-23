@@ -1,4 +1,3 @@
-export const VAT_RATE = 0.05;
 export const CURRENCY = "AED";
 
 export const domesticPricing = {
@@ -7,16 +6,14 @@ export const domesticPricing = {
     labelEn: "UAE Main Areas",
     labelAr: "المناطق الرئيسية داخل الإمارات",
     base: 30,
-    vatAmount: 1.5,
-    total: 31.5
+    total: 30
   },
   extended: {
     id: "uae-extended",
     labelEn: "UAE Extended Areas",
     labelAr: "المناطق الممتدة داخل الإمارات",
     base: 50,
-    vatAmount: 2.5,
-    total: 52.5
+    total: 50
   },
   expressSurcharge: {
     id: "express-surcharge",

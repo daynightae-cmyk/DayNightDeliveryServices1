@@ -14,9 +14,9 @@ export const aiAgentKnowledge = {
     whatsapp: companyMeta.whatsappUrl
   },
   prices: {
-    domesticMain: "30 AED + VAT 5% = 31.50 AED",
-    domesticExtended: "50 AED + VAT 5% = 52.50 AED",
-    express: "15 AED surcharge before VAT",
+    domesticMain: "30 AED final price",
+    domesticExtended: "50 AED final price",
+    express: "15 AED express surcharge",
     gcc: "95 AED first kg + 45 AED each additional kg",
     worldwide: "190 AED first kg + 90 AED each additional kg"
   },
