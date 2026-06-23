@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { createClient } from "../supabase";
+import { supabase } from "../supabase";
 import { Package, Truck, MapPin, FileText, Phone, Clock, CheckCircle, AlertCircle } from "lucide-react";
 
 interface Order {
@@ -13,8 +13,6 @@ interface Order {
   receiver_name?: string;
   receiver_phone?: string;
 }
-
-const supabase = createClient();
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
