@@ -26,6 +26,72 @@ create table if not exists public.contact_channels (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.international_rates (
+  id bigserial primary key,
+  country_code text not null unique,
+  country_name_en text not null,
+  country_name_ar text not null,
+  region text not null,
+  first_kg numeric(12,2) not null,
+  additional_kg numeric(12,2) not null,
+  estimated_days text not null default '5-10 days',
+  active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+alter table if exists public.international_rates
+  add column if not exists updated_at timestamptz not null default now();
+
+-- Legacy compatibility: older projects may have admin_settings with key/value only.
+alter table if exists public.admin_settings
+  add column if not exists setting_key text;
+
+alter table if exists public.admin_settings
+  add column if not exists setting_value jsonb;
+
+alter table if exists public.admin_settings
+  add column if not exists updated_at timestamptz not null default now();
+
+update public.admin_settings
+set setting_key = coalesce(setting_key, key)
+where setting_key is null
+  and key is not null;
+
+update public.admin_settings
+set setting_value = coalesce(setting_value, to_jsonb(value))
+where setting_value is null
+  and value is not null;
+
+create unique index if not exists admin_settings_setting_key_unique_idx
+  on public.admin_settings (setting_key)
+  where setting_key is not null;
+
+-- Legacy compatibility: older contact_channels may miss newer columns.
+alter table if exists public.contact_channels
+  add column if not exists channel_type text;
+
+alter table if exists public.contact_channels
+  add column if not exists label_en text;
+
+alter table if exists public.contact_channels
+  add column if not exists label_ar text;
+
+alter table if exists public.contact_channels
+  add column if not exists value text;
+
+alter table if exists public.contact_channels
+  add column if not exists href text;
+
+alter table if exists public.contact_channels
+  add column if not exists active boolean not null default true;
+
+alter table if exists public.contact_channels
+  add column if not exists created_at timestamptz not null default now();
+
+create unique index if not exists contact_channels_channel_type_unique_idx
+  on public.contact_channels (channel_type)
+  where channel_type is not null;
+
 insert into public.zones (name, zone_type, active) values
   ('Abu Dhabi Main', 'main', true),
   ('Dubai Main', 'main', true),
