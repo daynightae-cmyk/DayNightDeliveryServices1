@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { useAppContext } from "./lib/AppContext";
 import { translations } from "./data/translations";
-import { 
-  BrowserRouter, 
-  Routes, 
-  Route, 
-  Link, 
-  useNavigate, 
-  useSearchParams, 
-  useLocation, 
-  useParams 
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+  useParams
 } from "react-router-dom";
 
 const Home = lazy(() => import("./components/Home"));
@@ -36,18 +36,16 @@ const InternationalShippingAdvanced = lazy(() => import("./components/Internatio
 const DriverPortal = lazy(() => import("./components/driver/DriverPortal"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboard"));
 const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGalleryV2"));
+
 import SmartChat from "./components/SmartChat";
+import FloatingWhatsApp from "./components/FloatingWhatsApp";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
 import Footer from "./components/Footer";
 
-import { 
-  Menu, 
-  X, 
-  PhoneCall
-} from "lucide-react";
+import { Menu, X, PhoneCall, Sun, Moon } from "lucide-react";
 import companyMeta from "./data/companyMeta";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { trackPageLoad } from "./lib/monitoring";
@@ -59,13 +57,28 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const { language, toggleLanguage } = useAppContext();
+  const { language, toggleLanguage, theme } = useAppContext();
+  const isLight = theme === "light";
+  const isArabic = language === "ar";
 
   const t = translations[language];
 
   usePageSEO();
 
-  // Synchronize legacy key actions with real production URLs
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y > lastScrollY.current + 6 && y > 80) setHeaderHidden(true);
+      else if (y < lastScrollY.current - 6) setHeaderHidden(false);
+      lastScrollY.current = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   function handleNavigate(tab: string, trackingId?: string) {
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -80,11 +93,8 @@ function AppContent() {
     else if (tab === "pricing") navigate("/pricing");
     else if (tab === "request") navigate("/request");
     else if (tab === "tracking") {
-      if (trackingId) {
-        navigate(`/tracking?code=${trackingId}`);
-      } else {
-        navigate("/tracking");
-      }
+      if (trackingId) navigate(`/tracking?code=${trackingId}`);
+      else navigate("/tracking");
     }
     else if (tab === "faqs" || tab === "faq") navigate("/faq");
     else if (tab === "contact") navigate("/contact");
@@ -115,7 +125,6 @@ function AppContent() {
     { key: "contact", path: "/contact", label: t.nav.contact }
   ];
 
-  // Helper tracking parameter parser
   function TrackingRouteWrapper() {
     const [searchParams] = useSearchParams();
     const { code } = useParams();
@@ -124,57 +133,109 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-deep flex flex-col justify-between text-white antialiased selection:bg-brand-gold/30 selection:text-white leading-normal">
-      {/* Upper Slogan / Utility Bar */}
-      <div className="bg-brand-cool text-white text-[11px] font-sans py-2.5 px-4 sm:px-8 border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2.5 font-bold">
-        <div className="flex items-center gap-3">
+    <div
+      className={`min-h-screen flex flex-col justify-between antialiased leading-normal selection:bg-brand-gold/30 ${
+        isLight ? "text-[#071A33]" : "text-white"
+      }`}
+      style={{
+        backgroundColor: isLight ? "#EDF3FF" : "#071A33",
+        transition: "background-color 0.45s ease",
+      }}
+    >
+      {/* ── Fixed header wrapper — hides on scroll-down, shows on scroll-up ── */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
+          headerHidden ? "-translate-y-full" : "translate-y-0"
+        }`}
+      >
+      {/* ── Top utility bar ── */}
+      <div
+        className={`text-[11px] py-2 px-4 sm:px-8 border-b flex flex-col sm:flex-row items-center justify-between gap-2 font-bold ${
+          isLight
+            ? "bg-[#E0EAFA]/80 border-[#071A33]/10 text-[#071A33]/80"
+            : "bg-brand-cool/90 border-white/10 text-white"
+        }`}
+      >
+        <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
           <span className="text-brand-gold font-mono tracking-wider">{companyMeta.sloganEn}</span>
-          <span className="text-white/20 font-sans">|</span>
-          <span className="text-white/80">{companyMeta.sloganAr}</span>
+          <span className={`${isLight ? "text-[#071A33]/20" : "text-white/20"}`}>|</span>
+          <span className={isLight ? "text-[#071A33]/70" : "text-white/70"}>{companyMeta.sloganAr}</span>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
           <ThemeToggle />
-          <span className="text-white/20">|</span>
-          <button onClick={toggleLanguage} className="hover:text-brand-gold transition-colors font-mono cursor-pointer uppercase tracking-wider px-2 py-0.5 rounded border border-white/20 hover:border-brand-gold/50 text-xs font-bold">
-            {language === 'ar' ? 'EN' : 'عربي'}
+          <span className={isLight ? "text-[#071A33]/20" : "text-white/20"}>|</span>
+          <button
+            onClick={toggleLanguage}
+            className={`cursor-pointer uppercase tracking-wider px-2 py-0.5 rounded border text-xs font-bold transition-all ${
+              isLight
+                ? "border-[#071A33]/20 text-[#071A33]/70 hover:text-[#9A6F00] hover:border-[#9A6F00]/50"
+                : "border-white/20 text-white/80 hover:text-brand-gold hover:border-brand-gold/50"
+            }`}
+          >
+            {language === "ar" ? "EN" : "عربي"}
           </button>
-          <span className="text-white/20">|</span>
-          <a href={`tel:${companyMeta.phone}`} className="hover:text-brand-gold transition-colors flex items-center gap-1">
+          <span className={isLight ? "text-[#071A33]/20" : "text-white/20"}>|</span>
+          <a
+            href={`tel:${companyMeta.phone}`}
+            className={`flex items-center gap-1 transition-colors ${
+              isLight ? "hover:text-[#9A6F00]" : "hover:text-brand-gold"
+            }`}
+            dir="ltr"
+          >
             <PhoneCall className="w-3.5 h-3.5 text-brand-gold" />
             <span>{companyMeta.phone}</span>
           </a>
-          <span className="text-white/20 hidden md:inline">|</span>
-          <p className="text-white/60 hidden md:block">{t.footer.support}</p>
+          <span className={`hidden md:inline ${isLight ? "text-[#071A33]/20" : "text-white/20"}`}>|</span>
+          <p className={`hidden md:block text-[10px] ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}>
+            {t.footer.support}
+          </p>
         </div>
       </div>
 
-      {/* Main Glassmorphic Header */}
-      <header className="sticky top-0 bg-brand-deep/80 backdrop-blur-md border-b border-white/10 z-40 transition-all font-sans duration-150">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
-          
-          {/* Logo Brand with Official Logo */}
-          <Link 
-            to="/" 
-            className="flex items-center gap-2.5 cursor-pointer shrink-0 select-none text-right"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      {/* ── Main nav header ── */}
+      <header
+        className={`backdrop-blur-xl border-b transition-all duration-200 ${
+          isLight
+            ? "bg-white/90 border-[#071A33]/10 shadow-sm"
+            : "bg-[#071A33]/90 border-white/10"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between gap-4">
+
+          {/* Logo */}
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 cursor-pointer shrink-0 select-none"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           >
-            <div className="w-11 h-11 bg-brand-cool rounded-xl flex items-center justify-center border border-brand-gold/30 overflow-hidden">
-              <img 
-                src={LOGO_IMAGE_URL} 
-                alt="Day Night Official Logo" 
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover scale-110" 
+            <div className="w-11 h-11 rounded-full overflow-hidden border border-brand-gold/40 shadow-sm shrink-0">
+              <img
+                src={LOGO_IMAGE_URL}
+                alt="DAY NIGHT DELIVERY SERVICES"
+                className="w-full h-full object-contain"
               />
             </div>
             <div>
-              <h1 className="text-md sm:text-lg font-extrabold text-white leading-none uppercase font-sans tracking-tight">
-                DAY NIGHT <span className="text-brand-gold font-semibold font-sans text-xs">DELIVERY</span>
+              <h1
+                className={`text-sm sm:text-base font-extrabold leading-none uppercase tracking-tight ${
+                  isLight ? "text-[#071A33]" : "text-white"
+                }`}
+              >
+                DAY NIGHT{" "}
+                <span className="text-brand-gold text-[10px] font-semibold">DELIVERY</span>
               </h1>
-              <p className="text-[10px] text-white/50 font-bold tracking-tight">{t.footer.company}</p>
+              <p
+                className={`text-[10px] font-bold tracking-tight ${
+                  isLight ? "text-[#071A33]/50" : "text-white/50"
+                }`}
+              >
+                {t.footer.company}
+              </p>
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop nav */}
           <nav className="hidden lg:flex flex-1 items-center justify-center gap-0.5 xl:gap-1 text-[11px] xl:text-xs font-semibold max-w-4xl mx-auto overflow-x-auto no-scrollbar">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
@@ -183,53 +244,67 @@ function AppContent() {
                   id={`nav_link_${link.key}`}
                   key={link.key}
                   to={link.path}
-                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                   className={`px-2 xl:px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    isActive 
-                      ? "bg-brand-blue text-white font-extrabold shadow-md shadow-brand-blue/20" 
-                      : "text-white/70 hover:text-white hover:bg-white/5"
+                    isActive
+                      ? "bg-brand-blue text-white font-extrabold shadow-md shadow-brand-blue/25"
+                      : isLight
+                        ? "text-[#071A33]/70 hover:text-[#071A33] hover:bg-[#071A33]/5"
+                        : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <p className="leading-tight">{link.label}</p>
+                  {link.label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Call to action buttons */}
+          {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
             <Link
               to="/tracking"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="px-3 py-2 border border-white/20 hover:border-brand-gold/50 text-white/80 hover:text-white font-bold rounded-lg text-[11px] transition-all"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${
+                isLight
+                  ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60 hover:text-[#071A33]"
+                  : "border-white/20 text-white/80 hover:border-brand-gold/50 hover:text-white"
+              }`}
             >
               {t.header.trackBtn}
             </Link>
             <Link
               id="header_cta_btn"
               to="/request"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="px-4 py-2.5 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-extrabold rounded-lg text-[11px] leading-none transition-all duration-300 cursor-pointer border border-brand-gold/10 hover:border-brand-blue shadow-lg shadow-brand-gold/5"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="btn-gold px-4 py-2.5 rounded-lg text-[11px] leading-none cursor-pointer"
             >
               {t.header.requestBtn}
             </Link>
           </div>
 
-          {/* Mobile hamburger toggle */}
-          <div className="lg:hidden flex items-center gap-2">
+          {/* Mobile hamburger */}
+          <div className="lg:hidden">
             <button
               id="mobile_menu_trigger"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-white/80 hover:text-white focus:outline-none cursor-pointer"
+              className={`p-2 transition-colors ${
+                isLight ? "text-[#071A33]/80 hover:text-[#071A33]" : "text-white/80 hover:text-white"
+              }`}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation overlay drawer */}
+        {/* Mobile drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-brand-cool border-t border-white/10 py-4 px-4 space-y-1 animate-in slide-in-from-top-4 duration-200 max-h-[70vh] overflow-y-auto">
+          <div
+            className={`lg:hidden border-t py-4 px-4 space-y-1 max-h-[72vh] overflow-y-auto ${
+              isLight
+                ? "bg-white/95 border-[#071A33]/10"
+                : "bg-brand-cool/95 border-white/10"
+            }`}
+          >
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
@@ -239,51 +314,71 @@ function AppContent() {
                   to={link.path}
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                  className={`w-full text-right p-3 rounded-xl flex items-center justify-between text-xs font-bold transition-all ${
-                    isActive 
-                      ? "bg-brand-blue text-white" 
-                      : "text-white/70 hover:bg-white/5"
+                  className={`w-full block p-3 rounded-xl text-xs font-bold transition-all ${
+                    isArabic ? "text-right" : "text-left"
+                  } ${
+                    isActive
+                      ? "bg-brand-blue text-white"
+                      : isLight
+                        ? "text-[#071A33]/75 hover:bg-[#071A33]/5"
+                        : "text-white/75 hover:bg-white/5"
                   }`}
                 >
-                  <span>{link.label}</span>
+                  {link.label}
                 </Link>
               );
             })}
-            
-            <Link
-              to="/tracking"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full block py-3 border border-white/20 text-white font-bold rounded-xl text-center text-xs mt-2"
-            >
-              {t.header.trackBtn}
-            </Link>
-            <Link
-              id="mobile_cta_book"
-              to="/request"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full block py-3 bg-brand-gold text-brand-deep font-extrabold rounded-xl text-center text-xs mt-3 cursor-pointer hover:bg-brand-blue hover:text-white transition-all duration-200"
-            >
-              {t.header.bookNowMobile}
-            </Link>
-            <a
-              id="mobile_whatsapp_catalog"
-              href="https://wa.me/c/971568757331"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full block py-3 bg-amber-600 text-white font-extrabold rounded-xl text-center text-xs mt-2 cursor-pointer hover:bg-amber-500 transition-all duration-200"
-            >
-              {t.header.whatsappCatalog}
-            </a>
+
+            <div className="pt-2 space-y-2">
+              <Link
+                to="/tracking"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`w-full block py-3 border font-bold rounded-xl text-center text-xs transition-all ${
+                  isLight
+                    ? "border-[#071A33]/20 text-[#071A33]/75"
+                    : "border-white/20 text-white"
+                }`}
+              >
+                {t.header.trackBtn}
+              </Link>
+              <Link
+                id="mobile_cta_book"
+                to="/request"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full block py-3 btn-gold rounded-xl text-center text-xs font-extrabold"
+              >
+                {t.header.bookNowMobile}
+              </Link>
+              <a
+                id="mobile_whatsapp_catalog"
+                href={companyMeta.whatsappCatalog}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full block py-3 btn-whatsapp rounded-xl text-center text-xs font-extrabold"
+              >
+                {t.header.whatsappCatalog}
+              </a>
+            </div>
           </div>
         )}
       </header>
+      </div>{/* end fixed header wrapper */}
 
-      {/* Main Page Area Wrapper */}
-      <main className="flex-1 py-12 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
-        <Suspense fallback={<div className="text-center text-white/70 py-10">Loading...</div>}>
+      {/* Spacer compensating for fixed header */}
+      <div className="h-[96px] sm:h-[108px]" aria-hidden="true" />
+
+      {/* ── Page content ── */}
+      <main className="flex-1 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
+        <Suspense
+          fallback={
+            <div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}>
+              <div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" />
+            </div>
+          }
+        >
           <Routes>
             <Route path="/" element={<Home onNavigate={handleNavigate} />} />
             <Route path="/about" element={<AboutUs />} />
@@ -316,17 +411,21 @@ function AppContent() {
         </Suspense>
       </main>
 
-      {/* Smart Chat Floating Agent Widget */}
+      {/* Floating WhatsApp widget */}
+      <FloatingWhatsApp />
+
+      {/* Smart Chat */}
       <SmartChat />
 
-      {/* Premium Footer Component */}
+      {/* Footer */}
       <Footer />
     </div>
   );
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const skipSplash = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("nosplash");
+  const [showSplash, setShowSplash] = useState(!skipSplash);
 
   return (
     <BrowserRouter>
@@ -335,4 +434,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

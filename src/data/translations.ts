@@ -171,7 +171,10 @@ export const translations = {
       notFound1: "No shipment found matching the entered number.",
       notFound2: "Please check and try again.",
       fullDetails: "View Full Details",
-      viewDetails: "View Details"
+      viewDetails: "View Details",
+      notFoundError: "Shipment not found. Please check your tracking number and try again.",
+      serverError: "Unable to fetch tracking information. Please try again shortly.",
+      searchBtn: "Search"
     },
     aboutUs: {
       title: "About Us • Corporate Profile",
@@ -426,7 +429,10 @@ export const translations = {
       notFound1: "لم يتم العثور على شحنة تطابق الرقم المدخل.",
       notFound2: "يرجى التحقق وإعادة المحاولة.",
       fullDetails: "عرض التفاصيل الكاملة",
-      viewDetails: "التفاصيل"
+      viewDetails: "التفاصيل",
+      notFoundError: "لم يتم العثور على الشحنة. يرجى التحقق من رقم التتبع وإعادة المحاولة.",
+      serverError: "تعذّر جلب معلومات التتبع. يرجى المحاولة مجدداً.",
+      searchBtn: "بحث"
     },
     aboutUs: {
       title: "نبذة عن الشركة • Corporate Story",

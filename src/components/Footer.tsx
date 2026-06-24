@@ -96,14 +96,8 @@ export default function Footer() {
             isLight ? "border-brand-deep/10" : "border-white/10"
           }`}
         >
-          <div
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border overflow-hidden ${
-              isLight
-                ? "bg-white border-brand-gold/30"
-                : "bg-brand-cool border-brand-gold/20"
-            }`}
-          >
-            <img src={companyMeta.logoUrl} alt={companyMeta.name} className="w-full h-full object-cover" loading="lazy" />
+          <div className="w-16 h-16 rounded-full shrink-0 overflow-hidden border-2 border-brand-gold/40 shadow-md">
+            <img src={companyMeta.logoUrl} alt={companyMeta.name} className="w-full h-full object-contain" loading="lazy" />
           </div>
           <div className={`text-center md:${isArabic ? "text-right" : "text-left"} flex-1`}>
             <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isLight ? "text-brand-deep" : "text-white"}`}>

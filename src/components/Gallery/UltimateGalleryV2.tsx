@@ -299,6 +299,7 @@ export default function UltimateGalleryV2() {
           ? "bg-gradient-to-b from-[#E8F0FE] via-[#DDE7F5] to-[#E8F0FE]"
           : "bg-gradient-to-b from-[#071A33] via-[#0A1C3A] to-[#071A33]"
       }`}
+      data-gallery-debug="v2"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -323,29 +324,25 @@ export default function UltimateGalleryV2() {
           </p>
         </motion.div>
 
-        {/* Category Navigation */}
-        <div className="flex flex-wrap justify-center gap-3 mb-12">
+        {/* Category Navigation — inline color so it wins over CSS cascade */}
+        <div
+          className="flex flex-wrap justify-center gap-3 mb-12"
+          style={{ color: isLight ? "#1a2b47" : "rgba(248,250,252,0.80)" }}
+        >
           {galleryData.categories.map((category) => {
             const Icon = category.icon;
             const active = selectedCategory.id === category.id;
+            const label = categoryLabels[category.id] || category.id;
             return (
-              <motion.button
+              <button
                 key={category.id}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                className={`dn-cat-btn${active ? " dn-cat-active" : ""}`}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-5 py-3 rounded-2xl text-sm font-medium transition-all duration-300 flex items-center gap-2 border ${
-                  active
-                    ? "bg-gradient-to-r from-[#D4AF37] to-[#F5B700] text-brand-deep shadow-lg shadow-[#D4AF37]/20 border-transparent"
-                    : isLight
-                      ? "bg-white/60 text-brand-deep/70 border-brand-deep/10 hover:bg-white/80 hover:border-brand-gold/50"
-                      : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:border-brand-gold/30"
-                }`}
               >
-                <Icon className="w-4 h-4" />
-                {categoryLabels[category.id]}
-                <span className="text-xs opacity-60">({category.images.length})</span>
-              </motion.button>
+                <Icon size={15} />
+                {label}
+                <span style={{ fontSize: "11px", opacity: 0.55 }}>({category.images.length})</span>
+              </button>
             );
           })}
         </div>

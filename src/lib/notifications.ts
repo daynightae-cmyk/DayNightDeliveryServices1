@@ -27,7 +27,7 @@ export function subscribeToOrderStatusChanges(onNotify: (n: AppNotification) => 
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    supabase?.removeChannel(channel);
   };
 }
 
@@ -50,7 +50,7 @@ export function subscribeToNewOrdersForAdmin(onNotify: (n: AppNotification) => v
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    supabase?.removeChannel(channel);
   };
 }
 

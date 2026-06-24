@@ -4,18 +4,33 @@ type GlassCardProps = {
   children: ReactNode;
   className?: string;
   variant?: "default" | "gold" | "premium";
+  hover?: boolean;
+  shine?: boolean;
 };
 
-export default function GlassCard({ children, className = "", variant = "default" }: GlassCardProps) {
+export default function GlassCard({
+  children,
+  className = "",
+  variant = "default",
+  hover = false,
+  shine = false,
+}: GlassCardProps) {
   const variantClass =
     variant === "gold"
       ? "glass-gold"
       : variant === "premium"
-        ? "glass-premium"
+        ? "glass-strong"
         : "glass";
 
   return (
-    <div className={`${variantClass} rounded-2xl border border-white/12 backdrop-blur-[16px] ${className}`}>
+    <div
+      className={`
+        ${variantClass}
+        ${hover ? "glass-hover" : ""}
+        ${shine ? "card-shine" : ""}
+        ${className}
+      `}
+    >
       {children}
     </div>
   );

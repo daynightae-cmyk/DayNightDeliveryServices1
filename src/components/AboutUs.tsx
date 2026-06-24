@@ -35,9 +35,14 @@ export default function AboutUs() {
     <div className={`space-y-12 ${language === "ar" ? "text-right" : "text-left"}`}>
       <section className="bg-brand-cool/40 backdrop-blur-md rounded-3xl p-8 sm:p-12 border border-white/10 flex flex-col lg:flex-row items-center gap-12">
         <div className="space-y-6 lg:w-1/2">
-          <div className="inline-flex items-center gap-1.5 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-3 py-1 text-xs text-brand-gold font-bold uppercase">
-            <BadgeCheck className="w-4 h-4 text-brand-gold shrink-0" />
-            <span>{t.title}</span>
+          <div className="flex items-center gap-4 mb-2">
+            <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-brand-gold/40 shadow-lg shrink-0">
+              <img src="/logo-daynight.png" alt="DAY NIGHT DELIVERY SERVICES" className="w-full h-full object-contain" />
+            </div>
+            <div className="inline-flex items-center gap-1.5 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-3 py-1 text-xs text-brand-gold font-bold uppercase">
+              <BadgeCheck className="w-4 h-4 text-brand-gold shrink-0" />
+              <span>{t.title}</span>
+            </div>
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">

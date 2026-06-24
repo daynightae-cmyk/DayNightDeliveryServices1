@@ -9,7 +9,7 @@ export const SEO_METADATA = {
     "DAY NIGHT DELIVERY SERVICES, داي نايت لخدمات التوصيل والشحن, daynightae.com, UAE delivery, Abu Dhabi delivery, international shipping",
   ogType: "website",
   url: "https://www.daynightae.com",
-  image: "https://www.daynightae.com/logo-daynight.svg"
+  image: "https://www.daynightae.com/logo-daynight.png"
 };
 
 export function updateMetaTags(title?: string, description?: string) {

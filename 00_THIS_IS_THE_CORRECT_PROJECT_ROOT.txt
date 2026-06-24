@@ -1,8 +1,0 @@
-DAY NIGHT DELIVERY SERVICES - CORRECT PROJECT ROOT
-
-USE THIS FOLDER ONLY:
-D:\New folder (2)\day-night-delivery-services\DayNightDeliveryServices1
-
-This is the official project root for editors, terminals, build tools, deployment tools, and Codex.
-
-Do not select the parent folder, .claude, dist, node_modules, DN_RESCUE_REPORTS, DN_SUPER_AUDIT_REPORTS, or any archive folder as the project root.
