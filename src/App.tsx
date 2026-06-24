@@ -50,6 +50,7 @@ import companyMeta from "./data/companyMeta";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { trackPageLoad } from "./lib/monitoring";
 import usePageSEO from "./hooks/usePageSEO";
+import { Analytics } from "@vercel/analytics/react";
 
 const LOGO_IMAGE_URL = companyMeta.logoUrl;
 
@@ -431,6 +432,7 @@ export default function App() {
     <BrowserRouter>
       {showSplash && <Splash onComplete={() => setShowSplash(false)} />}
       <AppContent />
+      <Analytics />
     </BrowserRouter>
   );
 }
