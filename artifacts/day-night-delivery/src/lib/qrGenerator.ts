@@ -1,12 +1,43 @@
+const QR_BASE = "https://api.qrserver.com/v1/create-qr-code";
+
+function qrUrl(data: string, size = 512) {
+  return `${QR_BASE}/?size=${size}x${size}&color=071A33&bgcolor=FFFFFF&data=${encodeURIComponent(data)}`;
+}
+
 export function buildTrackingQrUrl(trackingCode: string) {
-  const encoded = encodeURIComponent(`https://www.daynightae.com/tracking?code=${trackingCode}`);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encoded}`;
+  return qrUrl(`https://www.daynightae.com/tracking?code=${trackingCode}`);
 }
 
 export function buildWhatsappQrUrl(trackingCode: string) {
-  const msg = encodeURIComponent(`Tracking code: ${trackingCode}`);
-  const url = encodeURIComponent(`https://wa.me/971568757331?text=${msg}`);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${url}`;
+  const msg = `Tracking code: ${trackingCode}`;
+  return qrUrl(`https://wa.me/971568757331?text=${encodeURIComponent(msg)}`);
+}
+
+export function buildWhatsappSupportQrUrl() {
+  return qrUrl("https://wa.me/971568757331");
+}
+
+export function buildRequestDeliveryQrUrl() {
+  return qrUrl("https://daynightae.com/request");
+}
+
+export function buildContactQrUrl() {
+  const vcard = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    "FN:DAY NIGHT DELIVERY SERVICES",
+    "ORG:DAY NIGHT DELIVERY SERVICES",
+    "TEL:+971568757331",
+    "EMAIL:Admin@daynightae.com",
+    "URL:https://daynightae.com",
+    "ADR:;;Mussafah 40;Abu Dhabi;;UAE",
+    "END:VCARD",
+  ].join("\n");
+  return qrUrl(vcard);
+}
+
+export function buildWebsiteQrUrl() {
+  return qrUrl("https://daynightae.com");
 }
 
 export function downloadQr(url: string, filename: string) {
@@ -16,4 +47,95 @@ export function downloadQr(url: string, filename: string) {
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.click();
+}
+
+export async function downloadQrAsPdf(
+  qrImgUrl: string,
+  title: string,
+  subtitle: string
+): Promise<void> {
+  const { jsPDF } = await import("jspdf");
+
+  const res = await fetch(qrImgUrl);
+  const blob = await res.blob();
+  const dataUrl = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+  const W = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(7, 26, 51);
+  doc.rect(0, 0, W, 42, "F");
+
+  doc.setTextColor(212, 175, 55);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("DAY NIGHT", W / 2, 16, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "normal");
+  doc.text("DELIVERY SERVICES", W / 2, 24, { align: "center" });
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(212, 175, 55);
+  doc.text("daynightae.com  |  +971 56 875 7331", W / 2, 31, { align: "center" });
+
+  doc.setDrawColor(212, 175, 55);
+  doc.setLineWidth(0.7);
+  doc.line(10, 42, W - 10, 42);
+
+  doc.setTextColor(7, 26, 51);
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, W / 2, 55, { align: "center" });
+
+  if (subtitle) {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(subtitle, W / 2, 63, { align: "center", maxWidth: W - 20 });
+  }
+
+  const qrSize = 85;
+  doc.addImage(dataUrl, "PNG", (W - qrSize) / 2, 70, qrSize, qrSize);
+
+  doc.setDrawColor(212, 175, 55);
+  doc.setLineWidth(0.4);
+  doc.line(10, 160, W - 10, 160);
+
+  doc.setTextColor(110, 110, 110);
+  doc.setFontSize(7.5);
+  doc.text(
+    "Admin@daynightae.com  |  daynightae.com",
+    W / 2,
+    167,
+    { align: "center" }
+  );
+  doc.setFontSize(7);
+  doc.setTextColor(160, 160, 160);
+  doc.text(
+    "DAY NIGHT DELIVERY SERVICES — UAE, Abu Dhabi, Mussafah 40",
+    W / 2,
+    173,
+    { align: "center" }
+  );
+
+  const safeName = title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+  doc.save(`daynight-qr-${safeName}.pdf`);
+}
+
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }

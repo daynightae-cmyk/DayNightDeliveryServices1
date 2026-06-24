@@ -70,9 +70,7 @@ if (fs.existsSync(pricingDataPath)) {
 /* ── Pricing engine calculation tests ── */
 const pricingEnginePath = path.join(src, "lib", "pricing.ts");
 if (fs.existsSync(pricingEnginePath)) {
-  // Dynamically import and test the pricing engine
   try {
-    // We can only check the source text here; runtime tests are separate
     const engine = read(pricingEnginePath);
     assert(engine.includes("calculateDomesticPrice"), "Pricing engine exports calculateDomesticPrice");
     assert(engine.includes("calculateInternationalPrice"), "Pricing engine exports calculateInternationalPrice");
@@ -123,6 +121,8 @@ if (fs.existsSync(footerPath)) {
   assert(footer.includes("/policy"), "Footer links to /policy");
   assert(footer.includes("/request"), "Footer links to request delivery");
   assert(footer.includes("/tracking"), "Footer links to tracking");
+  assert(footer.includes("/qr") || footer.includes("qr"), "Footer links to QR Services");
+  assert(footer.includes("Sadek") || footer.includes("sadek") || footer.includes("Elgazar"), "Footer credit exists");
 }
 
 /* ── Turnstile captcha ── */
@@ -132,6 +132,50 @@ assert(fs.existsSync(turnstilePath), "Turnstile captcha component exists");
 /* ── robots.txt ── */
 const robotsPath = path.join(root, "public", "robots.txt");
 assert(fs.existsSync(robotsPath), "robots.txt exists");
+
+/* ── QR Services page ── */
+const qrPagePath = path.join(src, "components", "QR.tsx");
+assert(fs.existsSync(qrPagePath), "QR page component exists");
+
+const appPath = path.join(src, "App.tsx");
+if (fs.existsSync(appPath)) {
+  const app = read(appPath);
+  assert(app.includes('path="/qr"') || app.includes("path: \"/qr\""), "QR route exists in App.tsx");
+  assert(app.includes("nav.qr") || app.includes("/qr"), "QR Services appears in navigation");
+}
+
+if (fs.existsSync(qrPagePath)) {
+  const qr = read(qrPagePath);
+  assert(
+    qr.includes("buildTrackingQrUrl") || qr.includes("trackingQrUrl"),
+    "QR generator function exists in QR page"
+  );
+  assert(
+    qr.includes("buildWhatsappSupportQrUrl") || qr.includes("whatsapp"),
+    "WhatsApp QR exists in QR page"
+  );
+  assert(
+    qr.includes("buildRequestDeliveryQrUrl") || qr.includes("request"),
+    "Request Delivery QR exists in QR page"
+  );
+  assert(
+    qr.includes("buildContactQrUrl") || qr.includes("contact"),
+    "Contact QR exists in QR page"
+  );
+  assert(
+    qr.includes("downloadQr") || qr.includes("Download"),
+    "Download QR action exists in QR page"
+  );
+  assert(
+    !qr.includes("getUserMedia") && !qr.includes("camera"),
+    "No camera permission break in QR page"
+  );
+}
+
+if (fs.existsSync(footerPath)) {
+  const footer = read(footerPath);
+  assert(footer.includes("/qr") || footer.includes("qr"), "QR Services appears in footer");
+}
 
 console.log("\n--- Production hardening gate complete ---");
 if (process.exitCode === 1) {

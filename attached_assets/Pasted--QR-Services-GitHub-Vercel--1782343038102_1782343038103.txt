@@ -1,0 +1,218 @@
+استكمل الآن المرحلة التالية فورًا: بناء صفحة QR Services الحقيقية ثم تجهيز النشر إلى GitHub/Vercel.
+
+## 1) QR Services Page
+
+أنت ذكرت أن /qr linked from nav and footer but has no content yet. المطلوب الآن إنشاء صفحة كاملة إنتاجية باسم:
+
+/qr
+
+العنوان:
+DAY NIGHT QR SERVICES
+خدمات داي نايت الذكية عبر QR
+
+استخدم الهوية الرسمية:
+Logo:
+https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+
+Colors:
+Deep Navy #071A33
+Gold #D4AF37
+Bright Blue #007BFF
+White #FFFFFF
+
+## وظائف الصفحة
+
+1. Generate Tracking QR
+   يدخل العميل رقم تتبع مثل:
+   DN-2026-XXXXX
+   ويتم توليد QR يؤدي إلى:
+   https://daynightae.com/tracking?code=DN-2026-XXXXX
+
+2. Manual Tracking Input
+   حقل إدخال رقم التتبع + زر:
+   Track Now
+
+3. WhatsApp QR
+   QR يفتح واتساب الدعم:
+   +971 56 875 7331
+
+4. Request Delivery QR
+   QR يفتح:
+   https://daynightae.com/request
+
+5. Company Contact QR
+   QR لبيانات الشركة:
+   DAY NIGHT DELIVERY SERVICES
+   [Admin@daynightae.com](mailto:Admin@daynightae.com)
+   +971 56 875 7331
+   https://daynightae.com
+
+6. Download QR
+   إضافة أزرار:
+   Download PNG
+   Download PDF
+   Copy Link
+
+7. QR Cards
+   اعرض كل QR في بطاقة زجاجية فاخرة:
+
+* Tracking QR
+* WhatsApp QR
+* Request Delivery QR
+* Contact QR
+
+8. Mobile UX
+   الصفحة يجب أن تعمل ممتاز على:
+   390px
+   400px
+   430px
+   768px
+   desktop
+
+## 2) Scanner اختياري بدون كسر
+
+لو إضافة camera scanner ستكسر CSP أو Permissions Policy، لا تضف camera الآن.
+اعمل manual QR generator/download أولًا بثبات.
+
+لو ستضيف camera:
+
+* اجعلها optional.
+* لا تكسر build.
+* لا تكسر security headers.
+* أظهر رسالة fallback لو الكاميرا غير متاحة.
+
+## 3) Export System Final Check
+
+راجع أزرار PDF/TXT التي أضفتها:
+
+* Pricing PDF
+* Domestic Quote PDF
+* International Quote PDF
+* Order PDF
+* Order TXT
+* Tracking PDF إن وجد
+
+تأكد أن الملفات:
+
+* branded بالشعار الرسمي
+* فيها header باللون navy
+* فيها gold accents
+* فيها بيانات التواصل
+* لا تظهر كـ screenshot رديء
+* تعمل على mobile وdesktop
+
+## 4) WhatsApp + Chatbot Final Position
+
+راجع مرة أخيرة:
+
+* WhatsApp left bottom.
+* Chatbot right bottom.
+* لا overlap.
+* لا يغطي sticky mobile bar.
+* لا يغطي أزرار request.
+* لا يغطي footer.
+* يعمل في dark/light.
+
+## 5) Final Full Audit
+
+مر على كل الصفحات:
+
+/
+/about
+/services
+/uae-delivery
+/international-shipping
+/international-advanced
+/ecommerce
+/corporate
+/pricing
+/request
+/tracking
+/gallery
+/contact
+/faq
+/policy
+/privacy
+/terms
+/qr
+/auth
+/driver
+/customer
+/admin
+
+تأكد من:
+
+* no 404
+* no blank page
+* no console red errors
+* no mojibake
+* no old prices 31.50 / 52.50
+* no broken nav links
+* no broken footer links
+* light theme readable
+* Arabic font readable
+* footer contains: Create By Eng Sadek Elgazar
+* QR Services appears in nav/footer
+* build PASS
+* production gate PASS
+
+## 6) Production Gate
+
+حدّث production-hardening-gate ليضيف checks لصفحة QR:
+
+* QR page exists.
+* QR route exists.
+* QR Services appears in navigation.
+* QR Services appears in footer.
+* QR generator function exists.
+* WhatsApp QR exists.
+* Request Delivery QR exists.
+* Contact QR exists.
+* Download QR action exists.
+* No camera permission break if scanner not enabled.
+
+ثم نفّذ:
+
+pnpm run build
+pnpm run production:gate
+
+يجب أن تكون النتيجة PASS بالكامل.
+
+## 7) GitHub / Vercel
+
+بعد نجاح كل شيء:
+
+git status --short
+
+تأكد أن:
+
+* no node_modules
+* no dist
+* no .env
+* no secrets
+
+ثم اعمل commit واضح:
+
+git add -A
+git commit -m "Add QR services hub and final production polish"
+
+ثم ادفع إلى GitHub branch أو main حسب طريقة العمل الحالية.
+
+المهم جدًا:
+هذه التعديلات يجب أن تصل إلى GitHub/Vercel، وليس Replit preview فقط.
+
+## 8) التقرير النهائي المطلوب
+
+أعطني في النهاية تقريرًا يحتوي:
+
+1. هل /qr تم إنشاؤها؟
+2. ما وظائف QR التي تعمل؟
+3. هل Download PNG/PDF يعمل؟
+4. هل Export PDF/TXT يعمل؟
+5. هل WhatsApp/Chatbot overlap انتهى؟
+6. هل كل الصفحات راجعتها؟
+7. نتائج pnpm run build.
+8. نتائج pnpm run production:gate.
+9. git status --short.
+10. اسم commit النهائي.
+11. هل يحتاج Redeploy على Vercel أم تم تلقائيًا؟
