@@ -3,9 +3,9 @@ export const companyMeta = {
   legalNameEn: "DAY NIGHT DELIVERY SERVICES",
   legalNameAr: "داي نايت لخدمات التوصيل والشحن",
   brandName: "DAY NIGHT",
-  domain: "https://www.daynightae.com",
-  website: "https://www.daynightae.com",
-  displayWebsite: "www.daynightae.com",
+  domain: "https://daynightae.com",
+  website: "https://daynightae.com",
+  displayWebsite: "daynightae.com",
   email: "Admin@daynightae.com",
   phone: "+971 56 875 7331",
   whatsappNumber: "971568757331",
@@ -16,7 +16,7 @@ export const companyMeta = {
   addressEn: "UAE – Abu Dhabi – Mussafah 40",
   addressAr: "الإمارات العربية المتحدة – أبوظبي – مصفح 40",
   logoUrl: "/logo-daynight.png",
-  qrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=256x256&color=071A33&bgcolor=F5B700&data=https%3A%2F%2Fwww.daynightae.com",
+  qrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=256x256&color=071A33&bgcolor=F5B700&data=https%3A%2F%2Fdaynightae.com",
   slogans: {
     en: ["Fast • Reliable • Every Time", "Your Comfort.. Our Priority"],
     ar: ["نصل إليك في كل وقت", "خدمة على مدار الساعة 24/7", "سريع.. آمن.. موثوق", "راحتكم أولويتنا"]

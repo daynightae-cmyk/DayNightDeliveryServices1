@@ -21,6 +21,7 @@ import {
 
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
+import TurnstileCaptcha from "./security/TurnstileCaptcha";
 
 interface RequestDeliveryProps {
   onNavigate: (tab: string, trackingId?: string) => void;
@@ -35,6 +36,9 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const [successId, setSuccessId] = useState("");
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [validationError, setValidationError] = useState("");
+  const captchaSiteKey = String(((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || "")).trim();
+  const captchaEnabled = Boolean(captchaSiteKey);
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const i18n = {
     ar: {
@@ -47,6 +51,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       invalidPrice: "تعذر احتساب سعر التوصيل. يرجى مراجعة البيانات والمحاولة مجدداً.",
       invalidCod: "يرجى إدخال مبلغ تحصيل COD صحيح.",
       notesRequired: "يرجى إضافة ملاحظات الطلب قبل الإرسال.",
+      captchaRequired: "يرجى تأكيد التحقق الأمني قبل إرسال الطلب.",
       orderCreateFailed: "تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.",
       senderStepRequired: "يرجى ملء كافة تفاصيل المرسل الإلزامية للمتابعة",
       receiverStepRequired: "يرجى تعبئة كافة بيانات المستلم الإلزامية للمتابعة"
@@ -61,6 +66,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       invalidPrice: "Unable to calculate delivery price. Please review the data and try again.",
       invalidCod: "Please enter a valid COD amount.",
       notesRequired: "Please add order notes before submission.",
+      captchaRequired: "Please complete the security verification before submitting the request.",
       orderCreateFailed: "Unable to create order right now. Please retry or contact WhatsApp support.",
       senderStepRequired: "Please complete all required sender details to continue.",
       receiverStepRequired: "Please complete all required receiver details to continue."
@@ -142,6 +148,10 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       return tr.invalidCod;
     }
 
+    if (captchaEnabled && !captchaToken) {
+      return tr.captchaRequired;
+    }
+
     if (!notes.trim()) {
       return tr.notesRequired;
     }
@@ -197,6 +207,8 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       amount: deliveryPricing.total,
       price: deliveryPricing.total,
       currency: "AED",
+      source_domain: "daynightae.com",
+      captcha_token: captchaToken || null,
       payment_method: paymentMethod,
       cod_amount: paymentMethod === "cod" ? Number(codAmount) : null,
       notes: notes.trim(),
@@ -542,6 +554,18 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               ></textarea>
             </div>
 
+            {captchaEnabled && (
+              <TurnstileCaptcha
+                siteKey={captchaSiteKey}
+                language={language}
+                onVerify={(token) => {
+                  setCaptchaToken(token);
+                  setValidationError("");
+                }}
+                onExpire={() => setCaptchaToken("")}
+              />
+            )}
+
             {/* Calculations Detail Box */}
             <div className="bg-brand-deep/85 rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-sans font-medium text-right">
               <div className="p-2.5 bg-brand-gold/10 rounded-lg text-brand-gold border border-brand-gold/20 text-[10px] leading-relaxed max-w-xs text-right">
@@ -571,7 +595,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
               <button
                 id="req_submit_confirm"
                 onClick={handleFormSubmit}
-                disabled={loading}
+                disabled={loading || (captchaEnabled && !captchaToken)}
                 className="px-10 py-3.5 bg-brand-gold hover:bg-brand-blue disabled:bg-white/10 text-brand-deep hover:text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <span>{loading ? (language === "ar" ? "جاري الحفظ والإرسال..." : "Submitting order...") : (language === "ar" ? "أرسل طلب التوصيل الآن" : "Submit delivery request")}</span>
@@ -665,6 +689,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
                   setReceiverAddress("");
                   setNotes("");
                   setCodAmount("");
+                  setCaptchaToken("");
                 }}
                 className="px-6 py-3 bg-brand-gold hover:bg-brand-blue text-brand-deep hover:text-white font-bold rounded-xl text-xs transition-transform cursor-pointer"
               >
