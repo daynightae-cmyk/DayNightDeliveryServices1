@@ -415,8 +415,84 @@ $$;
 
 -- Grant execute permissions
 grant execute on function public.calculate_delivery_price(text, text, numeric) to anon, authenticated;
+
+-- 7. calculate_international_price RPC
+-- Calculates international shipping price based on destination and weight
+-- Returns clean prices: GCC 95+45, Worldwide 190+90 (no VAT shown in UI)
+create or replace function public.calculate_international_price(
+  p_destination text,
+  p_weight_kg numeric default 1
+)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  v_destination text := lower(coalesce(p_destination, ''));
+  v_billable numeric := greatest(1, ceil(coalesce(p_weight_kg, 1)));
+  v_is_gcc boolean;
+  v_first numeric := 0;
+  v_additional numeric := 0;
+  v_total numeric := 0;
+  v_service_type text := 'worldwide';
+begin
+  -- Check if destination is GCC
+  v_is_gcc := v_destination in ('sa', 'ksa', 'qa', 'kw', 'om', 'bh', 'gcc')
+    or v_destination like '%saudi%'
+    or v_destination like '%qatar%'
+    or v_destination like '%kuwait%'
+    or v_destination like '%oman%'
+    or v_destination like '%bahrain%';
+
+  -- Set pricing based on destination type
+  if v_is_gcc then
+    v_first := 95;
+    v_additional := 45;
+    v_service_type := 'gcc';
+  else
+    v_first := 190;
+    v_additional := 90;
+    v_service_type := 'worldwide';
+  end if;
+
+  -- Calculate total price (clean price without VAT breakdown)
+  if v_billable > 1 then
+    v_total := v_first + ((v_billable - 1) * v_additional);
+  else
+    v_total := v_first;
+  end if;
+
+  return json_build_object(
+    'base_price', v_first,
+    'additional_kg_price', v_additional,
+    'weight_kg', p_weight_kg,
+    'billable_weight', v_billable,
+    'total_price', v_total,
+    'service_type', v_service_type,
+    'currency', 'AED',
+    'vat_included', true
+  );
+end;
+$$;
+
+-- 8. track_order RPC (legacy name for compatibility)
+-- Wrapper around track_public_order for backward compatibility
+create or replace function public.track_order(
+  p_tracking_code text
+)
+returns json
+language plpgsql
+security definer
+as $$
+begin
+  return public.track_public_order(p_tracking_code);
+end;
+$$;
+
+grant execute on function public.calculate_international_price(text, numeric) to anon, authenticated;
 grant execute on function public.create_public_order(jsonb) to anon;
 grant execute on function public.track_public_order(text) to anon;
+grant execute on function public.track_order(text) to anon;
 grant execute on function public.admin_update_order_status(uuid, text, text) to authenticated;
 grant execute on function public.driver_update_location(numeric, numeric, numeric, numeric, uuid) to authenticated;
 grant execute on function public.assign_driver_to_order(uuid, uuid) to authenticated;
