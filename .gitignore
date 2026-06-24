@@ -1,5 +1,38 @@
-(public/logo-daynight.png is an image file, which according to rule #8 should not be added to .gitignore)
+```
+# Build artifacts
+dist/
+build/
+target/
 
-(index.html, public/manifest.json, scripts/daynight-final-gate.mjs, src/data/aiAgentKnowledge.ts, src/hooks/usePageSEO.ts are all source/config files, and there are no build artifacts, dependencies, or temp files in the changes)
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
 
-(nothing should be ignored)
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+```

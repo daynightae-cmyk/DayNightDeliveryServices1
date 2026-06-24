@@ -158,8 +158,8 @@ async function main() {
   let domestic, domesticError;
   try {
     const result = await supabase.rpc("calculate_delivery_price", {
-      p_pickup_city_id: null,
-      p_delivery_city_id: null,
+      p_from_city: null,
+      p_to_city: null,
       p_weight_kg: 1
     });
     domestic = result.data;
@@ -257,17 +257,6 @@ async function main() {
     weight: 1,
     pieces: 1,
     service_type: "standard",
-    delivery_price: 31.5,
-    subtotal: 30,
-    base_price: 30,
-    vat_amount: 1.5,
-    vat: 1.5,
-    tax_amount: 1.5,
-    total: 31.5,
-    total_price: 31.5,
-    amount: 31.5,
-    price: 31.5,
-    currency: "AED",
     payment_method: "sender_pays",
     notes: "FINAL_AUTOMATED_AUDIT_TEST_SAFE_TO_DELETE",
     status: "Pending",
