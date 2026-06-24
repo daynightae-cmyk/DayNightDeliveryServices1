@@ -60,7 +60,6 @@ export default function Pricing() {
             <div className="text-center bg-brand-deep p-4 rounded-xl border border-white/5">
               <p className="text-xs text-white/40 font-sans">السعر الأساسي الموحد</p>
               <p className="text-3xl font-extrabold text-brand-gold font-mono mt-1">30 AED</p>
-              <p className="text-[10px] text-white/40 mt-1">شامل ضريبة 5%: 31.50 AED</p>
             </div>
 
             <p className="text-xs text-white/45 leading-relaxed font-bold">تشمل المدن التالية:</p>
@@ -90,7 +89,6 @@ export default function Pricing() {
             <div className="text-center bg-brand-deep p-4 rounded-xl border border-white/5">
               <p className="text-xs text-white/40">سعر التوصيل للمناطق البعيدة</p>
               <p className="text-3xl font-extrabold text-brand-gold font-mono mt-1">50 AED</p>
-              <p className="text-[10px] text-white/40 mt-1">شامل ضريبة 5%: 52.50 AED</p>
             </div>
 
             <p className="text-xs text-white/45 leading-relaxed font-bold">المحاور المعتمدة:</p>

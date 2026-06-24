@@ -19,6 +19,9 @@ export const supabase = createClient(
   SUPABASE_ANON_KEY
 );
 
+// Re-export createClient for use in other modules
+export { createClient };
+
 // Supabase RPC callers
 
 export async function calculateDeliveryPriceRpc(city: string, weight: number): Promise<any> {
