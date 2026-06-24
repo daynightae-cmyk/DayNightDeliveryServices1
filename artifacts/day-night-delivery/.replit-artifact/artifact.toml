@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Day Night Delivery"
+version = "1.0.0"
+id = "artifacts/day-night-delivery"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19739
+
+[services.development]
+run = "pnpm --filter @workspace/day-night-delivery run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/day-night-delivery", "run", "build" ]
+publicDir = "artifacts/day-night-delivery/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19739"
+BASE_PATH = "/"

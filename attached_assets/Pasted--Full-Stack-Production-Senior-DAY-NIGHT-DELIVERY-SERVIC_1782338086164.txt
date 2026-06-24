@@ -1,0 +1,928 @@
+أنت الآن مهندس Full-Stack Production Senior مطلوب منك استلام مشروع DAY NIGHT DELIVERY SERVICES بالكامل من GitHub، فحصه، إصلاحه، تحديثه، وتقويته إنتاجيًا بدون كسر الموقع المنشور.
+
+## 0) بيانات المشروع الرسمية
+
+الشركة:
+DAY NIGHT DELIVERY SERVICES
+داي نايت لخدمات التوصيل والشحن
+
+الدومين الرسمي:
+https://daynightae.com
+
+عرض الموقع:
+daynightae.com
+
+البريد الرسمي:
+[Admin@daynightae.com](mailto:Admin@daynightae.com)
+
+الهاتف / واتساب:
++971 56 875 7331
+
+الشعار الرسمي الوحيد المعتمد:
+https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+
+ألوان الهوية:
+Deep Navy: #071A33
+Navy: #0A1C3A
+Royal Blue: #0057B8
+Bright Blue: #007BFF
+Sky Blue: #18A8E8
+Luxury Gold: #D4AF37
+Warm Gold: #F5B700
+White: #FFFFFF
+
+الشعارات النصية:
+Fast • Reliable • Every Time
+Your Comfort.. Our Priority
+نصل إليك في كل وقت
+خدمة على مدار الساعة 24/7
+سريع.. آمن.. موثوق
+راحتكم أولويتنا
+
+Repository:
+https://github.com/daynightae-cmyk/DayNightDeliveryServices1.git
+
+Branch production:
+main
+
+استضافة الإنتاج:
+Vercel
+
+Backend:
+Supabase
+
+## 1) طريقة العمل الإلزامية
+
+أولًا استنسخ المستودع:
+
+git clone https://github.com/daynightae-cmyk/DayNightDeliveryServices1.git
+cd DayNightDeliveryServices1
+
+ثم أنشئ فرع عمل جديد ولا تعدل main مباشرة:
+
+git checkout main
+git pull origin main
+git checkout -b replit-production-audit-fix
+
+ممنوع تمامًا:
+
+* لا ترفع node_modules.
+* لا ترفع dist.
+* لا ترفع build.
+* لا ترفع .env أو .env.local.
+* لا تضع service_role key في frontend.
+* لا تضع sb_secret في الكود.
+* لا تضع GitHub tokens في الكود.
+* لا تمسح vercel.json إلا لو ستعيد بناءه بإعدادات صحيحة.
+* لا تكسر الدومين daynightae.com.
+* لا تغيّر الهوية البصرية الرسمية.
+* لا تغيّر الأسعار الرسمية إلا حسب القواعد المكتوبة هنا.
+* لا تعمل push إلى main قبل نجاح build وgate tests.
+
+## 2) المتغيرات المطلوبة في بيئة التشغيل
+
+يجب أن يعتمد الكود على Environment Variables فقط:
+
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_TURNSTILE_SITE_KEY
+
+ملاحظات:
+
+* VITE_SUPABASE_URL يجب أن يكون رابط مشروع Supabase.
+* VITE_SUPABASE_ANON_KEY يجب أن يكون publishable / anon key فقط.
+* لا تستخدم service role داخل React/Vite.
+* لا تستخدم أي secret في المتصفح.
+* إذا لم تكن VITE_TURNSTILE_SITE_KEY موجودة، يجب أن يعمل الموقع بدون CAPTCHA لكن بدون تفعيل الحماية.
+* إذا كانت موجودة، يجب أن تظهر Cloudflare Turnstile في صفحة الطلب.
+
+## 3) مرحلة الفحص قبل أي تعديل
+
+قبل أي إصلاح، اجمع تقريرًا فعليًا عن حالة المشروع:
+
+نفذ:
+
+pnpm install --config.optional=true
+pnpm run build
+pnpm run production:gate
+git status --short
+git ls-files node_modules | head
+git ls-files dist | head
+git ls-files .env* | head
+
+ثم افحص:
+
+* package.json
+* vite.config.ts
+* vercel.json
+* src/App.tsx
+* src/components/RequestDelivery.tsx
+* src/components/Tracking.tsx
+* src/components/AdminPanel.tsx
+* src/supabase.ts
+* src/lib/pricing.ts
+* src/data/pricingData.ts
+* src/hooks/usePageSEO.ts
+* src/lib/seo.ts
+* public/sitemap.xml
+* public/robots.txt
+* .gitignore
+
+اكتب تقريرًا داخليًا قبل الإصلاح يحتوي:
+
+1. أخطاء build.
+2. أخطاء route/deep links.
+3. أخطاء حساب السعر.
+4. أخطاء Supabase/RPC.
+5. أخطاء صفحة الطلب.
+6. أخطاء صفحة التتبع.
+7. أخطاء لوحة الإدارة.
+8. أخطاء mobile responsiveness.
+9. أخطاء SEO/canonical.
+10. أخطاء security headers.
+11. أخطاء chatbot/FAQ/support إذا غير موجود.
+12. أي ملفات مولدة أو أسرار أو كاش داخل Git.
+
+## 4) إصلاحات النشر و Vercel
+
+تأكد أن vercel.json مضبوط للإنتاج:
+
+* Framework: vite
+
+* Install Command:
+  corepack enable && corepack prepare pnpm@10.34.4 --activate && pnpm install --frozen-lockfile --config.optional=true
+
+* Build Command:
+  pnpm run build
+
+* Output Directory:
+  dist
+
+* cleanUrls: true
+
+* trailingSlash: false
+
+* redirect من [www.daynightae.com](http://www.daynightae.com) إلى daynightae.com
+
+* rewrites أو fallback مناسب للـ SPA
+
+* Security headers قوية
+
+يجب ألا يظهر 404 عند فتح أي رابط مباشر مثل:
+
+https://daynightae.com/request
+https://daynightae.com/tracking
+https://daynightae.com/admin
+https://daynightae.com/pricing
+https://daynightae.com/gallery
+https://daynightae.com/contact
+https://daynightae.com/faq
+
+لو Vercel rewrites لا تكفي، استخدم static SPA fallback generation بعد build بحيث يتم إنشاء:
+dist/request/index.html
+dist/tracking/index.html
+dist/admin/index.html
+dist/pricing/index.html
+dist/gallery/index.html
+dist/contact/index.html
+dist/faq/index.html
+dist/404.html
+
+يجب أن يعمل:
+pnpm run build
+
+ويظهر:
+SPA route fallbacks created
+
+## 5) إصلاح package.json
+
+تأكد أن package.json:
+
+* valid JSON.
+* بدون BOM.
+* لا يبدأ بحرف مخفي.
+* build script صحيح.
+* لا يحتوي scripts مكسورة.
+* لا يجبر npm بدل pnpm بطريقة تكسر Vercel.
+* لا يحتوي package-lock إذا المشروع pnpm.
+
+يجب أن ينجح:
+
+node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json OK')"
+
+## 6) إصلاح .gitignore والتنظيف
+
+تأكد أن .gitignore يحتوي على:
+
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.production
+.env.development
+.vercel/
+.local/
+.config/
+.agents/
+.migration-backup/
+.cache/
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+ثم تأكد:
+
+git ls-files node_modules
+git ls-files dist
+git ls-files .env*
+
+لا يجب أن يرجع أي شيء.
+
+## 7) إصلاح الأسعار والحساب بالكامل
+
+الأسعار الرسمية المعتمدة:
+
+داخل الإمارات:
+
+* المناطق الرئيسية: 30 AED
+* المناطق الممتدة: 50 AED
+* الخدمة السريعة Express: +15 AED
+* أول قطعة مشمولة في السعر الأساسي
+* كل قطعة إضافية بعد أول قطعة: +5 AED
+* إذا زاد الوزن عن 50kg أو القطع عن 20 قطعة: يظهر تنبيه Custom Quote / تأكيد تشغيلي
+
+الشحن الدولي:
+GCC:
+
+* أول 1kg = 95 AED
+* كل kg إضافي = 45 AED
+
+Worldwide:
+
+* أول 1kg = 190 AED
+* كل kg إضافي = 90 AED
+
+مهم:
+
+* COD amount ليس جزءًا من رسوم التوصيل.
+* COD يظهر كمبلغ سيتم تحصيله من المستلم، وليس مضافًا إلى سعر الشحن.
+* يجب عرض رسوم التوصيل بوضوح.
+* يجب عرض COD منفصلًا بوضوح.
+* يجب توحيد السعر في:
+
+  * صفحة الأسعار
+  * صفحة طلب التوصيل
+  * صفحة التوصيل المحلي
+  * صفحة الشحن الدولي
+  * SEO descriptions
+  * chatbot answers
+  * أي FAQ
+
+مثال اختبار إلزامي:
+
+* أبوظبي إلى دبي
+* Standard
+* الوزن 1.3kg
+* القطع 7
+* السعر المتوقع:
+  30 + 6×5 = 60 AED
+
+مثال آخر:
+
+* أبوظبي إلى دبي
+* Express
+* الوزن 1kg
+* القطع 1
+* السعر المتوقع:
+  30 + 15 = 45 AED
+
+مثال آخر:
+
+* منطقة ممتدة
+* Standard
+* القطع 3
+* السعر المتوقع:
+  50 + 2×5 = 60 AED
+
+يجب تحديث:
+src/data/pricingData.ts
+src/lib/pricing.ts
+src/components/RequestDelivery.tsx
+أي component يعرض pricing cards
+
+لازم RequestDelivery يمرر pieces إلى محرك السعر، وليس weight فقط.
+
+## 8) إصلاح صفحة طلب التوصيل
+
+صفحة /request يجب أن تكون إنتاجية بالكامل:
+
+المطلوب:
+
+* تعمل على desktop و mobile.
+* تعمل على عرض 400px بدون تكسير.
+* RTL عربي صحيح.
+* LTR إنجليزي صحيح.
+* الملاحظات تكون اختيارية وليست إلزامية.
+* رقم الهاتف الإماراتي يقبل:
+  +971568757331
+  +971 56 875 7331
+  0568757331
+* عند الخطأ يظهر سبب واضح.
+* عند نجاح الطلب يظهر رقم تتبع DN-...
+* بعد النجاح يظهر:
+
+  * رقم التتبع
+  * QR
+  * ملخص الطلب
+  * زر نسخ رقم التتبع
+  * زر واتساب
+  * زر فتح صفحة التتبع
+
+يجب إصلاح أي نصوص عربية مشوهة أو mojibake مثل:
+Ø£Ø¨ÙˆØ¸Ø¨ÙŠ
+ÙŠØ±Ø¬Ù‰
+إلى نص عربي صحيح:
+أبوظبي
+يرجى
+
+كل ملفات React يجب حفظها UTF-8 بدون BOM.
+
+## 9) إصلاح Supabase create_public_order
+
+المشكلة الحالية أن frontend يصل إلى Supabase لكن create_public_order لا يرجع رقم تتبع أو يفشل.
+
+افحص:
+src/supabase.ts
+scripts/production-hardening-gate.mjs
+scripts/debug-create-public-order.mjs إن وجد
+
+المطلوب:
+
+* createPublicOrder(payload) يجب أن يرسل:
+  supabase.rpc("create_public_order", { p_order_data: payload })
+
+* الدالة في Supabase يجب أن تكون:
+  create_public_order(p_order_data jsonb)
+
+* يجب أن ترجع واحدًا من:
+  tracking_code
+  tracking_number
+  id
+  أو string مباشر
+
+الأفضل أن ترجع string tracking_code مباشرة.
+
+لو SQL function غير موجودة أو signature مختلفة:
+أنشئ SQL patch غير تدميري في:
+supabase/sql/DN_PUBLIC_ORDER_RPC_FIX.sql
+
+يجب أن يكون patch:
+
+* idempotent
+* لا يحذف بيانات
+* لا يسقط جداول
+* لا يعطل RLS
+* يعطي execute للـ anon فقط على create_public_order و track_order حسب الحاجة
+* يتحقق من الحد الأدنى للحقول المطلوبة
+* يولد tracking number بنمط:
+  DN-YYYY-XXXXX
+
+الدالة يجب أن تقبل payload مرن يحتوي:
+sender_name
+sender_phone
+sender_city
+sender_address
+receiver_name
+receiver_phone
+receiver_city
+receiver_address
+package_type
+weight
+pieces
+service_type
+delivery_price
+subtotal
+base_price
+total
+total_price
+amount
+price
+currency
+source_domain
+captcha_token
+payment_method
+cod_amount
+notes
+status
+status_history
+created_at
+
+إذا جدول orders لا يحتوي بعض الأعمدة، لا تفشل الدالة بسببها؛ استخدم الأعمدة الموجودة فقط أو خزن البيانات الإضافية في metadata/jsonb إن وجد.
+
+يجب أن يعمل test:
+
+$env:DN_RUN_ORDER_TEST="1"
+pnpm run production:gate
+
+ويظهر:
+PASS: create_public_order RPC succeeded
+PASS: Tracking code returned
+PASS: track_order RPC succeeded
+
+## 10) إصلاح التتبع Tracking
+
+صفحة /tracking يجب أن:
+
+* تفتح مباشرة بدون 404.
+* تقبل رقم تتبع مثل DN-2026-XXXXX.
+* تستدعي track_order.
+* تعرض الحالة الحالية.
+* تعرض timeline.
+* تعرض بيانات مرئية جميلة.
+* تعرض رسالة واضحة لو الرقم غير موجود.
+* لا تكشف بيانات حساسة.
+* تعمل على mobile.
+
+يجب دعم demo tracking مثل:
+DN-2026-DEMO
+لكن لا تجعل demo يخفي فشل التتبع الحقيقي.
+
+## 11) إصلاح لوحة الإدارة Admin
+
+صفحة /admin يجب أن:
+
+* لا تظهر للعامة.
+* تتطلب تسجيل دخول.
+* تتحقق من role=admin من profiles.
+* تعرض الطلبات الجديدة.
+* تعرض البحث والفلترة.
+* تعرض تحديث الحالة.
+* تعرض تعيين سائق إن كان متاحًا.
+* تعرض إجمالي الطلبات وحالاتها.
+* تعمل على mobile/tablet.
+* لا تظهر في SEO.
+* لا تكسر build لو Supabase غير متصل.
+
+لو admin_update_order_status RPC يفشل، اكتب الخطأ الحقيقي في console أثناء التطوير، لكن لا تعرضه للعميل العام.
+
+## 12) إصلاح التصميم العام والصفحات كلها
+
+افحص كل الصفحات التالية:
+
+/
+/about
+/services
+/uae-delivery
+/international-shipping
+/international-advanced
+/ecommerce
+/corporate
+/pricing
+/request
+/tracking
+/gallery
+/contact
+/faq
+/policy
+/qr
+/auth
+/driver
+/customer
+/admin
+
+المطلوب:
+
+* لا توجد صفحة بيضاء.
+* لا توجد 404.
+* لا توجد أخطاء console حمراء.
+* لا توجد نصوص عربية مشوهة.
+* لا توجد English/Arabic متداخلة بشكل سيئ.
+* Header responsive.
+* Footer responsive.
+* Mobile menu واضح.
+* الأزرار تظهر بشكل صحيح.
+* اللمسات الزجاجية glassmorphism متناسقة.
+* الألوان من هوية الشركة فقط.
+* الشعار يظهر بجودة عالية.
+* لا تستخدم شعار قديم.
+* لا تستخدم صور سيارات غير Toyota Rush في أي محتوى تسويقي إن ظهرت سيارات.
+* لا توجد روابط مكسورة.
+* لا توجد بيانات تواصل قديمة.
+* البريد يجب أن يكون [Admin@daynightae.com](mailto:Admin@daynightae.com)
+* الموقع يجب أن يكون daynightae.com
+
+## 13) إصلاح SEO و Canonical
+
+Canonical الرسمي:
+https://daynightae.com
+
+لا تستخدم www في canonical.
+
+يجب تحديث:
+index.html
+src/lib/seo.ts
+src/hooks/usePageSEO.ts
+public/sitemap.xml
+public/robots.txt
+
+المطلوب:
+
+* sitemap يحتوي الصفحات العامة فقط.
+* admin/auth/customer/driver noindex.
+* title وdescription لكل صفحة.
+* OG image absolute URL.
+* Twitter card.
+* LocalBusiness / CourierService JSON-LD إن أمكن.
+* FAQPage JSON-LD للأسئلة الشائعة إن أمكن.
+* robots.txt يشير إلى sitemap الصحيح.
+
+## 14) Security Headers
+
+في vercel.json أضف أو راجع:
+
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+Content-Security-Policy يجب أن يسمح فقط بما يحتاجه الموقع:
+
+* self
+* Supabase URL
+* Supabase websocket
+* Cloudflare Turnstile
+* QR server إن كان مستخدمًا
+* الصور https/data/blob
+* fonts self/data
+
+لا تجعل CSP يكسر الموقع.
+
+## 15) Cloudflare Turnstile CAPTCHA
+
+المطلوب:
+
+* إذا VITE_TURNSTILE_SITE_KEY موجود:
+
+  * يظهر Turnstile في آخر خطوة من طلب التوصيل.
+  * لا يسمح بإرسال الطلب بدون token.
+  * يرسل captcha_token داخل payload.
+* إذا غير موجود:
+
+  * لا يظهر CAPTCHA.
+  * لا يكسر الصفحة.
+  * لا يمنع الإرسال.
+
+مهم:
+
+* لا تضع Turnstile secret في frontend.
+* التحقق server-side الحقيقي يكون لاحقًا عبر Supabase Edge Function أو RPC آمن.
+* حضّر TODO واضح لمرحلة server verification.
+
+## 16) Chatbot / Customer Service Bot
+
+أنشئ Chatbot قوي مدمج في الموقع مثل خدمة عملاء حقيقية.
+
+المطلوب:
+
+* يظهر كزر عائم أسفل الصفحة.
+
+* يبدأ محادثة تلقائية بعد 3 إلى 5 ثواني من دخول الزائر لأول مرة في الجلسة.
+
+* يقول تحية احترافية:
+  عربي:
+  أهلًا بك في داي نايت لخدمات التوصيل والشحن 👋
+  كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن الأسعار، التتبع، طلب توصيل، الشحن الدولي، الشركات، أو التواصل مع الدعم.
+
+  English:
+  Welcome to DAY NIGHT DELIVERY SERVICES 👋
+  How can I help you today? You can ask about prices, tracking, delivery requests, international shipping, corporate solutions, or support.
+
+* لا يزعج الزائر كل مرة؛ استخدم sessionStorage لتظهر التحية مرة واحدة في الجلسة.
+
+* يدعم عربي وإنجليزي.
+
+* يكتشف لغة السؤال أو يستخدم language من AppContext.
+
+* يرد بسرعة من knowledge base داخل المشروع.
+
+* لا يهلوس.
+
+* لو لا يعرف الإجابة يقول بوضوح:
+  يمكنني تحويلك إلى واتساب الدعم للحصول على تأكيد مباشر.
+
+* يوفر أزرار quick replies:
+  الأسعار
+  تتبع شحنة
+  طلب توصيل
+  الشحن الدولي
+  الشركات والعقود
+  التواصل مع واتساب
+  مواعيد العمل
+  COD
+  المناطق التي نغطيها
+
+## 17) قاعدة بيانات معرفة البوت
+
+أنشئ ملف قوي مثل:
+src/data/customerServiceKnowledge.ts
+أو حدّث:
+src/data/aiAgentKnowledge.ts
+
+يجب أن يحتوي على معرفة مفصلة ومنظمة:
+
+Company:
+
+* DAY NIGHT DELIVERY SERVICES
+* داي نايت لخدمات التوصيل والشحن
+* daynightae.com
+* [Admin@daynightae.com](mailto:Admin@daynightae.com)
+* +971 56 875 7331
+* خدمة 24/7
+* تغطية الإمارات
+* شحن دولي
+
+Services:
+
+* التوصيل المحلي داخل الإمارات
+* الشحن الدولي
+* حلول المتاجر الإلكترونية
+* COD
+* تتبع الشحنات
+* الشركات والعقود
+* الدعم 24/7
+* الطلبات الحساسة بحذر قانوني وبدون وعود غير واقعية
+
+Pricing:
+
+* UAE main 30 AED
+* UAE extended 50 AED
+* Express +15 AED
+* extra piece +5 AED after first piece
+* GCC 95 first kg + 45 additional kg
+* Worldwide 190 first kg + 90 additional kg
+* COD منفصل عن رسوم الشحن
+
+Coverage:
+
+* Abu Dhabi
+* Dubai
+* Sharjah
+* Ajman
+* Umm Al Quwain
+* Ras Al Khaimah
+* Fujairah
+* Khorfakkan
+* Al Ain
+* Western Region / extended areas
+
+Tracking:
+
+* اطلب من العميل رقم التتبع DN-...
+* وجهه إلى /tracking
+* لا تخترع حالة شحنة
+* إذا لا يوجد رقم تتبع، وجهه للدعم
+
+Request delivery:
+
+* وجهه إلى /request
+* اشرح الحقول المطلوبة
+* اشرح أن رقم التتبع يظهر بعد نجاح الطلب
+
+Business:
+
+* عقود شهرية
+* متاجر إلكترونية
+* تقارير وتسليمات
+* COD
+* SLA حسب الاتفاق
+
+Policies:
+
+* الأسعار تقديرية قابلة للتأكيد التشغيلي
+* الأوزان الكبيرة أو القطع الكثيرة تحتاج تأكيد
+* ممنوع المواد المحظورة قانونيًا
+* يجب تغليف الشحنة جيدًا
+* الشركة قد تراجع الطلب قبل الاستلام
+
+Contact:
+
+* WhatsApp link
+* Phone
+* Email
+* Website
+
+يجب بناء bot answers من هذه الداتا.
+
+## 18) واجهة البوت
+
+أنشئ:
+src/components/CustomerServiceBot.tsx
+
+المواصفات:
+
+* Floating chat bubble.
+* Badge أو رسالة ترحيب صغيرة.
+* Chat panel glassmorphism.
+* Arabic RTL.
+* English LTR.
+* Input.
+* Send button.
+* Quick replies.
+* Typing indicator.
+* Auto scroll.
+* Close/minimize.
+* Clear conversation.
+* WhatsApp handoff.
+* Link buttons إلى /request و /tracking و /pricing و /contact.
+
+لا تستخدم OpenAI API في frontend.
+لو تريد AI لاحقًا، حضّر Edge Function فقط بدون تنفيذ secret في المتصفح.
+
+## 19) ربط البوت بالموقع
+
+أضف البوت في App layout بحيث يظهر في كل الصفحات العامة:
+Home
+About
+Services
+Pricing
+Request
+Tracking
+Contact
+FAQ
+Gallery
+
+لكن لا يظهر داخل:
+Admin
+Auth
+Customer dashboard
+Driver portal
+أو اجعله قابل للإخفاء هناك.
+
+## 20) تحسين صفحة الأسعار
+
+صفحة الأسعار يجب أن تكون تفاعلية وواضحة:
+
+* Domestic cards.
+* International calculator.
+* Pieces calculator.
+* Weight calculator.
+* Express toggle.
+* COD note.
+* Custom quote alert.
+* Mobile friendly.
+* لا تعرض VAT بشكل متناقض.
+* لا تذكر 31.50 أو 52.50 إذا السياسة الحالية هي 30/50.
+
+## 21) تحسين تجربة الموبايل
+
+اختبر على:
+
+* 390px
+* 400px
+* 430px
+* 768px
+* desktop
+
+مطلوب:
+
+* لا يوجد horizontal scroll.
+* header لا يغطي المحتوى.
+* bottom WhatsApp لا يغطي زر الإرسال.
+* form controls واضحة.
+* الأزرار سهلة الضغط.
+* footer مرتب.
+* القائمة لا تتداخل عربي/إنجليزي.
+* الخط واضح.
+
+## 22) إصلاح Encoding العربي
+
+افحص كل الملفات التي تحتوي عربي:
+
+* RequestDelivery
+* Tracking
+* Header
+* Footer
+* translations
+* page copy
+* company meta
+* chatbot knowledge
+
+يجب ألا يظهر في الكود أو الواجهة:
+Ø
+Ù
+Ã
+�
+
+استخدم UTF-8 بدون BOM.
+لا تستخدم Set-Content -Encoding UTF8 القديم بطريقة تضيف BOM لو يسبب مشكلة.
+استخدم Node fs.writeFileSync UTF-8 أو أداة آمنة.
+
+## 23) Monitoring و Error Handling
+
+المطلوب:
+
+* Console error واضح أثناء التطوير.
+* User message بسيط وواضح في الواجهة.
+* لا تعرض raw SQL error للعميل.
+* عند فشل إنشاء الطلب، اعرض:
+  تعذر إنشاء الطلب حاليًا. يرجى المحاولة أو التواصل عبر واتساب.
+* أضف زر واتساب مباشرة عند الخطأ.
+* سجل الخطأ عبر monitoring إن كان موجودًا.
+
+## 24) Production Gate
+
+حدّث أو أنشئ:
+scripts/production-hardening-gate.mjs
+
+يجب أن يفحص:
+
+* vercel.json headers
+* canonical apex domain
+* sitemap apex domain
+* SEO prices unified
+* package.json valid
+* no BOM in package.json
+* Turnstile component exists
+* RequestDelivery notes optional
+* pieces passed into pricing engine
+* pricing test:
+  main, 7 pieces, standard = 60 AED
+  main, 1 piece, express = 45 AED
+  extended, 3 pieces, standard = 60 AED
+* route fallback script exists
+* Supabase env present if DN_RUN_ORDER_TEST=1
+* create_public_order works if live test enabled
+* track_order works if live test enabled
+
+الأوامر النهائية المطلوبة:
+
+pnpm run build
+pnpm run production:gate
+
+اختبار live اختياري:
+
+DN_RUN_ORDER_TEST=1 pnpm run production:gate
+
+## 25) Acceptance Criteria
+
+لا تعتبر العمل منتهيًا إلا إذا تحقق الآتي:
+
+1. pnpm install ينجح.
+2. pnpm run build ينجح.
+3. pnpm run production:gate ينجح.
+4. /request يفتح مباشرة بدون 404.
+5. /tracking يفتح مباشرة بدون 404.
+6. /admin يفتح مباشرة بدون 404.
+7. /pricing يفتح مباشرة بدون 404.
+8. صفحة الطلب على mobile تعمل.
+9. الملاحظات اختيارية.
+10. 7 قطع تزيد السعر.
+11. COD لا يضاف إلى رسوم التوصيل.
+12. create_public_order يرجع رقم تتبع أو يتم تحديد SQL fix واضح.
+13. tracking يعمل برقم حقيقي.
+14. chatbot يظهر ويحيي العميل تلقائيًا.
+15. chatbot يرد على الأسعار والخدمات والتتبع والتواصل.
+16. لا توجد أسرار داخل Git.
+17. لا يوجد node_modules أو dist داخل Git.
+18. لا توجد نصوص عربية مشوهة.
+19. Vercel Ready بعد push.
+20. daynightae.com يعمل.
+
+## 26) المطلوب في نهاية العمل
+
+اعرض تقرير نهائي واضح يحتوي:
+
+* الملفات التي تم تعديلها.
+* الأخطاء التي تم اكتشافها.
+* الأخطاء التي تم إصلاحها.
+* أي أخطاء متبقية تحتاج Supabase SQL Editor أو إعدادات Vercel.
+* نتائج:
+  pnpm run build
+  pnpm run production:gate
+  git status --short
+* روابط الاختبار:
+  https://daynightae.com/request
+  https://daynightae.com/tracking
+  https://daynightae.com/pricing
+  https://daynightae.com/admin
+* تعليمات أي Environment Variables ناقصة.
+* هل يحتاج Redeploy أم لا.
+
+## 27) أسلوب التنفيذ
+
+نفذ بإتقان إنتاجي.
+لا تعمل ترقيعات عشوائية.
+اجمع الأخطاء أولًا، ثم أصلح جذريًا.
+استخدم branch منفصل.
+اكتب commits واضحة.
+لا تكسر الموقع الشغال.
+لا تغير الهوية.
+لا تستخدم أسرار في الواجهة.
+لا ترفع ملفات مولدة.
+اختبر قبل الدفع.
+
+ابدأ الآن باستنساخ المستودع، ثم اعمل audit كامل، ثم نفّذ الإصلاحات، ثم أعطني التقرير النهائي.
