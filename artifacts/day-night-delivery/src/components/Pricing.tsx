@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BadgePercent, Check, MessageSquare, PackageCheck, Search, Truck } from "lucide-react";
+import { BadgePercent, Check, MessageSquare, PackageCheck, RefreshCw, Search, Truck } from "lucide-react";
 import { coverageAreas } from "../data/coverage";
 import { domesticPricing, internationalDestinations, internationalPricing } from "../data/pricingData";
 import { calculateDomesticPrice, calculateInternationalPrice, formatAED } from "../lib/pricing";
@@ -20,25 +20,50 @@ export default function Pricing() {
   const isLight = theme === "light";
   const isArabic = language === "ar";
 
-  const [pickupCity, setPickupCity] = useState("Abu Dhabi");
-  const [deliveryCity, setDeliveryCity] = useState("Dubai");
-  const [serviceType, setServiceType] = useState<"standard" | "express">("standard");
-  const [countryCode, setCountryCode] = useState("SA");
-  const [weight, setWeight] = useState(1);
+  /* ── Domestic calculator state (fully isolated) ── */
+  const [domesticPickupCity, setDomesticPickupCity] = useState("Abu Dhabi");
+  const [domesticDeliveryCity, setDomesticDeliveryCity] = useState("Dubai");
+  const [domesticService, setDomesticService] = useState<"standard" | "express">("standard");
+  const [domesticWeight, setDomesticWeight] = useState(1);
+  const [domesticPieces, setDomesticPieces] = useState(1);
 
+  /* ── International calculator state (fully isolated) ── */
+  const [internationalDestination, setInternationalDestination] = useState("SA");
+  const [internationalWeight, setInternationalWeight] = useState(1);
+
+  /* ── Computed results ── */
   const domestic = useMemo(() => {
-    return calculateDomesticPrice({ pickupCity, deliveryCity, serviceType, weight });
-  }, [pickupCity, deliveryCity, serviceType, weight]);
+    return calculateDomesticPrice({
+      pickupCity: domesticPickupCity,
+      deliveryCity: domesticDeliveryCity,
+      serviceType: domesticService,
+      weight: domesticWeight,
+      pieces: domesticPieces,
+    });
+  }, [domesticPickupCity, domesticDeliveryCity, domesticService, domesticWeight, domesticPieces]);
 
   const international = useMemo(() => {
-    return calculateInternationalPrice({ countryCode, weight });
-  }, [countryCode, weight]);
+    return calculateInternationalPrice({ countryCode: internationalDestination, weight: internationalWeight });
+  }, [internationalDestination, internationalWeight]);
 
   const cityOptions = coverageAreas.map((area) => ({
     value: area.nameEn,
     label: isArabic ? area.nameAr : area.nameEn,
     zone: area.zoneType,
   }));
+
+  function resetDomestic() {
+    setDomesticPickupCity("Abu Dhabi");
+    setDomesticDeliveryCity("Dubai");
+    setDomesticService("standard");
+    setDomesticWeight(1);
+    setDomesticPieces(1);
+  }
+
+  function resetInternational() {
+    setInternationalDestination("SA");
+    setInternationalWeight(1);
+  }
 
   const priceCards = [
     {
@@ -127,18 +152,27 @@ export default function Pricing() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Domestic Calculator */}
+        {/* ── Domestic Calculator (isolated state) ── */}
         <div className={`rounded-3xl p-6 border space-y-6 ${calculatorBase}`}>
-          <div className={`flex items-center gap-4 border-b pb-4 ${isLight ? "border-brand-deep/10" : "border-white/10"} ${isArabic ? "flex-row-reverse" : ""}`}>
-            <Truck className="w-8 h-8 text-brand-gold shrink-0" />
-            <div>
-              <h3 className={`text-xl font-extrabold ${isLight ? "text-brand-deep" : "text-white"}`}>
-                {tp.domesticCalculator}
-              </h3>
-              <p className={`text-xs ${isLight ? "text-brand-deep/45" : "text-white/45"}`}>
-                {tp.domesticHint}
-              </p>
+          <div className={`flex items-center justify-between border-b pb-4 ${isLight ? "border-brand-deep/10" : "border-white/10"}`}>
+            <div className={`flex items-center gap-4 ${isArabic ? "flex-row-reverse" : ""}`}>
+              <Truck className="w-8 h-8 text-brand-gold shrink-0" />
+              <div>
+                <h3 className={`text-xl font-extrabold ${isLight ? "text-brand-deep" : "text-white"}`}>
+                  {tp.domesticCalculator}
+                </h3>
+                <p className={`text-xs ${isLight ? "text-brand-deep/45" : "text-white/45"}`}>
+                  {tp.domesticHint}
+                </p>
+              </div>
             </div>
+            <button
+              onClick={resetDomestic}
+              title="Reset"
+              className={`p-2 rounded-lg transition-colors ${isLight ? "text-brand-deep/40 hover:text-brand-deep hover:bg-brand-deep/5" : "text-white/30 hover:text-white hover:bg-white/5"}`}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -147,8 +181,8 @@ export default function Pricing() {
                 {tp.pickupCity}
               </span>
               <select
-                value={pickupCity}
-                onChange={(e) => setPickupCity(e.target.value)}
+                value={domesticPickupCity}
+                onChange={(e) => setDomesticPickupCity(e.target.value)}
                 className={`w-full border rounded-xl p-3 text-sm ${inputBase}`}
               >
                 {cityOptions.map((city) => (
@@ -163,8 +197,8 @@ export default function Pricing() {
                 {tp.deliveryCity}
               </span>
               <select
-                value={deliveryCity}
-                onChange={(e) => setDeliveryCity(e.target.value)}
+                value={domesticDeliveryCity}
+                onChange={(e) => setDomesticDeliveryCity(e.target.value)}
                 className={`w-full border rounded-xl p-3 text-sm ${inputBase}`}
               >
                 {cityOptions.map((city) => (
@@ -179,8 +213,8 @@ export default function Pricing() {
                 {tp.service}
               </span>
               <select
-                value={serviceType}
-                onChange={(e) => setServiceType(e.target.value as "standard" | "express")}
+                value={domesticService}
+                onChange={(e) => setDomesticService(e.target.value as "standard" | "express")}
                 className={`w-full border rounded-xl p-3 text-sm ${inputBase}`}
               >
                 <option value="standard">{tp.standard}</option>
@@ -193,9 +227,23 @@ export default function Pricing() {
               </span>
               <input
                 type="number"
+                min="0.1"
+                step="0.1"
+                value={domesticWeight}
+                onChange={(e) => setDomesticWeight(Math.max(0.1, Number(e.target.value) || 1))}
+                className={`w-full border rounded-xl p-3 text-sm font-mono ${inputBase}`}
+              />
+            </label>
+            <label className="space-y-1 sm:col-span-2">
+              <span className={`text-xs font-bold ${isLight ? "text-brand-deep/60" : "text-white/60"}`}>
+                {isArabic ? "عدد القطع" : "Number of Pieces"}
+              </span>
+              <input
+                type="number"
                 min="1"
-                value={weight}
-                onChange={(e) => setWeight(Math.max(1, Number(e.target.value) || 1))}
+                step="1"
+                value={domesticPieces}
+                onChange={(e) => setDomesticPieces(Math.max(1, Math.round(Number(e.target.value) || 1)))}
                 className={`w-full border rounded-xl p-3 text-sm font-mono ${inputBase}`}
               />
             </label>
@@ -209,8 +257,8 @@ export default function Pricing() {
               </div>
             ))}
             {domestic.requiresCustomQuote && (
-              <p className="text-xs text-brand-gold italic">
-                {t.pricingWeight.customQuote}
+              <p className="text-xs text-amber-400 font-bold">
+                {isArabic ? "⚠️ الشحنة كبيرة — يتطلب تأكيداً تشغيلياً." : "⚠️ Large shipment — requires operational confirmation."}
               </p>
             )}
             <div className={`border-t pt-3 flex items-center justify-between ${isLight ? "border-brand-deep/10" : "border-white/10"}`}>
@@ -222,20 +270,38 @@ export default function Pricing() {
               </span>
             </div>
           </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Link to="/request" className="flex-1 text-center px-4 py-2.5 bg-brand-gold text-brand-deep font-extrabold rounded-xl text-xs hover:bg-brand-blue hover:text-white transition-all">
+              {tp.requestDelivery}
+            </Link>
+            <a href={companyMeta.whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-center px-4 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-500 transition-all">
+              WhatsApp
+            </a>
+          </div>
         </div>
 
-        {/* International Calculator */}
+        {/* ── International Calculator (isolated state) ── */}
         <div className={`rounded-3xl p-6 border space-y-6 ${calculatorBase}`}>
-          <div className={`flex items-center gap-4 border-b pb-4 ${isLight ? "border-brand-deep/10" : "border-white/10"} ${isArabic ? "flex-row-reverse" : ""}`}>
-            <PackageCheck className="w-8 h-8 text-brand-gold shrink-0" />
-            <div>
-              <h3 className={`text-xl font-extrabold ${isLight ? "text-brand-deep" : "text-white"}`}>
-                {tp.internationalCalculator}
-              </h3>
-              <p className={`text-xs ${isLight ? "text-brand-deep/45" : "text-white/45"}`}>
-                {tp.internationalHint}
-              </p>
+          <div className={`flex items-center justify-between border-b pb-4 ${isLight ? "border-brand-deep/10" : "border-white/10"}`}>
+            <div className={`flex items-center gap-4 ${isArabic ? "flex-row-reverse" : ""}`}>
+              <PackageCheck className="w-8 h-8 text-brand-gold shrink-0" />
+              <div>
+                <h3 className={`text-xl font-extrabold ${isLight ? "text-brand-deep" : "text-white"}`}>
+                  {tp.internationalCalculator}
+                </h3>
+                <p className={`text-xs ${isLight ? "text-brand-deep/45" : "text-white/45"}`}>
+                  {tp.internationalHint}
+                </p>
+              </div>
             </div>
+            <button
+              onClick={resetInternational}
+              title="Reset"
+              className={`p-2 rounded-lg transition-colors ${isLight ? "text-brand-deep/40 hover:text-brand-deep hover:bg-brand-deep/5" : "text-white/30 hover:text-white hover:bg-white/5"}`}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -244,8 +310,8 @@ export default function Pricing() {
                 {tp.destination}
               </span>
               <select
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
+                value={internationalDestination}
+                onChange={(e) => setInternationalDestination(e.target.value)}
                 className={`w-full border rounded-xl p-3 text-sm ${inputBase}`}
               >
                 {internationalDestinations.map((destination) => (
@@ -261,9 +327,10 @@ export default function Pricing() {
               </span>
               <input
                 type="number"
-                min="1"
-                value={weight}
-                onChange={(e) => setWeight(Math.max(1, Number(e.target.value) || 1))}
+                min="0.1"
+                step="0.1"
+                value={internationalWeight}
+                onChange={(e) => setInternationalWeight(Math.max(0.1, Number(e.target.value) || 1))}
                 className={`w-full border rounded-xl p-3 text-sm font-mono ${inputBase}`}
               />
             </label>
@@ -277,8 +344,8 @@ export default function Pricing() {
               </div>
             ))}
             {international.requiresCustomQuote && (
-              <p className="text-xs text-brand-gold italic">
-                {t.pricingWeight.customQuote}
+              <p className="text-xs text-amber-400 font-bold">
+                {isArabic ? "⚠️ وزن كبير جداً — يتطلب عرض سعر خاص." : "⚠️ Very heavy shipment — requires custom quote."}
               </p>
             )}
             <div className={`border-t pt-3 flex items-center justify-between ${isLight ? "border-brand-deep/10" : "border-white/10"}`}>
@@ -289,6 +356,19 @@ export default function Pricing() {
                 {formatAED(international.total)}
               </span>
             </div>
+            <p className={`text-[11px] italic ${isLight ? "text-brand-deep/40" : "text-white/40"}`} dir="ltr">
+              {international.notes}
+            </p>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Link to="/tracking" className={`flex-1 text-center px-4 py-2.5 border font-extrabold rounded-xl text-xs transition-all ${isLight ? "bg-white/50 border-brand-deep/10 text-brand-deep hover:border-brand-gold/50" : "bg-white/5 border-white/10 text-white hover:border-brand-gold/50"}`}>
+              <Search className="w-3.5 h-3.5 inline mr-1" />
+              {tp.trackShipment}
+            </Link>
+            <a href={companyMeta.whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-center px-4 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-500 transition-all">
+              WhatsApp
+            </a>
           </div>
         </div>
       </section>

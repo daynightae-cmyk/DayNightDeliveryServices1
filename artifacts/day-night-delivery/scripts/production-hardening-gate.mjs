@@ -17,6 +17,7 @@ function assert(condition, message) {
 const root = path.resolve(process.cwd());
 const src = path.join(root, "src");
 
+/* ── Vercel config ── */
 const vercelPath = path.join(root, "vercel.json");
 assert(fs.existsSync(vercelPath), "vercel.json exists");
 if (fs.existsSync(vercelPath)) {
@@ -26,6 +27,7 @@ if (fs.existsSync(vercelPath)) {
   assert(vercel.includes('"outputDirectory"'), "Vercel output directory set");
 }
 
+/* ── Sitemap / index ── */
 const sitemapPath = path.join(root, "public", "sitemap.xml");
 if (fs.existsSync(sitemapPath)) {
   const sitemap = read(sitemapPath);
@@ -38,19 +40,25 @@ if (fs.existsSync(indexPath)) {
   assert(!index.includes("www.daynightae.com"), "index.html canonical is apex domain");
 }
 
+/* ── SEO ── */
 const seoPath = path.join(src, "lib", "seo.ts");
 if (fs.existsSync(seoPath)) {
   const seo = read(seoPath);
   assert(!seo.includes("31.50 AED") && !seo.includes("52.50 AED"), "SEO prices use correct pricing (30/50 AED)");
 }
 
+/* ── AI knowledge ── */
 const aiKnowledgePath = path.join(src, "data", "aiAgentKnowledge.ts");
 if (fs.existsSync(aiKnowledgePath)) {
   const knowledge = read(aiKnowledgePath);
   assert(!knowledge.includes("31.50") && !knowledge.includes("52.50"), "AI agent knowledge uses correct pricing");
   assert(knowledge.includes("30 AED") || knowledge.includes("30 درهم"), "AI agent knowledge has correct domestic price");
+  assert(knowledge.includes("95") && knowledge.includes("45"), "AI agent knowledge has GCC pricing");
+  assert(knowledge.includes("190") && knowledge.includes("90"), "AI agent knowledge has worldwide pricing");
+  assert(knowledge.includes("COD") || knowledge.includes("cod"), "AI agent knowledge covers COD");
 }
 
+/* ── Pricing data ── */
 const pricingDataPath = path.join(src, "data", "pricingData.ts");
 if (fs.existsSync(pricingDataPath)) {
   const pricingData = read(pricingDataPath);
@@ -59,15 +67,69 @@ if (fs.existsSync(pricingDataPath)) {
   assert(!pricingData.includes("????"), "pricingData has no garbled Arabic labels");
 }
 
-const turnstilePath = path.join(src, "components", "security", "TurnstileCaptcha.tsx");
-assert(fs.existsSync(turnstilePath), "Turnstile captcha component exists");
+/* ── Pricing engine calculation tests ── */
+const pricingEnginePath = path.join(src, "lib", "pricing.ts");
+if (fs.existsSync(pricingEnginePath)) {
+  // Dynamically import and test the pricing engine
+  try {
+    // We can only check the source text here; runtime tests are separate
+    const engine = read(pricingEnginePath);
+    assert(engine.includes("calculateDomesticPrice"), "Pricing engine exports calculateDomesticPrice");
+    assert(engine.includes("calculateInternationalPrice"), "Pricing engine exports calculateInternationalPrice");
+    assert(engine.includes("extraPieceCharge") || engine.includes("pieces") || engine.includes("piece"), "Pricing engine handles pieces");
+    assert(engine.includes("expressSurcharge") || engine.includes("express"), "Pricing engine handles express surcharge");
+    assert(engine.includes("breakdown"), "Pricing engine returns breakdown array");
+  } catch (e) {
+    assert(false, "Pricing engine source readable: " + e.message);
+  }
+}
 
+/* ── Pricing.tsx isolated state ── */
+const pricingTsxPath = path.join(src, "components", "Pricing.tsx");
+if (fs.existsSync(pricingTsxPath)) {
+  const px = read(pricingTsxPath);
+  assert(px.includes("domesticWeight") && px.includes("internationalWeight"), "Pricing.tsx uses isolated weight state per calculator");
+  assert(px.includes("domesticPieces"), "Pricing.tsx has pieces input for domestic calculator");
+  assert(!px.includes("const [weight,") && !px.includes("const [weight ,"), "Pricing.tsx does NOT use shared weight state");
+}
+
+/* ── SmartChat component ── */
+const smartChatPath = path.join(src, "components", "SmartChat.tsx");
+if (fs.existsSync(smartChatPath)) {
+  const chat = read(smartChatPath);
+  assert(chat.includes("showBubble"), "SmartChat has greeting bubble state");
+  assert(chat.includes("CLOSED_KEY") || chat.includes("dn_chat_closed"), "SmartChat stores closed state in sessionStorage");
+  assert(chat.includes("Minus") || chat.includes("minimized"), "SmartChat has minimize button");
+  assert(chat.includes("HIDDEN_ROUTES") || chat.includes("/admin"), "SmartChat hidden on admin routes");
+  assert(chat.includes("chatPulse") || chat.includes("pulse"), "SmartChat has animated pulse icon");
+}
+
+/* ── RequestDelivery ── */
 const requestDeliveryPath = path.join(src, "components", "RequestDelivery.tsx");
 if (fs.existsSync(requestDeliveryPath)) {
   const rd = read(requestDeliveryPath);
   assert(!rd.includes("يرجى إكمال بيانات المرسل") || rd.includes("يرجى إكمال"), "RequestDelivery has proper Arabic (not garbled)");
+  assert(rd.includes("breakdown") || rd.includes("deliveryPricing"), "RequestDelivery shows price breakdown");
+  assert(rd.includes("isLargeShipment") || rd.includes("requiresCustomQuote"), "RequestDelivery handles large shipment warning");
 }
 
+/* ── Footer ── */
+const footerPath = path.join(src, "components", "Footer.tsx");
+if (fs.existsSync(footerPath)) {
+  const footer = read(footerPath);
+  assert(footer.includes("/faq") || footer.includes("faq"), "Footer links to /faq");
+  assert(footer.includes("/pricing"), "Footer links to /pricing");
+  assert(footer.includes("/privacy"), "Footer links to /privacy");
+  assert(footer.includes("/policy"), "Footer links to /policy");
+  assert(footer.includes("/request"), "Footer links to request delivery");
+  assert(footer.includes("/tracking"), "Footer links to tracking");
+}
+
+/* ── Turnstile captcha ── */
+const turnstilePath = path.join(src, "components", "security", "TurnstileCaptcha.tsx");
+assert(fs.existsSync(turnstilePath), "Turnstile captcha component exists");
+
+/* ── robots.txt ── */
 const robotsPath = path.join(root, "public", "robots.txt");
 assert(fs.existsSync(robotsPath), "robots.txt exists");
 

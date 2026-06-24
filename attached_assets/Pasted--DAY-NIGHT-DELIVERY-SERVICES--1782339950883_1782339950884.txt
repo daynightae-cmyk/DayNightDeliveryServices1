@@ -1,0 +1,728 @@
+أنت الآن تستكمل مشروع DAY NIGHT DELIVERY SERVICES بعد آخر إصلاحاتك. لا تبدأ من الصفر إلا إذا احتجت. المشروع الحالي Vite + React + Supabase + Vercel. مطلوب منك عمل Audit شامل وإصلاح إنتاجي نهائي لكل الأخطاء الجديدة التي ظهرت في المعاينة.
+
+## 0) بيانات ثابتة لا تغيّرها
+
+Company:
+DAY NIGHT DELIVERY SERVICES
+داي نايت لخدمات التوصيل والشحن
+
+Official website:
+https://daynightae.com
+
+Official display domain:
+daynightae.com
+
+Official email:
+[Admin@daynightae.com](mailto:Admin@daynightae.com)
+
+Official phone / WhatsApp:
++971 56 875 7331
+
+Official logo URL:
+https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+
+Brand colors:
+Deep Navy #071A33
+Navy #0A1C3A
+Royal Blue #0057B8
+Bright Blue #007BFF
+Sky Blue #18A8E8
+Luxury Gold #D4AF37
+Warm Gold #F5B700
+White #FFFFFF
+
+Slogans:
+Fast • Reliable • Every Time
+Your Comfort.. Our Priority
+نصل إليك في كل وقت
+خدمة على مدار الساعة 24/7
+سريع.. آمن.. موثوق
+راحتكم أولويتنا
+
+## 1) الوضع الحالي
+
+أنت أصلحت سابقًا:
+
+* Arabic mojibake في RequestDelivery و QuickPriceEstimate.
+* الأسعار القديمة 31.50 و52.50.
+* SmartChat auto greeting.
+* vercel.json وsecurity headers.
+* production-hardening-gate.
+* logo URL.
+* build وgate كانا PASS.
+
+لكن ظهرت أخطاء جديدة في المعاينة يجب إصلاحها جذريًا.
+
+## 2) أهم Bug الآن: حاسبة الأسعار المحلي والدولي متداخلين
+
+في صفحة Pricing توجد مشكلتان واضحتان:
+
+### المشكلة الأولى
+
+عندما أغير الوزن أو القيم في حاسبة التوصيل المحلي UAE Delivery Calculator، تتأثر أو تتغير حاسبة International Shipping Calculator أو العكس.
+
+هذا خطأ state management.
+
+### المطلوب
+
+افصل تمامًا بين state المحلي والدولي:
+
+Domestic calculator state:
+
+* domesticPickupCity
+* domesticDeliveryCity
+* domesticService
+* domesticWeight
+* domesticPieces
+* domesticPriceResult
+
+International calculator state:
+
+* internationalDestination
+* internationalWeight
+* internationalPriceResult
+
+ممنوع استخدام متغير عام واحد للوزن أو المدينة أو النتيجة بين الحاسبتين.
+
+ممنوع أن يغير input محلي أي قيمة دولية.
+
+ممنوع أن يغير input دولي أي قيمة محلية.
+
+### اختبارات إلزامية
+
+1. افتح /pricing.
+2. غير وزن المحلي إلى 3.
+3. يجب أن يتغير Total Price في المحلي فقط.
+4. السعر الدولي يجب أن يبقى ثابتًا.
+5. غير وزن الدولي إلى 3.
+6. يجب أن يتغير السعر الدولي فقط.
+7. المحلي يجب أن يبقى ثابتًا.
+8. غير pickup/delivery في المحلي.
+9. الدولي لا يتغير.
+10. غير destination في الدولي.
+11. المحلي لا يتغير.
+
+## 3) قواعد الحساب الرسمية التي يجب تطبيقها في كل مكان
+
+Domestic UAE:
+
+* Main UAE areas: 30 AED.
+* Extended UAE areas: 50 AED.
+* Express surcharge: +15 AED.
+* First piece included.
+* Every additional piece after first piece: +5 AED.
+* COD amount is not shipping fee and must not be added to delivery price.
+* COD is a collection amount displayed separately.
+
+International:
+GCC:
+
+* First kg: 95 AED.
+* Additional kg: 45 AED.
+
+Worldwide:
+
+* First kg: 190 AED.
+* Additional kg: 90 AED.
+
+### اختبارات حساب إلزامية
+
+Domestic main, standard, 1kg, 1 piece:
+30 AED
+
+Domestic main, standard, 1.3kg, 7 pieces:
+30 + 6×5 = 60 AED
+
+Domestic main, express, 1kg, 1 piece:
+30 + 15 = 45 AED
+
+Domestic extended, standard, 1kg, 3 pieces:
+50 + 2×5 = 60 AED
+
+International Saudi Arabia 3kg:
+95 + 2×45 = 185 AED
+
+Worldwide 3kg:
+190 + 2×90 = 370 AED
+
+يجب أن تضيف هذه الاختبارات داخل production-hardening-gate.
+
+## 4) أصلح صفحة Request Delivery بناءً على نفس الحساب
+
+صفحة /request يجب أن تستخدم نفس pricing engine.
+
+المطلوب:
+
+* pieces يجب أن تدخل في حساب السعر.
+* weight يجب أن تدخل في حساب الوزن.
+* serviceType يدخل في حساب Express.
+* COD لا يضاف إلى رسوم الشحن.
+* الملاحظات optional.
+* يظهر breakdown واضح:
+
+  * Base delivery
+  * Express surcharge إن وجد
+  * Additional pieces surcharge إن وجد
+  * Delivery total
+  * COD collection amount منفصل إن وجد
+* لو القطع أكثر من 20 أو الوزن أكثر من 50kg يظهر تنبيه: يحتاج تأكيد تشغيلي / custom quote.
+* زر الإرسال لا يتعطل بسبب ملاحظات فارغة.
+
+## 5) الشات بوت الحالي يحتاج إصلاح UX جذري
+
+المشكلة:
+الشات بوت يفتح تلقائيًا ويظل مفتوحًا ومزعجًا، ولا توجد تجربة إغلاق/فتح مريحة.
+
+### المطلوب
+
+أنشئ تجربة Customer Service Bot احترافية:
+
+1. يظهر كأيقونة عائمة فقط في البداية.
+2. بعد 3 إلى 5 ثواني يظهر تنبيه صغير أو bubble ترحيبي، وليس panel ضخم دائمًا.
+3. لا يفتح panel كامل إلا إذا ضغط العميل على الأيقونة أو على رسالة الترحيب.
+4. إذا فتح العميل الشات، يجب وجود زر واضح:
+
+   * Close X
+   * Minimize
+5. إذا ضغط Close:
+
+   * يغلق panel.
+   * تبقى أيقونة صغيرة فقط.
+   * لا يفتح تلقائيًا مرة أخرى في نفس الجلسة.
+   * استخدم sessionStorage أو localStorage.
+6. إذا ضغط الأيقونة بعد الإغلاق، يفتح مرة أخرى.
+7. الأيقونة يجب أن تكون متحركة بشكل لطيف:
+
+   * pulse
+   * glow
+   * small bounce
+   * بدون إزعاج.
+8. على الموبايل لا يغطي زر الإرسال ولا يغطي WhatsApp.
+9. z-index مضبوط.
+10. لا يظهر البوت في admin/auth/driver/customer dashboard أو يظهر minimized فقط.
+
+## 6) قاعدة معرفة الشات بوت يجب أن تصبح ضخمة وقوية
+
+حاليًا البوت بسيط. المطلوب أن يكون مثل خدمة عملاء فعلية.
+
+أنشئ أو حدّث:
+src/data/customerServiceKnowledge.ts
+أو src/data/aiAgentKnowledge.ts
+
+يجب أن تحتوي knowledge base ضخمة مبنية على كل معلومات الموقع:
+
+### Company data
+
+* DAY NIGHT DELIVERY SERVICES
+* داي نايت لخدمات التوصيل والشحن
+* daynightae.com
+* [Admin@daynightae.com](mailto:Admin@daynightae.com)
+* +971 56 875 7331
+* 24/7 support
+* UAE delivery
+* international shipping
+* e-commerce support
+* corporate contracts
+
+### Pricing answers
+
+* UAE main: 30 AED
+* UAE extended: 50 AED
+* Express: +15 AED
+* Extra piece after first: +5 AED
+* GCC: 95 first kg + 45 additional kg
+* Worldwide: 190 first kg + 90 additional kg
+* COD is separate from delivery charge
+
+### Tracking answers
+
+* اطلب رقم التتبع DN-...
+* وجه العميل إلى /tracking
+* لا تخترع حالة شحنة.
+* إذا لا يوجد رقم تتبع، وجهه إلى WhatsApp.
+
+### Request delivery
+
+* وجه العميل إلى /request
+* اشرح بيانات المرسل والمستلم.
+* اشرح أن رقم التتبع يظهر بعد إنشاء الطلب.
+* اشرح أن الطلبات الكبيرة تحتاج تأكيد.
+
+### Coverage
+
+* Abu Dhabi
+* Dubai
+* Sharjah
+* Ajman
+* Umm Al Quwain
+* Ras Al Khaimah
+* Fujairah
+* Khorfakkan
+* Al Ain
+* Western Region / extended areas
+
+### Business customers
+
+* contracts
+* e-commerce
+* COD
+* monthly reports
+* bulk delivery
+* corporate billing
+* store solutions
+
+### Policies
+
+* prohibited items
+* packaging responsibility
+* estimated prices
+* operational confirmation
+* large shipments custom quote
+* COD conditions
+* delivery attempts
+* customer support handoff
+
+### Quick replies
+
+* Local prices
+* GCC shipping
+* Track shipment
+* Request delivery
+* Final price
+* WhatsApp contact
+* Corporate quote
+* COD
+* Prohibited items
+* Coverage areas
+* Delivery time
+* Documents shipping
+* E-commerce stores
+
+### Bot behavior
+
+* عربي وإنجليزي.
+* يرد حسب لغة الموقع أو لغة السؤال.
+* لا يهلوس.
+* لا يعطي وعود غير مؤكدة.
+* لو لا يعرف الإجابة:
+  “يمكنني تحويلك إلى واتساب الدعم للحصول على تأكيد مباشر.”
+* أضف زر WhatsApp مباشر.
+* أضف روابط داخلية:
+  /request
+  /tracking
+  /pricing
+  /contact
+  /faq
+
+## 7) تصدير الملفات والفواتير والتقارير
+
+المطلوب إضافة نظام Export احترافي.
+
+### أماكن التصدير
+
+في نجاح طلب التوصيل:
+
+* Export Invoice PDF
+* Export Invoice DOCX
+* Export Invoice TXT
+* Export Shipping Label PDF
+* Export Order Summary PDF
+
+في Admin Panel:
+
+* Export selected order PDF
+* Export selected order DOCX
+* Export selected order TXT
+* Export all orders CSV
+* Export all orders PDF report
+* Export COD report
+* Export daily report
+* Export customer receipt
+
+### تصميم الملفات المصدرة
+
+كل ملف يجب أن يكون branded:
+
+* Logo official URL:
+  https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+
+* Header:
+  DAY NIGHT DELIVERY SERVICES
+  داي نايت لخدمات التوصيل والشحن
+  Fast • Reliable • Every Time
+
+* Colors:
+  Deep navy background accents
+  Gold headings
+  Clean white body
+  Professional courier invoice style
+
+### بيانات الفاتورة
+
+* Invoice number
+* Tracking number
+* Date
+* Sender details
+* Receiver details
+* Pickup city
+* Delivery city
+* Package type
+* Weight
+* Pieces
+* Service type
+* Payment method
+* Delivery price
+* Extra pieces fee
+* Express fee
+* COD amount separately
+* Total delivery fee
+* Notes
+* Terms / support note
+* Phone
+* Email
+* Website
+
+### Shipping label
+
+يجب أن يحتوي:
+
+* Tracking number كبير
+* Sender
+* Receiver
+* City
+* Phone
+* Package type
+* Pieces
+* Weight
+* QR code
+* مساحة barcode/QR نظيفة
+* Logo
+
+### Technical
+
+استخدم مكتبات مناسبة:
+
+* jsPDF أو html2canvas أو pdfmake للـ PDF.
+* docx package للـ DOCX إن أمكن.
+* Blob download للـ TXT.
+* CSV export للتقارير.
+
+لا تكسر build لو مكتبة غير مناسبة. اختر حلاً مستقرًا.
+
+## 8) راجع Navigation و Footer
+
+يوجد تكرار وأخطاء في Navigation/Footer مثل:
+
+Navigation
+Home
+About Us
+Services
+Gallery
+Pricing
+Tracking
+FAQs
+Contact
+
+Services
+Local Delivery
+Global Shipping
+E-Commerce
+Corporate
+Request Delivere
+
+About
+Services
+Local Delivery
+International Shipping
+Store Solutions
+Corporate & Contracts
+Pricing
+Gallery
+Tracking
+
+المشاكل:
+
+* تكرار غير منظم.
+* Request Delivere خطأ إملائي، يجب أن تكون Request Delivery.
+* Footer فيه أعمدة متداخلة ومكررة.
+* بعض الروابط مكررة.
+* بعض الروابط بالإنجليزي فقط أو بالعربي فقط.
+* mobile footer/header يحتاج ترتيب.
+
+### المطلوب
+
+أنشئ navigation structure موحد:
+
+Main Navigation:
+Home
+About Us
+Services
+UAE Delivery
+International Shipping
+E-Commerce
+Corporate & Contracts
+Pricing
+Gallery
+Tracking
+FAQs
+Contact
+Request Delivery
+
+Footer columns:
+Company:
+Home
+About Us
+Services
+Gallery
+FAQs
+Contact
+
+Services:
+UAE Local Delivery
+International Shipping
+E-Commerce Solutions
+Corporate & Contracts
+Request Delivery
+Tracking
+
+Support:
+Pricing
+Service Policy
+Privacy Policy
+Terms
+WhatsApp
+Email
+
+Contact:
++971 56 875 7331
+[Admin@daynightae.com](mailto:Admin@daynightae.com)
+daynightae.com
+UAE
+
+في العربي:
+الشركة
+الخدمات
+الدعم
+التواصل
+
+تأكد من:
+
+* لا يوجد typo.
+* لا يوجد route مكسور.
+* لا يوجد duplicate مزعج.
+* كل الروابط تعمل.
+* mobile menu واضح.
+* footer responsive.
+
+## 9) راجع كل الصفحات
+
+افحص وأصلح كل صفحة:
+
+/
+/about
+/services
+/uae-delivery
+/international-shipping
+/international-advanced
+/ecommerce
+/corporate
+/pricing
+/request
+/tracking
+/gallery
+/contact
+/faq
+/policy
+/privacy
+/terms
+/qr
+/auth
+/driver
+/customer
+/admin
+
+المطلوب:
+
+* لا توجد 404.
+* لا توجد صفحة بيضاء.
+* لا توجد console errors.
+* لا توجد نصوص عربية مشوهة.
+* لا توجد أسعار قديمة 31.50 أو 52.50.
+* لا توجد بيانات تواصل قديمة.
+* لا يوجد logo قديم.
+* لا يوجد www في canonical.
+* لا يوجد layout broken في 400px.
+* لا يوجد horizontal scroll.
+* لا يوجد bot يغطي content.
+* لا يوجد footer متداخل.
+* لا توجد أزرار غير واضحة.
+
+## 10) إصلاح Arabic Encoding نهائيًا
+
+راجع كل ملفات src التي تحتوي عربيًا وتأكد أنها UTF-8 بدون BOM.
+
+ابحث عن:
+Ø
+Ù
+Ã
+�
+�
+
+لو وجدت أي نص mojibake أصلحه.
+
+الملفات المهمة:
+RequestDelivery.tsx
+QuickPriceEstimate.tsx
+SmartChat.tsx
+Footer
+Header
+translations
+pageCopy
+companyMeta
+aiAgentKnowledge
+customerServiceKnowledge
+Pricing
+Tracking
+Contact
+FAQ
+
+## 11) Supabase create_public_order
+
+ما زالت صفحة الطلب تعرض:
+تعذر إنشاء الطلب حالياً، يرجى المحاولة أو التواصل عبر واتساب.
+
+هذا يعني أن create_public_order لا يرجع tracking code أو أن RPC يفشل.
+
+افحص:
+src/supabase.ts
+scripts/production-hardening-gate.mjs
+scripts/debug-create-public-order.mjs
+Supabase RPC signatures
+
+المطلوب:
+
+* اطبع error الحقيقي في dev console بشكل آمن.
+* لا تعرض raw error للعميل.
+* production gate يجب أن يفحص create_public_order عند DN_RUN_ORDER_TEST=1.
+* إذا المشكلة SQL، أنشئ ملف:
+  supabase/sql/DN_CREATE_PUBLIC_ORDER_FIX.sql
+
+يجب أن يكون SQL patch:
+
+* idempotent
+* لا يحذف بيانات
+* لا يسقط جداول
+* يقبل p_order_data jsonb
+* يرجع tracking code string
+* يتعامل مع الأعمدة الموجودة فقط
+* يمنح execute للـ anon على create_public_order
+* يستخدم RLS بشكل آمن
+* يولد tracking number DN-YYYY-XXXXX
+
+## 12) تحسين Pricing page UI
+
+صفحة الأسعار الآن جيدة بصريًا، لكن تحتاج فصل وتحسين:
+
+* Domestic calculator مستقل.
+* International calculator مستقل.
+* Add pieces input للـ domestic calculator.
+* Show breakdown:
+  Base price
+  Express
+  Extra pieces
+  Total
+* International breakdown:
+  First kg
+  Additional kg × count
+  Total
+* لا تجعل إدخال المحلي يغير الدولي.
+* لا تجعل إدخال الدولي يغير المحلي.
+* أضف Reset لكل calculator.
+* أضف CTA:
+  Request Delivery
+  Track Shipment
+  WhatsApp
+
+## 13) Production Gate جديد
+
+حدّث production-hardening-gate.mjs ليفحص:
+
+* package.json valid.
+* no BOM in package.json.
+* build script includes SPA fallbacks.
+* vercel headers exist.
+* canonical daynightae.com.
+* sitemap no [www](http://www).
+* no 31.50 / 52.50.
+* no mojibake characters.
+* RequestDelivery notes optional.
+* pieces passed into domestic pricing.
+* domestic 7 pieces = 60 AED.
+* domestic express = 45 AED.
+* extended 3 pieces = 60 AED.
+* Saudi Arabia 3kg = 185 AED.
+* worldwide 3kg = 370 AED.
+* SmartChat has close/minimize/sessionStorage behavior.
+* CustomerServiceKnowledge exists and has company/pricing/tracking/request/contact.
+* Export utilities exist.
+* Navigation does not contain Request Delivere.
+* No node_modules tracked.
+* No dist tracked.
+* No .env tracked.
+
+يجب أن ينجح:
+
+pnpm run build
+pnpm run production:gate
+
+## 14) لا ترفع الملفات الممنوعة
+
+تأكد من:
+git ls-files node_modules
+git ls-files dist
+git ls-files .env*
+
+كلها فارغة.
+
+## 15) بعد الإصلاح
+
+نفذ:
+
+pnpm install --config.optional=true
+pnpm run build
+pnpm run production:gate
+git status --short
+
+ثم اعرض تقرير نهائي يحتوي:
+
+1. الملفات المعدلة.
+2. الأخطاء التي وجدتها.
+3. الإصلاحات التي نفذتها.
+4. نتائج build.
+5. نتائج production gate.
+6. هل create_public_order تم إصلاحها أم تحتاج SQL داخل Supabase.
+7. هل Export PDF/DOCX/TXT يعمل.
+8. هل Chatbot يغلق ويفتح حسب رغبة العميل.
+9. هل Pricing calculators منفصلين.
+10. هل navigation/footer تم تنظيفهم.
+11. تعليمات push/deploy.
+
+## 16) Acceptance Criteria
+
+لا تعتبر المهمة منتهية إلا إذا:
+
+* المحلي والدولي في /pricing لا يؤثران على بعض.
+* 7 قطع في المحلي تزيد السعر.
+* COD لا يرفع رسوم الشحن.
+* الشات بوت يمكن إغلاقه وفتحه بسهولة.
+* الشات بوت لا يظل مفتوحًا قهريًا.
+* الشات بوت لديه knowledge base قوية من كل الموقع.
+* يوجد Export PDF/DOCX/TXT للفواتير أو على الأقل PDF/TXT مستقرين وDOCX إن أمكن.
+* الفواتير المصدرة branded باللوجو والألوان.
+* Navigation/Footer بلا تكرار أو أخطاء إملائية.
+* Request Delivere تم تصحيحها إلى Request Delivery.
+* كل الصفحات تفتح.
+* لا يوجد mojibake.
+* build PASS.
+* production gate PASS.
+* Vercel deployment يبقى قابل للنشر بدون كسر.

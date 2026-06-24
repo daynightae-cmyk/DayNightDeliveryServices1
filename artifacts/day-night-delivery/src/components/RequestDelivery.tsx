@@ -97,18 +97,15 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   // Al Ain Suburbs or Western Region count as remote areas
   const expensiveCitiesAr = ["العين (Al Ain)", "المنطقة الغربية (Western Region)", "السلع", "الرويس", "غياثي", "ليوا"];
   
-  function getCalculatedDeliveryPrice() {
-    const pricing = calculateDomesticPrice({
-      deliveryCity: receiverCity,
-      weight,
-      pieces,
-      serviceType
-    });
-    return { subtotal: pricing.subtotal, total: pricing.total };
-  }
-
-  const deliveryPricing = getCalculatedDeliveryPrice();
+  const deliveryPricing = calculateDomesticPrice({
+    pickupCity: senderCity,
+    deliveryCity: receiverCity,
+    weight,
+    pieces,
+    serviceType
+  });
   const deliveryPrice = deliveryPricing.total;
+  const isLargeShipment = deliveryPricing.requiresCustomQuote;
 
   function isValidUaePhone(phone: string) {
     const compact = phone.replace(/[^\d+]/g, "");
@@ -563,21 +560,33 @@ return "";
               />
             )}
 
-            {/* Calculations Detail Box */}
-            <div className="bg-brand-deep/85 rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm font-sans font-medium text-right">
-              <div className="p-2.5 bg-brand-gold/10 rounded-lg text-brand-gold border border-brand-gold/20 text-[10px] leading-relaxed max-w-xs text-right">
-                سيتم تأكيد رسوم التحصيل والدفع بدقة من الإدارة بمجرد معالجة الطلب الكترونياً. الأسعار المعروضة نهائية وواضحة.
+            {/* Price Breakdown Box */}
+            <div className="bg-brand-deep/85 rounded-2xl p-4 border border-brand-gold/20 space-y-3" dir="rtl">
+              <p className="text-white/60 text-xs font-bold font-sans">بيان رسوم التوصيل</p>
+              <div className="space-y-1.5">
+                {deliveryPricing.breakdown.map((line, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs" dir="ltr">
+                    <span className="text-brand-gold/70">✓</span>
+                    <span className="text-white/70">{line}</span>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-1 w-full sm:w-auto text-right">
-                <span className="text-white/40 text-xs font-bold font-sans">بيان قيمة رسوم التوصيل</span>
-                <div className="text-xs text-white/60 space-y-0.5">
-                  <p>سعر الخدمة: <span className="font-mono text-white">{deliveryPricing.subtotal.toFixed(2)} AED</span></p>
-                </div>
-                <p className="text-xl font-extrabold text-brand-gold font-mono leading-none pt-1 border-t border-white/5">{deliveryPricing.total.toFixed(2)} AED نهائي</p>
-                <p className="text-[10px] text-white/40 font-bold">
-                  {expensiveCitiesAr.includes(receiverCity) ? "* منطقة بعيدة/50 درهم أساسي." : "* سعر موحد/30 درهم أساسي."} 
-                  {serviceType === "express" && " مضاف رسوم خدمة سريعة (15 درهم)."}
+              {isLargeShipment && (
+                <p className="text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
+                  ⚠️ الشحنة كبيرة (20+ قطعة أو 50+ كجم) — سيتواصل معك الفريق لتأكيد الاستلام.
                 </p>
+              )}
+              {paymentMethod === "cod" && codAmount && (
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-white/10">
+                  <span className="text-emerald-400 font-bold font-sans">مبلغ التحصيل COD (منفصل)</span>
+                  <span className="font-mono text-emerald-400 font-bold">{codAmount} AED</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-2 border-t border-brand-gold/20">
+                <span className="text-white/80 text-xs font-bold font-sans">إجمالي رسوم التوصيل</span>
+                <span className="text-2xl font-black text-brand-gold font-mono" dir="ltr">
+                  {deliveryPricing.total.toFixed(2)} AED
+                </span>
               </div>
             </div>
 
