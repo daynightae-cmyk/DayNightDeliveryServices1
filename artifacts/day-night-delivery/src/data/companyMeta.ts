@@ -15,7 +15,7 @@ export const companyMeta = {
   mapUrl: "https://maps.app.goo.gl/PCTjMCQpZuR3ns2J7",
   addressEn: "UAE – Abu Dhabi – Mussafah 40",
   addressAr: "الإمارات العربية المتحدة – أبوظبي – مصفح 40",
-  logoUrl: "/logo-daynight.png",
+  logoUrl: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png",
   qrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=256x256&color=071A33&bgcolor=F5B700&data=https%3A%2F%2Fdaynightae.com",
   slogans: {
     en: ["Fast • Reliable • Every Time", "Your Comfort.. Our Priority"],

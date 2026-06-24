@@ -1,0 +1,1 @@
+- [Arabic mojibake fix technique](arabic-mojibake-fix.md) — triple-encoded Arabic: fix per-char via cp1252 encode + UTF-8 decode, not latin-1

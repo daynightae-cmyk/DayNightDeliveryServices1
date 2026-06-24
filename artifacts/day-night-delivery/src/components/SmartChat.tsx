@@ -35,6 +35,16 @@ export default function SmartChat() {
     setMessages([{ id: "welcome", sender: "bot", text: t.welcome }]);
   }, [language, t.welcome]);
 
+  useEffect(() => {
+    const SESSION_KEY = "dn_chat_greeted";
+    if (sessionStorage.getItem(SESSION_KEY)) return;
+    const timer = setTimeout(() => {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      setOpen(true);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const whatsappLink = useMemo(
     () => `${companyMeta.whatsappUrl}?text=${encodeURIComponent(isArabic ? "مرحباً، أحتاج مساعدة" : "Hello, I need support")}`,
     [isArabic]

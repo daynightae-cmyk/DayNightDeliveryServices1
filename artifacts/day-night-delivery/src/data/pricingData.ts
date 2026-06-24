@@ -24,7 +24,7 @@ export const domesticPricing = {
   additionalPieceSurcharge: {
     id: "additional-piece-surcharge",
     labelEn: "Additional piece surcharge",
-    labelAr: "???? ?????? ????????",
+    labelAr: "رسوم القطعة الإضافية",
     amount: 5
   }
 };
