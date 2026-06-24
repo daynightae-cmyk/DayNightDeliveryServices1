@@ -50,6 +50,7 @@ export default function Footer() {
     { key: "corporate", label: isArabic ? "الشركات والعقود" : "Corporate & Contracts", path: "/corporate" },
     { key: "request", label: isArabic ? "اطلب توصيل" : "Request Delivery", path: "/request" },
     { key: "tracking", label: isArabic ? "تتبع شحنتك" : "Track Shipment", path: "/tracking" },
+    { key: "qr", label: isArabic ? "خدمات QR الذكية" : "QR Services", path: "/qr" },
   ];
 
   /* ── Column: Support ── */
@@ -274,11 +275,25 @@ export default function Footer() {
           <p className={`text-xs text-center md:text-start ${isLight ? "text-brand-deep/50" : "text-white/50"}`}>
             {tf.allRights}
           </p>
-          <p className={`text-xs flex items-center gap-1 ${isLight ? "text-brand-deep/40" : "text-white/40"}`}>
-            {isArabic ? "صُمم بـ" : "Crafted with"}
-            <Heart className="w-3 h-3 text-brand-gold fill-brand-gold" />
-            {isArabic ? "لخدمتك" : "for you"}
-          </p>
+          <div className="flex flex-col items-center gap-1">
+            <p
+              className="text-xs font-bold"
+              style={{
+                background: "linear-gradient(90deg, #D4AF37, #F5B700, #D4AF37)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                letterSpacing: "0.03em",
+              }}
+            >
+              Create By Eng Sadek Elgazar
+            </p>
+            <p className={`text-xs flex items-center gap-1 ${isLight ? "text-brand-deep/40" : "text-white/40"}`}>
+              {isArabic ? "صُمم بـ" : "Crafted with"}
+              <Heart className="w-3 h-3 text-brand-gold fill-brand-gold" />
+              {isArabic ? "لخدمتك" : "for you"}
+            </p>
+          </div>
           <div className="flex items-center gap-3 flex-wrap justify-center">
             <Link to="/policy" className={`text-xs transition-colors ${isLight ? "text-brand-deep/50 hover:text-brand-deep" : "text-white/50 hover:text-white/80"}`}>
               {tf.policy}

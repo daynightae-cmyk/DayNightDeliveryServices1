@@ -8,6 +8,29 @@
   --color-brand-hover: #0057B8;
   --color-brand-sky:   #2BB8FF;
   --color-brand-green: #25D366;
+  --font-family-arabic: 'Cairo', 'Tajawal', sans-serif;
+  --font-family-english: 'Inter', 'Poppins', system-ui, sans-serif;
+}
+
+/* ── Global font strategy ── */
+:root {
+  font-family: 'Inter', 'Poppins', system-ui, sans-serif;
+}
+[dir="rtl"],
+[lang="ar"],
+html[lang="ar"],
+[dir="rtl"] input,
+[dir="rtl"] button,
+[dir="rtl"] p,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6,
+[dir="rtl"] span,
+[dir="rtl"] li {
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
 }
 
 /* ── Mobile-first font scale ── */

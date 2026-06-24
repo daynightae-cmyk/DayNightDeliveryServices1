@@ -30,6 +30,7 @@ const Tracking = lazy(() => import("./components/Tracking"));
 const Faqs = lazy(() => import("./components/Faqs"));
 const ContactUs = lazy(() => import("./components/ContactUs"));
 const Policy = lazy(() => import("./components/Policy"));
+const Privacy = lazy(() => import("./components/Privacy"));
 const QR = lazy(() => import("./components/QR"));
 const AdminPanel = lazy(() => import("./components/AdminPanel"));
 const InternationalShippingAdvanced = lazy(() => import("./components/InternationalShippingAdvanced"));
@@ -39,6 +40,7 @@ const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGaller
 
 import SmartChat from "./components/SmartChat";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
+import StickyMobileBar from "./components/StickyMobileBar";
 import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
@@ -122,6 +124,8 @@ function AppContent() {
     { key: "pricing", path: "/pricing", label: t.nav.pricing },
     { key: "gallery", path: "/gallery", label: t.nav.gallery },
     { key: "tracking", path: "/tracking", label: t.nav.tracking },
+    { key: "qr", path: "/qr", label: t.nav.qr },
+    { key: "faqs", path: "/faq", label: t.nav.faqs },
     { key: "contact", path: "/contact", label: t.nav.contact }
   ];
 
@@ -395,7 +399,7 @@ function AppContent() {
             <Route path="/faq" element={<Faqs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/policy" element={<Policy />} />
-            <Route path="/privacy" element={<Policy />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Policy />} />
             <Route path="/shipping-policy" element={<Policy />} />
             <Route path="/refund-policy" element={<Policy />} />
@@ -411,11 +415,14 @@ function AppContent() {
         </Suspense>
       </main>
 
-      {/* Floating WhatsApp widget */}
+      {/* Floating WhatsApp widget — always LEFT side */}
       <FloatingWhatsApp />
 
-      {/* Smart Chat */}
+      {/* Smart Chat — always RIGHT side */}
       <SmartChat />
+
+      {/* Mobile sticky bottom action bar */}
+      <StickyMobileBar />
 
       {/* Footer */}
       <Footer />

@@ -1,0 +1,625 @@
+استكمل الآن مشروع DAY NIGHT DELIVERY SERVICES بعد آخر إصلاحاتك الناجحة. لا تبدأ من الصفر. أنت بالفعل أصلحت Pricing state isolation وSmartChat وFooter وRequestDelivery breakdown وProduction Gate 39/39 PASS. الآن ظهرت ملاحظات جديدة من الفحص البصري والتجربة العملية، ويجب تنفيذها كمرحلة Production Polish + Export + QR + Final Full Website Audit.
+
+## 0) ثوابت لا تغيّرها
+
+Company:
+DAY NIGHT DELIVERY SERVICES
+داي نايت لخدمات التوصيل والشحن
+
+Official domain:
+https://daynightae.com
+
+Official email:
+[Admin@daynightae.com](mailto:Admin@daynightae.com)
+
+Official phone / WhatsApp:
++971 56 875 7331
+
+Official logo URL:
+https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+
+Brand colors:
+Deep Navy #071A33
+Navy #0A1C3A
+Royal Blue #0057B8
+Bright Blue #007BFF
+Sky Blue #18A8E8
+Luxury Gold #D4AF37
+Warm Gold #F5B700
+White #FFFFFF
+
+## 1) المشكلة الأولى: WhatsApp widget و Chatbot فوق بعض
+
+في المعاينة الحالية يوجد تداخل واضح بين أيقونة واتساب وأيقونة الشات بوت / panel، خصوصًا أسفل يمين الصفحة. هذا يسبب زحمة بصرية ويمنع العميل من استخدامهم بشكل مريح.
+
+### المطلوب
+
+* افصل مواضع Chatbot وWhatsApp تمامًا.
+* لا تجعلهم فوق بعض أبدًا في desktop أو mobile.
+* اجعلهم إما:
+
+  1. Stack عمودي منظم في زاوية واحدة مع مسافة واضحة بينهما، أو
+  2. WhatsApp في اليسار وChatbot في اليمين، حسب الأفضل للواجهة.
+* على mobile:
+
+  * لا يغطيان زر إرسال الطلب.
+  * لا يغطيان CTA buttons.
+  * لا يغطيان footer links.
+  * لا يغطيان pricing calculator.
+* اجعل Chatbot floating icon أنيقة ومتحركة بشكل لطيف:
+
+  * pulse خفيف
+  * glow ذهبي
+  * bounce بسيط
+  * بدون إزعاج
+* اجعل WhatsApp floating widget منفصلًا، واضحًا، وأصغر من panel الشات.
+* إذا كان Chatbot panel مفتوحًا، يجب أن يتحرك WhatsApp أو يظل بعيدًا عنه.
+* إذا كان WhatsApp card مفتوحًا، لا يفتح Chatbot فوقه.
+
+### Acceptance
+
+اختبر على:
+
+* 390px
+* 400px
+* 430px
+* 768px
+* desktop
+
+لا يوجد overlap بين:
+
+* WhatsApp icon
+* WhatsApp card
+* Chatbot icon
+* Chatbot panel
+* Replit preview badge إن وجد في بيئة التطوير
+
+## 2) الشات بوت: تحسين إضافي بعد الإصلاح السابق
+
+أنت أصلحت أنه لا يفتح قهريًا. الآن نريده أكثر احترافًا:
+
+* زر إغلاق واضح.
+* زر minimize واضح.
+* عند إغلاق العميل للشات، لا يظهر panel مرة أخرى تلقائيًا في نفس الجلسة.
+* يظهر فقط bubble صغير ترحيبي مرة واحدة.
+* quick replies تكون مرتبة ولا تسبب scroll مزدحم.
+* الأسئلة والأجوبة يجب أن تكون من كل بيانات الموقع.
+* أضف ردود مفصلة للأسئلة التالية:
+
+  * الأسعار المحلية
+  * القطع الإضافية
+  * Express
+  * COD
+  * الشحن الخليجي
+  * الشحن العالمي
+  * طلب توصيل
+  * تتبع شحنة
+  * الشركات والعقود
+  * المتاجر الإلكترونية
+  * المستندات
+  * المواد المحظورة
+  * مواعيد العمل
+  * مناطق التغطية
+  * سياسة الخصوصية
+  * الشروط والأحكام
+  * التواصل مع الدعم
+* لا يهلوس.
+* لو لا يعرف الإجابة، يوجه العميل إلى واتساب.
+* أضف أزرار داخلية:
+
+  * Request Delivery
+  * Pricing
+  * Tracking
+  * Contact
+  * WhatsApp
+
+## 3) تصدير PDF / DOC / TXT لكل شيء مهم
+
+المطلوب الآن تنفيذ Export System احترافي وليس مجرد زر بسيط.
+
+### أماكن التصدير المطلوبة
+
+#### صفحة طلب التوصيل /request
+
+بعد إنشاء الطلب أو في شاشة ملخص الطلب:
+
+* Export Order Summary PDF
+* Export Invoice PDF
+* Export Shipping Label PDF
+* Export TXT
+* Export DOCX إن أمكن بدون كسر build
+
+#### صفحة الأسعار /pricing
+
+* Export Price Quote PDF
+* Export Local Delivery Quote PDF
+* Export International Shipping Quote PDF
+* Export TXT summary
+* PDF يحتوي على القيم الحالية من الحاسبة:
+
+  * pickup city
+  * delivery city
+  * service
+  * weight
+  * pieces
+  * base price
+  * express surcharge
+  * extra pieces
+  * total delivery fee
+  * international destination
+  * international weight
+  * first kg
+  * additional kg
+  * total international price
+
+#### صفحة الشحن الدولي
+
+* Export International Shipping Info PDF
+* Export Quote PDF حسب الوجهة والوزن إن كانت الصفحة بها calculator
+
+#### صفحة التتبع /tracking
+
+* Export Tracking Report PDF
+* يحتوي:
+
+  * tracking number
+  * status
+  * timeline
+  * sender/receiver إن كانت متاحة
+  * support contact
+
+#### Admin Panel
+
+* Export selected order PDF
+* Export selected order TXT
+* Export orders CSV
+* Export COD report CSV/PDF
+* Export daily report PDF
+* Export invoice PDF
+* Export shipping label PDF
+
+### تصميم كل الملفات المصدرة
+
+كل ملف يجب أن يكون branded:
+
+Header:
+
+* الشعار الرسمي من الرابط:
+  https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png
+* DAY NIGHT DELIVERY SERVICES
+* داي نايت لخدمات التوصيل والشحن
+* Fast • Reliable • Every Time
+
+ألوان التصميم:
+
+* خلفية أو شريط علوي Deep Navy
+* عناوين Gold
+* جسم أبيض أو فاتح
+* جداول مرتبة
+* حدود ناعمة
+* رقم التتبع واضح
+* QR واضح إن وجد
+* Footer داخل الملف:
+  daynightae.com
+  [Admin@daynightae.com](mailto:Admin@daynightae.com)
+  +971 56 875 7331
+
+### مهم
+
+* لا تجعل PDF مجرد screenshot عشوائي.
+* يجب أن يكون PDF منسقًا كوثيقة شركة.
+* DOCX إن كان سيكسر build، اجعله optional أو fallback TXT.
+* PDF وTXT أهم شيء يجب أن يعملوا بثبات.
+* لا تستخدم مكتبة تسبب مشاكل في Vite أو Replit.
+* اختبر build بعد إضافة المكتبات.
+
+## 4) صفحة QR Scanner / QR Services Hub
+
+أنشئ صفحة جديدة مميزة للعملاء:
+
+Route:
+
+* /qr
+  أو
+* /qr-scanner
+  مع ربطها من Footer وNavigation إن كان مناسبًا.
+
+### المطلوب في الصفحة
+
+صفحة QR Services Hub بشكل premium:
+
+* عنوان:
+  DAY NIGHT QR SERVICES
+  خدمات داي نايت الذكية عبر QR
+
+* وظائف:
+
+  1. Scan Tracking QR
+  2. Enter Tracking Number manually
+  3. Generate QR for tracking number
+  4. QR links to:
+     /tracking?code=DN-...
+  5. QR for WhatsApp support
+  6. QR for company profile/contact card
+  7. QR for Request Delivery page
+  8. Download QR as PNG/PDF
+
+### Camera scanner
+
+لو ستضيف QR scanner بالكاميرا:
+
+* يجب أن تطلب إذن الكاميرا فقط داخل هذه الصفحة.
+* راجع Permissions-Policy في vercel.json، لأن الموقع حاليًا قد يمنع camera=().
+* لا تكسر security headers.
+* إن كان تشغيل الكاميرا معقدًا، اجعل scanner optional:
+
+  * manual input يعمل دائمًا.
+  * camera scan يظهر إذا مدعوم.
+  * fallback واضح لو الكاميرا غير متاحة.
+
+### تصميم
+
+* زجاجي Glassmorphism
+* Deep navy
+* Gold accents
+* QR cards
+* أزرار واضحة
+* Mobile-first
+
+## 5) صفحة السياسات / الشروط في الوضع النهاري غير واضحة
+
+في صفحة /terms أو /policy اللون النهاري غير مقروء. النصوص تظهر باهتة جدًا على خلفية فاتحة.
+
+### المطلوب
+
+* أصلح ألوان light theme في صفحات:
+
+  * /terms
+  * /policy
+  * /privacy
+  * /shipping-policy
+  * /refund-policy إن وجدت
+* النص يجب أن يكون واضحًا جدًا.
+* البطاقات يجب أن تكون contrast جيد.
+* لا تستخدم نص أبيض على خلفية فاتحة.
+* العناوين Navy.
+* العناوين الفرعية Gold/Navy.
+* الفقرات بلون مقروء.
+* اختبر dark mode وlight mode.
+
+## 6) أضف صفحة Privacy Policy كاملة
+
+أضف صفحة:
+
+* /privacy
+
+ويجب ربطها في:
+
+* Footer
+* SEO
+* sitemap
+* Chatbot knowledge
+* Policy/Terms navigation إن وجد
+
+### محتوى الصفحة
+
+اكتب Privacy Policy احترافية لشركة توصيل وشحن في الإمارات، تشمل:
+
+* البيانات التي يتم جمعها:
+
+  * الاسم
+  * الهاتف
+  * العنوان
+  * بيانات الشحنة
+  * رقم التتبع
+  * الدفع/COD إن وجد
+* سبب الاستخدام:
+
+  * تنفيذ الطلب
+  * التواصل
+  * التتبع
+  * الدعم
+  * الفواتير
+* مشاركة البيانات:
+
+  * مع السائقين أو الشركاء التشغيليين عند الحاجة فقط
+* حماية البيانات
+* الاحتفاظ بالبيانات
+* حقوق العميل
+* التواصل:
+  [Admin@daynightae.com](mailto:Admin@daynightae.com)
+  +971 56 875 7331
+* لا تكتب وعود قانونية مبالغ فيها.
+* استخدم لغة عربية وإنجليزية أو على الأقل صفحة عربية احترافية مع English summary.
+
+## 7) أضف credit ثابت في نهاية Footer
+
+في نهاية الموقع، داخل Footer، أضف سطر ثابت وأنيق:
+
+Create By Eng Sadek Elgazar
+
+### التصميم
+
+* خط جميل.
+* صغير لكن واضح.
+* Gold أو gradient gold.
+* يظهر في كل الصفحات.
+* لا يزاحم روابط الفوتر.
+* يظهر في desktop/mobile.
+* يمكن أن يكون:
+  Created with precision by Eng Sadek Elgazar
+  لكن يجب أن يظهر النص المطلوب تحديدًا:
+  Create By Eng Sadek Elgazar
+
+## 8) تحسين الخط العربي والإنجليزي في الموقع كله
+
+الموقع يحتاج خط عربي أجمل وأوضح.
+
+### المطلوب
+
+* استخدم خط عربي احترافي مناسب:
+
+  * Cairo
+  * Tajawal
+  * IBM Plex Sans Arabic
+  * Noto Kufi Arabic
+    اختَر الأفضل للتصميم.
+* استخدم خط إنجليزي حديث:
+
+  * Inter
+  * Poppins
+  * Montserrat
+* طبق الخطوط عالميًا عبر CSS variables.
+* Arabic RTL يجب أن يستخدم Arabic font.
+* English LTR يستخدم English font.
+* العناوين تكون قوية.
+* الأزرار مقروءة.
+* الفوتر والنافبار واضحين.
+* لا تستخدم خطوط كثيرة تسبب بطء.
+* الأفضل استخدام Google Fonts import أو self-host fallback حسب ما لا يكسر الأداء.
+
+## 9) راجع Navigation وFooter مرة أخرى
+
+تأكد أن Navigation النهائي لا يحتوي:
+
+* تكرارات مزعجة.
+* Request Delivere.
+* روابط مكسورة.
+* روابط قديمة.
+* مسارات لا تعمل.
+
+### Navigation النهائي المقترح
+
+Home
+About Us
+Services
+UAE Delivery
+International Shipping
+E-Commerce
+Corporate & Contracts
+Pricing
+Gallery
+Tracking
+QR Services
+FAQs
+Contact
+Request Delivery
+
+### Footer النهائي
+
+Company:
+Home
+About Us
+Services
+Gallery
+FAQs
+Contact
+
+Services:
+UAE Local Delivery
+International Shipping
+E-Commerce Solutions
+Corporate & Contracts
+Request Delivery
+Tracking
+QR Services
+
+Support:
+Pricing
+Service Policy
+Privacy Policy
+Terms & Conditions
+WhatsApp
+Email
+
+Contact:
++971 56 875 7331
+[Admin@daynightae.com](mailto:Admin@daynightae.com)
+daynightae.com
+UAE
+
+Bottom:
+Create By Eng Sadek Elgazar
+
+## 10) إضافات قوية تميز الموقع
+
+أضف 3 إلى 5 إضافات صغيرة عالية القيمة بدون كسر المشروع:
+
+### اقتراحات
+
+1. Sticky mini action bar على الموبايل:
+
+   * Request Delivery
+   * Track
+   * WhatsApp
+
+2. Smart copy buttons:
+
+   * نسخ رقم الهاتف
+   * نسخ البريد
+   * نسخ رقم التتبع
+   * نسخ رابط التتبع
+
+3. Service availability badge:
+
+   * 24/7 Available
+   * UAE Coverage
+   * International Shipping
+
+4. Tracking link generator:
+
+   * بعد إدخال رقم التتبع، يولد رابط مباشر قابل للنسخ.
+
+5. Price quote share:
+
+   * في صفحة pricing، زر “Copy Quote”
+   * ينسخ ملخص السعر للواتساب.
+
+6. WhatsApp prefilled messages:
+
+   * عند الضغط على WhatsApp من صفحة pricing، يرسل ملخص السعر.
+   * عند الضغط من tracking، يرسل رقم التتبع.
+   * عند الضغط من request، يرسل بيانات الطلب أو رقم التتبع.
+
+7. Small customer trust section:
+
+   * Secure handling
+   * Clear pricing
+   * Live support
+   * UAE-wide coverage
+
+اختر الإضافات التي يمكن تنفيذها بسرعة وثبات.
+
+## 11) مراجعة الموقع بالكامل صفحة صفحة
+
+بعد تنفيذ كل شيء، مرّ على كل الصفحات:
+
+/
+/about
+/services
+/uae-delivery
+/international-shipping
+/international-advanced
+/ecommerce
+/corporate
+/pricing
+/request
+/tracking
+/gallery
+/contact
+/faq
+/policy
+/privacy
+/terms
+/qr
+/auth
+/driver
+/customer
+/admin
+
+### المطلوب في كل صفحة
+
+* لا توجد 404.
+* لا توجد صفحة بيضاء.
+* لا توجد Console errors.
+* لا توجد نصوص عربية مشوهة.
+* لا يوجد لون غير مقروء.
+* لا يوجد overlap.
+* لا يوجد horizontal scroll.
+* لا يوجد تكرار مزعج.
+* لا توجد أسعار قديمة.
+* لا توجد بيانات تواصل قديمة.
+* لا يوجد logo قديم.
+* لا يوجد WhatsApp/chat overlap.
+* لا توجد أزرار مكسورة.
+* لا توجد روابط مكسورة.
+* layout mobile ممتاز.
+
+## 12) Production Gate
+
+حدّث production-hardening-gate.mjs من 39 PASS إلى مجموعة أوسع تشمل:
+
+* Pricing calculators isolated.
+* Domestic pieces calculation.
+* International calculation.
+* RequestDelivery breakdown.
+* Chatbot close/minimize/sessionStorage.
+* WhatsApp/chat no obvious shared fixed bottom class conflict.
+* Export utilities exist.
+* PDF export function exists.
+* TXT export function exists.
+* QR services page exists.
+* Privacy page exists.
+* Terms/Policy light theme readable classes exist.
+* Footer contains Create By Eng Sadek Elgazar.
+* Navigation contains QR Services.
+* No Request Delivere typo.
+* No old prices 31.50/52.50.
+* No mojibake.
+* package.json valid.
+* build script ok.
+* vercel.json ok.
+* no node_modules tracked.
+* no dist tracked.
+* no .env tracked.
+
+يجب أن ينجح:
+pnpm run build
+pnpm run production:gate
+
+## 13) لا ترفع أسرار ولا ملفات ممنوعة
+
+قبل النهاية نفّذ:
+
+git status --short
+git ls-files node_modules
+git ls-files dist
+git ls-files .env*
+
+كلها يجب أن تكون نظيفة من الملفات الممنوعة.
+
+## 14) التقرير النهائي المطلوب
+
+في النهاية أريد تقريرًا واضحًا يحتوي:
+
+1. الملفات التي عدلتها.
+2. إصلاح WhatsApp/chat overlap.
+3. ما تم في PDF/TXT/DOCX export.
+4. ما تم في QR Services page.
+5. ما تم في Privacy Policy.
+6. ما تم في light theme للسياسات.
+7. ما تم في Footer credit.
+8. ما تم في Arabic/English fonts.
+9. الإضافات المميزة التي أضفتها.
+10. نتائج:
+
+* pnpm run build
+* pnpm run production:gate
+* git status --short
+
+11. أي شيء يحتاج إعداد Vercel أو Supabase.
+12. هل جاهز للنشر على Vercel أم لا.
+
+## 15) Acceptance Criteria النهائي
+
+لا تعتبر المهمة منتهية إلا إذا:
+
+* WhatsApp وChatbot غير متداخلين.
+* Chatbot يفتح ويغلق حسب رغبة العميل.
+* Chatbot لا يفرض نفسه بعد الإغلاق.
+* Export PDF يعمل على الأقل للفواتير وملخص الطلب والسعر.
+* Export TXT يعمل.
+* DOCX يعمل إن أمكن بدون كسر build.
+* PDF branded بالشعار والألوان.
+* QR Services page موجودة ومميزة.
+* Privacy Policy page موجودة.
+* Terms/Policy light theme مقروء.
+* Footer يحتوي:
+  Create By Eng Sadek Elgazar
+* الخط العربي جميل وواضح.
+* الخط الإنجليزي متناسق.
+* Navigation/Footer منظمين.
+* كل الصفحات تمت مراجعتها.
+* build PASS.
+* production gate PASS.
+* لا توجد ملفات ممنوعة في Git.

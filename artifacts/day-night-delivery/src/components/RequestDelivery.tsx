@@ -16,8 +16,10 @@ import {
   CheckCircle, 
   ChevronRight, 
   Copy,
+  FileText,
   MessageSquare
 } from "lucide-react";
+import { exportOrderPDF, exportOrderTXT } from "../lib/exportUtils";
 
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
@@ -652,7 +654,7 @@ return "";
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
               <button
                 id="success_copy_tracking_btn"
                 type="button"
@@ -673,6 +675,40 @@ return "";
                 <MessageSquare className="w-4 h-4" />
                 <span>WhatsApp</span>
               </a>
+              <button
+                id="success_export_pdf_btn"
+                type="button"
+                onClick={() => exportOrderPDF({
+                  trackingCode: successId,
+                  senderName, senderPhone, senderCity, senderAddress,
+                  receiverName, receiverPhone, receiverCity, receiverAddress,
+                  packageType, pieces, weight, serviceType,
+                  paymentMethod: paymentMethod || "sender_pays",
+                  codAmount, notes,
+                  deliveryFee: calculateDomesticPrice({ pickupCity: senderCity, deliveryCity: receiverCity, weight, pieces, serviceType }).total,
+                }, "invoice")}
+                className="px-5 py-3 bg-brand-gold/10 border border-brand-gold/25 text-brand-gold font-bold rounded-xl text-xs transition-colors flex items-center gap-2 hover:bg-brand-gold/20"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{language === "ar" ? "تصدير PDF" : "Export PDF"}</span>
+              </button>
+              <button
+                id="success_export_txt_btn"
+                type="button"
+                onClick={() => exportOrderTXT({
+                  trackingCode: successId,
+                  senderName, senderPhone, senderCity, senderAddress,
+                  receiverName, receiverPhone, receiverCity, receiverAddress,
+                  packageType, pieces, weight, serviceType,
+                  paymentMethod: paymentMethod || "sender_pays",
+                  codAmount, notes,
+                  deliveryFee: calculateDomesticPrice({ pickupCity: senderCity, deliveryCity: receiverCity, weight, pieces, serviceType }).total,
+                })}
+                className="px-5 py-3 bg-white/5 border border-white/10 text-white/70 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 hover:border-white/30"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{language === "ar" ? "تصدير TXT" : "Export TXT"}</span>
+              </button>
             </div>
 
             <p className="text-white/60 text-xs leading-relaxed max-w-md mx-auto">

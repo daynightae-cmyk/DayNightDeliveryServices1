@@ -5,13 +5,14 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BadgePercent, Check, MessageSquare, PackageCheck, RefreshCw, Search, Truck } from "lucide-react";
+import { BadgePercent, Check, FileText, MessageSquare, PackageCheck, RefreshCw, Search, Truck } from "lucide-react";
 import { coverageAreas } from "../data/coverage";
 import { domesticPricing, internationalDestinations, internationalPricing } from "../data/pricingData";
-import { calculateDomesticPrice, calculateInternationalPrice, formatAED } from "../lib/pricing";
+import { calculateDomesticPrice, calculateInternationalPrice, EXPRESS_SURCHARGE, ADDITIONAL_PIECE_SURCHARGE, formatAED } from "../lib/pricing";
 import companyMeta from "../data/companyMeta";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
+import { exportDomesticQuotePDF, exportIntlQuotePDF, exportQuoteTXT } from "../lib/exportUtils";
 
 export default function Pricing() {
   const { language, theme } = useAppContext();
@@ -279,6 +280,39 @@ export default function Pricing() {
               WhatsApp
             </a>
           </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => exportDomesticQuotePDF({
+                pickupCity: domesticPickupCity,
+                deliveryCity: domesticDeliveryCity,
+                service: domesticService,
+                weight: domesticWeight,
+                pieces: domesticPieces,
+                basePrice: domestic.subtotal - (domesticService === "express" ? EXPRESS_SURCHARGE : 0) - Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE,
+                expressCharge: domesticService === "express" ? EXPRESS_SURCHARGE : 0,
+                extraPiecesCharge: Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE,
+                total: domestic.total,
+              })}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-colors ${isLight ? "border-brand-deep/15 text-brand-deep/70 hover:border-brand-gold/60 hover:text-brand-gold" : "border-white/10 text-white/50 hover:border-brand-gold/50 hover:text-brand-gold"}`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {isArabic ? "تصدير PDF" : "Export PDF"}
+            </button>
+            <button
+              onClick={() => exportQuoteTXT("domestic", {
+                "Pickup City": domesticPickupCity,
+                "Delivery City": domesticDeliveryCity,
+                "Service": domesticService,
+                "Weight": `${domesticWeight} kg`,
+                "Pieces": domesticPieces,
+                "Total": formatAED(domestic.total),
+              })}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-colors ${isLight ? "border-brand-deep/15 text-brand-deep/70 hover:border-brand-gold/60 hover:text-brand-gold" : "border-white/10 text-white/50 hover:border-brand-gold/50 hover:text-brand-gold"}`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {isArabic ? "تصدير TXT" : "Export TXT"}
+            </button>
+          </div>
         </div>
 
         {/* ── International Calculator (isolated state) ── */}
@@ -369,6 +403,43 @@ export default function Pricing() {
             <a href={companyMeta.whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-center px-4 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-500 transition-all">
               WhatsApp
             </a>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(() => {
+              const dest = internationalDestinations.find(d => d.countryCode === internationalDestination) || internationalDestinations[0];
+              return (
+                <>
+                  <button
+                    onClick={() => exportIntlQuotePDF({
+                      destination: dest ? (isArabic ? dest.countryNameAr : dest.countryNameEn) : internationalDestination,
+                      weight: internationalWeight,
+                      firstKgPrice: dest ? dest.firstKg : 0,
+                      additionalKgPrice: dest ? dest.additionalKg : 0,
+                      total: international.total,
+                      zone: international.pricingCategory,
+                    })}
+                    className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-colors ${isLight ? "border-brand-deep/15 text-brand-deep/70 hover:border-brand-gold/60 hover:text-brand-gold" : "border-white/10 text-white/50 hover:border-brand-gold/50 hover:text-brand-gold"}`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {isArabic ? "تصدير PDF" : "Export PDF"}
+                  </button>
+                  <button
+                    onClick={() => exportQuoteTXT("international", {
+                      "Destination": dest ? (isArabic ? dest.countryNameAr : dest.countryNameEn) : internationalDestination,
+                      "Weight": `${internationalWeight} kg`,
+                      "Zone": international.pricingCategory,
+                      "First Kg": formatAED(dest ? dest.firstKg : 0),
+                      "Additional Kg": formatAED(dest ? dest.additionalKg : 0),
+                      "Total": formatAED(international.total),
+                    })}
+                    className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-colors ${isLight ? "border-brand-deep/15 text-brand-deep/70 hover:border-brand-gold/60 hover:text-brand-gold" : "border-white/10 text-white/50 hover:border-brand-gold/50 hover:text-brand-gold"}`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {isArabic ? "تصدير TXT" : "Export TXT"}
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       </section>

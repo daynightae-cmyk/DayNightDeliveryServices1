@@ -3,44 +3,47 @@ import { useState } from "react";
 import { MessageCircle, X, Phone, ExternalLink } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { useAppContext } from "../lib/AppContext";
-import { translations } from "../data/translations";
+import { useLocation } from "react-router-dom";
+
+const HIDDEN_ON = ["/admin", "/driver", "/customer", "/auth"];
 
 export default function FloatingWhatsApp() {
   const [open, setOpen] = useState(false);
   const { language } = useAppContext();
-  const t = translations[language];
   const isArabic = language === "ar";
+  const location = useLocation();
+
+  if (HIDDEN_ON.some((r) => location.pathname.startsWith(r))) return null;
 
   return (
-    <div
-      className={`fixed bottom-6 z-50 flex flex-col items-end gap-3 ${
-        isArabic ? "left-6" : "right-6"
-      }`}
-    >
+    /* Always pinned to the LEFT side (regardless of RTL/LTR) — SmartChat is on the right */
+    <div className="fixed left-4 bottom-[72px] md:bottom-5 z-50 flex flex-col items-start gap-3">
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.92 }}
+            initial={{ opacity: 0, y: 16, scale: 0.92, originX: 0 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.92 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="glass-strong rounded-2xl p-5 w-72 shadow-2xl"
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="glass-strong rounded-2xl p-5 w-68 max-w-[calc(100vw-2rem)] shadow-2xl border border-[#25D366]/20"
+            dir={isArabic ? "rtl" : "ltr"}
           >
             <div className="flex items-center justify-between mb-3">
               <div className={`flex items-center gap-2 ${isArabic ? "flex-row-reverse" : ""}`}>
-                <div className="w-9 h-9 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-5 h-5 text-[#25D366]" />
                 </div>
                 <div className={isArabic ? "text-right" : "text-left"}>
                   <p className="text-white text-xs font-bold leading-none">DAY NIGHT</p>
                   <p className="text-white/50 text-[10px] mt-0.5">
-                    {isArabic ? "متاح الآن" : "Available now"}
+                    {isArabic ? "متاح الآن • 24/7" : "Available now • 24/7"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -84,33 +87,46 @@ export default function FloatingWhatsApp() {
         )}
       </AnimatePresence>
 
-      {/* Main FAB */}
+      {/* FAB — WhatsApp green */}
       <motion.button
+        id="whatsapp_widget_trigger"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(!open)}
-        className="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl"
+        aria-label="WhatsApp"
+        className="relative w-13 h-13 rounded-2xl flex items-center justify-center shadow-2xl"
         style={{
+          width: 52,
+          height: 52,
           background: "linear-gradient(135deg, #128C7E 0%, #25D366 100%)",
-          boxShadow: "0 4px 20px rgba(37,211,102,0.40)",
+          boxShadow: "0 4px 20px rgba(37,211,102,0.45)",
         }}
       >
-        {/* Pulse ring */}
         {!open && (
-          <span className="absolute inset-0 rounded-2xl bg-[#25D366]/40 pulse-ring" />
+          <span
+            className="absolute inset-0 rounded-2xl"
+            style={{ animation: "waPulse 2.5s ease-in-out infinite", background: "rgba(37,211,102,0.35)" }}
+          />
         )}
         <AnimatePresence mode="wait">
           {open ? (
-            <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+            <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
               <X className="w-6 h-6 text-white" />
             </motion.div>
           ) : (
-            <motion.div key="msg" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.2 }}>
+            <motion.div key="msg" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
               <MessageCircle className="w-6 h-6 text-white" />
             </motion.div>
           )}
         </AnimatePresence>
       </motion.button>
+
+      <style>{`
+        @keyframes waPulse {
+          0%, 100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.35); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -15,6 +15,7 @@ export const translations = {
       corporate: "Corporate & Contracts",
       gallery: "Gallery",
       faqs: "FAQs",
+      qr: "QR Services",
       policy: "Policy",
       quick_links: "Quick Navigation Links",
       quick_contact: "Fast & Direct Contact"
@@ -273,6 +274,7 @@ export const translations = {
       corporate: "الشركات والعقود",
       gallery: "المعرض",
       faqs: "الأسئلة المتكررة",
+      qr: "خدمات QR",
       policy: "سياسات النقل",
       quick_links: "روابط سريعة للتصفح",
       quick_contact: "اتصال سريع ومباشر"
