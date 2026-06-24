@@ -1,11 +1,11 @@
-{
+﻿{
   "name": "@workspace/day-night-delivery",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "vite build --config vite.config.ts",
+    "build": "vite build --config vite.config.ts && node scripts/create-spa-route-fallbacks.mjs",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "production:gate": "node scripts/production-hardening-gate.mjs"
@@ -88,3 +88,4 @@
     "lightningcss-win32-x64-msvc": "1.32.0"
   }
 }
+
