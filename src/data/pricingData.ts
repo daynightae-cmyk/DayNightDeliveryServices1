@@ -20,6 +20,12 @@ export const domesticPricing = {
     labelEn: "Express surcharge",
     labelAr: "رسوم الخدمة السريعة",
     amount: 15
+  },
+  additionalPieceSurcharge: {
+    id: "additional-piece-surcharge",
+    labelEn: "Additional piece surcharge",
+    labelAr: "???? ?????? ????????",
+    amount: 5
   }
 };
 

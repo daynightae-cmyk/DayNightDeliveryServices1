@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -101,6 +101,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
     const pricing = calculateDomesticPrice({
       deliveryCity: receiverCity,
       weight,
+      pieces,
       serviceType
     });
     return { subtotal: pricing.subtotal, total: pricing.total };

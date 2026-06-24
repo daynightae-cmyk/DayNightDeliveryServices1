@@ -16,6 +16,7 @@ export type DomesticPriceInput = {
   pickupCity?: string | null;
   deliveryCity?: string | null;
   weight?: number | string | null;
+  pieces?: number | string | null;
   serviceType?: "standard" | "express" | string | null;
 };
 
@@ -28,6 +29,7 @@ export type InternationalPriceInput = {
 export const LOCAL_MAIN_CITY_PRICE = domesticPricing.main.base;
 export const LOCAL_EXTENDED_AREA_PRICE = domesticPricing.extended.base;
 export const EXPRESS_SURCHARGE = domesticPricing.expressSurcharge.amount;
+export const ADDITIONAL_PIECE_SURCHARGE = domesticPricing.additionalPieceSurcharge.amount;
 export const GCC_FIRST_KG_PRICE = internationalPricing.gcc.firstKg;
 export const GCC_ADDITIONAL_KG_PRICE = internationalPricing.gcc.additionalKg;
 export const WORLDWIDE_FIRST_KG_PRICE = internationalPricing.worldwide.firstKg;
@@ -35,6 +37,14 @@ export const WORLDWIDE_ADDITIONAL_KG_PRICE = internationalPricing.worldwide.addi
 
 function normalizeWeight(weight: number | string | null | undefined) {
   const parsed = Number(weight);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil(parsed));
+}
+
+function normalizePieces(pieces: number | string | null | undefined) {
+  const parsed = Number(pieces);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return 1;
   }
@@ -55,13 +65,15 @@ function resolveDomesticZone(input: DomesticPriceInput) {
 
 export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult {
   const billableWeight = normalizeWeight(input.weight);
+  const billablePieces = normalizePieces(input.pieces);
   const zone = resolveDomesticZone(input);
   const basePrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
   const express = input.serviceType === "express" ? EXPRESS_SURCHARGE : 0;
-  const subtotal = basePrice + express;
+  const extraPieceFee = Math.max(0, billablePieces - 1) * ADDITIONAL_PIECE_SURCHARGE;
+  const subtotal = basePrice + express + extraPieceFee;
   const total = Number(subtotal.toFixed(2));
   const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
-  const requiresCustomQuote = billableWeight > 50;
+  const requiresCustomQuote = billableWeight > 50 || billablePieces > 20;
 
   return {
     subtotal,
@@ -72,7 +84,8 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
     requiresCustomQuote,
     breakdown: [
       `${category}: ${formatAED(basePrice)}`,
-      ...(express ? [`Express surcharge: ${formatAED(express)}`] : [])
+      ...(express ? [`Express surcharge: ${formatAED(express)}`] : []),
+      ...(extraPieceFee ? [`Additional pieces: ${formatAED(ADDITIONAL_PIECE_SURCHARGE)} x ${billablePieces - 1}`] : [])
     ],
     notes: requiresCustomQuote
       ? "Large shipments may require operational confirmation before pickup."
