@@ -1,49 +1,53 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
-
-# compiled output
-dist
-tmp
-out-tsc
-*.tsbuildinfo
-.expo
-.expo-shared
-
 # dependencies
-node_modules
+node_modules/
 
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# build outputs
+dist/
+build/
+out-tsc/
+tmp/
+*.tsbuildinfo
 
-# IDE - VSCode
+# environment and local secrets
+.env
+.env.*
+!.env.example
+*.local
+.vercel/
+.netlify/
+
+# logs and caches
+.cache/
+.local/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# editors
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.idea/
+.project
+.classpath
+.settings/
+*.sublime-workspace
+.c9/
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
-
-# System Files
+# system files
 .DS_Store
 Thumbs.db
 
+# generated / migrated legacy material
+.migration-backup/
+attached_assets/Pasted-*.txt
+
+# Replit / generated rules
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
-
-# Replit
-.cache/
-.local/
+.expo/
+.expo-shared/
