@@ -23,6 +23,15 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL === EX
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+function normalizePublicOrderPayload(payload: Record<string, unknown>) {
+  const notes = typeof payload.notes === "string" ? payload.notes.trim() : "";
+
+  return {
+    ...payload,
+    notes: notes || "N/A"
+  };
+}
+
 export async function calculateDeliveryPrice(payload: {
   pickupCity?: string | null;
   deliveryCity?: string | null;
@@ -97,7 +106,7 @@ export async function createPublicOrder(payload: Record<string, unknown>): Promi
   }
 
   const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: payload
+    p_order_data: normalizePublicOrderPayload(payload)
   });
 
   if (error || data === null) {
@@ -113,7 +122,7 @@ export async function createPublicOrderRpc(payload: Record<string, unknown>): Pr
   if (!supabase) return null;
 
   const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: payload
+    p_order_data: normalizePublicOrderPayload(payload)
   });
 
   if (error) {
