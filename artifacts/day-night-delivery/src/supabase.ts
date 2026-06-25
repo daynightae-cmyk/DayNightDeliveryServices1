@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { Order } from "./types";
+import { Order, OrderStatusHistoryItem } from "./types";
 import { calculateDomesticPrice, calculateInternationalPrice as calculateInternationalPriceLocal, calculateLocalPrice } from "./lib/pricing";
 
 const EXPECTED_SUPABASE_URL = "https://ngdwybpgacauorygoedi.supabase.co";
@@ -30,6 +30,11 @@ function normalizePublicOrderPayload(payload: Record<string, unknown>) {
     ...payload,
     notes: notes || "N/A"
   };
+}
+
+function normalizeStatusNote(note?: string | null) {
+  const clean = String(note || "").trim();
+  return clean || "Admin status update";
 }
 
 export async function calculateDeliveryPrice(payload: {
@@ -185,6 +190,22 @@ export async function fetchAllOrders(): Promise<Order[]> {
   return (data || []) as Order[];
 }
 
+export async function fetchOrderStatusHistory(orderId: string): Promise<OrderStatusHistoryItem[]> {
+  if (!supabase || !orderId) return [];
+
+  const { data, error } = await supabase
+    .from("order_status_history")
+    .select("*")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return [];
+  }
+
+  return (data || []) as OrderStatusHistoryItem[];
+}
+
 export async function insertNewOrder(orderData: Record<string, unknown>): Promise<string | null> {
   return createPublicOrder(orderData);
 }
@@ -211,21 +232,42 @@ export async function isAdminUser(userId: string): Promise<boolean> {
   }
 }
 
-export async function updateExistingOrderStatus(orderId: string, status: Order["status"], note?: string): Promise<boolean> {
-  if (!supabase) {
+export async function updateExistingOrderStatus(orderId: string, status: string, note?: string): Promise<boolean> {
+  if (!supabase || !orderId || !status) {
     return false;
   }
 
-  const { data, error } = await supabase.rpc("admin_update_order_status", {
+  const cleanNote = normalizeStatusNote(note);
+
+  const rpcResult = await supabase.rpc("admin_update_order_status", {
     p_order_id: orderId,
     p_status: status,
-    p_note: note || null
+    p_note: cleanNote
   });
 
-  if (error || !data) {
-    console.error("admin_update_order_status RPC failed.");
+  if (!rpcResult.error && rpcResult.data) {
+    return true;
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", orderId);
+
+  if (updateError) {
+    console.error("Order status update failed.");
     return false;
   }
+
+  await supabase.from("order_status_history").insert({
+    order_id: orderId,
+    status,
+    note: cleanNote,
+    created_at: new Date().toISOString()
+  });
 
   return true;
 }
