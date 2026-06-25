@@ -15,16 +15,25 @@ function assert(condition, message) {
 }
 
 const root = path.resolve(process.cwd());
+const repoRoot = path.resolve(root, "..", "..");
 const src = path.join(root, "src");
 
+function firstExisting(paths) {
+  return paths.find((item) => fs.existsSync(item));
+}
+
 /* ── Vercel config ── */
-const vercelPath = path.join(root, "vercel.json");
-assert(fs.existsSync(vercelPath), "vercel.json exists");
-if (fs.existsSync(vercelPath)) {
+const vercelPath = firstExisting([
+  path.join(root, "vercel.json"),
+  path.join(repoRoot, "vercel.json")
+]);
+assert(Boolean(vercelPath), "vercel.json exists in app or repository root");
+if (vercelPath) {
   const vercel = read(vercelPath);
   assert(vercel.includes('"headers"'), "Vercel security headers exist");
   assert(vercel.includes('"redirects"'), "Canonical redirect config exists");
   assert(vercel.includes('"outputDirectory"'), "Vercel output directory set");
+  assert(vercel.includes("artifacts/day-night-delivery/dist/public"), "Vercel output directory points to built app public folder");
 }
 
 /* ── Sitemap / index ── */
@@ -32,6 +41,9 @@ const sitemapPath = path.join(root, "public", "sitemap.xml");
 if (fs.existsSync(sitemapPath)) {
   const sitemap = read(sitemapPath);
   assert(!sitemap.includes("www.daynightae.com"), "Sitemap canonical is apex domain");
+  assert(sitemap.includes("/qr"), "Sitemap includes QR page");
+  assert(sitemap.includes("/refund-policy"), "Sitemap includes refund policy route");
+  assert(sitemap.includes("/shipping-policy"), "Sitemap includes shipping policy route");
 }
 
 const indexPath = path.join(root, "index.html");
@@ -111,6 +123,42 @@ if (fs.existsSync(requestDeliveryPath)) {
   assert(rd.includes("isLargeShipment") || rd.includes("requiresCustomQuote"), "RequestDelivery handles large shipment warning");
 }
 
+/* ── Supabase security and admin helpers ── */
+const supabasePath = path.join(src, "supabase.ts");
+if (fs.existsSync(supabasePath)) {
+  const sb = read(supabasePath);
+  assert(sb.includes("fetchAllOrders"), "Supabase admin order fetch helper exists");
+  assert(sb.includes("admin_update_order_status"), "Supabase admin status RPC is used");
+  assert(sb.includes("fetchOrderStatusHistory"), "Supabase status history fetch helper exists");
+  assert(sb.includes("order_status_history"), "Supabase status history table integration exists");
+  assert(sb.includes("notes: notes || \"N/A\""), "Public order notes fallback is enforced");
+  assert(!sb.includes("service_role") && !sb.includes("sb_secret"), "No service role or secret key in frontend Supabase client");
+}
+
+/* ── Admin Panel Stage 2 ── */
+const adminPanelPath = path.join(src, "components", "AdminPanel.tsx");
+assert(fs.existsSync(adminPanelPath), "AdminPanel component exists");
+if (fs.existsSync(adminPanelPath)) {
+  const admin = read(adminPanelPath);
+  assert(admin.includes("draftStatus") && admin.includes("handleSaveStatus"), "Admin status update uses draft state and save button");
+  assert(!admin.includes("onChange={(e) => handleStatusUpdate"), "Admin does not update status immediately on dropdown change");
+  assert(admin.includes("fetchOrderStatusHistory"), "Admin details modal loads status timeline");
+  assert(admin.includes("exportFilteredCsv"), "Admin exports filtered orders CSV");
+  assert(admin.includes("exportCodCsv"), "Admin exports COD CSV report");
+  assert(admin.includes("exportDailyReportPdf"), "Admin exports daily PDF report");
+  assert(admin.includes("exportOrderPDF") && admin.includes("exportOrderTXT"), "Admin exports selected order PDF and TXT");
+  assert(admin.includes("dateFilter") && admin.includes("cityFilter") && admin.includes("codFilter"), "Admin has date/city/COD filters");
+  assert(admin.includes("openWhatsapp") && admin.includes("openTracking") && admin.includes("copyTracking"), "Admin order actions include WhatsApp, tracking, and copy");
+}
+
+/* ── Protected admin route ── */
+const protectedAdminPath = path.join(src, "components", "ProtectedAdminRoute.tsx");
+if (fs.existsSync(protectedAdminPath)) {
+  const protectedAdmin = read(protectedAdminPath);
+  assert(protectedAdmin.includes("isAdminUser"), "ProtectedAdminRoute checks admin role");
+  assert(protectedAdmin.includes("getUser") || protectedAdmin.includes("onAuthStateChange"), "ProtectedAdminRoute checks authenticated Supabase user");
+}
+
 /* ── Footer ── */
 const footerPath = path.join(src, "components", "Footer.tsx");
 if (fs.existsSync(footerPath)) {
@@ -132,6 +180,11 @@ assert(fs.existsSync(turnstilePath), "Turnstile captcha component exists");
 /* ── robots.txt ── */
 const robotsPath = path.join(root, "public", "robots.txt");
 assert(fs.existsSync(robotsPath), "robots.txt exists");
+if (fs.existsSync(robotsPath)) {
+  const robots = read(robotsPath);
+  assert(robots.includes("Disallow: /admin"), "robots.txt disallows admin route");
+  assert(robots.includes("Disallow: /auth"), "robots.txt disallows auth route");
+}
 
 /* ── QR Services page ── */
 const qrPagePath = path.join(src, "components", "QR.tsx");
@@ -142,34 +195,17 @@ if (fs.existsSync(appPath)) {
   const app = read(appPath);
   assert(app.includes('path="/qr"') || app.includes("path: \"/qr\""), "QR route exists in App.tsx");
   assert(app.includes("nav.qr") || app.includes("/qr"), "QR Services appears in navigation");
+  assert(app.includes('path="/admin"'), "Admin route exists in App.tsx");
 }
 
 if (fs.existsSync(qrPagePath)) {
   const qr = read(qrPagePath);
-  assert(
-    qr.includes("buildTrackingQrUrl") || qr.includes("trackingQrUrl"),
-    "QR generator function exists in QR page"
-  );
-  assert(
-    qr.includes("buildWhatsappSupportQrUrl") || qr.includes("whatsapp"),
-    "WhatsApp QR exists in QR page"
-  );
-  assert(
-    qr.includes("buildRequestDeliveryQrUrl") || qr.includes("request"),
-    "Request Delivery QR exists in QR page"
-  );
-  assert(
-    qr.includes("buildContactQrUrl") || qr.includes("contact"),
-    "Contact QR exists in QR page"
-  );
-  assert(
-    qr.includes("downloadQr") || qr.includes("Download"),
-    "Download QR action exists in QR page"
-  );
-  assert(
-    !qr.includes("getUserMedia") && !qr.includes("camera"),
-    "No camera permission break in QR page"
-  );
+  assert(qr.includes("buildTrackingQrUrl") || qr.includes("trackingQrUrl"), "QR generator function exists in QR page");
+  assert(qr.includes("buildWhatsappSupportQrUrl") || qr.includes("whatsapp"), "WhatsApp QR exists in QR page");
+  assert(qr.includes("buildRequestDeliveryQrUrl") || qr.includes("request"), "Request Delivery QR exists in QR page");
+  assert(qr.includes("buildContactQrUrl") || qr.includes("contact"), "Contact QR exists in QR page");
+  assert(qr.includes("downloadQr") || qr.includes("Download"), "Download QR action exists in QR page");
+  assert(!qr.includes("getUserMedia") && !qr.includes("camera"), "No camera permission break in QR page");
 }
 
 if (fs.existsSync(footerPath)) {
