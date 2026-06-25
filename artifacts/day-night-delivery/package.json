@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "vite build --config vite.config.ts",
-    "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
+    "dev": "vite --config vite.config.ts",
+    "build": "node scripts/build-vite.mjs",
+    "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "production:gate": "node scripts/production-hardening-gate.mjs",
-    "build:spa": "vite build --config vite.config.ts && node scripts/create-spa-route-fallbacks.mjs"
+    "build:spa": "node scripts/build-vite.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
