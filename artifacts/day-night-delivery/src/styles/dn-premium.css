@@ -1,59 +1,156 @@
-/* DAY NIGHT premium visual stage 1 */
+/* DAY NIGHT Luxury Poster Theme — Navy / Electric Blue / Gold */
+:root {
+  color-scheme: dark;
+  --dn-lux-bg: #031226;
+  --dn-lux-bg-2: #061B36;
+  --dn-lux-panel: rgba(8, 26, 49, 0.84);
+  --dn-lux-panel-strong: rgba(3, 18, 38, 0.92);
+  --dn-lux-blue: #19A7FF;
+  --dn-lux-cyan: #4FD7FF;
+  --dn-lux-gold: #D4A62A;
+  --dn-lux-gold-2: #F2C94C;
+  --dn-lux-white: #F4F8FF;
+  --dn-lux-muted: #AFC4DD;
+}
+
+html,
+body {
+  background: #031226 !important;
+}
+
 body {
   position: relative;
   overflow-x: hidden;
+  color: var(--dn-lux-white);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(25,167,255,0.24), transparent 28rem),
+    radial-gradient(circle at 82% 18%, rgba(212,166,42,0.18), transparent 24rem),
+    radial-gradient(circle at 52% 92%, rgba(79,215,255,0.13), transparent 34rem),
+    linear-gradient(135deg, #020914 0%, #031226 38%, #061B36 100%) !important;
 }
 
+#root,
+#root > div {
+  background-color: transparent !important;
+}
+
+#root > div::before,
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  pointer-events: none;
   z-index: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.024) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.024) 1px, transparent 1px),
-    radial-gradient(circle at 50% 0%, rgba(212,175,55,0.11), transparent 30%),
-    radial-gradient(circle at 86% 18%, rgba(43,184,255,0.10), transparent 26%);
-  background-size: 46px 46px, 46px 46px, 100% 100%, 100% 100%;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.82), rgba(0,0,0,0.12) 62%, transparent);
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(79,215,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,215,255,0.045) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(25,167,255,0.16), transparent 32rem),
+    radial-gradient(circle at 78% 12%, rgba(212,166,42,0.12), transparent 28rem);
+  background-size: 52px 52px, 52px 52px, 100% 100%, 100% 100%;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.34) 60%, transparent 100%);
 }
 
-#root {
+#root,
+#root > div > * {
   position: relative;
   z-index: 1;
 }
 
-.dn-card,
-.dn-card-premium {
+/* Header */
+.fixed.top-0 > div:first-child,
+.fixed.top-0 header,
+header {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(25,167,255,0.13), transparent 20rem),
+    linear-gradient(180deg, rgba(3,18,38,0.96), rgba(6,27,54,0.86)) !important;
+  border-color: rgba(79,215,255,0.17) !important;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.30), 0 0 26px rgba(25,167,255,0.08) !important;
+}
+
+nav a,
+header a,
+header button {
+  font-weight: 900 !important;
+}
+
+nav a:hover,
+header a:hover,
+header button:hover {
+  color: var(--dn-lux-gold-2) !important;
+}
+
+/* Poster hero */
+.dn-poster-hero,
+section.bg-grid-pattern:first-child {
   position: relative;
-  overflow: hidden;
-  border-radius: 1.45rem;
-  border: 1px solid rgba(255,255,255,0.105);
-  background: linear-gradient(145deg, rgba(16,35,63,0.78), rgba(7,18,37,0.68));
-  box-shadow: 0 20px 64px rgba(0,0,0,0.27), inset 0 1px 0 rgba(255,255,255,0.055);
+  isolation: isolate;
+  min-height: clamp(560px, 72vh, 760px);
+  border: 1px solid rgba(79,215,255,0.18) !important;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(212,166,42,0.18), transparent 22rem),
+    radial-gradient(circle at 82% 18%, rgba(25,167,255,0.24), transparent 26rem),
+    radial-gradient(circle at 58% 90%, rgba(79,215,255,0.16), transparent 34rem),
+    linear-gradient(135deg, rgba(3,18,38,0.96), rgba(6,27,54,0.90)) !important;
+  box-shadow: 0 36px 120px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 70px rgba(25,167,255,0.12) !important;
+}
+
+.dn-poster-hero::after,
+section.bg-grid-pattern:first-child::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: -6%;
+  bottom: -12%;
+  width: min(58vw, 720px);
+  height: min(58vw, 720px);
+  border-radius: 999px;
+  background:
+    conic-gradient(from 225deg, transparent 0 16%, rgba(25,167,255,0.38) 18%, transparent 26%, rgba(212,166,42,0.28) 42%, transparent 48%, rgba(79,215,255,0.24) 66%, transparent 72%),
+    radial-gradient(circle, rgba(25,167,255,0.16), transparent 58%);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+section.bg-grid-pattern:first-child h1,
+.dn-poster-hero h1 {
+  text-shadow: 0 18px 60px rgba(0,0,0,0.48), 0 0 26px rgba(25,167,255,0.14);
+}
+
+/* Core components */
+.dn-card,
+.dn-card-premium,
+.glass,
+.glass-premium,
+.dn-glass-card,
+main section[class*="rounded"],
+main div[class*="rounded-3xl"][class*="border"],
+main div[class*="rounded-[2rem]"][class*="border"],
+main div[class*="rounded-[2.5rem]"][class*="border"] {
+  background:
+    linear-gradient(145deg, rgba(8,26,49,0.88), rgba(3,18,38,0.78)),
+    radial-gradient(circle at 12% 0%, rgba(212,166,42,0.10), transparent 20rem),
+    radial-gradient(circle at 92% 8%, rgba(25,167,255,0.12), transparent 22rem) !important;
+  border-color: rgba(79,215,255,0.16) !important;
+  box-shadow: 0 30px 95px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.065), 0 0 34px rgba(25,167,255,0.08) !important;
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
 
-.dn-card-premium {
-  border-color: rgba(212,175,55,0.28);
-  background:
-    linear-gradient(145deg, rgba(16,35,63,0.84), rgba(6,18,37,0.74)),
-    radial-gradient(circle at 14% 0%, rgba(212,175,55,0.16), transparent 18rem);
-  box-shadow: 0 26px 78px rgba(0,0,0,0.32), 0 0 40px rgba(212,175,55,0.08), inset 0 1px 0 rgba(255,255,255,0.075);
+.dn-card-premium,
+.glass-gold {
+  border-color: rgba(212,166,42,0.34) !important;
+  box-shadow: 0 30px 95px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 42px rgba(212,166,42,0.12) !important;
 }
 
-.dn-card-hover {
-  transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
-}
+.dn-card-hover { transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease; }
+.dn-card-hover:hover { transform: translateY(-4px); border-color: rgba(242,201,76,0.42) !important; }
 
-.dn-card-hover:hover {
-  transform: translateY(-4px);
-  border-color: rgba(212,175,55,0.34);
-  box-shadow: 0 34px 90px rgba(0,0,0,0.38), 0 0 35px rgba(212,175,55,0.10), inset 0 1px 0 rgba(255,255,255,0.08);
-}
+.text-brand-gold,
+.dn-stat-gold { color: var(--dn-lux-gold-2) !important; text-shadow: 0 0 28px rgba(212,166,42,0.26); }
+.text-brand-sky,
+.text-brand-blue,
+.dn-stat-blue { color: var(--dn-lux-cyan) !important; text-shadow: 0 0 28px rgba(25,167,255,0.24); }
 
+/* Buttons */
 .dn-btn {
   display: inline-flex;
   align-items: center;
@@ -64,176 +161,138 @@ body::before {
   font-weight: 950;
   white-space: nowrap;
   cursor: pointer;
-  transition: transform 220ms ease, box-shadow 220ms ease;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
-
 .dn-btn-sm { padding: 0.55rem 0.9rem; font-size: 0.72rem; }
 .dn-btn-md { padding: 0.78rem 1.18rem; font-size: 0.82rem; }
 .dn-btn-lg { padding: 0.98rem 1.45rem; font-size: 0.92rem; }
 
 .dn-btn-primary,
-.btn-gold {
-  background: linear-gradient(135deg, #D4AF37 0%, #F6C94A 52%, #F5B700 100%) !important;
-  color: #061225 !important;
-  border-color: rgba(255,211,90,0.70) !important;
-  box-shadow: 0 16px 42px rgba(246,201,74,0.30), inset 0 1px 0 rgba(255,255,255,0.48) !important;
+.btn-gold,
+main a[class*="bg-brand-gold"],
+main button[class*="bg-brand-gold"] {
+  background: linear-gradient(135deg, #D4A62A 0%, #F2C94C 54%, #E8B93D 100%) !important;
+  color: #031226 !important;
+  border-color: rgba(242,201,76,0.78) !important;
+  box-shadow: 0 18px 46px rgba(212,166,42,0.34), inset 0 1px 0 rgba(255,255,255,0.48) !important;
 }
 
 .dn-btn-secondary,
 .btn-glass {
-  background: linear-gradient(135deg, rgba(16,35,63,0.82), rgba(8,23,44,0.70)) !important;
-  color: #F8FAFC !important;
-  border-color: rgba(43,184,255,0.30) !important;
+  background: linear-gradient(135deg, rgba(8,26,49,0.88), rgba(10,37,72,0.78)) !important;
+  border-color: rgba(79,215,255,0.30) !important;
+  color: #F4F8FF !important;
+  box-shadow: 0 16px 40px rgba(25,167,255,0.12), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
 .dn-btn-whatsapp,
-.btn-whatsapp {
-  background: linear-gradient(135deg, #0EA271 0%, #25D366 100%) !important;
-  color: #ffffff !important;
+.btn-whatsapp,
+main a[class*="bg-emerald"],
+main button[class*="bg-emerald"] {
+  background: linear-gradient(135deg, #0EA271, #25D366) !important;
+  color: #fff !important;
+  box-shadow: 0 18px 42px rgba(37,211,102,0.20) !important;
 }
 
 .dn-btn:hover,
 .btn-gold:hover,
 .btn-glass:hover,
-.btn-whatsapp:hover {
-  transform: translateY(-2px);
-}
+.btn-whatsapp:hover { transform: translateY(-3px) !important; }
 
-.dn-input-control,
-.dn-select-control {
-  width: 100%;
-  border-radius: 1rem;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: linear-gradient(145deg, rgba(6,18,37,0.82), rgba(16,35,63,0.62));
-  color: #ffffff;
-  box-shadow: 0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.045);
-  padding: 0.92rem 1rem;
-  font-size: 0.88rem;
-  font-weight: 800;
-  outline: none;
-}
-
-.dn-input-control:focus,
-.dn-select-control:focus {
-  border-color: rgba(212,175,55,0.62);
-  box-shadow: 0 0 0 4px rgba(212,175,55,0.10), 0 12px 30px rgba(0,0,0,0.22);
-}
-
-:root.light-theme .dn-card,
-:root.light-theme .dn-card-premium {
-  background: linear-gradient(145deg, rgba(255,255,255,0.90), rgba(232,240,250,0.78)) !important;
-  border-color: rgba(7,26,51,0.12) !important;
-  box-shadow: 0 28px 86px rgba(10,28,58,0.12), inset 0 1px 0 rgba(255,255,255,0.95) !important;
-}
-
-/* Visual Stage 1 adapters: Pricing, Customer, Admin */
-main section[class*="rounded"],
-main div[class*="rounded-3xl"][class*="border"],
-main div[class*="rounded-[2rem]"][class*="border"],
-main div[class*="rounded-[2.25rem]"][class*="border"] {
-  position: relative;
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  box-shadow: 0 24px 78px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.055);
-}
-
-main section[class*="rounded"]::before,
-main div[class*="rounded-3xl"][class*="border"]::before,
-main div[class*="rounded-[2rem]"][class*="border"]::before,
-main div[class*="rounded-[2.25rem]"][class*="border"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(212,175,55,0.09), transparent 22rem),
-    radial-gradient(circle at 90% 10%, rgba(43,184,255,0.08), transparent 24rem),
-    linear-gradient(110deg, transparent, rgba(255,255,255,0.025), transparent 44%);
-}
-
-main section[class*="rounded"] > *,
-main div[class*="rounded-3xl"][class*="border"] > *,
-main div[class*="rounded-[2rem]"][class*="border"] > *,
-main div[class*="rounded-[2.25rem]"][class*="border"] > * {
-  position: relative;
-  z-index: 1;
-}
-
+/* Forms */
 main input,
 main select,
-main textarea {
+main textarea,
+.dn-input-control,
+.dn-select-control {
   border-radius: 1rem !important;
-  border-color: rgba(255,255,255,0.12) !important;
-  background: linear-gradient(145deg, rgba(6,18,37,0.82), rgba(16,35,63,0.64)) !important;
-  color: #ffffff !important;
-  box-shadow: 0 12px 26px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.045) !important;
+  background: linear-gradient(145deg, rgba(3,18,38,0.90), rgba(8,26,49,0.74)) !important;
+  color: #F4F8FF !important;
+  border: 1px solid rgba(79,215,255,0.18) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  min-height: 44px;
 }
 
 main input:focus,
 main select:focus,
-main textarea:focus {
-  border-color: rgba(212,175,55,0.62) !important;
-  box-shadow: 0 0 0 4px rgba(212,175,55,0.10), 0 12px 30px rgba(0,0,0,0.22) !important;
+main textarea:focus,
+.dn-input-control:focus,
+.dn-select-control:focus {
+  border-color: rgba(242,201,76,0.68) !important;
+  box-shadow: 0 0 0 4px rgba(242,201,76,0.10), 0 0 26px rgba(25,167,255,0.12) !important;
+  outline: none !important;
 }
 
-main a[class*="bg-brand-gold"],
-main button[class*="bg-brand-gold"] {
-  background: linear-gradient(135deg, #D4AF37 0%, #F6C94A 52%, #F5B700 100%) !important;
-  color: #061225 !important;
-  border-color: rgba(255,211,90,0.66) !important;
-  box-shadow: 0 16px 42px rgba(246,201,74,0.22), inset 0 1px 0 rgba(255,255,255,0.42) !important;
+/* Tables / dashboards */
+main table { border-collapse: separate !important; border-spacing: 0 0.7rem !important; width: 100%; }
+main tbody tr { background: rgba(8,26,49,0.72) !important; box-shadow: 0 14px 36px rgba(0,0,0,0.22), 0 0 18px rgba(25,167,255,0.05) !important; }
+main tbody tr:hover { background: rgba(10,37,72,0.86) !important; }
+main thead th { color: rgba(175,196,221,0.86) !important; font-weight: 950 !important; }
+main tbody td { border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
+
+/* Map */
+.leaflet-container { background: #031226 !important; filter: saturate(1.1) contrast(1.04); }
+.leaflet-control-zoom a { background: rgba(3,18,38,0.94) !important; color: var(--dn-lux-gold-2) !important; }
+
+/* Footer */
+footer {
+  background: radial-gradient(circle at 16% 0%, rgba(25,167,255,0.14), transparent 24rem), linear-gradient(180deg, rgba(3,18,38,0.94), rgba(2,9,20,0.98)) !important;
+  border-color: rgba(79,215,255,0.15) !important;
 }
 
-main a[class*="bg-emerald"],
-main button[class*="bg-emerald"] {
-  background: linear-gradient(135deg, #0EA271, #25D366) !important;
-  color: #ffffff !important;
-  box-shadow: 0 16px 38px rgba(37,211,102,0.18) !important;
+/* Luxury day mode: premium, not washed out */
+:root.light-theme body {
+  color: #061B36;
+  background: radial-gradient(circle at 16% 8%, rgba(25,167,255,0.15), transparent 30rem), radial-gradient(circle at 80% 14%, rgba(212,166,42,0.16), transparent 24rem), linear-gradient(145deg, #DDEBFF 0%, #F4F8FF 46%, #E7F1FF 100%) !important;
 }
 
-main table {
-  border-collapse: separate;
-  border-spacing: 0 0.55rem;
+:root.light-theme #root > div::before,
+:root.light-theme body::before {
+  background: linear-gradient(rgba(6,27,54,0.052) 1px, transparent 1px), linear-gradient(90deg, rgba(6,27,54,0.052) 1px, transparent 1px), radial-gradient(circle at 50% 0%, rgba(25,167,255,0.12), transparent 32rem), radial-gradient(circle at 78% 12%, rgba(212,166,42,0.14), transparent 28rem);
+  background-size: 52px 52px, 52px 52px, 100% 100%, 100% 100%;
 }
 
-main thead th {
-  color: rgba(248,250,252,0.52) !important;
-  font-weight: 950 !important;
-  letter-spacing: 0.035em;
+:root.light-theme .dn-poster-hero,
+:root.light-theme section.bg-grid-pattern:first-child,
+:root.light-theme .dn-card,
+:root.light-theme .dn-card-premium,
+:root.light-theme .glass,
+:root.light-theme .glass-premium,
+:root.light-theme .dn-glass-card,
+:root.light-theme main section[class*="rounded"],
+:root.light-theme main div[class*="rounded-3xl"][class*="border"],
+:root.light-theme main div[class*="rounded-[2rem]"][class*="border"],
+:root.light-theme main div[class*="rounded-[2.5rem]"][class*="border"] {
+  background: linear-gradient(145deg, rgba(255,255,255,0.90), rgba(226,239,255,0.78)), radial-gradient(circle at 12% 0%, rgba(212,166,42,0.11), transparent 20rem), radial-gradient(circle at 92% 8%, rgba(25,167,255,0.10), transparent 22rem) !important;
+  border-color: rgba(6,27,54,0.13) !important;
+  box-shadow: 0 30px 95px rgba(6,27,54,0.12), inset 0 1px 0 rgba(255,255,255,0.96) !important;
 }
 
-main tbody tr {
-  background: rgba(255,255,255,0.035);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.16);
-}
-
-main tbody td {
-  border-top: 1px solid rgba(255,255,255,0.07);
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-
-main [class*="text-brand-gold"] {
-  text-shadow: 0 0 24px rgba(212,175,55,0.16);
-}
+:root.light-theme main .text-white,
+:root.light-theme main .text-white\/90,
+:root.light-theme main .text-white\/80,
+:root.light-theme main .text-white\/70 { color: #061B36 !important; }
+:root.light-theme main .text-white\/65,
+:root.light-theme main .text-white\/60,
+:root.light-theme main .text-white\/55,
+:root.light-theme main .text-white\/50,
+:root.light-theme main .text-white\/45,
+:root.light-theme main .text-white\/40,
+:root.light-theme main .text-white\/35,
+:root.light-theme main .text-white\/30 { color: rgba(6,27,54,0.64) !important; }
 
 :root.light-theme main input,
 :root.light-theme main select,
-:root.light-theme main textarea {
-  background: rgba(255,255,255,0.88) !important;
-  color: #071A33 !important;
-  border-color: rgba(7,26,51,0.14) !important;
+:root.light-theme main textarea,
+:root.light-theme .dn-input-control,
+:root.light-theme .dn-select-control {
+  background: rgba(255,255,255,0.92) !important;
+  color: #061B36 !important;
+  border-color: rgba(6,27,54,0.16) !important;
 }
 
 @media (max-width: 768px) {
-  main section[class*="rounded"],
-  main div[class*="rounded-3xl"][class*="border"],
-  main div[class*="rounded-[2rem]"][class*="border"],
-  main div[class*="rounded-[2.25rem]"][class*="border"] {
-    border-radius: 1.35rem !important;
-  }
-
-  main table {
-    border-spacing: 0 0.7rem;
-  }
+  .dn-poster-hero,
+  section.bg-grid-pattern:first-child { min-height: auto; border-radius: 1.6rem !important; }
+  main table { border-spacing: 0 0.8rem !important; }
 }
