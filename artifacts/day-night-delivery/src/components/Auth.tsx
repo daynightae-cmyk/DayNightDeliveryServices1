@@ -10,12 +10,9 @@ interface AuthProps {
 }
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
-  if (typeof window !== "undefined" && window.location.pathname === "/customer") {
-    return <CustomerDashboard />;
-  }
-
   const { language } = useAppContext();
   const isArabic = language === "ar";
+  const isCustomerRoute = typeof window !== "undefined" && window.location.pathname === "/customer";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -26,6 +23,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const captchaEnabled = Boolean(captchaSiteKey);
 
   useEffect(() => {
+    if (isCustomerRoute) return;
     async function verifyCurrentAdmin() {
       if (!supabase) return;
       const { data } = await supabase.auth.getUser();
@@ -33,7 +31,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       if (user && await isAdminUser(user.id)) onAuthSuccess();
     }
     void verifyCurrentAdmin();
-  }, [onAuthSuccess]);
+  }, [onAuthSuccess, isCustomerRoute]);
+
+  if (isCustomerRoute) {
+    return <CustomerDashboard />;
+  }
 
   function guardHumanCheck() {
     if (captchaEnabled && !captchaToken) {
