@@ -38,7 +38,7 @@ export default function CustomerDashboard() {
     setLoading(true);
     const { error: linkError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/customer-login` },
+      options: { emailRedirectTo: `${window.location.origin}/customer` },
     });
     setLoading(false);
     if (linkError) setError(linkError.message);
@@ -51,7 +51,7 @@ export default function CustomerDashboard() {
     if (!supabase) return setError(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
     const { error: providerError } = await supabase.auth.signInWithOAuth({
       provider: provider as any,
-      options: { redirectTo: `${window.location.origin}/customer-login` },
+      options: { redirectTo: `${window.location.origin}/customer` },
     });
     if (providerError) setError(providerError.message);
   }
