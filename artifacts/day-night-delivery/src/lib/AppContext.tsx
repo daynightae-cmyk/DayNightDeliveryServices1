@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { detectBrowserLanguage, getSavedLanguage, saveLanguage } from "../i18n";
+import { getSavedLanguage, saveLanguage } from "../i18n";
 
 type Theme = "dark" | "light";
 type ThemeMode = Theme | "system";
@@ -27,11 +27,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    return "system";
+    return "dark";
   });
 
   const [theme, setTheme] = useState<Theme>("dark");
-  const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || detectBrowserLanguage());
+  const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || "ar");
 
   useEffect(() => {
     const prefersDark = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
