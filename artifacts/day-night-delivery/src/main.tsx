@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { AppProvider } from './lib/AppContext.tsx';
 import { reportError } from './lib/monitoring';
 import './index.css';
+import './styles/dn-premium.css';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
@@ -30,4 +31,3 @@ createRoot(document.getElementById('root')!).render(
     </AppProvider>
   </StrictMode>,
 );
-
