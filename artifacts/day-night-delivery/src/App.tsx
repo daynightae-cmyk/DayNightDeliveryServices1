@@ -47,7 +47,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
 import Footer from "./components/Footer";
 
-import { Menu, X, PhoneCall, Sun, Moon } from "lucide-react";
+import { Menu, X, PhoneCall } from "lucide-react";
 import companyMeta from "./data/companyMeta";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { trackPageLoad } from "./lib/monitoring";
@@ -62,6 +62,7 @@ function AppContent() {
   const { language, toggleLanguage, theme } = useAppContext();
   const isLight = theme === "light";
   const isArabic = language === "ar";
+  const adminLabel = isArabic ? "لوحة الإدارة" : "Admin Portal";
 
   const t = translations[language];
 
@@ -191,6 +192,16 @@ function AppContent() {
             <span>{companyMeta.phone}</span>
           </a>
           <span className={`hidden md:inline ${isLight ? "text-[#071A33]/20" : "text-white/20"}`}>|</span>
+          <Link
+            id="top_admin_portal_link"
+            to="/auth"
+            className={`hidden md:inline text-[10px] font-black transition-colors ${
+              isLight ? "text-[#071A33]/60 hover:text-[#9A6F00]" : "text-white/55 hover:text-brand-gold"
+            }`}
+          >
+            {adminLabel}
+          </Link>
+          <span className={`hidden md:inline ${isLight ? "text-[#071A33]/20" : "text-white/20"}`}>|</span>
           <p className={`hidden md:block text-[10px] ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}>
             {t.footer.support}
           </p>
@@ -240,7 +251,7 @@ function AppContent() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex flex-1 items-center justify-center gap-0.5 xl:gap-1 text-[11px] xl:text-xs font-semibold max-w-4xl mx-auto overflow-x-auto no-scrollbar">
+          <nav className="hidden lg:flex flex-1 min-w-0 items-center justify-start gap-0.5 xl:gap-1 text-[10px] xl:text-[11px] font-semibold max-w-none mx-2 overflow-x-auto no-scrollbar scroll-smooth">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
@@ -265,6 +276,18 @@ function AppContent() {
 
           {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
+            <Link
+              id="desktop_admin_portal_link"
+              to="/auth"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${
+                isLight
+                  ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60 hover:text-[#071A33]"
+                  : "border-white/20 text-white/80 hover:border-brand-gold/50 hover:text-white"
+              }`}
+            >
+              {adminLabel}
+            </Link>
             <Link
               to="/tracking"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
@@ -294,6 +317,7 @@ function AppContent() {
               className={`p-2 transition-colors ${
                 isLight ? "text-[#071A33]/80 hover:text-[#071A33]" : "text-white/80 hover:text-white"
               }`}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -336,6 +360,18 @@ function AppContent() {
             })}
 
             <div className="pt-2 space-y-2">
+              <Link
+                id="mobile_admin_portal_link"
+                to="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`w-full block py-3 border font-extrabold rounded-xl text-center text-xs transition-all ${
+                  isLight
+                    ? "border-brand-gold/60 text-[#071A33] bg-brand-gold/10"
+                    : "border-brand-gold/50 text-brand-gold bg-brand-gold/10"
+                }`}
+              >
+                {adminLabel}
+              </Link>
               <Link
                 to="/tracking"
                 onClick={() => setMobileMenuOpen(false)}
@@ -416,13 +452,13 @@ function AppContent() {
       </main>
 
       {/* Floating WhatsApp widget — always LEFT side */}
-      <FloatingWhatsApp />
+      {!mobileMenuOpen && <FloatingWhatsApp />}
 
       {/* Smart Chat — always RIGHT side */}
-      <SmartChat />
+      {!mobileMenuOpen && <SmartChat />}
 
       {/* Mobile sticky bottom action bar */}
-      <StickyMobileBar />
+      {!mobileMenuOpen && <StickyMobileBar />}
 
       {/* Footer */}
       <Footer />
