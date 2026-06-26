@@ -11,7 +11,7 @@ interface AuthProps {
 export default function Auth({ onAuthSuccess }: AuthProps) {
   const { language } = useAppContext();
   const isArabic = language === "ar";
-  const [email, setEmail] = useState("Admin@daynightae.com");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -50,7 +50,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setLoading(true);
 
     if (!supabase) {
-      setErrorMsg(isArabic ? "تعذر الاتصال بخدمة المصادقة. تحقق من إعدادات البيئة." : "Authentication service is not configured.");
+      setErrorMsg(isArabic ? "خدمة الدخول غير متاحة حالياً. يرجى المحاولة لاحقاً أو التواصل مع الدعم." : "Secure sign-in is currently unavailable. Please try again later or contact support.");
       setLoading(false);
       return;
     }
@@ -63,12 +63,12 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       } as any);
 
       if (error) {
-        setErrorMsg(`${isArabic ? "خطأ في تسجيل الدخول" : "Login error"}: ${error.message}`);
+        setErrorMsg(`${isArabic ? "تعذر تسجيل الدخول" : "Sign-in failed"}: ${error.message}`);
       } else if (data?.user) {
-        setSuccessMsg(isArabic ? "تم تسجيل الدخول. جاري التحقق من صلاحيات الإدارة..." : "Logged in. Verifying admin permissions...");
+        setSuccessMsg(isArabic ? "تم تسجيل الدخول. جاري فتح حسابك الآمن..." : "Signed in. Opening your secure account...");
         const admin = await isAdminUser(data.user.id);
         if (!admin) {
-          setErrorMsg(isArabic ? "هذا الحساب لا يملك صلاحية الإدارة." : "This account is not authorized as admin.");
+          setErrorMsg(isArabic ? "هذا الحساب غير مخول للوصول إلى هذه البوابة." : "This account is not authorized to access this portal.");
           await supabase.auth.signOut();
           setSuccessMsg("");
           setLoading(false);
@@ -77,7 +77,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         onAuthSuccess();
       }
     } catch {
-      setErrorMsg(isArabic ? "حدث خطأ تقني غير متوقع أثناء الاتصال بالخادم." : "Unexpected technical error while contacting the server.");
+      setErrorMsg(isArabic ? "حدث خطأ غير متوقع أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Unexpected sign-in error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setErrorMsg("");
     setSuccessMsg("");
     if (!guardHumanCheck()) return;
-    if (!supabase) return setErrorMsg(isArabic ? "المصادقة غير مفعلة." : "Authentication is not configured.");
+    if (!supabase) return setErrorMsg(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
@@ -98,13 +98,13 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     } as any);
     setLoading(false);
     if (error) setErrorMsg(error.message);
-    else setSuccessMsg(isArabic ? "تم إرسال رابط دخول آمن إلى البريد." : "A secure login link was sent to your email.");
+    else setSuccessMsg(isArabic ? "تم إرسال رابط دخول آمن إلى بريدك الإلكتروني." : "A secure sign-in link was sent to your email.");
   }
 
   async function handleGoogleLogin() {
     setErrorMsg("");
     setSuccessMsg("");
-    if (!supabase) return setErrorMsg(isArabic ? "المصادقة غير مفعلة." : "Authentication is not configured.");
+    if (!supabase) return setErrorMsg(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth` },
@@ -116,7 +116,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setErrorMsg("");
     setSuccessMsg("");
     if (!guardHumanCheck()) return;
-    if (!supabase) return setErrorMsg(isArabic ? "المصادقة غير مفعلة." : "Authentication is not configured.");
+    if (!supabase) return setErrorMsg(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
     if (!phone.trim()) return setErrorMsg(isArabic ? "أدخل رقم الهاتف أولاً." : "Enter the phone number first.");
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
@@ -125,7 +125,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     } as any);
     setLoading(false);
     if (error) setErrorMsg(error.message);
-    else setSuccessMsg(isArabic ? "تم إرسال رمز OTP للهاتف إن كانت خدمة الهاتف مفعلة في Supabase." : "OTP sent if phone auth is enabled in Supabase.");
+    else setSuccessMsg(isArabic ? "تم إرسال رمز الدخول إلى الهاتف المسجل." : "A sign-in code was sent to the registered phone number.");
   }
 
   return (
@@ -138,7 +138,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         <div className="text-center pt-6 pb-2 space-y-2">
           <h2 className="text-2xl font-black text-white">{isArabic ? "بوابة الدخول الآمنة" : "Secure Access Portal"}</h2>
           <p className="text-xs text-white/50 leading-relaxed font-sans">
-            {isArabic ? "تسجيل دخول الإدارة والعملاء والسائقين عبر Supabase مع تحقق أمني شبيه Cloudflare Turnstile عند تفعيله." : "Admin, customer, and driver login through Supabase with optional Cloudflare Turnstile-style verification."}
+            {isArabic ? "دخول آمن للحسابات المعتمدة لإدارة الطلبات ومتابعة الشحنات وخدمات داي نايت الرقمية." : "Secure access for approved accounts to manage orders, track shipments, and use DAY NIGHT digital services."}
           </p>
         </div>
 
@@ -165,7 +165,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Admin@daynightae.com"
+                placeholder={isArabic ? "أدخل بريدك المسجل" : "Enter your registered email"}
                 className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-cool transition-all placeholder:text-white/20 text-right font-sans"
                 dir="ltr"
               />
@@ -203,16 +203,16 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             disabled={loading}
             className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer"
           >
-            {loading ? (isArabic ? "جاري المصادقة..." : "Authenticating...") : (isArabic ? "تسجيل الدخول" : "Sign in")}
+            {loading ? (isArabic ? "جاري التحقق..." : "Verifying...") : (isArabic ? "تسجيل الدخول" : "Sign in")}
           </button>
         </form>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
           <button onClick={handleMagicLink} disabled={loading} className="py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-colors">
-            {isArabic ? "رابط دخول عبر البريد" : "Email magic link"}
+            {isArabic ? "رابط دخول عبر البريد" : "Email sign-in link"}
           </button>
           <button onClick={handleGoogleLogin} disabled={loading} className="py-3 rounded-xl border border-brand-gold/25 bg-brand-gold/10 hover:bg-brand-gold/20 text-brand-gold text-xs font-bold transition-colors">
-            Google / Gmail
+            {isArabic ? "الدخول عبر Google" : "Continue with Google"}
           </button>
         </div>
       </section>
@@ -220,19 +220,19 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       <aside className="p-6 rounded-3xl border border-white/10 bg-brand-cool/35 space-y-4 text-right">
         <div className="flex items-center justify-end gap-2 text-brand-gold font-black">
           <ShieldCheck className="w-5 h-5" />
-          <span>{isArabic ? "مداخل احترافية جاهزة" : "Professional access methods"}</span>
+          <span>{isArabic ? "خيارات دخول موثوقة" : "Trusted access options"}</span>
         </div>
         <p className="text-white/60 text-sm leading-relaxed">
-          {isArabic ? "البريد وكلمة المرور يعملان الآن. Google/Gmail وPhone OTP يظهران في الواجهة، ويعملان عند تفعيل مزودي تسجيل الدخول داخل Supabase." : "Email/password works now. Google/Gmail and Phone OTP are visible and will work once enabled in Supabase providers."}
+          {isArabic ? "استخدم البريد المسجل أو رابط الدخول الآمن. ولحسابات الهاتف المعتمدة يمكن طلب رمز تحقق مباشر." : "Use your registered email or a secure sign-in link. Approved phone accounts can request a verification code."}
         </p>
         <div className="space-y-2">
-          <label className="text-white/70 text-xs font-bold">{isArabic ? "هاتف OTP اختياري" : "Optional phone OTP"}</label>
+          <label className="text-white/70 text-xs font-bold">{isArabic ? "الدخول برمز الهاتف" : "Phone verification"}</label>
           <div className="relative">
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+971 56 875 7331" dir="ltr" className="w-full bg-brand-deep/70 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold" />
             <Smartphone className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
           </div>
           <button onClick={handlePhoneOtp} disabled={loading} className="w-full py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-colors">
-            {isArabic ? "إرسال رمز الهاتف" : "Send phone OTP"}
+            {isArabic ? "إرسال رمز التحقق" : "Send verification code"}
           </button>
         </div>
       </aside>
