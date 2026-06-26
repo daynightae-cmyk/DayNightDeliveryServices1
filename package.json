@@ -6,7 +6,11 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "web:typecheck": "pnpm --dir artifacts/day-night-delivery run typecheck",
+    "web:gate": "pnpm --dir artifacts/day-night-delivery run production:gate",
+    "web:build": "pnpm --dir artifacts/day-night-delivery run build",
+    "web:validate": "pnpm run web:typecheck && pnpm run web:gate && pnpm run web:build"
   },
   "private": true,
   "devDependencies": {
