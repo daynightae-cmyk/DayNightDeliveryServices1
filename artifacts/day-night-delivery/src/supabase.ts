@@ -37,6 +37,36 @@ function normalizeStatusNote(note?: string | null) {
   return clean || "Admin status update";
 }
 
+async function getSignedInCustomerIdentity() {
+  if (!supabase) return null;
+
+  try {
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
+    if (!user?.id) return null;
+
+    return {
+      id: user.id,
+      email: user.email || null,
+      name: String(user.user_metadata?.full_name || user.user_metadata?.name || user.email || "").trim() || null
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function withSignedInCustomer(payload: Record<string, unknown>) {
+  const customer = await getSignedInCustomerIdentity();
+  if (!customer?.id) return payload;
+
+  return {
+    ...payload,
+    customer_id: typeof payload.customer_id === "string" && payload.customer_id ? payload.customer_id : customer.id,
+    customer_email: typeof payload.customer_email === "string" && payload.customer_email ? payload.customer_email : customer.email,
+    customer_name: typeof payload.customer_name === "string" && payload.customer_name ? payload.customer_name : customer.name
+  };
+}
+
 export async function calculateDeliveryPrice(payload: {
   pickupCity?: string | null;
   deliveryCity?: string | null;
@@ -110,8 +140,9 @@ export async function createPublicOrder(payload: Record<string, unknown>): Promi
     return null;
   }
 
+  const linkedPayload = await withSignedInCustomer(payload);
   const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: normalizePublicOrderPayload(payload)
+    p_order_data: normalizePublicOrderPayload(linkedPayload)
   });
 
   if (error || data === null) {
@@ -126,8 +157,9 @@ export async function createPublicOrder(payload: Record<string, unknown>): Promi
 export async function createPublicOrderRpc(payload: Record<string, unknown>): Promise<any> {
   if (!supabase) return null;
 
+  const linkedPayload = await withSignedInCustomer(payload);
   const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: normalizePublicOrderPayload(payload)
+    p_order_data: normalizePublicOrderPayload(linkedPayload)
   });
 
   if (error) {
@@ -184,6 +216,28 @@ export async function fetchAllOrders(): Promise<Order[]> {
 
   if (error) {
     console.error("Failed to fetch orders from Supabase.");
+    return [];
+  }
+
+  return (data || []) as Order[];
+}
+
+export async function fetchCustomerOrders(customerId?: string | null): Promise<Order[]> {
+  if (!supabase) return [];
+
+  const customer = await getSignedInCustomerIdentity();
+  const activeCustomerId = customerId || customer?.id;
+  if (!activeCustomerId) return [];
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", activeCustomerId)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) {
+    console.warn("Customer order fetch failed.");
     return [];
   }
 
