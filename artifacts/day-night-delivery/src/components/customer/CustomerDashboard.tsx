@@ -12,12 +12,42 @@ type CustomerUser = {
   user_metadata?: Record<string, unknown>;
 };
 
+type OAuthProvider = "google" | "azure";
+
 function ProviderIcon({ label }: { label: string }) {
   return <span className="w-5 h-5 rounded-full bg-brand-gold/15 text-brand-gold flex items-center justify-center text-[10px] font-black">{label}</span>;
 }
 
 function cleanOAuthError(value: string) {
   return decodeURIComponent(value.replace(/\+/g, " "));
+}
+
+function safeAuthError(value: string, isArabic: boolean) {
+  const clean = cleanOAuthError(value);
+  const normalized = clean.toLowerCase();
+
+  if (normalized.includes("getting user email") || normalized.includes("external provider")) {
+    return isArabic
+      ? "تعذر إكمال الدخول لأن مزود الحساب لم يرسل بريدًا إلكترونيًا مؤكدًا. استخدم Google أو رابط البريد الآن، أو أعد ضبط Microsoft من لوحة التحكم."
+      : "Sign-in could not be completed because the provider did not return a verified email. Use Google or email link now, or update Microsoft provider settings.";
+  }
+
+  if (normalized.includes("database error") || normalized.includes("saving new user")) {
+    return isArabic
+      ? "تم رفض إنشاء الحساب من قاعدة البيانات. راجع إعدادات Supabase للمستخدمين ثم جرّب مرة أخرى."
+      : "The account could not be created by the database. Check Supabase user/profile settings and try again.";
+  }
+
+  return clean;
+}
+
+function metadataText(user: CustomerUser | null, keys: string[]) {
+  const metadata = user?.user_metadata || {};
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
 }
 
 export default function CustomerDashboard() {
@@ -36,7 +66,7 @@ export default function CustomerDashboard() {
     const params = new URLSearchParams(window.location.search);
     const oauthError = params.get("error_description") || params.get("error");
     if (oauthError) {
-      setError(cleanOAuthError(oauthError));
+      setError(safeAuthError(oauthError, isArabic));
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -63,17 +93,14 @@ export default function CustomerDashboard() {
       mounted = false;
       data.subscription.unsubscribe();
     };
-  }, []);
+  }, [isArabic]);
 
   const customerName = useMemo(() => {
-    const metadata = user?.user_metadata || {};
-    return String(metadata.full_name || metadata.name || user?.email || user?.phone || (isArabic ? "عميل داي نايت" : "DAY NIGHT Customer"));
+    return metadataText(user, ["full_name", "name", "preferred_username", "user_name"]) || user?.email || user?.phone || (isArabic ? "عميل داي نايت" : "DAY NIGHT Customer");
   }, [isArabic, user]);
 
-  const avatarUrl = useMemo(() => {
-    const metadata = user?.user_metadata || {};
-    return typeof metadata.avatar_url === "string" ? metadata.avatar_url : "";
-  }, [user]);
+  const avatarUrl = useMemo(() => metadataText(user, ["avatar_url", "picture"]), [user]);
+  const customerIdentity = useMemo(() => user?.email || metadataText(user, ["email", "preferred_username", "upn"]) || user?.phone || user?.id || "", [user]);
 
   async function sendEmailLink() {
     setError("");
@@ -86,19 +113,24 @@ export default function CustomerDashboard() {
       options: { emailRedirectTo: `${window.location.origin}/customer` },
     });
     setLoading(false);
-    if (linkError) setError(linkError.message);
+    if (linkError) setError(safeAuthError(linkError.message, isArabic));
     else setMessage(isArabic ? "تم إرسال رابط دخول آمن إلى بريدك." : "A secure sign-in link was sent to your email.");
   }
 
-  async function providerLogin(provider: "google" | "azure") {
+  async function providerLogin(provider: OAuthProvider) {
     setError("");
     setMessage("");
     if (!supabase) return setError(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
+
+    const scopes = provider === "azure" ? "openid email profile User.Read" : "openid email profile";
     const { error: providerError } = await supabase.auth.signInWithOAuth({
       provider: provider as any,
-      options: { redirectTo: `${window.location.origin}/customer` },
+      options: {
+        redirectTo: `${window.location.origin}/customer`,
+        scopes,
+      },
     });
-    if (providerError) setError(providerError.message);
+    if (providerError) setError(safeAuthError(providerError.message, isArabic));
   }
 
   function passkeyNotice() {
@@ -134,7 +166,7 @@ export default function CustomerDashboard() {
                 <ShieldCheck className="w-4 h-4" /> {isArabic ? "تم تسجيل الدخول" : "Signed in"}
               </span>
               <h1 className="mt-5 text-3xl sm:text-5xl font-black text-white leading-tight">{customerName}</h1>
-              <p className="mt-3 text-brand-gold text-xs font-mono" dir="ltr">{user.email || user.phone || user.id}</p>
+              <p className="mt-3 text-brand-gold text-xs font-mono break-all" dir="ltr">{customerIdentity}</p>
             </div>
           </div>
 
