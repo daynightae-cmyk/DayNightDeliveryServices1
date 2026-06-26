@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts",
-    "build": "vite build --config vite.config.ts",
+    "build": "node scripts/build-vite.mjs",
     "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "production:gate": "node scripts/production-hardening-gate.mjs",
-    "build:spa": "vite build --config vite.config.ts"
+    "build:spa": "node scripts/build-vite.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -79,10 +79,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
-    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
-    "motion": "^12.41.0",
-    "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.18.0"
+    "motion": "^12.40.0",
+    "react-leaflet": "^5.0.0"
   }
 }
