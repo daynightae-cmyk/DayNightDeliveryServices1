@@ -30,6 +30,8 @@ create index if not exists idx_orders_tracking_number
 
 -- Customer read policy.
 -- This is additive and does not replace existing admin/service policies.
+-- It intentionally grants SELECT only. Customers must not update order status,
+-- COD values, pricing, driver assignment, or operational fields from the frontend.
 do $$
 begin
   if not exists (
@@ -44,27 +46,6 @@ begin
       for select
       to authenticated
       using (customer_id = auth.uid());
-  end if;
-end $$;
-
--- Optional update guard for future profile/order linking screens.
--- Customers can only update their own linked order metadata fields if a future UI
--- explicitly uses these columns. Operational status changes remain admin-owned.
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_policies
-    where schemaname = 'public'
-      and tablename = 'orders'
-      and policyname = 'customers_update_own_contact_metadata'
-  ) then
-    create policy customers_update_own_contact_metadata
-      on public.orders
-      for update
-      to authenticated
-      using (customer_id = auth.uid())
-      with check (customer_id = auth.uid());
   end if;
 end $$;
 
