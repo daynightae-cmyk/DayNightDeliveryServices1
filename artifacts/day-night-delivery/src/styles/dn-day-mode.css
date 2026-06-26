@@ -1,0 +1,85 @@
+/* DAY NIGHT luxury day-mode corrections */
+:root.light-theme body {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(0,85,187,0.16), transparent 28rem),
+    radial-gradient(circle at 82% 16%, rgba(212,175,55,0.13), transparent 24rem),
+    linear-gradient(145deg, #DDEAFF 0%, #F4F8FF 50%, #E7F1FF 100%) !important;
+}
+
+:root.light-theme main {
+  color: #071A33 !important;
+}
+
+:root.light-theme main .text-white,
+:root.light-theme main .text-white\/90,
+:root.light-theme main .text-white\/85,
+:root.light-theme main .text-white\/80,
+:root.light-theme main .text-white\/75,
+:root.light-theme main .text-white\/70 {
+  color: #071A33 !important;
+}
+
+:root.light-theme main .text-white\/65,
+:root.light-theme main .text-white\/60,
+:root.light-theme main .text-white\/55,
+:root.light-theme main .text-white\/50,
+:root.light-theme main .text-white\/45,
+:root.light-theme main .text-white\/40,
+:root.light-theme main .text-white\/35,
+:root.light-theme main .text-white\/30 {
+  color: rgba(7,26,51,0.64) !important;
+}
+
+:root.light-theme .dn-card,
+:root.light-theme .dn-card-premium,
+:root.light-theme main section[class*="rounded"],
+:root.light-theme main div[class*="rounded-3xl"][class*="border"],
+:root.light-theme main div[class*="rounded-[2rem]"][class*="border"],
+:root.light-theme main div[class*="rounded-[2.25rem]"][class*="border"] {
+  background-color: rgba(255,255,255,0.72) !important;
+  border-color: rgba(7,26,51,0.12) !important;
+  box-shadow: 0 30px 95px rgba(7,26,51,0.10), inset 0 1px 0 rgba(255,255,255,0.88) !important;
+}
+
+:root.light-theme main input,
+:root.light-theme main select,
+:root.light-theme main textarea,
+:root.light-theme .dn-input-control,
+:root.light-theme .dn-select-control {
+  background: rgba(255,255,255,0.92) !important;
+  color: #071A33 !important;
+  border-color: rgba(7,26,51,0.16) !important;
+  box-shadow: 0 12px 26px rgba(10,28,58,0.08), inset 0 1px 0 rgba(255,255,255,0.92) !important;
+}
+
+:root.light-theme main input::placeholder,
+:root.light-theme main textarea::placeholder,
+:root.light-theme .dn-input-control::placeholder {
+  color: rgba(7,26,51,0.38) !important;
+}
+
+:root.light-theme .dn-btn-secondary,
+:root.light-theme .btn-glass,
+:root.light-theme main a[class*="bg-white"],
+:root.light-theme main button[class*="bg-white"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(232,240,250,0.86)) !important;
+  color: #071A33 !important;
+  border-color: rgba(0,85,187,0.22) !important;
+}
+
+:root.light-theme main thead th {
+  color: rgba(7,26,51,0.52) !important;
+}
+
+:root.light-theme main tbody tr {
+  background: rgba(255,255,255,0.74) !important;
+  box-shadow: 0 12px 30px rgba(7,26,51,0.08) !important;
+}
+
+:root.light-theme main tbody td {
+  border-color: rgba(7,26,51,0.08) !important;
+}
+
+:root.light-theme .leaflet-container {
+  background: #EAF2FF !important;
+}
