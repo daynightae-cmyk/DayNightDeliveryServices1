@@ -3,6 +3,7 @@ Allow: /
 Disallow: /admin
 Disallow: /auth
 Disallow: /customer
+Disallow: /update-password
 Disallow: /driver
 
 Sitemap: https://daynightae.com/sitemap.xml
