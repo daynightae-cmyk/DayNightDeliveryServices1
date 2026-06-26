@@ -3,12 +3,17 @@ import { supabase, isAdminUser } from "../supabase";
 import { CheckCircle, KeyRound, Lock, Mail, ShieldAlert, ShieldCheck } from "lucide-react";
 import TurnstileCaptcha from "./security/TurnstileCaptcha";
 import { useAppContext } from "../lib/AppContext";
+import CustomerDashboard from "./customer/CustomerDashboard";
 
 interface AuthProps {
   onAuthSuccess: () => void;
 }
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
+  if (typeof window !== "undefined" && window.location.pathname === "/customer") {
+    return <CustomerDashboard />;
+  }
+
   const { language } = useAppContext();
   const isArabic = language === "ar";
   const [email, setEmail] = useState("");
@@ -116,39 +121,18 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             <div className="space-y-1.5">
               <label className="text-white/80 text-xs font-bold">{isArabic ? "بريد الإدارة" : "Admin email"}</label>
               <div className="relative">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Admin@daynightae.com"
-                  className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-right"
-                  dir="ltr"
-                />
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin@daynightae.com" className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-right" dir="ltr" />
                 <Mail className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
               </div>
             </div>
-
             <div className="space-y-1.5">
               <label className="text-white/80 text-xs font-bold">{isArabic ? "كلمة المرور" : "Password"}</label>
               <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-left tracking-widest"
-                  dir="ltr"
-                />
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••••••" className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-left tracking-widest" dir="ltr" />
                 <KeyRound className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
               </div>
             </div>
-
-            {captchaEnabled && (
-              <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />
-            )}
-
+            {captchaEnabled && <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />}
             <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
               {loading ? (isArabic ? "جاري التحقق..." : "Verifying...") : (isArabic ? "دخول لوحة الإدارة" : "Open Admin Panel")}
             </button>
