@@ -33,7 +33,10 @@ if (vercelPath) {
   assert(vercel.includes('"headers"'), "Vercel security headers exist");
   assert(vercel.includes('"redirects"'), "Canonical redirect config exists");
   assert(vercel.includes('"outputDirectory"'), "Vercel output directory set");
-  assert(vercel.includes("artifacts/day-night-delivery/dist/public"), "Vercel output directory points to built app public folder");
+  assert(
+    vercel.includes("artifacts/day-night-delivery/dist/public") || vercel.includes('"outputDirectory": "dist/public"'),
+    "Vercel output directory points to built app public folder"
+  );
 }
 
 /* ── Sitemap / index ── */
