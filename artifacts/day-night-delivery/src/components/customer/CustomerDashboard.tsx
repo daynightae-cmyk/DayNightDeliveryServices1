@@ -45,9 +45,20 @@ export default function CustomerDashboard() {
     else setMessage(isArabic ? "تم إرسال رابط دخول آمن إلى بريدك." : "A secure sign-in link was sent to your email.");
   }
 
-  function premiumNotice(method: string) {
+  async function providerLogin(provider: "google" | "apple" | "azure") {
     setError("");
-    setMessage(isArabic ? `${method} متاح للحسابات المعتمدة. استخدم الهاتف أو البريد الآن للدخول السريع.` : `${method} is available for approved accounts. Use phone or email for fast access now.`);
+    setMessage("");
+    if (!supabase) return setError(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
+    const { error: providerError } = await supabase.auth.signInWithOAuth({
+      provider: provider as any,
+      options: { redirectTo: `${window.location.origin}/customer-login` },
+    });
+    if (providerError) setError(providerError.message);
+  }
+
+  function passkeyNotice() {
+    setError("");
+    setMessage(isArabic ? "الدخول بالبصمة متاح للحسابات التي فعّلت مفتاح مرور على الجهاز." : "Biometric access is available for accounts with a saved passkey on this device.");
   }
 
   return (
@@ -114,10 +125,10 @@ export default function CustomerDashboard() {
 
             <div className="my-6 h-px bg-white/10" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button onClick={() => premiumNotice("Google")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><ProviderIcon label="G" /> Google</button>
-              <button onClick={() => premiumNotice("Apple")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><Apple className="w-4 h-4" /> Apple</button>
-              <button onClick={() => premiumNotice("Microsoft")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><ProviderIcon label="M" /> Microsoft</button>
-              <button onClick={() => premiumNotice(isArabic ? "البصمة" : "Passkey")} className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-brand-gold text-xs font-black flex items-center justify-center gap-2"><Fingerprint className="w-4 h-4" /> {isArabic ? "بصمة / Face ID" : "Passkey"}</button>
+              <button onClick={() => void providerLogin("google")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><ProviderIcon label="G" /> Google</button>
+              <button onClick={() => void providerLogin("apple")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><Apple className="w-4 h-4" /> Apple</button>
+              <button onClick={() => void providerLogin("azure")} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black flex items-center justify-center gap-2"><ProviderIcon label="M" /> Microsoft</button>
+              <button onClick={passkeyNotice} className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-brand-gold text-xs font-black flex items-center justify-center gap-2"><Fingerprint className="w-4 h-4" /> {isArabic ? "بصمة / Face ID" : "Passkey"}</button>
             </div>
 
             <Link to="/request" className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white text-xs font-black">
