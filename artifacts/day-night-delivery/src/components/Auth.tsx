@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
 import { CheckCircle, KeyRound, Lock, Mail, ShieldAlert, ShieldCheck } from "lucide-react";
-import TurnstileCaptcha from "./security/TurnstileCaptcha";
+import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
 import { useAppContext } from "../lib/AppContext";
 import CustomerDashboard from "./customer/CustomerDashboard";
 
@@ -21,6 +21,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [captchaToken, setCaptchaToken] = useState("");
   const captchaSiteKey = String(((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || "")).trim();
   const captchaEnabled = Boolean(captchaSiteKey);
+  const usableCaptchaToken = captchaToken && captchaToken !== TURNSTILE_FALLBACK_TOKEN ? captchaToken : "";
 
   useEffect(() => {
     if (isCustomerRoute) return;
@@ -60,7 +61,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
-        options: captchaToken ? { captchaToken } : undefined,
+        options: usableCaptchaToken ? { captchaToken: usableCaptchaToken } : undefined,
       } as any);
 
       if (error) {
@@ -135,6 +136,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               </div>
             </div>
             {captchaEnabled && <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />}
+            {captchaToken === TURNSTILE_FALLBACK_TOKEN && (
+              <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">
+                {isArabic ? "تم تفعيل مسار دخول احتياطي لأن تحقق Cloudflare لم يُحمّل على هذا المتصفح." : "Fallback sign-in enabled because Cloudflare verification did not load in this browser."}
+              </p>
+            )}
             <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
               {loading ? (isArabic ? "جاري التحقق..." : "Verifying...") : (isArabic ? "دخول لوحة الإدارة" : "Open Admin Panel")}
             </button>
