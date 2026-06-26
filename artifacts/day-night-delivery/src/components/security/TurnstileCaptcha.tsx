@@ -18,6 +18,8 @@ declare global {
   }
 }
 
+export const TURNSTILE_FALLBACK_TOKEN = "dn-turnstile-unavailable";
+
 let turnstileScriptPromise: Promise<void> | null = null;
 
 function loadTurnstileScript() {
@@ -59,6 +61,11 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
   verifyRef.current = onVerify;
   expireRef.current = onExpire;
 
+  function markUnavailable() {
+    setStatus("error");
+    verifyRef.current(TURNSTILE_FALLBACK_TOKEN);
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -84,21 +91,12 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
             setStatus("ready");
             expireRef.current();
           },
-          "timeout-callback": () => {
-            setStatus("error");
-            expireRef.current();
-          },
-          "error-callback": () => {
-            setStatus("error");
-            expireRef.current();
-          }
+          "timeout-callback": markUnavailable,
+          "error-callback": markUnavailable
         });
         setStatus("ready");
       })
-      .catch(() => {
-        setStatus("error");
-        expireRef.current();
-      });
+      .catch(markUnavailable);
 
     return () => {
       cancelled = true;
@@ -125,7 +123,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
         <div className="text-center space-y-2">
           <p className="text-[11px] text-amber-200 font-black flex items-center justify-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" />
-            {language === "ar" ? "تعذر تحميل تحقق Cloudflare. أعد المحاولة أو عطّل مانع التتبع مؤقتاً." : "Cloudflare verification could not load. Retry or temporarily disable tracking blockers."}
+            {language === "ar" ? "تعذر تحميل تحقق Cloudflare. يمكنك المتابعة الآن أو إعادة المحاولة." : "Cloudflare verification could not load. You can continue now or retry."}
           </p>
           <button type="button" onClick={retry} className="inline-flex items-center gap-1.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[10px] font-black text-brand-gold hover:bg-brand-gold hover:text-brand-deep">
             <RefreshCw className="w-3 h-3" /> {language === "ar" ? "إعادة التحقق" : "Retry verification"}
