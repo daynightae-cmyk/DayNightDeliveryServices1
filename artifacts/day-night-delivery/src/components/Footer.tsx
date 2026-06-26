@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Shield,
+  Code2,
 } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
@@ -32,7 +33,6 @@ export default function Footer() {
   const isArabic = language === "ar";
   const isLight = theme === "light";
 
-  /* ── Column: Company ── */
   const companyLinks = [
     { key: "home", label: isArabic ? "الرئيسية" : "Home", path: "/" },
     { key: "about", label: isArabic ? "من نحن" : "About Us", path: "/about" },
@@ -42,7 +42,6 @@ export default function Footer() {
     { key: "contact", label: isArabic ? "تواصل معنا" : "Contact", path: "/contact" },
   ];
 
-  /* ── Column: Services ── */
   const serviceLinks = [
     { key: "uae", label: isArabic ? "توصيل داخل الإمارات" : "UAE Local Delivery", path: "/uae-delivery" },
     { key: "global", label: isArabic ? "الشحن الدولي" : "International Shipping", path: "/international-shipping" },
@@ -53,12 +52,12 @@ export default function Footer() {
     { key: "qr", label: isArabic ? "خدمات QR الذكية" : "QR Services", path: "/qr" },
   ];
 
-  /* ── Column: Support ── */
   const supportLinks = [
     { key: "pricing", label: isArabic ? "الأسعار والحاسبة" : "Pricing & Calculator", path: "/pricing", isRoute: true },
     { key: "policy", label: isArabic ? "سياسة الخدمة" : "Service Policy", path: "/policy", isRoute: true },
     { key: "privacy", label: isArabic ? "سياسة الخصوصية" : "Privacy Policy", path: "/privacy", isRoute: true },
     { key: "terms", label: isArabic ? "الشروط والأحكام" : "Terms & Conditions", path: "/terms", isRoute: true },
+    { key: "admin", label: isArabic ? "لوحة الإدارة" : "Admin Portal", path: "/auth", isRoute: true },
     { key: "whatsapp", label: "WhatsApp", path: companyMeta.whatsappUrl, isRoute: false },
     { key: "email", label: companyMeta.email, path: `mailto:${companyMeta.email}`, isRoute: false },
   ];
@@ -94,7 +93,6 @@ export default function Footer() {
       />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Brand header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -114,7 +112,7 @@ export default function Footer() {
             <p className="text-brand-gold font-bold text-sm mb-1">
               {isArabic ? companyMeta.legalNameAr : tf.slogan}
             </p>
-            <a href={companyMeta.website} target="_blank" rel="noopener noreferrer" className="text-xs text-white/50 hover:text-brand-gold font-mono" dir="ltr">
+            <a href={companyMeta.website} target="_blank" rel="noopener noreferrer" className={`text-xs hover:text-brand-gold font-mono ${isLight ? "text-brand-deep/50" : "text-white/50"}`} dir="ltr">
               {companyMeta.displayWebsite}
             </a>
             <p className={`max-w-2xl text-sm leading-relaxed mt-2 ${isLight ? "text-brand-deep/70" : "text-white/70"}`}>
@@ -123,7 +121,6 @@ export default function Footer() {
           </div>
         </motion.div>
 
-        {/* Links grid — 4 columns */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -131,7 +128,6 @@ export default function Footer() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 py-12"
         >
-          {/* Company */}
           <div className={isArabic ? "text-right" : "text-left"}>
             <h4 className={headingClass}>{isArabic ? "الشركة" : "Company"}</h4>
             <ul className="space-y-3">
@@ -146,7 +142,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Services */}
           <div className={isArabic ? "text-right" : "text-left"}>
             <h4 className={headingClass}>{isArabic ? "الخدمات" : "Services"}</h4>
             <ul className="space-y-3">
@@ -161,7 +156,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support */}
           <div className={isArabic ? "text-right" : "text-left"}>
             <h4 className={headingClass}>
               <span className="flex items-center gap-1.5">
@@ -193,7 +187,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
           <div className={isArabic ? "text-right" : "text-left"}>
             <h4 className={headingClass}>{isArabic ? "التواصل" : "Contact"}</h4>
             <ul className="space-y-4">
@@ -231,7 +224,6 @@ export default function Footer() {
           </div>
         </motion.div>
 
-        {/* Social strip */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -270,23 +262,26 @@ export default function Footer() {
           <p className="text-brand-gold/90 font-bold text-sm text-center">{tf.motto}</p>
         </motion.div>
 
-        {/* Bottom bar */}
         <div className={`pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-4 ${isLight ? "border-brand-deep/10" : "border-white/10"}`}>
           <p className={`text-xs text-center md:text-start ${isLight ? "text-brand-deep/50" : "text-white/50"}`}>
             {tf.allRights}
           </p>
           <div className="flex flex-col items-center gap-1">
             <p
-              className="text-xs font-bold"
+              id="footer_creator_credit"
+              className="inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-1.5 text-[12px] sm:text-sm font-black shadow-[0_0_25px_rgba(212,175,55,0.18)]"
               style={{
-                background: "linear-gradient(90deg, #D4AF37, #F5B700, #D4AF37)",
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                backgroundImage: "linear-gradient(90deg, #D4AF37, #F5B700, #FFFFFF, #D4AF37)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
-                letterSpacing: "0.03em",
+                letterSpacing: "0.055em",
               }}
+              aria-label="Creating by Eng Sadek Elgazar"
             >
-              Create By Eng Sadek Elgazar
+              <Code2 className="w-3.5 h-3.5 text-brand-gold" />
+              Creating by Eng Sadek Elgazar
             </p>
             <p className={`text-xs flex items-center gap-1 ${isLight ? "text-brand-deep/40" : "text-white/40"}`}>
               {isArabic ? "صُمم بـ" : "Crafted with"}
