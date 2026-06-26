@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
+import companyMeta from "../data/companyMeta";
 
-const LOGO_IMAGE_URL = "/logo-daynight.png";
+const LOGO_IMAGE_URL = companyMeta.logoUrl;
 
 interface SplashProps {
   onComplete?: () => void;
@@ -169,7 +170,7 @@ export default function Splash({ onComplete }: SplashProps) {
                 className="absolute -inset-3 rounded-full bg-gradient-to-r from-brand-gold/25 via-brand-sky/15 to-brand-gold/25 blur-xl pointer-events-none"
               />
               {/* Logo image */}
-              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-brand-gold/55 shadow-2xl">
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-brand-gold/55 shadow-2xl bg-white/5">
                 <img
                   src={LOGO_IMAGE_URL}
                   alt="DAY NIGHT DELIVERY SERVICES"
