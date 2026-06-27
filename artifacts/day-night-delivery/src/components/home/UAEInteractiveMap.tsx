@@ -11,7 +11,7 @@ import {
   Truck,
   Zap,
 } from "lucide-react";
-import "./UAEInteractiveMap.css";
+import "../../styles/dn-dashboard-map.css";
 
 const MAP_IMAGE_URL =
   "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png";
