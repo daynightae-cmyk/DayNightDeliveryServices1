@@ -1,152 +1,199 @@
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import { Clock, MapPin, Navigation, Package, Truck, Zap } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "motion/react";
+import { Activity, Box, Clock, MapPin, Navigation, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { useAppContext } from "../../lib/AppContext";
+import "../../styles/dn-dashboard-map.css";
 
 type ZoneType = "main" | "extended";
-type City = {
+
+type MapNode = {
   id: string;
   nameAr: string;
   nameEn: string;
-  emirateAr: string;
-  emirateEn: string;
-  lat: number;
-  lng: number;
+  zoneAr: string;
+  zoneEn: string;
+  x: number;
+  y: number;
+  labelX: number;
+  labelY: number;
+  curve: number;
   isHub?: boolean;
   zoneType: ZoneType;
   price: number;
   coverage: number;
 };
 
-const UAE_CITIES: City[] = [
-  { id: "abudhabi", nameAr: "أبوظبي", nameEn: "Abu Dhabi", emirateAr: "إمارة أبوظبي", emirateEn: "Abu Dhabi", lat: 24.4539, lng: 54.3773, isHub: true, zoneType: "main", price: 30, coverage: 23 },
-  { id: "mussafah", nameAr: "مصفح", nameEn: "Mussafah", emirateAr: "إمارة أبوظبي", emirateEn: "Abu Dhabi", lat: 24.3682, lng: 54.4907, zoneType: "main", price: 30, coverage: 8 },
-  { id: "dubai", nameAr: "دبي", nameEn: "Dubai", emirateAr: "إمارة دبي", emirateEn: "Dubai", lat: 25.2048, lng: 55.2708, zoneType: "main", price: 30, coverage: 35 },
-  { id: "sharjah", nameAr: "الشارقة", nameEn: "Sharjah", emirateAr: "إمارة الشارقة", emirateEn: "Sharjah", lat: 25.3463, lng: 55.4209, zoneType: "main", price: 30, coverage: 12 },
-  { id: "ajman", nameAr: "عجمان", nameEn: "Ajman", emirateAr: "إمارة عجمان", emirateEn: "Ajman", lat: 25.4052, lng: 55.5136, zoneType: "main", price: 30, coverage: 6 },
-  { id: "uaq", nameAr: "أم القيوين", nameEn: "Umm Al Quwain", emirateAr: "أم القيوين", emirateEn: "Umm Al Quwain", lat: 25.5647, lng: 55.5553, zoneType: "main", price: 30, coverage: 5 },
-  { id: "rak", nameAr: "رأس الخيمة", nameEn: "Ras Al Khaimah", emirateAr: "رأس الخيمة", emirateEn: "Ras Al Khaimah", lat: 25.7895, lng: 55.9432, zoneType: "main", price: 30, coverage: 15 },
-  { id: "fujairah", nameAr: "الفجيرة", nameEn: "Fujairah", emirateAr: "إمارة الفجيرة", emirateEn: "Fujairah", lat: 25.1288, lng: 56.3265, zoneType: "main", price: 30, coverage: 10 },
-  { id: "alain", nameAr: "العين", nameEn: "Al Ain", emirateAr: "إمارة أبوظبي", emirateEn: "Abu Dhabi", lat: 24.2075, lng: 55.7447, zoneType: "extended", price: 50, coverage: 18 },
-  { id: "western", nameAr: "المنطقة الغربية", nameEn: "Western Region", emirateAr: "إمارة أبوظبي", emirateEn: "Abu Dhabi", lat: 23.7, lng: 51.6, zoneType: "extended", price: 50, coverage: 12 },
+const UAE_SHAPE = "M82 426 C130 356 215 372 292 344 C374 315 425 250 517 205 C615 157 698 96 790 48 C852 74 918 154 920 240 C912 306 846 330 772 346 C708 360 673 420 608 457 C516 511 384 506 285 482 C205 464 133 462 82 426 Z";
+const UAE_INNER = "M132 414 C188 372 259 374 326 344 C403 310 453 262 531 226 C618 186 698 126 777 84 C827 110 878 169 882 235 C873 279 815 299 755 315 C688 333 658 385 598 421 C514 472 397 468 308 448 C238 432 175 440 132 414 Z";
+
+const NODES: MapNode[] = [
+  { id: "abudhabi", nameAr: "أبوظبي", nameEn: "Abu Dhabi", zoneAr: "المركز الرئيسي", zoneEn: "Main hub", x: 492, y: 388, labelX: 510, labelY: 366, curve: -15, isHub: true, zoneType: "main", price: 30, coverage: 23 },
+  { id: "dubai", nameAr: "دبي", nameEn: "Dubai", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 646, y: 253, labelX: 616, labelY: 231, curve: -72, zoneType: "main", price: 30, coverage: 35 },
+  { id: "sharjah", nameAr: "الشارقة", nameEn: "Sharjah", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 688, y: 210, labelX: 634, labelY: 182, curve: -88, zoneType: "main", price: 30, coverage: 12 },
+  { id: "ajman", nameAr: "عجمان", nameEn: "Ajman", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 724, y: 178, labelX: 667, labelY: 155, curve: -106, zoneType: "main", price: 30, coverage: 6 },
+  { id: "uaq", nameAr: "أم القيوين", nameEn: "Umm Al Quwain", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 758, y: 145, labelX: 662, labelY: 116, curve: -126, zoneType: "main", price: 30, coverage: 5 },
+  { id: "rak", nameAr: "رأس الخيمة", nameEn: "Ras Al Khaimah", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 796, y: 82, labelX: 700, labelY: 58, curve: -154, zoneType: "main", price: 30, coverage: 15 },
+  { id: "fujairah", nameAr: "الفجيرة", nameEn: "Fujairah", zoneAr: "منطقة رئيسية", zoneEn: "Main zone", x: 895, y: 250, labelX: 828, labelY: 230, curve: -58, zoneType: "main", price: 30, coverage: 10 },
+  { id: "alain", nameAr: "العين", nameEn: "Al Ain", zoneAr: "منطقة موسعة", zoneEn: "Extended zone", x: 660, y: 461, labelX: 638, labelY: 437, curve: 58, zoneType: "extended", price: 50, coverage: 18 },
+  { id: "western", nameAr: "المنطقة الغربية", nameEn: "Western Region", zoneAr: "منطقة موسعة", zoneEn: "Extended zone", x: 180, y: 448, labelX: 108, labelY: 426, curve: 78, zoneType: "extended", price: 50, coverage: 12 },
 ];
 
-const HUB = UAE_CITIES[0];
+const HUB = NODES[0];
+const ROUTES = NODES.filter((node) => !node.isHub);
 
-function MapController({ city }: { city: City }) {
-  const map = useMap();
-  useEffect(() => {
-    const zoom = city.id === "western" ? 7 : city.id === "abudhabi" ? 8 : 10;
-    map.flyTo([city.lat, city.lng], zoom, { duration: 1.15, easeLinearity: 0.5 });
-  }, [city.id, city.lat, city.lng, map]);
-  return null;
+function routePath(node: MapNode) {
+  const midX = (HUB.x + node.x) / 2 + node.curve;
+  const midY = (HUB.y + node.y) / 2 - Math.abs(node.curve) * 0.28;
+  return `M ${HUB.x} ${HUB.y} Q ${midX} ${midY} ${node.x} ${node.y}`;
 }
 
-function getMarkerColor(city: City) {
-  if (city.isHub) return "#F6C94A";
-  if (city.zoneType === "extended") return "#00CFFF";
-  return "#2196F3";
+function nodeLabel(node: MapNode, isArabic: boolean) {
+  return isArabic ? node.nameAr : node.nameEn;
+}
+
+function zoneLabel(node: MapNode, isArabic: boolean) {
+  if (node.isHub) return isArabic ? "مركز توزيع" : "Dispatch hub";
+  return node.zoneType === "main" ? (isArabic ? "سعر رئيسي" : "Main rate") : (isArabic ? "منطقة موسعة" : "Extended");
 }
 
 export default function UAEInteractiveMap() {
-  const { language, theme } = useAppContext();
+  const { language } = useAppContext();
   const isArabic = language === "ar";
-  const isLight = theme === "light";
-  const [selectedCity, setSelectedCity] = useState<City>(HUB);
-  const [mounted, setMounted] = useState(false);
-  const selectedColor = getMarkerColor(selectedCity);
+  const [selectedId, setSelectedId] = useState(HUB.id);
+  const [paused, setPaused] = useState(false);
+  const selected = NODES.find((node) => node.id === selectedId) || HUB;
+
+  const mapLights = useMemo(() => Array.from({ length: 92 }, (_, index) => {
+    const x = 120 + ((index * 73) % 760);
+    const y = 95 + ((index * 41) % 390);
+    const opacity = 0.24 + ((index * 17) % 50) / 100;
+    const radius = 1 + ((index * 7) % 3);
+    return { id: index, x, y, opacity, radius };
+  }), []);
 
   useEffect(() => {
-    setMounted(true);
-    const style = document.createElement("style");
-    style.id = "dn-map-styles";
-    style.innerHTML = `
-      .leaflet-dn-tooltip { background: rgba(7,26,51,0.94) !important; border: 1px solid rgba(212,175,55,0.42) !important; border-radius: 9px !important; padding: 5px 11px !important; color: #fff !important; font-size: 11px !important; font-weight: 800 !important; box-shadow: 0 6px 20px rgba(0,0,0,0.35) !important; white-space: nowrap !important; }
-      .leaflet-dn-tooltip::before { display: none !important; }
-      .leaflet-control-zoom { border: 1px solid rgba(212,175,55,0.25) !important; border-radius: 12px !important; overflow: hidden !important; }
-      .leaflet-control-zoom a { background: rgba(7,26,51,0.92) !important; color: #F6C94A !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
-      .leaflet-container { outline: none; font-family: inherit; }
-    `;
-    if (!document.getElementById("dn-map-styles")) document.head.appendChild(style);
-    return () => document.getElementById("dn-map-styles")?.remove();
-  }, []);
+    if (paused) return;
+    const timer = window.setInterval(() => {
+      setSelectedId((current) => {
+        const currentIndex = NODES.findIndex((node) => node.id === current);
+        return NODES[(currentIndex + 1) % NODES.length].id;
+      });
+    }, 4200);
+    return () => window.clearInterval(timer);
+  }, [paused]);
 
-  const tileUrl = isLight
-    ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-
-  const panelBg = isLight ? "rgba(255,255,255,0.94)" : "rgba(5,20,40,0.94)";
-  const panelText = isLight ? "#071A33" : "#FFFFFF";
-  const mutedText = isLight ? "rgba(7,26,51,0.55)" : "rgba(255,255,255,0.50)";
-
-  const infoPanel = (
-    <div style={{ position: "absolute", top: 16, [isArabic ? "right" : "left"]: 16, zIndex: 1000, width: 230, background: panelBg, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: `1px solid ${selectedColor}55`, borderRadius: 20, padding: 18, boxShadow: isLight ? "0 12px 34px rgba(7,26,51,0.16)" : "0 8px 32px rgba(0,0,0,0.50)" }} dir={isArabic ? "rtl" : "ltr"}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedColor, boxShadow: `0 0 10px ${selectedColor}` }} /><span style={{ fontSize: 10, fontWeight: 900, color: "#B58900", letterSpacing: "0.08em", textTransform: "uppercase" }}>{isArabic ? selectedCity.emirateAr : selectedCity.emirateEn}</span></div>
-      <h3 style={{ fontSize: 24, fontWeight: 950, color: panelText, marginBottom: 4, lineHeight: 1.1 }}>{isArabic ? selectedCity.nameAr : selectedCity.nameEn}</h3>
-      <p style={{ fontSize: 11, color: mutedText, marginBottom: 14 }}>{selectedCity.isHub ? (isArabic ? "• المقر الرئيسي" : "• HQ & Dispatch Hub") : selectedCity.zoneType === "main" ? (isArabic ? "• منطقة رئيسية" : "• Main Zone") : (isArabic ? "• منطقة موسعة" : "• Extended Zone")}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-        <div style={{ textAlign: "center", padding: "11px 6px", background: isLight ? "rgba(7,26,51,0.045)" : "rgba(255,255,255,0.055)", borderRadius: 12, border: isLight ? "1px solid rgba(7,26,51,0.08)" : "1px solid rgba(255,255,255,0.08)" }}><div style={{ fontSize: 24, fontWeight: 900, color: "#B58900", lineHeight: 1 }}>{selectedCity.price}</div><div style={{ fontSize: 9, color: mutedText, marginTop: 3 }}>{isArabic ? "درهم" : "AED FLAT"}</div></div>
-        <div style={{ textAlign: "center", padding: "11px 6px", background: isLight ? "rgba(7,26,51,0.045)" : "rgba(255,255,255,0.055)", borderRadius: 12, border: isLight ? "1px solid rgba(7,26,51,0.08)" : "1px solid rgba(255,255,255,0.08)" }}><div style={{ fontSize: 24, fontWeight: 900, color: "#1E90FF", lineHeight: 1 }}>{selectedCity.coverage}</div><div style={{ fontSize: 9, color: mutedText, marginTop: 3 }}>{isArabic ? "منطقة" : "ZONES"}</div></div>
-      </div>
-      <div style={{ padding: "9px 10px", background: `${selectedColor}12`, borderRadius: 10, border: `1px solid ${selectedColor}33`, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ fontSize: 10, color: mutedText }}>{isArabic ? "نوع المنطقة" : "Zone type"}</span><span style={{ fontSize: 10, fontWeight: 900, color: selectedColor }}>{selectedCity.zoneType === "main" ? (isArabic ? "رئيسية" : "Main") : (isArabic ? "موسعة" : "Extended")}</span></div>
-    </div>
-  );
-
-  const liveBadge = (
-    <div style={{ position: "absolute", top: 16, [isArabic ? "left" : "right"]: 16, zIndex: 1000, display: "flex", alignItems: "center", gap: 6, padding: "7px 15px", background: panelBg, backdropFilter: "blur(12px)", border: isLight ? "1px solid rgba(7,26,51,0.10)" : "1px solid rgba(255,255,255,0.10)", borderRadius: 999 }}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#25D366", boxShadow: "0 0 8px #25D366" }} />
-      <span style={{ fontSize: 10, fontWeight: 900, color: panelText, letterSpacing: "0.1em" }}>{isArabic ? "مباشر" : "LIVE"}</span>
-    </div>
-  );
-
-  if (!mounted) {
-    return <section className="relative py-16 px-4"><div className="mx-auto max-w-7xl"><div className="rounded-3xl border border-white/10 flex items-center justify-center" style={{ height: 520, background: isLight ? "rgba(255,255,255,0.85)" : "rgba(5,20,40,0.80)" }}><div className={isLight ? "text-brand-deep/50 text-sm" : "text-white/40 text-sm"}>{isArabic ? "جاري تحميل الخريطة..." : "Loading map..."}</div></div></div></section>;
-  }
+  const features = [
+    { icon: ShieldCheck, value: isArabic ? "تغطية موثوقة" : "Trusted coverage", caption: isArabic ? "في جميع أنحاء الدولة" : "Across UAE" },
+    { icon: Zap, value: isArabic ? "تسعير لحظي" : "Live pricing", caption: isArabic ? "حسب المسافة والوقت" : "By route and timing" },
+    { icon: Clock, value: "24 / 7", caption: isArabic ? "نهاراً وليلاً" : "Day and night" },
+    { icon: Box, value: isArabic ? "تتبع مباشر" : "Live tracking", caption: isArabic ? "لحظة بلحظة" : "Step by step" },
+  ];
 
   return (
-    <section className="relative py-16 px-4" dir={isArabic ? "rtl" : "ltr"}>
-      <div className="text-center mb-10 mx-auto max-w-4xl">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 text-brand-gold text-xs font-black uppercase tracking-widest mb-4"><Navigation className="w-3.5 h-3.5" />{isArabic ? "خريطة التغطية – الإمارات" : "Coverage Map – UAE"}</div>
-        <h2 className={isLight ? "text-3xl sm:text-4xl font-black text-brand-deep mb-3" : "text-3xl sm:text-4xl font-black text-white mb-3"}>{isArabic ? "نقاط تشغيل نشطة عبر الإمارات" : "Active Operations Across UAE"}</h2>
-        <p className={isLight ? "text-brand-deep/65 max-w-xl mx-auto text-sm font-bold" : "text-white/60 max-w-xl mx-auto text-sm font-bold"}>{isArabic ? "اختر أي مدينة أو منطقة لمعرفة التسعير والتغطية الفعلية." : "Select any city or area to see live pricing and coverage details."}</p>
+    <section className="relative py-14 sm:py-16" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="mx-auto mb-9 max-w-4xl text-center">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-1.5 text-xs font-black uppercase tracking-widest text-brand-gold">
+          <Navigation className="h-3.5 w-3.5" /> {isArabic ? "خريطة تشغيل حيوية" : "Live Operations Map"}
+        </div>
+        <h2 className="text-3xl font-black leading-tight text-white sm:text-4xl">{isArabic ? "خريطة تغطية الإمارات بتأثير حي" : "UAE coverage map with live motion"}</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-7 text-white/58">{isArabic ? "اضغط على أي مدينة لمشاهدة التغطية، السعر، ونوع المنطقة مع خطوط تشغيل متحركة من مركز أبوظبي." : "Click any city to see coverage, price, and zone type with animated routes from Abu Dhabi hub."}</p>
       </div>
 
       <div className="mx-auto max-w-7xl">
-        <div className="relative overflow-hidden rounded-[1.75rem]" style={{ height: 560, border: isLight ? "1px solid rgba(7,26,51,0.12)" : "1px solid rgba(255,255,255,0.10)", boxShadow: isLight ? "0 28px 80px rgba(7,26,51,0.13)" : "0 28px 80px rgba(0,0,0,0.35)" }}>
-          <MapContainer center={[24.5, 54.5]} zoom={7} className="w-full h-full" zoomControl attributionControl={false} style={{ background: isLight ? "#EAF2FF" : "#050f1a" }}>
-            <TileLayer url={tileUrl} attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>' subdomains="abcd" maxZoom={20} />
-            <MapController city={selectedCity} />
-            {UAE_CITIES.filter((city) => !city.isHub).map((city) => <Polyline key={`route-${city.id}`} positions={[[HUB.lat, HUB.lng], [city.lat, city.lng]]} pathOptions={{ color: city.id === selectedCity.id ? "#F6C94A" : city.zoneType === "extended" ? "#00CFFF" : "#2196F3", weight: city.id === selectedCity.id ? 2.5 : 1.25, opacity: city.id === selectedCity.id ? 0.82 : 0.32, dashArray: "5 8" }} />)}
-            {UAE_CITIES.map((city) => {
-              const isSelected = city.id === selectedCity.id;
-              const color = getMarkerColor(city);
-              const radius = city.isHub ? 12 : isSelected ? 10 : 6.5;
-              return <CircleMarker key={city.id} center={[city.lat, city.lng]} radius={radius} pathOptions={{ fillColor: color, fillOpacity: 0.95, color: isSelected || city.isHub ? "rgba(255,255,255,0.95)" : "transparent", weight: 2 }} eventHandlers={{ click: () => setSelectedCity(city) }}><Tooltip direction="top" offset={[0, -(radius + 3)]} opacity={1} className="leaflet-dn-tooltip" permanent={city.isHub}>{isArabic ? city.nameAr : city.nameEn}</Tooltip></CircleMarker>;
+        <div className="dn-uae-map-stage" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+          <div className="dn-map-chip p-4">
+            <div className="flex items-center gap-3">
+              <div className="grid h-12 w-12 place-items-center rounded-full border border-brand-gold/35 bg-brand-gold/10">
+                <Activity className="h-5 w-5 text-brand-sky" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white">{isArabic ? "تحديث لحظي" : "Live refresh"}</p>
+                <p className="mt-1 text-[11px] font-bold text-white/52">{isArabic ? "حركة الشحن والمناطق تحدث كل 30 ثانية" : "Routes and zones refresh every 30 seconds"}</p>
+              </div>
+              <span className="ms-auto h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
+            </div>
+          </div>
+
+          <svg className="dn-uae-map-svg" viewBox="0 0 1000 620" role="img" aria-label={isArabic ? "خريطة تغطية الإمارات" : "UAE coverage map"}>
+            <defs>
+              <linearGradient id="dnMapLand" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stopColor="#123D78" />
+                <stop offset="0.48" stopColor="#0A2B5A" />
+                <stop offset="1" stopColor="#061A36" />
+              </linearGradient>
+              <linearGradient id="dnMapEdge" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" stopColor="#1D9CFF" />
+                <stop offset="0.55" stopColor="#4FD7FF" />
+                <stop offset="1" stopColor="#F6C94A" />
+              </linearGradient>
+              <radialGradient id="dnMapHubGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0" stopColor="rgba(246,201,74,0.92)" />
+                <stop offset="0.42" stopColor="rgba(246,201,74,0.34)" />
+                <stop offset="1" stopColor="rgba(246,201,74,0)" />
+              </radialGradient>
+              <filter id="dnMapShadow" x="-20%" y="-20%" width="140%" height="160%">
+                <feDropShadow dx="0" dy="22" stdDeviation="16" floodColor="#000" floodOpacity="0.45" />
+                <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#1E90FF" floodOpacity="0.25" />
+              </filter>
+            </defs>
+
+            <rect x="0" y="0" width="1000" height="620" fill="transparent" />
+            <path d={UAE_SHAPE} transform="translate(0 28)" fill="#031226" opacity="0.72" />
+            <path d={UAE_SHAPE} transform="translate(0 16)" fill="#063267" opacity="0.52" />
+            <motion.path d={UAE_SHAPE} fill="url(#dnMapLand)" stroke="url(#dnMapEdge)" strokeWidth="4" filter="url(#dnMapShadow)" initial={{ pathLength: 0, opacity: 0.65 }} whileInView={{ pathLength: 1, opacity: 1 }} viewport={{ once: true }} transition={{ duration: 1.4, ease: "easeOut" }} />
+            <path d={UAE_INNER} fill="none" stroke="rgba(79,215,255,0.18)" strokeWidth="1.2" strokeDasharray="8 12" />
+
+            {mapLights.map((light) => <circle key={light.id} cx={light.x} cy={light.y} r={light.radius} fill="#F6C94A" opacity={light.opacity} />)}
+            {mapLights.slice(0, 30).map((light) => <circle key={`blue-${light.id}`} cx={light.x + 8} cy={light.y - 12} r="1.3" fill="#4FD7FF" opacity="0.42" />)}
+
+            {ROUTES.map((node) => {
+              const active = node.id === selected.id || selected.isHub;
+              return <path key={node.id} d={routePath(node)} className={`dn-map-route ${active ? "dn-map-route-gold" : "dn-map-route-blue"}`} strokeWidth={active ? 3.2 : 1.7} opacity={active ? 0.95 : 0.52} />;
             })}
-            <CircleMarker center={[HUB.lat, HUB.lng]} radius={21} pathOptions={{ fillColor: "transparent", color: "#F6C94A", weight: 1, opacity: 0.24, dashArray: "3 7" }} interactive={false} />
-          </MapContainer>
-          {infoPanel}
-          {liveBadge}
+
+            {NODES.map((node) => {
+              const active = node.id === selected.id;
+              return (
+                <motion.g key={node.id} className={active ? "dn-map-node-selected" : ""} onClick={() => setSelectedId(node.id)} whileHover={{ scale: 1.08 }} style={{ cursor: "pointer" }}>
+                  <circle cx={node.x} cy={node.y} r={node.isHub ? 45 : 30} fill="url(#dnMapHubGlow)" opacity={node.isHub || active ? 0.95 : 0.5} />
+                  <circle className="dn-map-node-ring" cx={node.x} cy={node.y} r={node.isHub ? 28 : 21} />
+                  <circle className="dn-map-node-core" cx={node.x} cy={node.y} r={node.isHub ? 13 : 10} />
+                  <line x1={node.x} y1={node.y - 20} x2={node.labelX} y2={node.labelY + 8} stroke="rgba(246,201,74,0.55)" strokeWidth="1.2" />
+                  <text x={node.labelX} y={node.labelY} textAnchor={node.labelX > node.x ? "start" : "end"} className={node.isHub ? "dn-map-label" : "dn-map-label-small"}>{nodeLabel(node, isArabic)}</text>
+                </motion.g>
+              );
+            })}
+          </svg>
+
+          <div className="dn-map-feature-strip grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map(({ icon: Icon, value, caption }) => <div key={String(value)} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"><Icon className="h-5 w-5 shrink-0 text-brand-gold" /><div><p className="text-sm font-black text-white">{value}</p><p className="text-[11px] font-bold text-white/48">{caption}</p></div></div>)}
+          </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}><div className="flex gap-2 px-0.5" style={{ minWidth: "max-content" }}>{UAE_CITIES.map((city) => { const isActive = city.id === selectedCity.id; const color = getMarkerColor(city); return <button key={city.id} onClick={() => setSelectedCity(city)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 15px", borderRadius: 14, fontSize: 12, fontWeight: isActive ? 900 : 700, cursor: "pointer", whiteSpace: "nowrap", border: `1px solid ${isActive ? color : isLight ? "rgba(7,26,51,0.12)" : "rgba(255,255,255,0.12)"}`, background: isActive ? `${color}1F` : isLight ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.05)", color: isActive ? color : isLight ? "rgba(7,26,51,0.58)" : "rgba(255,255,255,0.55)" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />{isArabic ? city.nameAr : city.nameEn}</button>; })}</div></div>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[0.78fr_1.22fr]">
+          <div className="rounded-[1.7rem] border border-brand-gold/25 bg-brand-gold/10 p-5">
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-1 h-5 w-5 text-brand-gold" />
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-brand-gold">{isArabic ? selected.zoneAr : selected.zoneEn}</p>
+                <h3 className="mt-2 text-3xl font-black text-white">{nodeLabel(selected, isArabic)}</h3>
+                <p className="mt-2 text-sm font-bold text-white/55">{zoneLabel(selected, isArabic)} • {selected.coverage} {isArabic ? "منطقة تشغيل" : "active zones"}</p>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-center"><p className="text-3xl font-black text-brand-gold" dir="ltr">{selected.price}</p><p className="text-xs font-bold text-white/45">{isArabic ? "درهم" : "AED"}</p></div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-center"><p className="text-3xl font-black text-brand-sky" dir="ltr">{selected.coverage}</p><p className="text-xs font-bold text-white/45">{isArabic ? "نقطة" : "points"}</p></div>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-          {[
-            { icon: MapPin, labelAr: "إمارات مغطاة", labelEn: "Emirates covered", value: "7+" },
-            { icon: Truck, labelAr: "توصيل يومي", labelEn: "Daily deliveries", value: "23+" },
-            { icon: Package, labelAr: "سعر المدن الرئيسية", labelEn: "Main city flat rate", value: "30 AED" },
-            { icon: Clock, labelAr: "خدمة مستمرة", labelEn: "Non-stop service", value: "24/7" },
-          ].map(({ icon: Icon, labelAr, labelEn, value }) => <div key={labelEn} className="flex items-center gap-3 rounded-2xl border p-4" style={{ background: isLight ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.05)", borderColor: isLight ? "rgba(7,26,51,0.10)" : "rgba(255,255,255,0.08)" }}><Icon className="w-4 h-4 text-brand-gold shrink-0" /><div><div style={{ fontSize: 14, fontWeight: 900, color: "#B58900" }}>{value}</div><div style={{ fontSize: 10, color: isLight ? "rgba(7,26,51,0.55)" : "rgba(255,255,255,0.45)" }}>{isArabic ? labelAr : labelEn}</div></div></div>)}
+          <div className="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs font-black text-brand-gold"><Sparkles className="h-4 w-4" /> {isArabic ? "اختر مدينة" : "Choose a city"}</div>
+            <div className="flex flex-wrap gap-2">
+              {NODES.map((node) => <button key={node.id} onClick={() => setSelectedId(node.id)} className={`dn-map-city-button ${node.id === selected.id ? "dn-map-city-button-active" : ""} rounded-2xl px-4 py-2.5 text-xs font-black`}>{nodeLabel(node, isArabic)}</button>)}
+            </div>
+          </div>
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-4"><Legend color="#F6C94A" label={isArabic ? "مركز التوزيع" : "Dispatch Hub"} isLight={isLight} /><Legend color="#2196F3" label={isArabic ? "منطقة رئيسية – 30 درهم" : "Main zone – 30 AED"} isLight={isLight} /><Legend color="#00CFFF" label={isArabic ? "منطقة موسعة – 50 درهم" : "Extended zone – 50 AED"} isLight={isLight} /><div className="flex items-center gap-2"><Zap className="w-3 h-3 text-brand-gold" /><span className={isLight ? "text-xs text-brand-deep/55" : "text-xs text-white/50"}>{isArabic ? "انقر على أي مدينة" : "Click any city"}</span></div></div>
       </div>
     </section>
   );
-}
-
-function Legend({ color, label, isLight }: { color: string; label: string; isLight: boolean }) {
-  return <div className="flex items-center gap-2"><span style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} /><span className={isLight ? "text-xs text-brand-deep/55" : "text-xs text-white/50"}>{label}</span></div>;
 }
