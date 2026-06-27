@@ -3,6 +3,7 @@ import { Clock3, MapPin, PackageCheck, ShieldCheck, Sparkles, Truck } from "luci
 import { useAppContext } from "../../lib/AppContext";
 import companyMeta from "../../data/companyMeta";
 import CustomerDashboardCore from "./CustomerDashboard";
+import "../../styles/dn-dashboard-map.css";
 
 export default function CustomerDashboardLuxury() {
   const { language } = useAppContext();
