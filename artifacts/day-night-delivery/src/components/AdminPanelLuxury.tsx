@@ -2,6 +2,7 @@ import { Activity, BarChart3, Database, Download, ShieldCheck, Truck } from "luc
 import { useAppContext } from "../lib/AppContext";
 import companyMeta from "../data/companyMeta";
 import AdminPanelCore from "./AdminPanel";
+import "../styles/dn-dashboard-map.css";
 
 export default function AdminPanelLuxury() {
   const { language } = useAppContext();
