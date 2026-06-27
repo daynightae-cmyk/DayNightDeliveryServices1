@@ -1,0 +1,248 @@
+/* DAY NIGHT — dashboard polish + live UAE operations map */
+
+.dn-uae-map-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2.25rem;
+  border: 1px solid rgba(79, 215, 255, 0.18);
+  background:
+    radial-gradient(circle at 72% 22%, rgba(246, 201, 74, 0.18), transparent 20rem),
+    radial-gradient(circle at 22% 18%, rgba(25, 167, 255, 0.18), transparent 26rem),
+    linear-gradient(145deg, rgba(2, 9, 20, 0.98), rgba(3, 18, 38, 0.96) 52%, rgba(6, 27, 54, 0.96));
+  box-shadow: 0 36px 110px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px rgba(25,167,255,0.10);
+}
+
+.dn-uae-map-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(79, 215, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 215, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: 0.52;
+  pointer-events: none;
+}
+
+.dn-uae-map-svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 520px;
+  display: block;
+}
+
+.dn-map-route {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 8 12;
+  animation: dnRouteFlow 2.9s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(246, 201, 74, 0.28));
+}
+
+.dn-map-route-blue {
+  stroke: rgba(79, 215, 255, 0.42);
+}
+
+.dn-map-route-gold {
+  stroke: rgba(246, 201, 74, 0.90);
+  stroke-width: 3.4;
+  stroke-dasharray: 12 10;
+  filter: drop-shadow(0 0 11px rgba(246, 201, 74, 0.55));
+}
+
+.dn-map-node-ring {
+  fill: rgba(246, 201, 74, 0.10);
+  stroke: rgba(246, 201, 74, 0.65);
+  stroke-width: 2;
+  transform-origin: center;
+  animation: dnNodePulse 2.4s ease-in-out infinite;
+}
+
+.dn-map-node-core {
+  fill: #fff7d1;
+  stroke: #f6c94a;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 10px rgba(246, 201, 74, 0.95));
+  cursor: pointer;
+}
+
+.dn-map-node-selected .dn-map-node-core {
+  stroke-width: 6;
+  filter: drop-shadow(0 0 18px rgba(246, 201, 74, 1));
+}
+
+.dn-map-label {
+  fill: #ffffff;
+  font-weight: 950;
+  font-size: 23px;
+  paint-order: stroke;
+  stroke: rgba(3, 18, 38, 0.95);
+  stroke-width: 7px;
+  stroke-linejoin: round;
+}
+
+.dn-map-label-small {
+  fill: rgba(244, 248, 255, 0.78);
+  font-weight: 850;
+  font-size: 14px;
+  paint-order: stroke;
+  stroke: rgba(3, 18, 38, 0.92);
+  stroke-width: 5px;
+}
+
+.dn-map-chip {
+  position: absolute;
+  z-index: 2;
+  top: 1.25rem;
+  left: 1.25rem;
+  width: min(260px, calc(100% - 2.5rem));
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 1.5rem;
+  background: linear-gradient(145deg, rgba(8,26,49,0.86), rgba(3,18,38,0.72));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 18px 48px rgba(0,0,0,0.22);
+  backdrop-filter: blur(18px);
+}
+
+[dir="rtl"] .dn-map-chip {
+  left: auto;
+  right: 1.25rem;
+}
+
+.dn-map-feature-strip {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 1.25rem;
+  bottom: 1.25rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(79, 215, 255, 0.18);
+  background: rgba(3, 18, 38, 0.76);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.dn-map-city-button {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.055);
+  color: rgba(244,248,255,0.72);
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease;
+}
+
+.dn-map-city-button:hover,
+.dn-map-city-button-active {
+  transform: translateY(-2px);
+  border-color: rgba(246, 201, 74, 0.55);
+  background: rgba(246, 201, 74, 0.12);
+  color: #f6c94a;
+}
+
+@keyframes dnRouteFlow {
+  to { stroke-dashoffset: -80; }
+}
+
+@keyframes dnNodePulse {
+  0%, 100% { opacity: .45; transform: scale(1); }
+  50% { opacity: .95; transform: scale(1.25); }
+}
+
+/* Customer dashboard order cards */
+.dn-customer-luxury-shell > section:not(:first-child) {
+  border-radius: 2.25rem !important;
+  border: 1px solid rgba(79, 215, 255, 0.16) !important;
+  background: linear-gradient(145deg, rgba(8,26,49,0.88), rgba(3,18,38,0.78)) !important;
+  box-shadow: 0 30px 95px rgba(0,0,0,0.32), 0 0 42px rgba(25,167,255,0.08) !important;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+.dn-customer-luxury-shell a[href^="/tracking?code="] {
+  border-radius: 999px !important;
+  box-shadow: 0 14px 34px rgba(246,201,74,0.14) !important;
+}
+
+.dn-customer-luxury-shell a[href="/request"],
+.dn-customer-luxury-shell button {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.dn-customer-luxury-shell a[href="/request"]:hover,
+.dn-customer-luxury-shell button:hover {
+  transform: translateY(-2px);
+}
+
+/* Admin panel table polish */
+.dn-admin-luxury-shell table {
+  border-collapse: separate !important;
+  border-spacing: 0 0.75rem !important;
+}
+
+.dn-admin-luxury-shell thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dn-admin-luxury-shell thead tr {
+  background: linear-gradient(135deg, rgba(3,18,38,0.96), rgba(8,26,49,0.92)) !important;
+}
+
+.dn-admin-luxury-shell thead th {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+  color: rgba(246,201,74,0.82) !important;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.dn-admin-luxury-shell tbody tr {
+  background: linear-gradient(135deg, rgba(8,26,49,0.82), rgba(3,18,38,0.78)) !important;
+  box-shadow: 0 18px 46px rgba(0,0,0,0.24), 0 0 18px rgba(25,167,255,0.06) !important;
+  transform: translateZ(0);
+  transition: transform .22s ease, box-shadow .22s ease, background .22s ease;
+}
+
+.dn-admin-luxury-shell tbody tr:hover {
+  transform: translateY(-3px);
+  background: linear-gradient(135deg, rgba(10,37,72,0.92), rgba(4,24,52,0.84)) !important;
+  box-shadow: 0 22px 62px rgba(0,0,0,0.32), 0 0 28px rgba(25,167,255,0.14) !important;
+}
+
+.dn-admin-luxury-shell tbody td {
+  border-top: 1px solid rgba(79,215,255,0.10) !important;
+  border-bottom: 1px solid rgba(79,215,255,0.10) !important;
+}
+
+.dn-admin-luxury-shell tbody td:first-child {
+  border-inline-start: 1px solid rgba(79,215,255,0.10) !important;
+  border-start-start-radius: 1.15rem;
+  border-end-start-radius: 1.15rem;
+}
+
+.dn-admin-luxury-shell tbody td:last-child {
+  border-inline-end: 1px solid rgba(79,215,255,0.10) !important;
+  border-start-end-radius: 1.15rem;
+  border-end-end-radius: 1.15rem;
+}
+
+.dn-admin-luxury-shell input,
+.dn-admin-luxury-shell select,
+.dn-admin-luxury-shell textarea {
+  min-height: 46px;
+}
+
+.dn-admin-luxury-shell .fixed.inset-0 > div {
+  background: linear-gradient(145deg, rgba(8,26,49,0.98), rgba(3,18,38,0.98)) !important;
+  border-color: rgba(79,215,255,0.18) !important;
+}
+
+:root.light-theme .dn-customer-luxury-shell > section:not(:first-child),
+:root.light-theme .dn-admin-luxury-shell section,
+:root.light-theme .dn-admin-luxury-shell tbody tr {
+  background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(226,239,255,0.80)) !important;
+  color: #061B36 !important;
+}
+
+@media (max-width: 768px) {
+  .dn-uae-map-svg { min-height: 440px; }
+  .dn-map-feature-strip { position: relative; inset: auto; margin: 0 1rem 1rem; }
+  .dn-map-chip { position: relative; inset: auto; margin: 1rem; width: auto; }
+}
