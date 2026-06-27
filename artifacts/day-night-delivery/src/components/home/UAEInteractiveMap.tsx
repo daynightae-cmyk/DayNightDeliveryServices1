@@ -1,14 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { Activity, Box, Clock3, Globe2, PackageCheck, Radar, ShieldCheck, Truck, Zap } from "lucide-react";
+import { Activity, Box, Clock3, Globe2, MapPin, PackageCheck, Radar, RefreshCw, ShieldCheck, Truck, Zap } from "lucide-react";
+import { supabase } from "../../supabase";
+import type { Order } from "../../types";
 import "../../styles/dn-dashboard-map.css";
 
 const MAP_IMAGE_URL = "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png";
 
-const liveStats = [
-  { label: "شحنة نشطة", value: "505+" },
-  { label: "مناطق تغطية", value: "36" },
-  { label: "تحديث مباشر", value: "30s" },
+type CityPoint = { ar: string; en: string; x: number; y: number };
+type LiveOrder = Partial<Order> & { id: string; status: string; sender_city?: string; receiver_city?: string; updated_at?: string; created_at?: string };
+type MapMode = "live" | "demo" | "empty" | "offline";
+
+const CITY_POINTS: Record<string, CityPoint> = {
+  abudhabi: { ar: "أبوظبي", en: "Abu Dhabi", x: 45, y: 64 },
+  dubai: { ar: "دبي", en: "Dubai", x: 64, y: 39 },
+  sharjah: { ar: "الشارقة", en: "Sharjah", x: 69, y: 29 },
+  ajman: { ar: "عجمان", en: "Ajman", x: 65, y: 24 },
+  rak: { ar: "رأس الخيمة", en: "Ras Al Khaimah", x: 73, y: 11 },
+  fujairah: { ar: "الفجيرة", en: "Fujairah", x: 87, y: 33 },
+  alain: { ar: "العين", en: "Al Ain", x: 76, y: 78 },
+  western: { ar: "المنطقة الغربية", en: "Western Region", x: 19, y: 69 },
+};
+
+const DEMO_ORDERS: LiveOrder[] = [
+  { id: "DN-LIVE-001", tracking_code: "DN-LIVE-001", status: "Out for Delivery", sender_city: "Abu Dhabi", receiver_city: "Dubai", created_at: new Date().toISOString() },
+  { id: "DN-LIVE-002", tracking_code: "DN-LIVE-002", status: "Picked Up", sender_city: "Abu Dhabi", receiver_city: "Sharjah", created_at: new Date().toISOString() },
+  { id: "DN-LIVE-003", tracking_code: "DN-LIVE-003", status: "In Transit", sender_city: "Dubai", receiver_city: "Ras Al Khaimah", created_at: new Date().toISOString() },
+  { id: "DN-LIVE-004", tracking_code: "DN-LIVE-004", status: "Assigned", sender_city: "Abu Dhabi", receiver_city: "Al Ain", created_at: new Date().toISOString() },
 ];
 
 const bottomFeatures = [
@@ -25,116 +43,190 @@ const glassStyle: CSSProperties = {
   boxShadow: "0 28px 80px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.14)",
 };
 
+function resolveCity(city?: string | null): CityPoint {
+  const value = String(city || "").toLowerCase();
+  if (value.includes("dubai") || value.includes("دبي")) return CITY_POINTS.dubai;
+  if (value.includes("sharjah") || value.includes("الشارقة")) return CITY_POINTS.sharjah;
+  if (value.includes("ajman") || value.includes("عجمان")) return CITY_POINTS.ajman;
+  if (value.includes("quwain") || value.includes("القيوين")) return CITY_POINTS.ajman;
+  if (value.includes("khaimah") || value.includes("الخيمة")) return CITY_POINTS.rak;
+  if (value.includes("fujairah") || value.includes("الفجيرة")) return CITY_POINTS.fujairah;
+  if (value.includes("ain") || value.includes("العين")) return CITY_POINTS.alain;
+  if (value.includes("western") || value.includes("الغربية") || value.includes("dhafra") || value.includes("الظفرة")) return CITY_POINTS.western;
+  return CITY_POINTS.abudhabi;
+}
+
+function routePath(from: CityPoint, to: CityPoint) {
+  const cx = (from.x + to.x) / 2;
+  const cy = Math.min(from.y, to.y) - 16;
+  return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`;
+}
+
+function routePoint(from: CityPoint, to: CityPoint, t: number) {
+  const cx = (from.x + to.x) / 2;
+  const cy = Math.min(from.y, to.y) - 16;
+  const x = (1 - t) * (1 - t) * from.x + 2 * (1 - t) * t * cx + t * t * to.x;
+  const y = (1 - t) * (1 - t) * from.y + 2 * (1 - t) * t * cy + t * t * to.y;
+  return { x, y };
+}
+
+function statusProgress(status?: string) {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("deliver")) return 0.86;
+  if (s.includes("transit") || s.includes("route")) return 0.58;
+  if (s.includes("pickup") || s.includes("picked")) return 0.34;
+  if (s.includes("assign")) return 0.18;
+  return 0.25;
+}
+
+function displayTracking(order: LiveOrder) {
+  return order.tracking_code || order.tracking_number || order.id;
+}
+
 export default function UAEInteractiveMap() {
-  const [tick, setTick] = useState(1);
+  const [orders, setOrders] = useState<LiveOrder[]>(DEMO_ORDERS);
+  const [drivers, setDrivers] = useState(0);
+  const [mode, setMode] = useState<MapMode>("demo");
+  const [selectedId, setSelectedId] = useState(DEMO_ORDERS[0].id);
   const [imageLoaded, setImageLoaded] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(() => new Date());
+  const [now, setNow] = useState(Date.now());
+
+  async function loadLiveOperations() {
+    setLastUpdated(new Date());
+
+    if (!supabase) {
+      setMode("demo");
+      setOrders(DEMO_ORDERS);
+      setDrivers(4);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id,tracking_code,tracking_number,status,sender_city,receiver_city,driver_name,driver_phone,created_at,updated_at,delivery_price")
+      .order("updated_at", { ascending: false })
+      .limit(18);
+
+    const { data: driverRows } = await supabase.from("driver_locations").select("*").limit(60);
+
+    if (error) {
+      setMode("offline");
+      setOrders(DEMO_ORDERS);
+      setDrivers(Array.isArray(driverRows) ? driverRows.length : 0);
+      return;
+    }
+
+    const active = (data || []).filter((order: any) => !String(order.status || "").toLowerCase().includes("cancel")) as LiveOrder[];
+    setOrders(active.length ? active : DEMO_ORDERS);
+    setMode(active.length ? "live" : "empty");
+    setDrivers(Array.isArray(driverRows) ? driverRows.length : 0);
+    if (active[0]?.id) setSelectedId(active[0].id);
+  }
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setTick((value) => value + 1);
-      setLastUpdated(new Date());
-    }, 30000);
-    return () => window.clearInterval(timer);
+    void loadLiveOperations();
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    const refresh = window.setInterval(() => void loadLiveOperations(), 30000);
+
+    const channel = supabase
+      ?.channel("dn-live-uae-operations-map")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => void loadLiveOperations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, () => void loadLiveOperations())
+      .subscribe();
+
+    return () => {
+      window.clearInterval(clock);
+      window.clearInterval(refresh);
+      if (channel && supabase) void supabase.removeChannel(channel);
+    };
   }, []);
 
+  const routes = useMemo(() => orders.slice(0, 10).map((order, index) => {
+    const from = resolveCity(order.sender_city);
+    const to = resolveCity(order.receiver_city);
+    const liveOffset = ((now / 1000 + index * 11) % 100) / 100;
+    const base = statusProgress(order.status);
+    const progress = Math.min(0.96, Math.max(0.04, base * 0.68 + liveOffset * 0.32));
+    return { order, from, to, progress, point: routePoint(from, to, progress), selected: order.id === selectedId };
+  }), [orders, now, selectedId]);
+
+  const cityLoad = useMemo(() => {
+    const map = new Map<string, number>();
+    orders.forEach((order) => {
+      const city = resolveCity(order.receiver_city).ar;
+      map.set(city, (map.get(city) || 0) + 1);
+    });
+    return map;
+  }, [orders]);
+
+  const selectedOrder = routes.find((route) => route.selected)?.order || routes[0]?.order;
   const formattedUpdateTime = useMemo(() => lastUpdated.toLocaleTimeString("ar-AE", { hour: "2-digit", minute: "2-digit" }), [lastUpdated]);
+  const modeLabel = mode === "live" ? "LIVE DATA" : mode === "offline" ? "FALLBACK" : mode === "empty" ? "NO ACTIVE ORDERS" : "DEMO MOTION";
 
   return (
-    <section
-      className="relative w-full overflow-hidden px-4 py-16 text-white sm:px-8 lg:px-12"
-      dir="rtl"
-      style={{
-        background: "radial-gradient(circle at 16% 18%,rgba(0,123,255,.24),transparent 34%),radial-gradient(circle at 84% 12%,rgba(245,183,0,.16),transparent 30%),linear-gradient(135deg,#030a18 0%,#071a33 48%,#01050f 100%)",
-      }}
-    >
+    <section className="relative w-full overflow-hidden px-4 py-16 text-white sm:px-8 lg:px-12" dir="rtl" style={{ background: "radial-gradient(circle at 16% 18%,rgba(0,123,255,.24),transparent 34%),radial-gradient(circle at 84% 12%,rgba(245,183,0,.16),transparent 30%),linear-gradient(135deg,#030a18,#071a33 48%,#01050f)" }}>
+      <style>{`@keyframes dnRouteDash{to{stroke-dashoffset:-42}}@keyframes dnTruckFloat{50%{transform:translate(-50%,-62%) scale(1.08)}}`}</style>
       <div className="pointer-events-none absolute right-[5%] top-[10%] h-60 w-60 rounded-full bg-blue-500/15 blur-2xl" />
       <div className="pointer-events-none absolute bottom-[16%] left-[9%] h-48 w-48 rounded-full bg-yellow-400/10 blur-2xl" />
 
       <div className="relative z-[3] mx-auto mb-7 flex w-[min(1180px,100%)] flex-col items-stretch justify-between gap-6 lg:flex-row lg:items-end">
         <div className="max-w-[780px]">
-          <span className="mb-3 inline-flex text-xs font-black uppercase tracking-[0.14em] text-[#f5b700]">DAY NIGHT DELIVERY SERVICES</span>
-          <h2 className="m-0 text-[clamp(30px,4vw,54px)] font-black leading-[1.08] text-white">خريطة تغطية الإمارات الحية</h2>
-          <p className="mt-4 max-w-[760px] text-[clamp(15px,1.5vw,18px)] font-bold leading-[1.95] text-white/70">
-            واجهة بصرية احترافية تعرض تغطية DAY NIGHT داخل الإمارات بأسلوب ثلاثي الأبعاد، مع إحساس مباشر بحركة الشحن، المسارات، والمناطق النشطة على مدار الساعة.
-          </p>
+          <span className="mb-3 inline-flex rounded-full border border-[#f5b700]/25 bg-[#f5b700]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#f5b700]">DAY NIGHT LIVE OPS</span>
+          <h2 className="m-0 text-[clamp(30px,4vw,54px)] font-black leading-[1.08] text-white">خريطة تشغيل حية وعملية</h2>
+          <p className="mt-4 max-w-[760px] text-[clamp(15px,1.5vw,18px)] font-bold leading-[1.95] text-white/70">تتحرك المسارات حسب الطلبات الحالية، وتستقبل تحديثات Supabase Realtime عند تغيّر الطلبات أو مواقع السائقين. عند عدم توفر صلاحيات القراءة يظهر وضع حركة تشغيلي احتياطي بوضوح.</p>
         </div>
-
-        <div className="flex min-w-[245px] items-center gap-3 rounded-[22px] p-4" style={glassStyle}>
-          <span className="grid h-[46px] w-[46px] place-items-center rounded-2xl border border-[#18a8e8]/20 bg-[#18a8e8]/15 text-[#18a8e8]"><Activity size={23} /></span>
-          <div><strong className="block text-sm font-black text-white">نظام متابعة مباشر</strong><span className="mt-1 block text-xs font-bold text-white/60">آخر تحديث: {formattedUpdateTime}</span></div>
+        <div className="flex min-w-[265px] items-center gap-3 rounded-[22px] p-4" style={glassStyle}>
+          <span className="grid h-[46px] w-[46px] place-items-center rounded-2xl border border-[#18a8e8]/20 bg-[#18a8e8]/15 text-[#18a8e8]"><Radar size={23} /></span>
+          <div><strong className="block text-sm font-black text-white">{modeLabel}</strong><span className="mt-1 block text-xs font-bold text-white/60">آخر تحديث: {formattedUpdateTime}</span></div>
+          <button onClick={() => void loadLiveOperations()} className="ms-auto grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-[#f5b700] hover:bg-[#f5b700] hover:text-[#071a33]"><RefreshCw size={15} /></button>
         </div>
       </div>
 
-      <div
-        className="relative z-[3] mx-auto min-h-[720px] w-[min(1180px,100%)] overflow-hidden rounded-[36px] max-lg:min-h-[690px] max-md:min-h-[820px]"
-        style={{
-          border: "1px solid rgba(24,168,232,0.19)",
-          background: "radial-gradient(circle at 50% 42%,rgba(0,87,184,.34),transparent 42%),linear-gradient(145deg,rgba(4,17,39,.95),rgba(1,7,20,.99))",
-          boxShadow: "0 44px 120px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.13), inset 0 0 90px rgba(0,123,255,.11)",
-        }}
-      >
-        <div className="pointer-events-none absolute left-[30px] right-[30px] top-[30px] z-10 flex items-start justify-between gap-4 max-md:left-4 max-md:right-4 max-md:top-4 max-md:flex-col">
-          <div className="flex w-[278px] items-center gap-3 rounded-3xl p-[18px] max-md:w-full" style={glassStyle}>
-            <div className="grid h-[68px] w-[68px] place-items-center rounded-full border border-white/15 text-[#18a8e8] max-md:h-14 max-md:w-14" style={{ background: "radial-gradient(circle,rgba(24,168,232,.25),rgba(255,255,255,.06))" }}><Radar size={30} /></div>
-            <div className="min-w-0"><strong className="block text-sm font-black text-white">تحديث لحظي</strong><span className="mt-1 block text-xs font-bold text-white/70">حركة الشحن والمناطق</span><small className="mt-1 block text-[11px] font-bold text-white/45">تحديث كل 30 ثانية</small></div>
-            <i className="ms-auto h-[9px] w-[9px] shrink-0 animate-pulse rounded-full bg-[#24ff92] shadow-[0_0_18px_rgba(36,255,146,0.9)]" />
+      <div className="relative z-[3] mx-auto w-[min(1180px,100%)] overflow-hidden rounded-[36px] p-4" style={{ border: "1px solid rgba(24,168,232,.19)", background: "linear-gradient(145deg,rgba(4,17,39,.95),rgba(1,7,20,.99))", boxShadow: "0 44px 120px rgba(0,0,0,.58),inset 0 1px 0 rgba(255,255,255,.13)" }}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_310px]">
+          <div className="relative min-h-[520px] overflow-hidden rounded-[30px] bg-[#061225] max-md:min-h-[440px]">
+            {imageLoaded ? <img className="absolute inset-0 h-full w-full object-cover object-center" src={MAP_IMAGE_URL} alt="DAY NIGHT UAE 3D live operations map" loading="eager" decoding="async" onError={() => setImageLoaded(false)} style={{ filter: "saturate(1.08) contrast(1.05) brightness(.9)" }} /> : <div className="absolute inset-0 grid place-content-center justify-items-center gap-3 bg-[#071a33] text-center"><Globe2 size={56} className="text-[#18a8e8]" /><strong className="text-xl font-black">تعذر تحميل صورة الخريطة</strong></div>}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.18)_58%,rgba(0,0,0,.45)_100%)]" />
+
+            <svg className="pointer-events-none absolute inset-0 z-[6] h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {routes.map(({ order, from, to, selected }) => <path key={order.id} d={routePath(from, to)} fill="none" stroke={selected ? "rgba(245,183,0,.95)" : "rgba(24,168,232,.54)"} strokeWidth={selected ? 0.7 : 0.36} strokeLinecap="round" strokeDasharray="2 2.8" style={{ animation: "dnRouteDash 2.4s linear infinite", filter: selected ? "drop-shadow(0 0 8px rgba(245,183,0,.9))" : "drop-shadow(0 0 5px rgba(24,168,232,.55))" }} />)}
+            </svg>
+
+            {Object.values(CITY_POINTS).map((city) => <button key={city.ar} className="absolute z-[9] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#f5b700]/45 bg-[#071a33]/70 p-2 text-[#f5b700] shadow-[0_0_22px_rgba(245,183,0,.28)] backdrop-blur" style={{ left: `${city.x}%`, top: `${city.y}%` }} title={city.ar}><MapPin size={16} /><span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#f5b700] px-1 text-[10px] font-black text-[#071a33]">{cityLoad.get(city.ar) || 0}</span></button>)}
+
+            {routes.map(({ order, point, selected }) => <button key={`${order.id}-truck`} onClick={() => setSelectedId(order.id)} className={`absolute z-[10] grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border ${selected ? "border-[#f5b700] bg-[#f5b700] text-[#071a33]" : "border-[#18a8e8]/50 bg-[#071a33]/80 text-[#18a8e8]"} shadow-[0_0_24px_rgba(24,168,232,.45)] backdrop-blur`} style={{ left: `${point.x}%`, top: `${point.y}%`, animation: "dnTruckFloat 2.2s ease-in-out infinite" }} title={displayTracking(order)}><Truck size={18} /></button>)}
+
+            <div className="absolute bottom-4 left-4 right-4 z-[12] grid grid-cols-3 gap-2 max-md:grid-cols-1">
+              {[{ label: "طلبات نشطة", value: orders.length }, { label: "سائقون متصلون", value: drivers || "—" }, { label: "تحديث", value: "30s" }].map((item) => <div key={item.label} className="rounded-2xl p-3 text-center" style={glassStyle}><strong className="block text-xl font-black text-white" dir="ltr">{item.value}</strong><span className="text-xs font-bold text-white/55">{item.label}</span></div>)}
+            </div>
           </div>
 
-          <div className="flex min-w-[190px] items-center gap-3 rounded-[20px] p-4 max-md:w-full" style={glassStyle}>
-            <PackageCheck size={23} className="text-[#18a8e8]" />
-            <div><strong className="block text-2xl font-black leading-none text-white">505+</strong><span className="mt-1 block text-xs font-bold text-white/60">شحنة نشطة اليوم</span></div>
-          </div>
-        </div>
+          <aside className="space-y-3">
+            <div className="rounded-[24px] p-4" style={glassStyle}>
+              <div className="mb-3 flex items-center gap-2 text-[#f5b700]"><Activity size={18} /><strong>لوحة التشغيل</strong></div>
+              <p className="text-xs font-bold leading-6 text-white/60">المسارات المتحركة ليست صورة ثابتة: يتم حسابها من مدينة الإرسال والاستلام لكل طلب، وتتغير عند وصول تحديث جديد.</p>
+            </div>
 
-        <div className="absolute z-[2] overflow-hidden rounded-[30px] max-lg:inset-[16px_16px_156px_16px] max-md:inset-[14px_14px_298px_14px]" style={{ inset: "18px 18px 118px 18px", background: "radial-gradient(circle at 50% 56%,rgba(8,61,128,.68),transparent 46%),linear-gradient(145deg,rgba(5,17,41,.78),rgba(0,4,13,.92))" }}>
-          {imageLoaded ? (
-            <img
-              className="absolute inset-0 h-full w-full object-cover object-center max-md:scale-[1.06]"
-              src={MAP_IMAGE_URL}
-              alt="DAY NIGHT UAE 3D delivery coverage map"
-              loading="eager"
-              decoding="async"
-              onError={() => setImageLoaded(false)}
-              style={{ opacity: 0.98, transform: "scale(1.01)", filter: "saturate(1.12) contrast(1.08) brightness(.96) drop-shadow(0 38px 44px rgba(0,0,0,.48))" }}
-            />
-          ) : (
-            <div className="absolute inset-0 grid place-content-center justify-items-center gap-3 bg-[#071a33] text-center text-white"><Globe2 size={56} className="text-[#18a8e8]" /><strong className="text-xl font-black">تعذر تحميل صورة الخريطة</strong><span className="text-sm text-white/60">تحقق من رابط الصورة أو ضعها داخل public/assets</span></div>
-          )}
+            {selectedOrder && <div className="rounded-[24px] p-4" style={glassStyle}>
+              <span className="text-[11px] font-black uppercase tracking-widest text-[#f5b700]">Selected Shipment</span>
+              <h3 className="mt-2 text-2xl font-black text-white" dir="ltr">{displayTracking(selectedOrder)}</h3>
+              <p className="mt-2 text-sm font-bold text-white/65">{selectedOrder.sender_city || "Abu Dhabi"} ← {selectedOrder.receiver_city || "Dubai"}</p>
+              <p className="mt-1 text-xs font-black text-[#18a8e8]">{selectedOrder.status}</p>
+            </div>}
 
-          <div className="pointer-events-none absolute inset-0 z-[4]" style={{ background: "radial-gradient(circle at 50% 50%,transparent 0%,transparent 48%,rgba(0,0,0,.36) 100%)" }} />
-          <div className="pointer-events-none absolute inset-0 z-[5] mix-blend-screen" style={{ background: "radial-gradient(circle at 24% 82%,rgba(0,123,255,.18),transparent 28%),radial-gradient(circle at 84% 72%,rgba(24,168,232,.12),transparent 24%)" }} />
-          <div className="pointer-events-none absolute inset-0 z-[7] animate-pulse mix-blend-screen" style={{ background: "linear-gradient(180deg,transparent 0%,transparent 46%,rgba(24,168,232,.09) 49%,rgba(255,255,255,.08) 50%,transparent 54%)" }} />
-
-          {Array.from({ length: 36 }).map((_, index) => (
-            <span
-              key={index}
-              className="pointer-events-none absolute z-[8] h-[3px] w-[3px] animate-pulse rounded-full bg-[#ffe7a6] shadow-[0_0_10px_rgba(245,183,0,0.85)]"
-              style={{ left: `${6 + ((index * 19) % 88)}%`, top: `${9 + ((index * 31) % 78)}%`, animationDelay: `${(index % 9) * 0.32}s`, transform: `scale(${0.75 + (index % 4) * 0.2})` }}
-            />
-          ))}
-
-          <div className="pointer-events-none absolute bottom-[30px] left-[28px] z-[12] flex items-center gap-3 rounded-[18px] px-4 py-3 max-md:hidden" style={glassStyle}><Truck size={24} className="text-[#f5b700]" /><div><strong className="block text-xs font-black text-white">حركة تشغيل نشطة</strong><span className="mt-1 block text-[11px] font-bold text-white/55">توزيع مستمر بين الإمارات</span></div></div>
-          <div className="pointer-events-none absolute right-[28px] top-[128px] z-[12] flex items-center gap-3 rounded-[18px] px-4 py-3 max-lg:bottom-[30px] max-lg:top-auto max-md:hidden" style={glassStyle}><Globe2 size={24} className="text-[#f5b700]" /><div><strong className="block text-xs font-black text-white">ربط محلي ودولي</strong><span className="mt-1 block text-[11px] font-bold text-white/55">UAE • GCC • Worldwide</span></div></div>
-        </div>
-
-        <div className="absolute left-[30px] right-[30px] bottom-[94px] z-[13] grid grid-cols-3 gap-3 max-md:left-4 max-md:right-4 max-md:bottom-[174px] max-md:grid-cols-1">
-          {liveStats.map((item) => <div key={item.label} className="rounded-[18px] p-3 text-center" style={glassStyle}><strong className="block text-[22px] font-black leading-none text-white">{item.value}</strong><span className="mt-2 block text-xs font-bold text-white/55">{item.label}</span></div>)}
-        </div>
-
-        <div className="absolute bottom-6 left-[28px] right-[28px] z-[14] grid grid-cols-4 items-center rounded-[22px] px-5 py-3 max-lg:grid-cols-2 max-lg:gap-2 max-md:left-4 max-md:right-4 max-md:bottom-4 max-md:grid-cols-1" style={glassStyle}>
-          {bottomFeatures.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <div className="grid min-w-0 grid-cols-[1fr_auto] items-center max-lg:block" key={feature.title}>
-                <div className="flex min-w-0 items-center gap-3 px-2"><Icon size={24} className={feature.tone === "blue" ? "shrink-0 text-[#18a8e8]" : "shrink-0 text-[#f5b700]"} /><div className="min-w-0"><strong className="block whitespace-nowrap text-xs font-black text-white max-md:whitespace-normal">{feature.title}</strong><span className="mt-1 block whitespace-nowrap text-xs font-bold text-white/55 max-md:whitespace-normal">{feature.description}</span></div></div>
-                {index < bottomFeatures.length - 1 && <div className="mx-2 h-9 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent max-lg:hidden" />}
+            <div className="rounded-[24px] p-3" style={glassStyle}>
+              <div className="mb-2 flex items-center justify-between"><strong className="text-sm text-white">آخر الحركة</strong><span className="text-[11px] text-white/45">نبضة #{Math.floor(now / 1000) % 999}</span></div>
+              <div className="space-y-2">
+                {orders.slice(0, 6).map((order) => <button key={order.id} onClick={() => setSelectedId(order.id)} className={`w-full rounded-2xl border p-3 text-right transition ${order.id === selectedId ? "border-[#f5b700]/60 bg-[#f5b700]/10" : "border-white/10 bg-white/[0.035] hover:border-[#18a8e8]/45"}`}><span className="block text-xs font-black text-white" dir="ltr">{displayTracking(order)}</span><span className="mt-1 block text-[11px] font-bold text-white/50">{order.status} • {order.receiver_city || "UAE"}</span></button>)}
               </div>
-            );
-          })}
+            </div>
+          </aside>
         </div>
 
-        <div className="pointer-events-none absolute bottom-[94px] right-[30px] z-[15] inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-white/70 max-md:right-4 max-md:bottom-[246px]" style={glassStyle}><Activity size={18} className="text-[#24ff92]" /><span>نبضة تشغيل #{tick}</span></div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {bottomFeatures.map((feature) => { const Icon = feature.icon; return <div key={feature.title} className="flex items-center gap-3 rounded-2xl p-4" style={glassStyle}><Icon size={24} className={feature.tone === "blue" ? "text-[#18a8e8]" : "text-[#f5b700]"} /><div><strong className="block text-sm font-black text-white">{feature.title}</strong><span className="text-xs font-bold text-white/55">{feature.description}</span></div></div>; })}
+        </div>
       </div>
     </section>
   );
