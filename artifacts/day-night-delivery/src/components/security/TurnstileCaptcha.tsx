@@ -63,7 +63,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
   function markUnavailable() {
     setStatus("error");
-    verifyRef.current(TURNSTILE_FALLBACK_TOKEN);
+    expireRef.current();
   }
 
   useEffect(() => {
@@ -71,6 +71,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
     if (!siteKey) return;
     setStatus("loading");
+    expireRef.current();
 
     loadTurnstileScript()
       .then(() => {
@@ -109,6 +110,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
   function retry() {
     expireRef.current();
+    turnstileScriptPromise = null;
     if (widgetIdRef.current && window.turnstile) {
       window.turnstile.remove(widgetIdRef.current);
       widgetIdRef.current = null;
@@ -123,7 +125,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
         <div className="text-center space-y-2">
           <p className="text-[11px] text-amber-200 font-black flex items-center justify-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" />
-            {language === "ar" ? "تعذر تحميل تحقق Cloudflare. يمكنك المتابعة الآن أو إعادة المحاولة." : "Cloudflare verification could not load. You can continue now or retry."}
+            {language === "ar" ? "تعذر تحميل تحقق Cloudflare. أعد المحاولة أو عطّل مانع التتبع مؤقتاً." : "Cloudflare verification could not load. Retry or temporarily disable tracking blockers."}
           </p>
           <button type="button" onClick={retry} className="inline-flex items-center gap-1.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[10px] font-black text-brand-gold hover:bg-brand-gold hover:text-brand-deep">
             <RefreshCw className="w-3 h-3" /> {language === "ar" ? "إعادة التحقق" : "Retry verification"}
