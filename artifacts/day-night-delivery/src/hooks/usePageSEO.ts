@@ -53,6 +53,11 @@ const routeMeta: Record<string, { title: string; description: string; noindex?: 
     description: "Protected customer order access.",
     noindex: true
   },
+  "/update-password": {
+    title: "Update Password | DAY NIGHT DELIVERY SERVICES",
+    description: "Secure customer password recovery page.",
+    noindex: true
+  },
   "/privacy": {
     title: "Privacy Policy | DAY NIGHT DELIVERY SERVICES",
     description: "Privacy and data handling policy for DAY NIGHT delivery customers."
