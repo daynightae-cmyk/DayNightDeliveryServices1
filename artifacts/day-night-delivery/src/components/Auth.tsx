@@ -39,7 +39,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   function guardHumanCheck() {
-    if (captchaEnabled && !captchaToken) {
+    if (captchaEnabled && (!captchaToken || captchaToken === TURNSTILE_FALLBACK_TOKEN)) {
       setErrorMsg(isArabic ? "يرجى إكمال التحقق الأمني أولاً." : "Please complete the security check first.");
       return false;
     }
@@ -138,7 +138,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             {captchaEnabled && <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />}
             {captchaToken === TURNSTILE_FALLBACK_TOKEN && (
               <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">
-                {isArabic ? "تم تفعيل مسار دخول احتياطي لأن تحقق Cloudflare لم يُحمّل على هذا المتصفح." : "Fallback sign-in enabled because Cloudflare verification did not load in this browser."}
+                {isArabic ? "تعذر تحميل تحقق Cloudflare. أعد المحاولة أو عطّل مانع التتبع مؤقتاً." : "Cloudflare verification could not load. Retry or temporarily disable tracking blockers."}
               </p>
             )}
             <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
