@@ -8,6 +8,17 @@ import companyMeta from "../../data/companyMeta";
 import GlassCard from "../ui/GlassCard";
 import { KeyRound, MessageSquare, Loader2 } from "lucide-react";
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function phonesMatch(inputPhone: string, driverPhone?: string | null) {
+  const input = normalizePhone(inputPhone);
+  const stored = normalizePhone(String(driverPhone || ""));
+  if (!input || !stored) return false;
+  return input.endsWith(stored.slice(-9)) || stored.endsWith(input.slice(-9));
+}
+
 export default function DriverPortal() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
@@ -24,9 +35,9 @@ export default function DriverPortal() {
     if (!supabase) return [];
     const { data, error: fetchError } = await supabase
       .from("orders")
-      .select("id, status, sender_city, receiver_city, created_at, driver_code, driver_phone")
+      .select("id, tracking_code, tracking_number, status, sender_city, receiver_city, created_at, driver_code, driver_phone")
       .eq("driver_code", code)
-      .in("status", ["confirmed", "assigned", "picked_up", "in_transit", "Picked Up", "In Transit", "Processing"])
+      .in("status", ["Confirmed", "Assigned", "Driver Assigned", "Picked Up", "In Transit", "Out for Delivery", "confirmed", "assigned", "picked_up", "in_transit"])
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -43,33 +54,31 @@ export default function DriverPortal() {
     setLoading(true);
 
     const code = driverCode.trim().toUpperCase();
-    if (code.length < 4) {
+    if (code.length < 4 || !driverPhone.trim()) {
       setError(t.invalidCode);
       setLoading(false);
       return;
     }
 
-    if (supabase) {
-      const { data: driverRow } = await supabase
-        .from("drivers")
-        .select("id, code, phone, active")
-        .eq("code", code)
-        .maybeSingle();
+    if (!supabase) {
+      setError(t.invalidCode);
+      setLoading(false);
+      return;
+    }
 
-      if (driverRow && driverRow.active === false) {
-        setError(t.invalidCode);
-        setLoading(false);
-        return;
-      }
+    const { data: driverRow, error: driverError } = await supabase
+      .from("drivers")
+      .select("id, code, phone, active")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (driverError || !driverRow || driverRow.active === false || !phonesMatch(driverPhone, driverRow.phone)) {
+      setError(t.invalidCode);
+      setLoading(false);
+      return;
     }
 
     const assigned = await loadOrders(code);
-    if (assigned.length === 0 && !supabase) {
-      setError(t.invalidCode);
-      setLoading(false);
-      return;
-    }
-
     setOrders(assigned);
     setVerified(true);
     setLoading(false);
@@ -114,13 +123,15 @@ export default function DriverPortal() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-white/75 text-xs font-bold">{t.phoneLabel}</label>
+              <label className="text-white/75 text-xs font-bold">{t.phoneLabel} *</label>
               <input
                 type="tel"
                 value={driverPhone}
                 onChange={(e) => setDriverPhone(e.target.value)}
                 className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold"
                 dir="ltr"
+                placeholder="+971 5X XXX XXXX"
+                required
               />
             </div>
             {error && <p className="text-red-400 text-xs">{error}</p>}
