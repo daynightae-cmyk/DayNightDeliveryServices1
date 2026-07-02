@@ -1,6 +1,6 @@
 -- DAY NIGHT DELIVERY SERVICES
 -- Merchants / contracted traders + admin coupon order creation.
--- Apply once in Supabase SQL Editor.
+-- Apply once in Supabase SQL Editor. Safe to re-run.
 
 begin;
 
@@ -43,15 +43,20 @@ alter table public.orders
   add column if not exists destination_country text,
   add column if not exists source_channel text default 'website';
 
-alter table public.orders
-  add constraint orders_order_count_positive check (order_count is null or order_count >= 1) not valid;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'orders_order_count_positive') then
+    alter table public.orders
+      add constraint orders_order_count_positive
+      check (order_count is null or order_count >= 1)
+      not valid;
+  end if;
+exception when duplicate_object then null;
+end $$;
 
 do $$
 begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'orders_merchant_id_fkey'
-  ) then
+  if not exists (select 1 from pg_constraint where conname = 'orders_merchant_id_fkey') then
     alter table public.orders
       add constraint orders_merchant_id_fkey
       foreign key (merchant_id)
@@ -180,16 +185,5 @@ drop trigger if exists trg_daynight_merchants_updated_at on public.merchants;
 create trigger trg_daynight_merchants_updated_at
 before insert or update on public.merchants
 for each row execute function public.daynight_merchants_touch_updated_at();
-
--- Keep local delivery rule visible in DB for admin operations notes.
-insert into public.admin_settings (key, value, description)
-values (
-  'local_delivery_pricing_rule',
-  '30 AED per local order in main UAE areas; extended areas 50 AED; no kilogram surcharge for local delivery; international uses kg pricing.',
-  'DAY NIGHT admin local pricing rule for merchant orders'
-)
-on conflict (key) do update
-set value = excluded.value,
-    description = excluded.description;
 
 commit;
