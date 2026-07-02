@@ -23,6 +23,23 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL === EX
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+export type PublicLiveMapOrder = {
+  tracking_ref?: string | null;
+  status?: string | null;
+  sender_city?: string | null;
+  receiver_city?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+export type PublicLiveOperationsMap = {
+  generated_at?: string | null;
+  mode?: string | null;
+  active_orders_count?: number | null;
+  driver_count?: number | null;
+  orders?: PublicLiveMapOrder[] | null;
+};
+
 function normalizePublicOrderPayload(payload: Record<string, unknown>) {
   const notes = typeof payload.notes === "string" ? payload.notes.trim() : "";
 
@@ -202,6 +219,22 @@ export async function searchChatbotAnswerRpc(queryText: string): Promise<any> {
 
   if (error) return null;
   return data;
+}
+
+export async function fetchPublicLiveOperationsMap(limit = 18): Promise<PublicLiveOperationsMap | null> {
+  if (!supabase) return null;
+
+  const safeLimit = Math.min(Math.max(Math.trunc(Number(limit) || 18), 1), 30);
+  const { data, error } = await supabase.rpc("public_live_operations_map", {
+    p_limit: safeLimit
+  });
+
+  if (error || !data || typeof data !== "object") {
+    console.warn("public_live_operations_map RPC failed or is not installed.");
+    return null;
+  }
+
+  return data as PublicLiveOperationsMap;
 }
 
 export async function fetchAllOrders(): Promise<Order[]> {
