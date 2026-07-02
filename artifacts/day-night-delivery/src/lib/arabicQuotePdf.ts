@@ -33,80 +33,142 @@ export type ArabicInternationalQuoteData = {
   total: number;
 };
 
-const W = 794;
-const H = 1123;
-const FONT = "Tajawal, Cairo, Arial, Tahoma, sans-serif";
+const FONT_NAME = "NotoNaskhArabicDN";
+const FONT_FILE = "NotoNaskhArabicDN.ttf";
+const FONT_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf";
+const NAVY = [7, 26, 51] as const;
+const GOLD = [212, 175, 55] as const;
+const GOLD2 = [245, 183, 0] as const;
+const WHITE = [255, 255, 255] as const;
+const LIGHT = [244, 247, 251] as const;
+const TEXT = [7, 26, 51] as const;
+const MUTED = [100, 116, 139] as const;
+
+let arabicFontBase64Promise: Promise<string> | null = null;
 
 function arDate() {
   return new Date().toLocaleDateString("ar-AE", { dateStyle: "long" });
 }
 
-function write(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, align: CanvasTextAlign, dir: CanvasDirection, color: string, font: string) {
-  ctx.save();
-  ctx.direction = dir;
-  ctx.textAlign = align;
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = color;
-  ctx.font = font;
-  ctx.fillText(text || "-", x, y);
-  ctx.restore();
+function safeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "_");
 }
 
-function drawRow(ctx: CanvasRenderingContext2D, label: string, value: string, y: number, shade: boolean) {
-  if (shade) {
-    ctx.fillStyle = "#f4f7fb";
-    ctx.fillRect(58, y - 26, 678, 40);
+function hasArabic(value: string) {
+  return /[\u0600-\u06ff]/.test(value);
+}
+
+function bufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
-  write(ctx, label, 716, y, "right", "rtl", "#64748b", `800 16px ${FONT}`);
-  write(ctx, value, 86, y, "left", "rtl", "#071a33", `900 16px ${FONT}`);
+  return btoa(binary);
+}
+
+async function getArabicFontBase64() {
+  if (!arabicFontBase64Promise) {
+    arabicFontBase64Promise = fetch(FONT_URL, { cache: "force-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Arabic font failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(bufferToBase64);
+  }
+  return arabicFontBase64Promise;
+}
+
+async function registerArabicFont(doc: jsPDF) {
+  const base64 = await getArabicFontBase64();
+  const api = doc as jsPDF & {
+    addFileToVFS: (filename: string, filecontent: string) => void;
+    addFont: (postScriptName: string, id: string, fontStyle: string) => void;
+    setLanguage?: (language: string) => void;
+  };
+  api.addFileToVFS(FONT_FILE, base64);
+  api.addFont(FONT_FILE, FONT_NAME, "normal");
+  api.setLanguage?.("ar");
+  doc.setFont(FONT_NAME, "normal");
+}
+
+function shapeArabic(doc: jsPDF, value: string) {
+  const api = doc as jsPDF & { processArabic?: (input: string) => string };
+  return hasArabic(value) && typeof api.processArabic === "function" ? api.processArabic(value) : value;
+}
+
+function write(doc: jsPDF, value: string, x: number, y: number, options: { size?: number; color?: readonly number[]; align?: "left" | "center" | "right"; weight?: "normal" | "bold" } = {}) {
+  const color = options.color || TEXT;
+  doc.setFont(FONT_NAME, options.weight === "bold" ? "normal" : "normal");
+  doc.setFontSize(options.size || 10);
+  doc.setTextColor(color[0], color[1], color[2]);
+  doc.text(shapeArabic(doc, String(value || "-")), x, y, { align: options.align || "right" });
+}
+
+function sectionTitle(doc: jsPDF, title: string, y: number) {
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.rect(42, y, 511, 28, "F");
+  write(doc, title, 538, y + 19, { size: 12, color: GOLD, align: "right", weight: "bold" });
+  return y + 44;
+}
+
+function row(doc: jsPDF, label: string, value: string, y: number, shade: boolean) {
+  if (shade) {
+    doc.setFillColor(LIGHT[0], LIGHT[1], LIGHT[2]);
+    doc.rect(42, y - 17, 511, 28, "F");
+  }
+  write(doc, label, 538, y, { size: 10, color: MUTED, align: "right" });
+  write(doc, value, 58, y, { size: 10, color: TEXT, align: "left", weight: "bold" });
+}
+
+function header(doc: jsPDF, title: string) {
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.rect(0, 0, 595.28, 126, "F");
+  doc.setFillColor(GOLD[0], GOLD[1], GOLD[2]);
+  doc.rect(0, 126, 595.28, 5, "F");
+  write(doc, "DAY NIGHT DELIVERY SERVICES", 297.64, 43, { size: 18, color: GOLD, align: "center", weight: "bold" });
+  write(doc, "داي نايت لخدمات التوصيل والشحن", 297.64, 72, { size: 15, color: WHITE, align: "center", weight: "bold" });
+  write(doc, title, 297.64, 101, { size: 17, color: GOLD2, align: "center", weight: "bold" });
+}
+
+function footer(doc: jsPDF) {
+  const h = doc.internal.pageSize.getHeight();
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.rect(0, h - 58, 595.28, 58, "F");
+  write(doc, `${companyMeta.displayWebsite} - ${companyMeta.email} - ${companyMeta.phone}`, 297.64, h - 32, { size: 10, color: GOLD, align: "center" });
+  write(doc, "Creating by Eng Sadek Elgazar", 297.64, h - 14, { size: 8, color: WHITE, align: "center" });
 }
 
 export async function exportArabicQuotePdfImage(input: ArabicQuotePdfInput) {
-  const scale = 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = W * scale;
-  canvas.height = H * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  ctx.scale(scale, scale);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#071a33";
-  ctx.fillRect(0, 0, W, 176);
-  ctx.fillStyle = "#d4af37";
-  ctx.fillRect(0, 176, W, 8);
-  write(ctx, "DAY NIGHT DELIVERY SERVICES", W / 2, 60, "center", "ltr", "#d4af37", `900 26px ${FONT}`);
-  write(ctx, "داي نايت لخدمات التوصيل والشحن", W / 2, 102, "center", "rtl", "#ffffff", `900 22px ${FONT}`);
-  write(ctx, input.title, W / 2, 142, "center", "rtl", "#f5b700", `900 24px ${FONT}`);
-  let y = 242;
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4", putOnlyUsedFonts: true, compress: true });
+  await registerArabicFont(doc);
+
+  header(doc, input.title);
+  let y = 176;
   input.sections.forEach((section) => {
-    ctx.fillStyle = "#071a33";
-    ctx.fillRect(58, y, 678, 38);
-    write(ctx, section.title, 714, y + 26, "right", "rtl", "#d4af37", `900 17px ${FONT}`);
-    y += 58;
+    y = sectionTitle(doc, section.title, y);
     section.rows.forEach(([label, value], index) => {
-      drawRow(ctx, label, value, y, index % 2 === 0);
-      y += 43;
+      row(doc, label, value, y, index % 2 === 0);
+      y += 30;
     });
-    y += 28;
+    y += 18;
   });
-  ctx.fillStyle = "#d4af37";
-  ctx.fillRect(58, y, 678, 3);
-  y += 25;
-  ctx.fillStyle = "#071a33";
-  ctx.fillRect(58, y, 678, 62);
-  write(ctx, input.totalLabel, 714, y + 40, "right", "rtl", "#ffffff", `900 18px ${FONT}`);
-  write(ctx, input.totalValue, 86, y + 42, "left", "ltr", "#f5b700", `900 27px ${FONT}`);
-  y += 95;
-  if (input.note) write(ctx, input.note, 714, y, "right", "rtl", "#64748b", `800 14px ${FONT}`);
-  ctx.fillStyle = "#071a33";
-  ctx.fillRect(0, H - 82, W, 82);
-  write(ctx, `${companyMeta.displayWebsite} - ${companyMeta.email} - ${companyMeta.phone}`, W / 2, H - 45, "center", "ltr", "#d4af37", `800 14px ${FONT}`);
-  write(ctx, "Creating by Eng Sadek Elgazar", W / 2, H - 22, "center", "ltr", "#ffffff", `700 12px ${FONT}`);
-  const image = canvas.toDataURL("image/png");
-  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-  doc.addImage(image, "PNG", 0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), undefined, "FAST");
-  doc.save(input.fileName.split("/").join("_"));
+
+  doc.setFillColor(GOLD[0], GOLD[1], GOLD[2]);
+  doc.rect(42, y, 511, 2, "F");
+  y += 22;
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.rect(42, y, 511, 44, "F");
+  write(doc, input.totalLabel, 538, y + 29, { size: 13, color: WHITE, align: "right", weight: "bold" });
+  write(doc, input.totalValue, 58, y + 31, { size: 18, color: GOLD2, align: "left", weight: "bold" });
+
+  if (input.note) {
+    write(doc, input.note, 538, y + 74, { size: 10, color: MUTED, align: "right" });
+  }
+
+  footer(doc);
+  doc.save(safeFileName(input.fileName));
 }
 
 export function exportArabicDomesticQuotePdf(data: ArabicDomesticQuoteData) {
