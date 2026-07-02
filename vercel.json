@@ -9,49 +9,26 @@
     {
       "source": "/(.*)",
       "has": [
-        {
-          "type": "host",
-          "value": "www.daynightae.com"
-        }
+        { "type": "host", "value": "www.daynightae.com" }
       ],
       "destination": "https://daynightae.com/$1",
       "permanent": true
     }
   ],
   "rewrites": [
-    {
-      "source": "/((?!api/.*|.*\\..*).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/((?!api/.*|.*\\..*).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "Strict-Transport-Security",
-          "value": "max-age=63072000; includeSubDomains; preload"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
-        },
-        {
-          "key": "X-DNS-Prefetch-Control",
-          "value": "on"
-        }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://i.postimg.cc https://api.qrserver.com; connect-src 'self' https://ngdwybpgacauorygoedi.supabase.co wss://ngdwybpgacauorygoedi.supabase.co https://cdn.jsdelivr.net; frame-src https://challenges.cloudflare.com" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+        { "key": "X-DNS-Prefetch-Control", "value": "on" }
       ]
     }
   ]
