@@ -5,6 +5,7 @@ import { coverageAreas } from "../data/coverage";
 import { domesticPricing, internationalDestinations, internationalPricing } from "../data/pricingData";
 import { calculateDomesticPrice, calculateInternationalPrice, EXPRESS_SURCHARGE, ADDITIONAL_PIECE_SURCHARGE, formatAED } from "../lib/pricing";
 import { exportDomesticQuotePDF, exportIntlQuotePDF, exportQuoteTXT } from "../lib/exportUtils";
+import { exportArabicDomesticQuotePdf, exportArabicInternationalQuotePdf } from "../lib/arabicQuotePdf";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
 import companyMeta from "../data/companyMeta";
@@ -35,8 +36,16 @@ export default function Pricing() {
 
   const resetDomestic = () => { setDomesticPickupCity("Abu Dhabi"); setDomesticDeliveryCity("Dubai"); setDomesticService("standard"); setDomesticWeight(1); setDomesticPieces(1); };
   const resetInternational = () => { setInternationalDestination("SA"); setInternationalWeight(1); };
-  const domesticPdf = () => exportDomesticQuotePDF({ pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, service: domesticService, weight: domesticWeight, pieces: domesticPieces, basePrice: domestic.subtotal - (domesticService === "express" ? EXPRESS_SURCHARGE : 0) - Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE, expressCharge: domesticService === "express" ? EXPRESS_SURCHARGE : 0, extraPiecesCharge: Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE, total: domestic.total }, "en");
-  const intlPdf = () => exportIntlQuotePDF({ destination: dest ? dest.countryNameEn : internationalDestination, weight: internationalWeight, firstKgPrice: dest ? dest.firstKg : 0, additionalKgPrice: dest ? dest.additionalKg : 0, total: international.total, zone: international.pricingCategory }, "en");
+  const domesticPdf = () => {
+    const quote = { pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, service: domesticService, weight: domesticWeight, pieces: domesticPieces, basePrice: domestic.subtotal - (domesticService === "express" ? EXPRESS_SURCHARGE : 0) - Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE, expressCharge: domesticService === "express" ? EXPRESS_SURCHARGE : 0, extraPiecesCharge: Math.max(0, domesticPieces - 1) * ADDITIONAL_PIECE_SURCHARGE, total: domestic.total };
+    if (isArabic) { void exportArabicDomesticQuotePdf(quote); return; }
+    exportDomesticQuotePDF(quote, "en");
+  };
+  const intlPdf = () => {
+    const quote = { destination: dest ? dest.countryNameEn : internationalDestination, weight: internationalWeight, firstKgPrice: dest ? dest.firstKg : 0, additionalKgPrice: dest ? dest.additionalKg : 0, total: international.total, zone: international.pricingCategory };
+    if (isArabic) { void exportArabicInternationalQuotePdf({ ...quote, destination: dest ? dest.countryNameAr : internationalDestination }); return; }
+    exportIntlQuotePDF(quote, "en");
+  };
   const domesticTxt = () => exportQuoteTXT("domestic", { "Pickup City": domesticPickupCity, "Delivery City": domesticDeliveryCity, Service: domesticService, Weight: `${domesticWeight} kg`, Pieces: domesticPieces, Total: formatAED(domestic.total) });
   const intlTxt = () => exportQuoteTXT("international", { Destination: dest ? (isArabic ? dest.countryNameAr : dest.countryNameEn) : internationalDestination, Weight: `${internationalWeight} kg`, Zone: international.pricingCategory, Total: formatAED(international.total) });
 
