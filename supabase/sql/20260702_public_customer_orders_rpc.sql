@@ -44,6 +44,14 @@ begin
       v_phone <> ''
       and regexp_replace(coalesce(to_jsonb(o) ->> 'customer_phone', ''), '[^0-9]', '', 'g') = v_phone
     )
+    or (
+      v_phone <> ''
+      and regexp_replace(coalesce(to_jsonb(o) ->> 'sender_phone', ''), '[^0-9]', '', 'g') = v_phone
+    )
+    or (
+      v_phone <> ''
+      and regexp_replace(coalesce(to_jsonb(o) ->> 'receiver_phone', ''), '[^0-9]', '', 'g') = v_phone
+    )
   order by coalesce(o.updated_at, o.created_at) desc nulls last, o.created_at desc nulls last
   limit v_safe_limit;
 end;
