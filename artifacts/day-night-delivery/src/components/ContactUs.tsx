@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -8,8 +8,6 @@ import {
   Phone,
   Mail,
   MapPin,
-  Facebook,
-  Instagram,
   MessageSquare,
   ExternalLink,
   CheckCircle,
@@ -21,14 +19,7 @@ import { pageCopy } from "../data/pageCopy";
 import { supabase } from "../supabase";
 import SectionHeader from "./ui/SectionHeader";
 import GlassCard from "./ui/GlassCard";
-
-function TikTokIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-    </svg>
-  );
-}
+import { getCompanySocialLinks } from "./ui/SocialLinks";
 
 export default function ContactUs() {
   const { language } = useAppContext();
@@ -80,11 +71,7 @@ export default function ContactUs() {
     }, 5000);
   }
 
-  const socialLinks = [
-    { name: "Facebook", url: companyMeta.socials.facebook, icon: <Facebook className="w-5 h-5 text-[#1877F2]" /> },
-    { name: "Instagram", url: companyMeta.socials.instagram, icon: <Instagram className="w-5 h-5 text-[#E4405F]" /> },
-    { name: "TikTok", url: companyMeta.socials.tiktok, icon: <TikTokIcon className="w-5 h-5 text-white" /> }
-  ];
+  const socialLinks = getCompanySocialLinks(isArabic);
 
   return (
     <div className="space-y-12" dir={isArabic ? "rtl" : "ltr"}>
@@ -137,23 +124,36 @@ export default function ContactUs() {
           </GlassCard>
 
           <GlassCard className="p-6 space-y-4">
-            <h4 className="font-bold text-white">{t.socialTitle}</h4>
-            <div className="flex flex-col gap-2.5">
-              {socialLinks.map((s) => (
-                <a
-                  key={s.name}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between p-3.5 bg-brand-deep/60 hover:bg-white/5 rounded-xl border border-white/10 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {s.icon}
-                    <span className="text-sm font-semibold text-white/80">{s.name}</span>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-white/40" />
-                </a>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="font-bold text-white">{t.socialTitle}</h4>
+              <span className="rounded-full border border-brand-gold/25 bg-brand-gold/10 px-3 py-1 text-[10px] font-black text-brand-gold">
+                {isArabic ? "قنوات رسمية" : "Official Channels"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {socialLinks.map((s) => {
+                const Icon = s.Icon;
+                return (
+                  <a
+                    key={s.key}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-brand-deep/60 p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-gold/40 hover:bg-white/[0.075]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.055] shadow-[0_0_24px_rgba(245,183,0,0.12)]" style={{ color: s.color }}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-white/90">{s.label}</span>
+                        <span className="block truncate text-[11px] font-semibold text-white/40" dir="ltr">{s.handle}</span>
+                      </span>
+                    </div>
+                    <ExternalLink className="w-4 h-4 shrink-0 text-brand-gold/65 opacity-70 transition-opacity group-hover:opacity-100" />
+                  </a>
+                );
+              })}
             </div>
           </GlassCard>
         </div>
