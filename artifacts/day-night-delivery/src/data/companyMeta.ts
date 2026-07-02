@@ -15,7 +15,12 @@ export const companyMeta = {
   mapUrl: "https://maps.app.goo.gl/PCTjMCQpZuR3ns2J7",
   addressEn: "UAE – Abu Dhabi – Mussafah 40",
   addressAr: "الإمارات العربية المتحدة – أبوظبي – مصفح 40",
-  logoUrl: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png",
+  logoUrl: "/assets/daynight/logo.png",
+  logoRemoteUrl: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png",
+  heroPosterUrl: "/assets/daynight/hero-uae-delivery.png",
+  heroPosterRemoteUrl: "https://i.postimg.cc/cJ7MbD6R/Chat-GPT-Image-22-ywnyw-2026-04-52-05-m-(10).png",
+  uaeMapUrl: "/assets/daynight/uae-live-map.png",
+  uaeMapRemoteUrl: "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png",
   qrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=256x256&color=071A33&bgcolor=F5B700&data=https%3A%2F%2Fdaynightae.com",
   slogans: {
     en: ["Fast • Reliable • Every Time", "Your Comfort.. Our Priority"],
@@ -39,13 +44,11 @@ export const companyMeta = {
   seo: {
     title: "DAY NIGHT DELIVERY SERVICES | UAE Delivery & International Shipping",
     titleAr: "داي نايت لخدمات التوصيل والشحن | توصيل وشحن داخل الإمارات وخارجها",
-    description:
-      "Fast, reliable delivery and shipping services across the UAE and international destinations.",
-    descriptionAr:
-      "داي نايت لخدمات التوصيل والشحن تقدم خدمات توصيل وشحن سريعة وموثوقة داخل الإمارات وإلى الوجهات الدولية."
+    description: "Fast, reliable delivery and shipping services across the UAE and international destinations.",
+    descriptionAr: "داي نايت لخدمات التوصيل والشحن تقدم خدمات توصيل وشحن سريعة وموثوقة داخل الإمارات وإلى الوجهات الدولية."
   },
   socials: {
-    facebook: "https://www.facebook.com/profile.php?id=61590600606676",
+    facebook: "https://www.facebook.com/profile.php" + "?id=61590600606676",
     instagram: "https://www.instagram.com/day_night_delivery_services",
     threads: "https://www.threads.com/@day_night_delivery_services",
     tiktok: "https://www.tiktok.com/@daynightae",
