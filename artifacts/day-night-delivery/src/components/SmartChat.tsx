@@ -143,16 +143,32 @@ export default function SmartChat() {
     }
   }, [isArabic, language]);
 
-  function openPanel() { setOpen(true); setShowBubble(false); setMinimized(false); }
+  function openPanel() {
+    setOpen(true);
+    setShowBubble(false);
+    setMinimized(false);
+  }
+
   function closePanel() {
-    setOpen(false); setShowBubble(false); setMinimized(false);
+    setOpen(false);
+    setShowBubble(false);
+    setMinimized(false);
     sessionStorage.setItem(CLOSED_KEY, "1");
   }
+
   function toggleOpen() {
-    if (open) { minimized ? setMinimized(false) : closePanel(); }
-    else openPanel();
+    if (open) {
+      minimized ? setMinimized(false) : closePanel();
+    } else {
+      openPanel();
+    }
   }
-  function sendMessage() { const cur = text; setText(""); void sendText(cur); }
+
+  function sendMessage() {
+    const cur = text;
+    setText("");
+    void sendText(cur);
+  }
 
   function exportConversationTxt() {
     const lines = [
@@ -212,8 +228,11 @@ export default function SmartChat() {
   return (
     <>
       {showBubble && !open && (
-        <div className="fixed right-4 bottom-[130px] md:bottom-[82px] z-50 max-w-[240px]">
-          <div className="bg-brand-deep border border-brand-gold/30 rounded-2xl px-4 py-3 shadow-xl relative" style={{ animation: "fadeInUp 0.35s ease" }}>
+        <div
+          className="fixed max-w-[240px] pointer-events-none"
+          style={{ right: 18, bottom: "calc(146px + env(safe-area-inset-bottom))", zIndex: 72 }}
+        >
+          <div className="bg-brand-deep border border-brand-gold/30 rounded-2xl px-4 py-3 shadow-xl relative pointer-events-auto" style={{ animation: "fadeInUp 0.35s ease" }}>
             <button onClick={() => setShowBubble(false)} className="absolute top-2 right-2 text-white/40 hover:text-white/80 transition-colors" aria-label="Dismiss bubble">
               <X className="w-3 h-3" />
             </button>
@@ -224,7 +243,17 @@ export default function SmartChat() {
       )}
 
       {open && !minimized && (
-        <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 w-[min(92vw,390px)] max-h-[78vh] bg-brand-deep border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" dir={isArabic ? "rtl" : "ltr"}>
+        <div
+          className="fixed bg-brand-deep border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          dir={isArabic ? "rtl" : "ltr"}
+          style={{
+            right: 18,
+            bottom: "calc(88px + env(safe-area-inset-bottom))",
+            width: "min(calc(100vw - 24px), 400px)",
+            maxHeight: "min(78vh, calc(100dvh - 124px))",
+            zIndex: 75,
+          }}
+        >
           <div className="bg-brand-cool border-b border-white/10 px-4 py-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-full bg-brand-gold text-brand-deep grid place-items-center">
@@ -249,7 +278,7 @@ export default function SmartChat() {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[260px]">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[240px]">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender === "bot" ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-6 whitespace-pre-wrap ${msg.sender === "bot" ? "bg-white/8 text-white border border-white/10" : "bg-brand-gold text-brand-deep font-bold"}`}>
@@ -283,10 +312,23 @@ export default function SmartChat() {
         </div>
       )}
 
-      <button onClick={toggleOpen} className={`fixed right-4 z-50 w-14 h-14 rounded-full shadow-2xl grid place-items-center transition-all hover:scale-105 ${open && minimized ? "bottom-[88px]" : "bottom-6 md:bottom-6"} ${open ? "bg-brand-gold text-brand-deep" : "bg-brand-cool border border-brand-gold/35 text-brand-gold"}`} aria-label="Smart chat">
-        <MessageSquare className="w-6 h-6" />
-        {!open && <span className="absolute inset-0 rounded-full border border-brand-gold/50 animate-ping" />}
-      </button>
+      {(!open || minimized) && (
+        <button
+          onClick={toggleOpen}
+          className={`fixed rounded-full shadow-2xl grid place-items-center transition-all hover:scale-105 ${open ? "bg-brand-gold text-brand-deep" : "bg-brand-cool border border-brand-gold/35 text-brand-gold"}`}
+          style={{
+            right: 18,
+            bottom: "calc(74px + env(safe-area-inset-bottom))",
+            width: 56,
+            height: 56,
+            zIndex: 74,
+          }}
+          aria-label="Smart chat"
+        >
+          <MessageSquare className="w-6 h-6" />
+          {!open && <span className="absolute inset-0 rounded-full border border-brand-gold/50 animate-ping" />}
+        </button>
+      )}
     </>
   );
 }
