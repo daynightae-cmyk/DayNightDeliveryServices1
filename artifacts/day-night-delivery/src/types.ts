@@ -19,6 +19,8 @@ export interface Order {
   id: string; // Tracking Number e.g., DN-491026-X or database UUID depending on source
   tracking_code?: string;
   tracking_number?: string;
+  invoice_number?: string;
+  invoiceNumber?: string;
   sender_name: string;
   sender_phone: string;
   sender_email?: string;
