@@ -65,15 +65,13 @@ function resolveDomesticZone(input: DomesticPriceInput) {
 
 export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult {
   const billableWeight = normalizeWeight(input.weight);
-  const billablePieces = normalizePieces(input.pieces);
+  const localOrderCount = normalizePieces(input.pieces);
   const zone = resolveDomesticZone(input);
-  const basePrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
-  const express = input.serviceType === "express" ? EXPRESS_SURCHARGE : 0;
-  const extraPieceFee = Math.max(0, billablePieces - 1) * ADDITIONAL_PIECE_SURCHARGE;
-  const subtotal = basePrice + express + extraPieceFee;
+  const unitPrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
+  const subtotal = unitPrice * localOrderCount;
   const total = Number(subtotal.toFixed(2));
   const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
-  const requiresCustomQuote = billableWeight > 50 || billablePieces > 20;
+  const requiresCustomQuote = localOrderCount > 200;
 
   return {
     subtotal,
@@ -83,15 +81,14 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
     billableWeight,
     requiresCustomQuote,
     breakdown: [
-      `${category}: ${formatAED(basePrice)}`,
-      ...(express ? [`Express surcharge: ${formatAED(express)}`] : []),
-      ...(extraPieceFee ? [`Additional pieces: ${formatAED(ADDITIONAL_PIECE_SURCHARGE)} x ${billablePieces - 1}`] : [])
+      `${category}: ${formatAED(unitPrice)}`,
+      `Local order count: ${localOrderCount} x ${formatAED(unitPrice)}`
     ],
     notes: requiresCustomQuote
-      ? "Large shipments may require operational confirmation before pickup."
+      ? "High local order quantity may require operational confirmation before pickup."
       : zone === "extended"
-        ? "Extended UAE area delivery price."
-        : "Main UAE city delivery price."
+        ? "Extended UAE area delivery price. Local delivery is charged per order, not per kilogram."
+        : "Main UAE city delivery price. Local delivery is charged per order, not per kilogram."
   };
 }
 
@@ -134,7 +131,7 @@ export function calculateInternationalPrice(inputOrDestination: InternationalPri
 export function calculateLocalPrice(cityArOrEn: string, weightKg: number): PricingResult {
   return calculateDomesticPrice({
     deliveryCity: cityArOrEn,
-    weight: weightKg,
+    pieces: Math.max(1, Math.ceil(Number(weightKg) || 1)),
     serviceType: "standard"
   });
 }
