@@ -1,5 +1,6 @@
 -- DAY NIGHT public live map RPC
 -- Apply this SQL in Supabase before enabling live public map data.
+-- Safe for enum order_status: status is always cast to text before null/like checks.
 
 begin;
 
@@ -14,14 +15,18 @@ as $$
   ),
   live_orders as (
     select
-      coalesce(nullif(o.tracking_code, ''), nullif(o.tracking_number, ''), concat('DN-', left(o.id::text, 8))) as raw_tracking,
-      coalesce(nullif(o.status, ''), 'Pending') as status,
+      coalesce(
+        nullif(o.tracking_code, ''),
+        nullif(o.tracking_number, ''),
+        concat('DN-', left(o.id::text, 8))
+      ) as raw_tracking,
+      coalesce(nullif(o.status::text, ''), 'Pending') as status,
       coalesce(nullif(o.sender_city, ''), 'Abu Dhabi') as sender_city,
       coalesce(nullif(o.receiver_city, ''), 'Dubai') as receiver_city,
       o.created_at,
       o.updated_at
     from public.orders o
-    where lower(coalesce(o.status, '')) not like '%cancel%'
+    where lower(coalesce(o.status::text, '')) not like '%cancel%'
     order by coalesce(o.updated_at, o.created_at) desc nulls last
     limit (select value from safe_limit)
   ),
@@ -30,7 +35,8 @@ as $$
       jsonb_build_object(
         'tracking_ref',
           case
-            when length(raw_tracking) > 12 then concat(left(raw_tracking, 9), '...', right(raw_tracking, 3))
+            when length(raw_tracking) > 12
+              then concat(left(raw_tracking, 9), '...', right(raw_tracking, 3))
             else raw_tracking
           end,
         'status', status,
@@ -46,8 +52,8 @@ as $$
   active_order_count as (
     select count(*)::integer as value
     from public.orders o
-    where lower(coalesce(o.status, '')) not like '%cancel%'
-      and lower(coalesce(o.status, '')) not like '%delivered%'
+    where lower(coalesce(o.status::text, '')) not like '%cancel%'
+      and lower(coalesce(o.status::text, '')) not like '%delivered%'
   ),
   active_driver_count as (
     select count(*)::integer as value
