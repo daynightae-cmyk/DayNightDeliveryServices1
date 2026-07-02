@@ -8,17 +8,24 @@ type Metric = {
 };
 
 const state = {
-  failedRequests: 0
+  failedRequests: 0,
+  disabledTables: new Set<string>()
 };
 
 const isDev = (import.meta as any).env?.DEV === true;
 
 async function safeInsert(table: string, payload: Record<string, unknown>) {
-  if (!supabase) return;
+  if (!supabase || state.disabledTables.has(table)) return;
+
   try {
-    await supabase.from(table).insert(payload);
-  } catch {
-    // Monitoring failures must never crash app runtime.
+    const { error } = await supabase.from(table).insert(payload);
+    if (error) {
+      state.disabledTables.add(table);
+      if (isDev) console.warn(`[monitoring] optional table disabled: ${table}`, error.message);
+    }
+  } catch (error) {
+    state.disabledTables.add(table);
+    if (isDev) console.warn(`[monitoring] optional table unavailable: ${table}`, error);
   }
 }
 
@@ -30,7 +37,7 @@ export function reportError(error: unknown, context: string, extra?: Record<stri
     console.error("[monitoring]", context, message, extra || {});
   }
 
-  safeInsert("error_logs", {
+  void safeInsert("error_logs", {
     context,
     message,
     stack,
@@ -56,7 +63,7 @@ export function trackPageLoad(page: string) {
     console.info("[monitoring] page_load", metric);
   }
 
-  safeInsert("performance_logs", metric as unknown as Record<string, unknown>);
+  void safeInsert("performance_logs", metric as unknown as Record<string, unknown>);
 }
 
 export async function trackApiCall<T>(name: string, operation: () => Promise<T>): Promise<T> {
@@ -64,7 +71,7 @@ export async function trackApiCall<T>(name: string, operation: () => Promise<T>)
   try {
     const result = await operation();
     const elapsed = Number((performance.now() - startedAt).toFixed(2));
-    safeInsert("performance_logs", {
+    void safeInsert("performance_logs", {
       event: "api_call_success",
       value: elapsed,
       meta: { name },
@@ -73,7 +80,7 @@ export async function trackApiCall<T>(name: string, operation: () => Promise<T>)
     return result;
   } catch (error) {
     state.failedRequests += 1;
-    safeInsert("performance_logs", {
+    void safeInsert("performance_logs", {
       event: "api_call_failure",
       value: Number((performance.now() - startedAt).toFixed(2)),
       meta: { name, failedRequests: state.failedRequests },
