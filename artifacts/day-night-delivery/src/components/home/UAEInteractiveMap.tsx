@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, MapPin, RefreshCw, Radar, Truck } from "lucide-react";
 import { fetchPublicLiveOperationsMap } from "../../supabase";
+import localAssets, { withRemoteFallback } from "../../data/localAssets";
 
-const MAP_IMAGE_URL = "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png";
+const MAP_IMAGE_URL = localAssets.uaeMap;
 
 type MapRow = {
   tracking_ref?: string | null;
@@ -67,13 +68,6 @@ function progressFromStatus(status?: string | null) {
   if (value.includes("assign")) return 0.18;
   return 0.24;
 }
-
-const glass = {
-  border: "1px solid rgba(255,255,255,.13)",
-  background: "linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.045))",
-  backdropFilter: "blur(22px)",
-  boxShadow: "0 24px 72px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.12)",
-};
 
 export default function UAEInteractiveMap() {
   const [rows, setRows] = useState<MapRow[]>(demoRows);
@@ -158,7 +152,7 @@ export default function UAEInteractiveMap() {
 
       <div className="mx-auto grid w-[min(1180px,100%)] grid-cols-1 gap-4 rounded-[36px] border border-[#18a8e8]/20 bg-[#061225]/90 p-4 shadow-2xl lg:grid-cols-[1fr_320px]">
         <div className="relative min-h-[560px] overflow-hidden rounded-[30px] bg-[#030a18]">
-          {imageOk ? <img src={MAP_IMAGE_URL} alt="DAY NIGHT UAE live map" className="absolute inset-0 h-full w-full object-cover brightness-90" onError={() => setImageOk(false)} /> : null}
+          {imageOk ? <img src={MAP_IMAGE_URL} alt="DAY NIGHT UAE live map" className="absolute inset-0 h-full w-full object-cover brightness-90" onError={(event) => { setImageOk(false); withRemoteFallback(event, localAssets.remote.uaeMap); }} /> : null}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.22)_65%,rgba(0,0,0,.55)_100%)]" />
 
           <svg className="pointer-events-none absolute inset-0 z-[5] h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
