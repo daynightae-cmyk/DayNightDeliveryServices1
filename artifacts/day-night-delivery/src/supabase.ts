@@ -40,26 +40,110 @@ export type PublicLiveOperationsMap = {
   orders?: PublicLiveMapOrder[] | null;
 };
 
-function normalizePublicOrderPayload(payload: Record<string, unknown>) {
-  const notes = typeof payload.notes === "string" ? payload.notes.trim() : "";
-
-  return {
-    ...payload,
-    notes: notes || "N/A"
-  };
-}
-
-function normalizeStatusNote(note?: string | null) {
-  const clean = String(note || "").trim();
-  return clean || "Admin status update";
+function cleanText(value?: string | null) {
+  return String(value || "").trim();
 }
 
 function normalizePhoneForMatching(value?: string | null) {
   return String(value || "").replace(/\D/g, "");
 }
 
-function cleanText(value?: string | null) {
-  return String(value || "").trim();
+function normalizeOrderStatus(value?: unknown) {
+  const raw = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const map: Record<string, string> = {
+    pending: "pending",
+    confirmed: "confirmed",
+    assigned: "assigned",
+    picked_up: "picked_up",
+    pickup: "picked_up",
+    in_transit: "in_transit",
+    transit: "in_transit",
+    delivered: "delivered",
+    cancelled: "cancelled",
+    canceled: "cancelled"
+  };
+  return map[raw] || "pending";
+}
+
+function normalizeStatusHistory(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    const row = typeof item === "object" && item !== null ? item as Record<string, unknown> : {};
+    return {
+      ...row,
+      status: normalizeOrderStatus(row.status),
+      note: cleanText(String(row.note || "")) || "Admin status update"
+    };
+  });
+}
+
+function normalizeNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizePublicOrderPayload(payload: Record<string, unknown>) {
+  const notes = typeof payload.notes === "string" ? payload.notes.trim() : "";
+  const status = normalizeOrderStatus(payload.status);
+
+  return {
+    ...payload,
+    notes: notes || "N/A",
+    status,
+    status_history: normalizeStatusHistory(payload.status_history)
+  };
+}
+
+function buildPublicOrderInsertPayload(payload: Record<string, unknown>) {
+  const description = cleanText(String(payload.package_description || payload.package_type || "Local delivery item"));
+  const createdAt = cleanText(String(payload.created_at || "")) || new Date().toISOString();
+  const total = normalizeNumber(payload.total_price ?? payload.total ?? payload.delivery_price ?? payload.price ?? payload.amount, 30);
+
+  const directPayload: Record<string, unknown> = {
+    sender_name: cleanText(String(payload.sender_name || "")),
+    sender_phone: cleanText(String(payload.sender_phone || "")),
+    sender_city: cleanText(String(payload.sender_city || "")),
+    sender_address: cleanText(String(payload.sender_address || "")),
+    receiver_name: cleanText(String(payload.receiver_name || "")),
+    receiver_phone: cleanText(String(payload.receiver_phone || "")),
+    receiver_city: cleanText(String(payload.receiver_city || "")),
+    receiver_address: cleanText(String(payload.receiver_address || "")),
+    package_type: description,
+    package_description: description,
+    weight: normalizeNumber(payload.weight, 1) || 1,
+    pieces: Math.max(1, Math.trunc(normalizeNumber(payload.pieces, 1) || 1)),
+    service_type: cleanText(String(payload.service_type || "standard")) || "standard",
+    payment_method: cleanText(String(payload.payment_method || "sender_pays")) || "sender_pays",
+    cod_amount: payload.payment_method === "cod" ? normalizeNumber(payload.cod_amount, 0) : null,
+    delivery_price: total,
+    subtotal: normalizeNumber(payload.subtotal, total),
+    base_price: normalizeNumber(payload.base_price, total),
+    total,
+    total_price: total,
+    amount: total,
+    price: total,
+    currency: cleanText(String(payload.currency || "AED")) || "AED",
+    source_domain: cleanText(String(payload.source_domain || "daynightae.com")) || "daynightae.com",
+    notes: cleanText(String(payload.notes || "N/A")) || "N/A",
+    status: normalizeOrderStatus(payload.status),
+    created_at: createdAt,
+    status_history: normalizeStatusHistory(payload.status_history)
+  };
+
+  for (const key of ["customer_id", "customer_email", "customer_phone", "customer_name"]) {
+    if (typeof payload[key] === "string" && cleanText(payload[key] as string)) {
+      directPayload[key] = cleanText(payload[key] as string);
+    }
+  }
+
+  return directPayload;
+}
+
+function extractTrackingId(data: any): string | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  if (typeof row === "string") return row;
+  return row.tracking_code || row.tracking_number || row.id || null;
 }
 
 async function getSignedInCustomerIdentity() {
@@ -204,30 +288,54 @@ export async function createPublicOrder(payload: Record<string, unknown>): Promi
     return null;
   }
 
-  const linkedPayload = await withSignedInCustomer(payload);
-  const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: normalizePublicOrderPayload(linkedPayload)
-  });
+  const linkedPayload = normalizePublicOrderPayload(await withSignedInCustomer(payload));
+  const safePayload = buildPublicOrderInsertPayload(linkedPayload);
 
-  if (error || data === null) {
-    console.error("create_public_order failed. Order was not saved.");
-    return null;
+  for (const candidate of [linkedPayload, safePayload]) {
+    const { data, error } = await supabase.rpc("create_public_order", {
+      p_order_data: candidate
+    });
+
+    if (!error && data !== null) {
+      return extractTrackingId(data);
+    }
+
+    if (error) {
+      console.error("create_public_order RPC failed:", error.message, error.details || "");
+    }
   }
 
-  if (typeof data === "string") return data;
-  return data.tracking_code || data.tracking_number || data.id || null;
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(safePayload)
+      .select("*")
+      .single();
+
+    if (!error && data) {
+      return extractTrackingId(data);
+    }
+
+    if (error) {
+      console.error("direct public order insert failed:", error.message, error.details || "");
+    }
+  } catch (error) {
+    console.error("direct public order insert crashed:", error);
+  }
+
+  return null;
 }
 
 export async function createPublicOrderRpc(payload: Record<string, unknown>): Promise<any> {
   if (!supabase) return null;
 
-  const linkedPayload = await withSignedInCustomer(payload);
+  const linkedPayload = normalizePublicOrderPayload(await withSignedInCustomer(payload));
   const { data, error } = await supabase.rpc("create_public_order", {
-    p_order_data: normalizePublicOrderPayload(linkedPayload)
+    p_order_data: linkedPayload
   });
 
   if (error) {
-    console.error("create_public_order RPC failed.");
+    console.error("create_public_order RPC failed:", error.message, error.details || "");
     return null;
   }
 
@@ -357,66 +465,4 @@ export async function fetchOrderStatusHistory(orderId: string): Promise<OrderSta
 
 export async function insertNewOrder(orderData: Record<string, unknown>): Promise<string | null> {
   return createPublicOrder(orderData);
-}
-
-export async function isAdminUser(userId: string): Promise<boolean> {
-  if (!supabase || !userId) {
-    return false;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .single();
-
-    if (error) {
-      return false;
-    }
-
-    return data?.role?.toLowerCase() === "admin";
-  } catch {
-    return false;
-  }
-}
-
-export async function updateExistingOrderStatus(orderId: string, status: string, note?: string): Promise<boolean> {
-  if (!supabase || !orderId || !status) {
-    return false;
-  }
-
-  const cleanNote = normalizeStatusNote(note);
-
-  const rpcResult = await supabase.rpc("admin_update_order_status", {
-    p_order_id: orderId,
-    p_status: status,
-    p_note: cleanNote
-  });
-
-  if (!rpcResult.error && rpcResult.data) {
-    return true;
-  }
-
-  const { error: updateError } = await supabase
-    .from("orders")
-    .update({
-      status,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", orderId);
-
-  if (updateError) {
-    console.error("Order status update failed.");
-    return false;
-  }
-
-  await supabase.from("order_status_history").insert({
-    order_id: orderId,
-    status,
-    note: cleanNote,
-    created_at: new Date().toISOString()
-  });
-
-  return true;
 }
