@@ -1,7 +1,8 @@
 -- DAY NIGHT public live map RPC
 -- Apply this SQL in Supabase before enabling live public map data.
--- Safe for enum order_status: status is always cast to text before null/like checks.
+-- Safe for enum/order fields: public values are cast to text before null/like checks.
 
+rollback;
 begin;
 
 create or replace function public.public_live_operations_map(p_limit integer default 18)
@@ -16,13 +17,13 @@ as $$
   live_orders as (
     select
       coalesce(
-        nullif(o.tracking_code, ''),
-        nullif(o.tracking_number, ''),
+        nullif(o.tracking_code::text, ''),
+        nullif(o.tracking_number::text, ''),
         concat('DN-', left(o.id::text, 8))
       ) as raw_tracking,
       coalesce(nullif(o.status::text, ''), 'Pending') as status,
-      coalesce(nullif(o.sender_city, ''), 'Abu Dhabi') as sender_city,
-      coalesce(nullif(o.receiver_city, ''), 'Dubai') as receiver_city,
+      coalesce(nullif(o.sender_city::text, ''), 'Abu Dhabi') as sender_city,
+      coalesce(nullif(o.receiver_city::text, ''), 'Dubai') as receiver_city,
       o.created_at,
       o.updated_at
     from public.orders o
