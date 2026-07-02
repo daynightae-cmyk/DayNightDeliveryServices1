@@ -42,8 +42,14 @@ export default function StickyMobileBar() {
 
   return (
     <div
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 flex items-stretch border-t backdrop-blur-xl bg-brand-deep/95 border-white/10`}
+      className="md:hidden fixed left-0 right-0 flex items-stretch border-t backdrop-blur-xl bg-brand-deep/95 border-white/10 shadow-[0_-18px_45px_rgba(0,0,0,0.35)]"
       dir={isArabic ? "rtl" : "ltr"}
+      style={{
+        bottom: 0,
+        height: "calc(58px + env(safe-area-inset-bottom))",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        zIndex: 60,
+      }}
     >
       {actions.map(({ id, label, icon: Icon, to, isLink, className }) =>
         isLink ? (
