@@ -3,10 +3,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  Facebook,
-  Instagram,
-  MessageSquare,
-  Heart,
   ExternalLink,
   ChevronRight,
   ChevronLeft,
@@ -17,15 +13,8 @@ import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
 import companyMeta from "../data/companyMeta";
 import { Link } from "react-router-dom";
+import { getCompanySocialLinks } from "./ui/SocialLinks";
 import "../styles/dn-day-mode.css";
-
-function TikTokIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-    </svg>
-  );
-}
 
 export default function Footer() {
   const { language, theme } = useAppContext();
@@ -63,12 +52,7 @@ export default function Footer() {
     { key: "email", label: companyMeta.email, path: `mailto:${companyMeta.email}`, isRoute: false },
   ];
 
-  const socialLinks = [
-    { key: "facebook", icon: Facebook, href: companyMeta.socials.facebook, label: "Facebook" },
-    { key: "instagram", icon: Instagram, href: companyMeta.socials.instagram, label: "Instagram" },
-    { key: "tiktok", icon: TikTokIcon, href: companyMeta.socials.tiktok, label: "TikTok" },
-  ];
-
+  const socialLinks = getCompanySocialLinks(isArabic);
   const Arrow = isArabic ? ChevronLeft : ChevronRight;
 
   const linkClass = `group flex items-center gap-2 text-sm transition-colors duration-200 ${
@@ -111,8 +95,36 @@ export default function Footer() {
               <a href={`mailto:${companyMeta.email}`} className={linkClass}><Mail className="w-4 h-4 text-brand-gold" />{companyMeta.email}</a>
               <p className={linkClass}><MapPin className="w-4 h-4 text-brand-gold" />{companyMeta.address}</p>
             </div>
-            <div className="flex gap-2 mt-5 justify-center md:justify-start">
-              {socialLinks.map(({ key, icon: Icon, href, label }) => <a key={key} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className="w-9 h-9 rounded-xl border border-brand-gold/25 bg-brand-gold/10 text-brand-gold flex items-center justify-center hover:bg-brand-gold hover:text-brand-deep transition-all"><Icon className="w-4 h-4" /></a>)}
+
+            <div className="mt-6">
+              <h4 className={`mb-3 text-xs font-black uppercase tracking-[0.22em] ${isLight ? "text-brand-deep/70" : "text-white/55"}`}>{isArabic ? "تابعنا" : "Follow us"}</h4>
+              <div className="grid grid-cols-2 gap-2.5">
+                {socialLinks.map(({ key, Icon, href, label, handle, color }) => (
+                  <a
+                    key={key}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${label} ${handle}`}
+                    className={`group rounded-2xl border p-3 transition-all duration-300 hover:-translate-y-0.5 ${
+                      isLight
+                        ? "border-brand-deep/10 bg-white/65 hover:border-brand-gold/45 hover:bg-white"
+                        : "border-white/10 bg-white/[0.045] hover:border-brand-gold/45 hover:bg-white/[0.075]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-brand-deep/80 shadow-[0_0_22px_rgba(245,183,0,0.12)]" style={{ color }}>
+                        <Icon className="h-4.5 w-4.5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className={`block text-xs font-black ${isLight ? "text-brand-deep" : "text-white"}`}>{label}</span>
+                        <span className={`block truncate text-[10px] ${isLight ? "text-brand-deep/45" : "text-white/35"}`}>{handle}</span>
+                      </span>
+                      <ExternalLink className="ms-auto h-3.5 w-3.5 text-brand-gold/70 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </div>
