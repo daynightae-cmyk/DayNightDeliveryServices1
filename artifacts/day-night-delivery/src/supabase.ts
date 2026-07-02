@@ -466,3 +466,5 @@ export async function fetchOrderStatusHistory(orderId: string): Promise<OrderSta
 export async function insertNewOrder(orderData: Record<string, unknown>): Promise<string | null> {
   return createPublicOrder(orderData);
 }
+
+export { isAdminUser, updateExistingOrderStatus } from "./supabaseAdminOps";
