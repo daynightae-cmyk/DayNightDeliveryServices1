@@ -1,3 +1,5 @@
+import type { SyntheticEvent } from "react";
+
 export const localAssets = {
   logo: "/assets/daynight/logo.png",
   hero: "/assets/daynight/hero-uae-delivery.png",
@@ -9,7 +11,7 @@ export const localAssets = {
   },
 } as const;
 
-export function withRemoteFallback(event: React.SyntheticEvent<HTMLImageElement>, remoteUrl: string) {
+export function withRemoteFallback(event: SyntheticEvent<HTMLImageElement>, remoteUrl: string) {
   const image = event.currentTarget;
   if (image.dataset.fallbackApplied === "true") return;
   image.dataset.fallbackApplied = "true";
