@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Activity, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, MapPin, RefreshCw, Radar, Truck } from "lucide-react";
 import { fetchPublicLiveOperationsMap } from "../../supabase";
 
 const MAP_IMAGE_URL = "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png";
@@ -11,18 +11,78 @@ type MapRow = {
   receiver_city?: string | null;
 };
 
+type CityPoint = { ar: string; en: string; x: number; y: number };
+type RouteItem = { id: string; code: string; status: string; fromName: string; toName: string; from: CityPoint; to: CityPoint; selected: boolean; point: { x: number; y: number } };
+
+const CITIES: Record<string, CityPoint> = {
+  abudhabi: { ar: "أبوظبي", en: "Abu Dhabi", x: 46, y: 66 },
+  dubai: { ar: "دبي", en: "Dubai", x: 64, y: 43 },
+  sharjah: { ar: "الشارقة", en: "Sharjah", x: 69, y: 31 },
+  ajman: { ar: "عجمان", en: "Ajman", x: 66, y: 26 },
+  rak: { ar: "رأس الخيمة", en: "Ras Al Khaimah", x: 75, y: 13 },
+  fujairah: { ar: "الفجيرة", en: "Fujairah", x: 88, y: 35 },
+  alain: { ar: "العين", en: "Al Ain", x: 78, y: 79 },
+  western: { ar: "المنطقة الغربية", en: "Western Region", x: 19, y: 72 },
+};
+
 const demoRows: MapRow[] = [
   { tracking_ref: "DN-LIVE-001", status: "Out for Delivery", sender_city: "Abu Dhabi", receiver_city: "Dubai" },
   { tracking_ref: "DN-LIVE-002", status: "In Transit", sender_city: "Abu Dhabi", receiver_city: "Sharjah" },
   { tracking_ref: "DN-LIVE-003", status: "Picked Up", sender_city: "Dubai", receiver_city: "Al Ain" },
+  { tracking_ref: "DN-LIVE-004", status: "Assigned", sender_city: "Abu Dhabi", receiver_city: "Ras Al Khaimah" },
 ];
+
+function resolveCity(name?: string | null): CityPoint {
+  const value = String(name || "").toLowerCase();
+  if (value.includes("dubai") || value.includes("دبي")) return CITIES.dubai;
+  if (value.includes("sharjah") || value.includes("الشارقة")) return CITIES.sharjah;
+  if (value.includes("ajman") || value.includes("عجمان")) return CITIES.ajman;
+  if (value.includes("khaimah") || value.includes("الخيمة")) return CITIES.rak;
+  if (value.includes("fujairah") || value.includes("الفجيرة")) return CITIES.fujairah;
+  if (value.includes("ain") || value.includes("العين")) return CITIES.alain;
+  if (value.includes("western") || value.includes("الغربية") || value.includes("dhafra") || value.includes("الظفرة")) return CITIES.western;
+  return CITIES.abudhabi;
+}
+
+function routePath(from: CityPoint, to: CityPoint) {
+  const cx = (from.x + to.x) / 2;
+  const cy = Math.min(from.y, to.y) - 15;
+  return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`;
+}
+
+function routePoint(from: CityPoint, to: CityPoint, t: number) {
+  const cx = (from.x + to.x) / 2;
+  const cy = Math.min(from.y, to.y) - 15;
+  return {
+    x: (1 - t) ** 2 * from.x + 2 * (1 - t) * t * cx + t ** 2 * to.x,
+    y: (1 - t) ** 2 * from.y + 2 * (1 - t) * t * cy + t ** 2 * to.y,
+  };
+}
+
+function progressFromStatus(status?: string | null) {
+  const value = String(status || "").toLowerCase();
+  if (value.includes("deliver")) return 0.82;
+  if (value.includes("transit") || value.includes("route")) return 0.58;
+  if (value.includes("pickup") || value.includes("picked")) return 0.34;
+  if (value.includes("assign")) return 0.18;
+  return 0.24;
+}
+
+const glass = {
+  border: "1px solid rgba(255,255,255,.13)",
+  background: "linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.045))",
+  backdropFilter: "blur(22px)",
+  boxShadow: "0 24px 72px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.12)",
+};
 
 export default function UAEInteractiveMap() {
   const [rows, setRows] = useState<MapRow[]>(demoRows);
   const [activeCount, setActiveCount] = useState(demoRows.length);
-  const [signalCount, setSignalCount] = useState<number | string>("—");
+  const [signalCount, setSignalCount] = useState<number | string>(0);
   const [mode, setMode] = useState("عرض تشغيلي");
+  const [selected, setSelected] = useState("DN-LIVE-001-0");
   const [updatedAt, setUpdatedAt] = useState(() => new Date());
+  const [now, setNow] = useState(Date.now());
   const [imageOk, setImageOk] = useState(true);
 
   async function refreshMap() {
@@ -33,32 +93,63 @@ export default function UAEInteractiveMap() {
       setMode("RPC غير مفعل");
       setRows(demoRows);
       setActiveCount(demoRows.length);
-      setSignalCount("—");
+      setSignalCount(0);
       return;
     }
 
     const safeRows = Array.isArray(payload.orders) ? payload.orders : [];
-    setRows(safeRows.length ? safeRows : demoRows);
+    const nextRows = safeRows.length ? safeRows : demoRows;
+    setRows(nextRows);
     setActiveCount(Number(payload.active_orders_count ?? safeRows.length) || 0);
-    setSignalCount(Number(payload.driver_count ?? 0) || "—");
+    setSignalCount(Number(payload.driver_count ?? 0));
     setMode(safeRows.length ? "تشغيل مباشر آمن" : "لا توجد طلبات نشطة");
+    if (nextRows[0]) setSelected(`${nextRows[0].tracking_ref || "DN-1"}-0`);
   }
 
   useEffect(() => {
     void refreshMap();
+    const pulse = window.setInterval(() => setNow(Date.now()), 1000);
     const timer = window.setInterval(() => void refreshMap(), 30000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(pulse);
+      window.clearInterval(timer);
+    };
   }, []);
 
+  const routes = useMemo<RouteItem[]>(() => rows.slice(0, 10).map((row, index) => {
+    const code = String(row.tracking_ref || `DN-${index + 1}`);
+    const id = `${code}-${index}`;
+    const fromName = String(row.sender_city || "Abu Dhabi");
+    const toName = String(row.receiver_city || "Dubai");
+    const from = resolveCity(fromName);
+    const to = resolveCity(toName);
+    const movement = ((now / 1000 + index * 8) % 100) / 100;
+    const progress = Math.min(0.96, Math.max(0.04, progressFromStatus(row.status) * 0.64 + movement * 0.36));
+    return { id, code, status: String(row.status || "Pending"), fromName, toName, from, to, selected: id === selected, point: routePoint(from, to, progress) };
+  }), [rows, now, selected]);
+
+  const cityLoad = useMemo(() => {
+    const output = new Map<string, number>();
+    if (mode !== "تشغيل مباشر آمن") return output;
+    rows.forEach((row) => {
+      const label = resolveCity(row.receiver_city).ar;
+      output.set(label, (output.get(label) || 0) + 1);
+    });
+    return output;
+  }, [rows, mode]);
+
+  const active = routes.find((route) => route.selected) || routes[0];
   const timeLabel = updatedAt.toLocaleTimeString("ar-AE", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <section className="relative w-full overflow-hidden px-4 py-16 text-white sm:px-8 lg:px-12" dir="rtl" style={{ background: "linear-gradient(135deg,#030a18,#071a33 48%,#01050f)" }}>
+      <style>{`@keyframes dnRouteDash{to{stroke-dashoffset:-44}}@keyframes dnTruckFloat{50%{transform:translate(-50%,-62%) scale(1.08)}}`}</style>
+
       <div className="mx-auto mb-7 flex w-[min(1180px,100%)] flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <span className="mb-3 inline-flex rounded-full border border-[#f5b700]/25 bg-[#f5b700]/10 px-4 py-1.5 text-xs font-black tracking-[0.14em] text-[#f5b700]">DAY NIGHT SECURE LIVE OPS</span>
           <h2 className="m-0 text-[clamp(30px,4vw,54px)] font-black leading-[1.08]">خريطة تشغيل حية وآمنة</h2>
-          <p className="mt-4 max-w-[760px] text-sm font-bold leading-8 text-white/70">بيانات عامة محدودة من RPC آمن، مع تحديث تلقائي كل 30 ثانية.</p>
+          <p className="mt-4 max-w-[760px] text-sm font-bold leading-8 text-white/70">بيانات عامة محدودة من RPC آمن، مع مسارات متحركة وتحديث تلقائي كل 30 ثانية.</p>
         </div>
         <button onClick={() => void refreshMap()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-[#f5b700] backdrop-blur hover:bg-[#f5b700] hover:text-[#071a33]">
           <RefreshCw size={16} /> تحديث الآن
@@ -66,20 +157,46 @@ export default function UAEInteractiveMap() {
       </div>
 
       <div className="mx-auto grid w-[min(1180px,100%)] grid-cols-1 gap-4 rounded-[36px] border border-[#18a8e8]/20 bg-[#061225]/90 p-4 shadow-2xl lg:grid-cols-[1fr_320px]">
-        <div className="relative min-h-[520px] overflow-hidden rounded-[30px] bg-[#030a18]">
+        <div className="relative min-h-[560px] overflow-hidden rounded-[30px] bg-[#030a18]">
           {imageOk ? <img src={MAP_IMAGE_URL} alt="DAY NIGHT UAE live map" className="absolute inset-0 h-full w-full object-cover brightness-90" onError={() => setImageOk(false)} /> : null}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.28)_65%,rgba(0,0,0,.55)_100%)]" />
-          <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2 max-md:grid-cols-1">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.22)_65%,rgba(0,0,0,.55)_100%)]" />
+
+          <svg className="pointer-events-none absolute inset-0 z-[5] h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {routes.map((route) => (
+              <path key={route.id} d={routePath(route.from, route.to)} fill="none" stroke={route.selected ? "rgba(245,183,0,.95)" : "rgba(24,168,232,.58)"} strokeWidth={route.selected ? 0.72 : 0.38} strokeLinecap="round" strokeDasharray="2 2.7" style={{ animation: "dnRouteDash 2.4s linear infinite", filter: route.selected ? "drop-shadow(0 0 8px rgba(245,183,0,.8))" : "drop-shadow(0 0 5px rgba(24,168,232,.55))" }} />
+            ))}
+          </svg>
+
+          {Object.values(CITIES).map((city) => (
+            <button key={city.ar} className="absolute z-[8] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#f5b700]/45 bg-[#071a33]/75 p-2 text-[#f5b700] shadow-[0_0_22px_rgba(245,183,0,.28)] backdrop-blur" style={{ left: `${city.x}%`, top: `${city.y}%` }} title={city.ar}>
+              <MapPin size={15} />
+              <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#f5b700] px-1 text-[10px] font-black text-[#071a33]">{cityLoad.get(city.ar) || 0}</span>
+            </button>
+          ))}
+
+          {routes.map((route) => (
+            <button key={`${route.id}-vehicle`} onClick={() => setSelected(route.id)} className={`absolute z-[9] grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border ${route.selected ? "border-[#f5b700] bg-[#f5b700] text-[#071a33]" : "border-[#18a8e8]/50 bg-[#071a33]/80 text-[#18a8e8]"} shadow-[0_0_24px_rgba(24,168,232,.45)] backdrop-blur`} style={{ left: `${route.point.x}%`, top: `${route.point.y}%`, animation: "dnTruckFloat 2.2s ease-in-out infinite" }} title={route.code}>
+              <Truck size={18} />
+            </button>
+          ))}
+
+          <div className="absolute bottom-4 left-4 right-4 z-[12] grid grid-cols-3 gap-2 max-md:grid-cols-1">
             {[{ label: "طلبات نشطة", value: activeCount }, { label: "مؤشرات تشغيل", value: signalCount }, { label: "آخر تحديث", value: timeLabel }].map((item) => <div key={item.label} className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center backdrop-blur"><strong className="block text-xl font-black" dir="ltr">{item.value}</strong><span className="text-xs font-bold text-white/60">{item.label}</span></div>)}
           </div>
         </div>
 
         <aside className="space-y-3">
           <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-            <div className="mb-3 flex items-center gap-2 text-[#f5b700]"><Activity size={18} /><strong>{mode}</strong></div>
+            <div className="mb-3 flex items-center gap-2 text-[#f5b700]"><Radar size={18} /><strong>{mode}</strong></div>
             <p className="text-xs font-bold leading-6 text-white/60">الموقع لا يقرأ الجداول التشغيلية مباشرة. التغذية تأتي من وظيفة عامة محدودة الحقول.</p>
           </div>
-          {rows.slice(0, 7).map((row, index) => <div key={`${row.tracking_ref || index}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><span className="block text-xs font-black" dir="ltr">{row.tracking_ref || `DN-${index + 1}`}</span><span className="mt-1 block text-[11px] font-bold text-white/50">{row.status || "Pending"} • {row.sender_city || "Abu Dhabi"} ← {row.receiver_city || "Dubai"}</span></div>)}
+          {active && <div className="rounded-[24px] border border-[#f5b700]/25 bg-[#f5b700]/10 p-4 backdrop-blur">
+            <div className="mb-2 flex items-center gap-2 text-[#f5b700]"><Activity size={17} /><strong className="text-sm">المسار المحدد</strong></div>
+            <strong className="block text-xl font-black text-white" dir="ltr">{active.code}</strong>
+            <span className="mt-2 block text-xs font-bold text-white/60" dir="ltr">{active.fromName} → {active.toName}</span>
+            <span className="mt-1 block text-xs font-black text-[#18a8e8]">{active.status}</span>
+          </div>}
+          {routes.slice(0, 7).map((route) => <button key={route.id} onClick={() => setSelected(route.id)} className={`w-full rounded-2xl border p-3 text-right transition ${route.selected ? "border-[#f5b700]/60 bg-[#f5b700]/10" : "border-white/10 bg-white/[0.04] hover:border-[#18a8e8]/45"}`}><span className="block text-xs font-black text-white" dir="ltr">{route.code}</span><span className="mt-1 block text-[11px] font-bold text-white/50" dir="ltr">{route.status} • {route.fromName} → {route.toName}</span></button>)}
         </aside>
       </div>
     </section>
