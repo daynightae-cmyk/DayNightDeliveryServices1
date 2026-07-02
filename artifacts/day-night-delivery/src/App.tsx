@@ -18,6 +18,7 @@ import { Menu, PhoneCall, X } from "lucide-react";
 import { useAppContext } from "./lib/AppContext";
 import { translations } from "./data/translations";
 import companyMeta from "./data/companyMeta";
+import localAssets, { withRemoteFallback } from "./data/localAssets";
 import { trackPageLoad } from "./lib/monitoring";
 import usePageSEO from "./hooks/usePageSEO";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
@@ -51,7 +52,7 @@ const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGaller
 const AdminPanel = lazy(() => import("./components/AdminPanelLuxury"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboardLuxury"));
 
-const LOGO_IMAGE_URL = companyMeta.logoUrl;
+const LOGO_IMAGE_URL = localAssets.logo;
 
 function TrackingRouteWrapper() {
   const [searchParams] = useSearchParams();
@@ -157,7 +158,7 @@ function AppContent() {
         <header className={`backdrop-blur-xl border-b transition-all duration-200 ${isLight ? "bg-white/90 border-[#071A33]/10 shadow-sm" : "bg-[#071A33]/90 border-white/10"}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between gap-4">
             <Link to="/" className="flex items-center gap-2.5 cursor-pointer shrink-0 select-none" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-              <div className="w-11 h-11 rounded-full overflow-hidden border border-brand-gold/40 shadow-sm shrink-0"><img src={LOGO_IMAGE_URL} alt="DAY NIGHT DELIVERY SERVICES" className="w-full h-full object-contain" /></div>
+              <div className="w-11 h-11 rounded-full overflow-hidden border border-brand-gold/40 shadow-sm shrink-0"><img src={LOGO_IMAGE_URL} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT DELIVERY SERVICES" className="w-full h-full object-contain" /></div>
               <div>
                 <h1 className={`text-sm sm:text-base font-extrabold leading-none uppercase tracking-tight ${isLight ? "text-[#071A33]" : "text-white"}`}>DAY NIGHT <span className="text-brand-gold text-[10px] font-semibold">DELIVERY</span></h1>
                 <p className={`text-[10px] font-bold tracking-tight ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}>{t.footer.company}</p>
