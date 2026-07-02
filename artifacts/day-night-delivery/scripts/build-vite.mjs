@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 process.env.BASE_PATH ||= "/";
 process.env.PORT ||= "3000";
 
+await import("./install-local-assets.mjs");
+
 const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const result = spawnSync(
   pnpmBin,
