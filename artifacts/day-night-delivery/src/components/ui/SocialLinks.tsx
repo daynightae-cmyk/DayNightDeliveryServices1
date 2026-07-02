@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ElementType } from "react";
 import { Facebook, Instagram, Linkedin, Youtube } from "lucide-react";
 import companyMeta from "../../data/companyMeta";
 
@@ -38,7 +38,7 @@ export type CompanySocialLink = {
   handle: string;
   href: string;
   color: string;
-  Icon: ComponentType<SocialIconProps>;
+  Icon: ElementType<SocialIconProps>;
 };
 
 export function getCompanySocialLinks(isArabic = false): CompanySocialLink[] {
