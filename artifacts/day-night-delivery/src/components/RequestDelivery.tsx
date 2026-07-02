@@ -6,15 +6,14 @@
 import { useState } from "react";
 import { Order } from "../types";
 import { createPublicOrder } from "../supabase";
-import { calculateDomesticPrice } from "../lib/pricing";
 import { canSubmitDeliveryRequest } from "../lib/security";
 import { reportError, trackApiCall } from "../lib/monitoring";
 import QRGenerator from "./QRGenerator";
 import Invoice from "./Invoice";
 import ShippingLabel from "./ShippingLabel";
-import { 
-  CheckCircle, 
-  ChevronRight, 
+import {
+  CheckCircle,
+  ChevronRight,
   Copy,
   FileText,
   MessageSquare
@@ -28,6 +27,11 @@ import TurnstileCaptcha from "./security/TurnstileCaptcha";
 interface RequestDeliveryProps {
   onNavigate: (tab: string, trackingId?: string) => void;
 }
+
+const LOCAL_DELIVERY_PRICE = 30;
+const LOCAL_PACKAGE_WEIGHT = 1;
+const LOCAL_PACKAGE_PIECES = 1;
+const LOCAL_SERVICE_TYPE = "standard" as const;
 
 export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const { language } = useAppContext();
@@ -47,12 +51,9 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       senderRequired: "يرجى إكمال بيانات المرسل الأساسية قبل إرسال الطلب.",
       receiverRequired: "يرجى إكمال بيانات المستلم الأساسية قبل إرسال الطلب.",
       invalidPhone: "يرجى إدخال رقم هاتف إماراتي صحيح مثل +971 56 875 7331.",
-      basicSelections: "يرجى اختيار نوع الطرد والخدمة وطريقة الدفع.",
-      invalidWeight: "يرجى إدخال وزن صحيح أكبر من صفر.",
-      invalidPieces: "يرجى إدخال عدد قطع صحيح.",
+      basicSelections: "يرجى كتابة محتوى الشحنة واختيار طريقة الدفع.",
       invalidPrice: "تعذر احتساب سعر التوصيل. يرجى مراجعة البيانات والمحاولة مجدداً.",
       invalidCod: "يرجى إدخال مبلغ تحصيل COD صحيح.",
-      notesRequired: "يرجى إضافة ملاحظات الطلب قبل الإرسال.",
       captchaRequired: "يرجى تأكيد التحقق الأمني قبل إرسال الطلب.",
       orderCreateFailed: "تعذر إنشاء الطلب حالياً. يرجى المحاولة أو التواصل عبر واتساب.",
       senderStepRequired: "يرجى ملء كافة تفاصيل المرسل الإلزامية للمتابعة",
@@ -62,12 +63,9 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       senderRequired: "Please complete sender details before submitting the request.",
       receiverRequired: "Please complete receiver details before submitting the request.",
       invalidPhone: "Please enter a valid UAE phone number, for example +971 56 875 7331.",
-      basicSelections: "Please choose package type, service type, and payment method.",
-      invalidWeight: "Please enter a valid weight greater than zero.",
-      invalidPieces: "Please enter a valid pieces count.",
+      basicSelections: "Please describe the shipment content and choose the payment method.",
       invalidPrice: "Unable to calculate delivery price. Please review the data and try again.",
       invalidCod: "Please enter a valid COD amount.",
-      notesRequired: "Please add order notes before submission.",
       captchaRequired: "Please complete the security verification before submitting the request.",
       orderCreateFailed: "Unable to create order right now. Please retry or contact WhatsApp support.",
       senderStepRequired: "Please complete all required sender details to continue.",
@@ -86,28 +84,32 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
   const [receiverCity, setReceiverCity] = useState("دبي");
   const [receiverAddress, setReceiverAddress] = useState("");
 
-  const [packageType, setPackageType] = useState("Documents");
-  const [weight, setWeight] = useState(1);
-  const [pieces, setPieces] = useState(1);
-  const [serviceType, setServiceType] = useState<"standard" | "express">("standard");
+  const [packageType, setPackageType] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Order["payment_method"]>("sender_pays");
   const [codAmount, setCodAmount] = useState("");
   const [notes, setNotes] = useState("");
 
   const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان"];
-  
-  // Al Ain Suburbs or Western Region count as remote areas
   const expensiveCitiesAr = ["العين (Al Ain)", "المنطقة الغربية (Western Region)", "السلع", "الرويس", "غياثي", "ليوا"];
-  
-  const deliveryPricing = calculateDomesticPrice({
-    pickupCity: senderCity,
-    deliveryCity: receiverCity,
-    weight,
-    pieces,
-    serviceType
-  });
+  const allCities = [...mainCities, ...expensiveCitiesAr];
+
+  const deliveryPricing = {
+    subtotal: LOCAL_DELIVERY_PRICE,
+    total: LOCAL_DELIVERY_PRICE,
+    currency: "AED",
+    pricingCategory: "UAE Local Delivery",
+    billableWeight: LOCAL_PACKAGE_WEIGHT,
+    requiresCustomQuote: false,
+    breakdown: [
+      language === "ar"
+        ? "توصيل محلي داخل الإمارات: 30.00 AED"
+        : "UAE local delivery: 30.00 AED"
+    ],
+    notes: language === "ar"
+      ? "السعر المحلي ثابت ولا يعتمد على الوزن أو عدد القطع."
+      : "Local delivery fee is fixed and does not depend on weight or pieces."
+  };
   const deliveryPrice = deliveryPricing.total;
-  const isLargeShipment = deliveryPricing.requiresCustomQuote;
 
   function isValidUaePhone(phone: string) {
     const compact = phone.replace(/[^\d+]/g, "");
@@ -128,16 +130,8 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       return tr.invalidPhone;
     }
 
-    if (!packageType || !serviceType || !paymentMethod) {
+    if (!packageType.trim() || !paymentMethod) {
       return tr.basicSelections;
-    }
-
-    if (!Number.isFinite(Number(weight)) || Number(weight) <= 0) {
-      return tr.invalidWeight;
-    }
-
-    if (!Number.isFinite(Number(pieces)) || Number(pieces) < 1) {
-      return tr.invalidPieces;
     }
 
     if (!Number.isFinite(deliveryPrice) || deliveryPrice <= 0) {
@@ -152,7 +146,7 @@ export default function RequestDelivery({ onNavigate }: RequestDeliveryProps) {
       return tr.captchaRequired;
     }
 
-return "";
+    return "";
   }
 
   async function handleFormSubmit() {
@@ -176,12 +170,13 @@ return "";
     const now = new Date().toISOString();
     const statusHistory = [
       {
-        status: "Pending",
+        status: "pending",
         date: new Date().toLocaleString(),
-        note: "تم استلام الطلب الكترونياً وجاري المراجعة والتأكيد من فريق داي نايت"
+        note: "تم استلام الطلب إلكترونياً وجاري المراجعة والتأكيد من فريق داي نايت"
       }
     ];
 
+    const shipmentDescription = packageType.trim();
     const newOrder = {
       sender_name: senderName.trim(),
       sender_phone: senderPhone.trim(),
@@ -191,10 +186,11 @@ return "";
       receiver_phone: receiverPhone.trim(),
       receiver_city: receiverCity,
       receiver_address: receiverAddress.trim(),
-      package_type: packageType,
-      weight: Number(weight) || 1,
-      pieces: Number(pieces) || 1,
-      service_type: serviceType,
+      package_type: shipmentDescription,
+      package_description: shipmentDescription,
+      weight: LOCAL_PACKAGE_WEIGHT,
+      pieces: LOCAL_PACKAGE_PIECES,
+      service_type: LOCAL_SERVICE_TYPE,
       delivery_price: deliveryPrice,
       subtotal: deliveryPricing.subtotal,
       base_price: deliveryPricing.subtotal,
@@ -208,7 +204,7 @@ return "";
       payment_method: paymentMethod,
       cod_amount: paymentMethod === "cod" ? Number(codAmount) : null,
       notes: notes.trim(),
-      status: "Pending",
+      status: "pending",
       created_at: now,
       status_history: statusHistory
     };
@@ -236,7 +232,6 @@ return "";
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
-      {/* Visual Stepper */}
       <div className="flex items-center justify-between border-b border-white/10 pb-5 max-w-xl mx-auto text-sm font-sans font-bold">
         <div className={`flex items-center gap-2 ${step >= 1 ? "text-brand-gold" : "text-white/40"}`}>
           <span className="w-7 h-7 rounded-full bg-brand-deep border border-white/10 text-white font-mono flex items-center justify-center text-xs">1</span>
@@ -250,7 +245,7 @@ return "";
         <ChevronRight className="w-4 h-4 text-white/20" />
         <div className={`flex items-center gap-2 ${step >= 3 ? "text-brand-gold" : "text-white/40"}`}>
           <span className="w-7 h-7 rounded-full bg-brand-deep border border-white/10 text-white font-mono flex items-center justify-center text-xs">3</span>
-          <span>بيانات الطرد والدفع</span>
+          <span>بيانات الشحنة والدفع</span>
         </div>
       </div>
 
@@ -263,8 +258,8 @@ return "";
       <div className="bg-brand-cool/30 rounded-3xl p-6 sm:p-8 border border-white/10 shadow-lg">
         {step === 1 && (
           <div className="space-y-6 text-right">
-            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 1: تفاصيل جهة الاستلام (المرسل)</h3>
-            
+            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 1: بيانات المرسل وجهة الاستلام</h3>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-white/80 text-xs font-bold font-sans">اسم المرسل / المتجر *</label>
@@ -279,7 +274,7 @@ return "";
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-white/80 text-xs font-bold font-sans">رقم هاتف المرسل للاستلام المباشر *</label>
+                <label className="text-white/80 text-xs font-bold font-sans">رقم هاتف المرسل *</label>
                 <input
                   id="sender_phone_input"
                   type="text"
@@ -294,24 +289,21 @@ return "";
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-white/80 text-xs font-bold font-sans">مدينة الاستلام *</label>
+                <label className="text-white/80 text-xs font-bold font-sans">مدينة المرسل / مدينة الاستلام *</label>
                 <select
                   id="sender_city_select"
                   value={senderCity}
-                  onChange={(e) => setSenderCity(e.target.value)}
+                  onChange={(e) => { setSenderCity(e.target.value); setValidationError(""); }}
                   className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all"
                 >
-                  {mainCities.map((c, i) => (
-                    <option key={i} value={c} className="bg-brand-deep text-white">{c}</option>
-                  ))}
-                  {expensiveCitiesAr.map((c, i) => (
+                  {allCities.map((c, i) => (
                     <option key={i} value={c} className="bg-brand-deep text-white">{c}</option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="space-y-1.5">
-                <label className="text-white/80 text-xs font-bold font-sans">العنوان التفصيلي / الحي ومقر المستودع *</label>
+                <label className="text-white/80 text-xs font-bold font-sans">عنوان المرسل التفصيلي / الحي والمبنى *</label>
                 <input
                   id="sender_add_input"
                   type="text"
@@ -328,7 +320,7 @@ return "";
               <button
                 id="req_step_next_1"
                 onClick={() => {
-                  if (!senderName || !senderPhone || !senderAddress) {
+                  if (!senderName || !senderPhone || !senderCity || !senderAddress) {
                     setValidationError(tr.senderStepRequired);
                     return;
                   }
@@ -346,7 +338,7 @@ return "";
 
         {step === 2 && (
           <div className="space-y-6 text-right">
-            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 2: تفاصيل واجهة التسليم والزبون (المستلم)</h3>
+            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 2: بيانات المستلم وجهة التسليم</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -384,10 +376,7 @@ return "";
                   onChange={(e) => { setReceiverCity(e.target.value); setValidationError(""); }}
                   className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all"
                 >
-                  {mainCities.map((c, i) => (
-                    <option key={i} value={c} className="bg-brand-deep text-white">{c}</option>
-                  ))}
-                  {expensiveCitiesAr.map((c, i) => (
+                  {allCities.map((c, i) => (
                     <option key={i} value={c} className="bg-brand-deep text-white">{c}</option>
                   ))}
                 </select>
@@ -418,7 +407,7 @@ return "";
               <button
                 id="req_step_next_2"
                 onClick={() => {
-                  if (!receiverName || !receiverPhone || !receiverAddress) {
+                  if (!receiverName || !receiverPhone || !receiverCity || !receiverAddress) {
                     setValidationError(tr.receiverStepRequired);
                     return;
                   }
@@ -427,7 +416,7 @@ return "";
                 }}
                 className="px-8 py-3.5 bg-brand-gold hover:bg-brand-blue hover:text-white text-brand-deep font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <span>المتابعة لبيانات الطرد والدفع</span>
+                <span>المتابعة لبيانات الشحنة والدفع</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -436,75 +425,31 @@ return "";
 
         {step === 3 && (
           <div className="space-y-6 text-right">
-            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 3: تفاصيل السلعة والدفع والتكلفة</h3>
+            <h3 className="text-xl font-bold text-white border-r-4 border-brand-gold pr-3">مرحلة 3: تفاصيل الشحنة والدفع والتكلفة</h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
-                <label className="text-white/80 text-xs font-bold font-sans">نوع محتوى الشحنة *</label>
-                <select
-                  id="package_type_select"
+                <label className="text-white/80 text-xs font-bold font-sans">اكتب محتوى الشحنة كما هو *</label>
+                <input
+                  id="package_type_input"
+                  type="text"
+                  required
                   value={packageType}
-                  onChange={(e) => setPackageType(e.target.value)}
-                  className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all"
-                >
-                  <option value="Documents" className="bg-brand-deep text-white">مستندات وأوراق (Documents)</option>
-                  <option value="Perfumes" className="bg-brand-deep text-white">عطور ومستحضرات تجميل (Perfumes)</option>
-                  <option value="Clothes" className="bg-brand-deep text-white">ملابس ومنسوجات (Clothes)</option>
-                  <option value="Electronics" className="bg-brand-deep text-white">أجهزة إلكترونية (Electronics)</option>
-                  <option value="Foods" className="bg-brand-deep text-white">مواد غذائية أو طعام (Foods)</option>
-                  <option value="Gifts" className="bg-brand-deep text-white">هدايا وباقات ورود (Gifts)</option>
-                </select>
+                  onChange={(e) => { setPackageType(e.target.value); setValidationError(""); }}
+                  placeholder="مثال: مستندات عقد، عطر، ملابس، هدية، قطع غيار، منتج متجر إلكتروني..."
+                  className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all placeholder:text-white/25"
+                />
+                <p className="text-[11px] text-white/45 font-bold leading-6">
+                  {language === "ar"
+                    ? "هذه الخانة مفتوحة للعميل بالكامل، لا يوجد اختيار إجباري لنوع محدد."
+                    : "This field is fully open for the customer, with no forced category selection."}
+                </p>
               </div>
+            </div>
 
-              <div className="space-y-1.5 align-top">
-                <label className="text-white/80 text-xs font-bold font-sans">الخدمة المطلوبة</label>
-                <div className="flex bg-brand-deep p-1 rounded-xl border border-white/10">
-                  <button
-                    id="service_type_std"
-                    type="button"
-                    onClick={() => setServiceType("standard")}
-                    className={`flex-1 py-2 text-xs font-extrabold rounded-lg transition-colors cursor-pointer ${serviceType === "standard" ? "bg-brand-gold text-brand-deep" : "text-white/40 hover:text-white"}`}
-                  >
-                    عادي Standard
-                  </button>
-                  <button
-                    id="service_type_exp"
-                    type="button"
-                    onClick={() => setServiceType("express")}
-                    className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-colors cursor-pointer ${serviceType === "express" ? "bg-brand-gold text-brand-deep" : "text-white/40 hover:text-white"}`}
-                  >
-                    سريع Express
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <label className="text-white/80 text-xs font-bold font-sans">القطع *</label>
-                  <input
-                    id="pieces_input"
-                    type="number"
-                    min="1"
-                    required
-                    value={pieces}
-                    onChange={(e) => setPieces(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all text-center font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-white/80 text-xs font-bold font-sans">الوزن (كجم) *</label>
-                  <input
-                    id="weight_input"
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    required
-                    value={weight}
-                    onChange={(e) => setWeight(Math.max(0.1, Number(e.target.value)))}
-                    className="w-full bg-brand-deep/80 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-gold focus:bg-brand-deep/95 transition-all text-center font-mono"
-                  />
-                </div>
-              </div>
+            <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-right">
+              <p className="text-brand-gold text-sm font-black">توصيل محلي داخل الإمارات — 30 درهم ثابت</p>
+              <p className="mt-1 text-white/55 text-xs font-bold leading-6">لا يتم احتساب أي زيادة حسب عدد القطع أو الوزن في نموذج التوصيل المحلي. تفاصيل الوزن والقطع تخص الشحن الدولي فقط.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -562,7 +507,6 @@ return "";
               />
             )}
 
-            {/* Price Breakdown Box */}
             <div className="bg-brand-deep/85 rounded-2xl p-4 border border-brand-gold/20 space-y-3" dir="rtl">
               <p className="text-white/60 text-xs font-bold font-sans">بيان رسوم التوصيل</p>
               <div className="space-y-1.5">
@@ -573,11 +517,6 @@ return "";
                   </div>
                 ))}
               </div>
-              {isLargeShipment && (
-                <p className="text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
-                  ⚠️ الشحنة كبيرة (20+ قطعة أو 50+ كجم) — سيتواصل معك الفريق لتأكيد الاستلام.
-                </p>
-              )}
               {paymentMethod === "cod" && codAmount && (
                 <div className="flex items-center justify-between text-xs pt-2 border-t border-white/10">
                   <span className="text-emerald-400 font-bold font-sans">مبلغ التحصيل COD (منفصل)</span>
@@ -616,21 +555,20 @@ return "";
         {step === 4 && (
           <div className="text-center p-8 space-y-6">
             <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto animate-bounce" />
-            
+
             <div className="space-y-2">
               <h3 className="text-2xl font-extrabold text-white">{t.requestDelivery.requestSuccess}</h3>
               <p className="text-white/40 text-sm">{t.requestDelivery.databaseSaved}</p>
             </div>
 
-            {/* Notification toggle widget */}
             <div className="max-w-sm mx-auto bg-brand-cool/50 rounded-xl p-4 border border-white/5 mt-4">
-               <label className={`flex items-center gap-3 cursor-pointer ${language === 'ar' ? 'text-right flex-row' : 'text-left flex-row-reverse'}`}>
+               <label className={`flex items-center gap-3 cursor-pointer ${language === "ar" ? "text-right flex-row" : "text-left flex-row-reverse"}`}>
                  <span className="text-white/80 text-xs font-bold leading-relaxed">{t.notifications.label}</span>
-                 <input 
-                   type="checkbox" 
-                   className="w-4 h-4 rounded text-brand-gold bg-brand-deep border-white/20 shrink-0" 
+                 <input
+                   type="checkbox"
+                   className="w-4 h-4 rounded text-brand-gold bg-brand-deep border-white/20 shrink-0"
                    onChange={(e) => {
-                     if (e.target.checked && 'Notification' in window) {
+                     if (e.target.checked && "Notification" in window) {
                        Notification.requestPermission();
                      }
                    }}
@@ -642,7 +580,7 @@ return "";
               <p className="text-white/40 text-xs font-bold uppercase tracking-wider font-sans">{t.requestDelivery.trackingNumberLabel}</p>
               <p className="text-2xl font-extrabold text-brand-gold">{successId}</p>
               <p className="text-emerald-500 text-[11px] font-sans font-bold flex items-center justify-center gap-1">
-                <span>{language === 'ar' ? 'حالة الشحنة الحالية (Pending)' : 'Current Status (Pending)'}</span>
+                <span>{language === "ar" ? "حالة الشحنة الحالية (Pending)" : "Current Status (Pending)"}</span>
               </p>
             </div>
 
@@ -682,10 +620,14 @@ return "";
                   trackingCode: successId,
                   senderName, senderPhone, senderCity, senderAddress,
                   receiverName, receiverPhone, receiverCity, receiverAddress,
-                  packageType, pieces, weight, serviceType,
+                  packageType,
+                  pieces: LOCAL_PACKAGE_PIECES,
+                  weight: LOCAL_PACKAGE_WEIGHT,
+                  serviceType: LOCAL_SERVICE_TYPE,
                   paymentMethod: paymentMethod || "sender_pays",
-                  codAmount, notes,
-                  deliveryFee: calculateDomesticPrice({ pickupCity: senderCity, deliveryCity: receiverCity, weight, pieces, serviceType }).total,
+                  codAmount,
+                  notes,
+                  deliveryFee: LOCAL_DELIVERY_PRICE,
                 }, "invoice")}
                 className="px-5 py-3 bg-brand-gold/10 border border-brand-gold/25 text-brand-gold font-bold rounded-xl text-xs transition-colors flex items-center gap-2 hover:bg-brand-gold/20"
               >
@@ -699,10 +641,14 @@ return "";
                   trackingCode: successId,
                   senderName, senderPhone, senderCity, senderAddress,
                   receiverName, receiverPhone, receiverCity, receiverAddress,
-                  packageType, pieces, weight, serviceType,
+                  packageType,
+                  pieces: LOCAL_PACKAGE_PIECES,
+                  weight: LOCAL_PACKAGE_WEIGHT,
+                  serviceType: LOCAL_SERVICE_TYPE,
                   paymentMethod: paymentMethod || "sender_pays",
-                  codAmount, notes,
-                  deliveryFee: calculateDomesticPrice({ pickupCity: senderCity, deliveryCity: receiverCity, weight, pieces, serviceType }).total,
+                  codAmount,
+                  notes,
+                  deliveryFee: LOCAL_DELIVERY_PRICE,
                 })}
                 className="px-5 py-3 bg-white/5 border border-white/10 text-white/70 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 hover:border-white/30"
               >
@@ -712,10 +658,10 @@ return "";
             </div>
 
             <p className="text-white/60 text-xs leading-relaxed max-w-md mx-auto">
-              {language === 'ar' ? 'تم إرسال طردك لوكيل التوزيع، وسيصل سائق داي نايت لإجراء الاستلام في وقت قريب. يمكنك استخدام رقم التتبع أعلاه للمراقبة فورياً!' : 'Your package has been sent to the distribution agent. A driver will arrive for pickup soon. Use the tracking number to monitor.'}
+              {language === "ar" ? "تم إرسال طلبك لفريق التشغيل، وسيتم التواصل لتأكيد الاستلام. يمكنك استخدام رقم التتبع أعلاه للمراقبة فورياً." : "Your request has been sent to operations. Use the tracking number above to monitor it."}
             </p>
 
-            <div className={`flex justify-center gap-3 pt-2 ${language === 'ar' ? 'flex-row' : 'flex-row-reverse'}`}>
+            <div className={`flex justify-center gap-3 pt-2 ${language === "ar" ? "flex-row" : "flex-row-reverse"}`}>
               <button
                 id="success_new_btn"
                 onClick={() => {
@@ -729,6 +675,7 @@ return "";
                   setReceiverName("");
                   setReceiverPhone("");
                   setReceiverAddress("");
+                  setPackageType("");
                   setNotes("");
                   setCodAmount("");
                   setCaptchaToken("");
@@ -751,4 +698,3 @@ return "";
     </div>
   );
 }
-
