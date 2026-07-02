@@ -49,7 +49,7 @@ export const companyMeta = {
   },
   socials: {
     facebook: "https://www.facebook.com/profile.php" + "?id=61590600606676",
-    instagram: "https://www.instagram.com/day_night_delivery_services",
+    instagram: "https://www.instagram.com/daynigt.ae",
     threads: "https://www.threads.com/@day_night_delivery_services",
     tiktok: "https://www.tiktok.com/@daynightae",
     youtube: "https://www.youtube.com/@daynightae",
@@ -58,7 +58,7 @@ export const companyMeta = {
   },
   socialHandles: {
     facebook: "DAY NIGHT Express",
-    instagram: "@day_night_delivery_services",
+    instagram: "@daynigt.ae",
     threads: "@day_night_delivery_services",
     tiktok: "@daynightae",
     youtube: "@daynightae",
