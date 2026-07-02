@@ -16,8 +16,10 @@ export default function FloatingWhatsApp() {
   if (HIDDEN_ON.some((r) => location.pathname.startsWith(r))) return null;
 
   return (
-    /* Always pinned to the LEFT side (regardless of RTL/LTR) — SmartChat is on the right */
-    <div className="fixed left-4 bottom-[72px] md:bottom-5 z-50 flex flex-col items-start gap-3">
+    <div
+      className="hidden md:flex fixed flex-col items-start gap-3"
+      style={{ left: 24, bottom: 28, zIndex: 70 }}
+    >
       <AnimatePresence>
         {open && (
           <motion.div
@@ -87,19 +89,18 @@ export default function FloatingWhatsApp() {
         )}
       </AnimatePresence>
 
-      {/* FAB — WhatsApp green */}
       <motion.button
         id="whatsapp_widget_trigger"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(!open)}
         aria-label="WhatsApp"
-        className="relative w-13 h-13 rounded-2xl flex items-center justify-center shadow-2xl"
+        className="relative rounded-2xl flex items-center justify-center shadow-2xl"
         style={{
-          width: 52,
-          height: 52,
+          width: 56,
+          height: 56,
           background: "linear-gradient(135deg, #128C7E 0%, #25D366 100%)",
-          boxShadow: "0 4px 20px rgba(37,211,102,0.45)",
+          boxShadow: "0 14px 34px rgba(37,211,102,0.42)",
         }}
       >
         {!open && (
