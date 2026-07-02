@@ -77,7 +77,6 @@ export default function UAEInteractiveMap() {
   const [selected, setSelected] = useState("DN-LIVE-001-0");
   const [updatedAt, setUpdatedAt] = useState(() => new Date());
   const [now, setNow] = useState(Date.now());
-  const [imageOk, setImageOk] = useState(true);
 
   async function refreshMap() {
     setUpdatedAt(new Date());
@@ -152,7 +151,7 @@ export default function UAEInteractiveMap() {
 
       <div className="mx-auto grid w-[min(1180px,100%)] grid-cols-1 gap-4 rounded-[36px] border border-[#18a8e8]/20 bg-[#061225]/90 p-4 shadow-2xl lg:grid-cols-[1fr_320px]">
         <div className="relative min-h-[560px] overflow-hidden rounded-[30px] bg-[#030a18]">
-          {imageOk ? <img src={MAP_IMAGE_URL} alt="DAY NIGHT UAE live map" className="absolute inset-0 h-full w-full object-cover brightness-90" onError={(event) => { setImageOk(false); withRemoteFallback(event, localAssets.remote.uaeMap); }} /> : null}
+          <img src={MAP_IMAGE_URL} alt="DAY NIGHT UAE live map" className="absolute inset-0 h-full w-full object-cover brightness-90" onError={(event) => withRemoteFallback(event, localAssets.remote.uaeMap)} />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.22)_65%,rgba(0,0,0,.55)_100%)]" />
 
           <svg className="pointer-events-none absolute inset-0 z-[5] h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
