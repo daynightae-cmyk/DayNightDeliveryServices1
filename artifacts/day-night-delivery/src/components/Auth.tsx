@@ -40,7 +40,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   function guardHumanCheck() {
-    if (captchaEnabled && !usableCaptchaToken && !captchaUnavailable) {
+    if (captchaEnabled && !usableCaptchaToken) {
       setErrorMsg(isArabic ? "يرجى إكمال التحقق الأمني أولاً." : "Please complete the security check first.");
       return false;
     }
@@ -69,8 +69,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         const message = String(error.message || "").toLowerCase();
         if (message.includes("captcha")) {
           setErrorMsg(isArabic
-            ? "Cloudflare Turnstile غير مفعل لهذا الدومين داخل Cloudflare أو Supabase. أضف daynightae.com في Hostname Management ثم أعد المحاولة."
-            : "Cloudflare Turnstile is not authorized for this domain in Cloudflare or Supabase. Add daynightae.com in Hostname Management, then retry.");
+            ? "تحقق Cloudflare لم يكتمل أو لم يتم قبول المفتاح السري داخل Supabase. تأكد من Captcha secret ثم أعد المحاولة."
+            : "Cloudflare verification was not completed or the secret was not accepted in Supabase. Check the Captcha secret, then retry.");
         } else {
           setErrorMsg(isArabic ? "بيانات الدخول غير صحيحة أو غير مخولة." : "Invalid or unauthorized credentials.");
         }
@@ -160,8 +160,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             {captchaUnavailable && (
               <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">
                 {isArabic
-                  ? "تنبيه تشغيل: Turnstile لم يعتمد هذا الدومين بعد. يمكنك محاولة الدخول الآن، وإذا رفض Supabase الطلب أضف daynightae.com داخل Cloudflare Hostname Management."
-                  : "Operations notice: Turnstile has not authorized this hostname yet. You may try signing in now; if Supabase rejects it, add daynightae.com in Cloudflare Hostname Management."}
+                  ? "تعذر تشغيل Turnstile لهذا المتصفح. لا يمكن فتح لوحة الإدارة بدون تحقق أمني مكتمل."
+                  : "Turnstile could not run in this browser. Admin access requires a completed security check."}
               </p>
             )}
             <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
