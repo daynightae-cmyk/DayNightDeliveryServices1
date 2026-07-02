@@ -12,9 +12,34 @@ export type ArabicQuotePdfInput = {
   note?: string;
 };
 
+export type ArabicDomesticQuoteData = {
+  pickupCity: string;
+  deliveryCity: string;
+  service: string;
+  weight: number;
+  pieces: number;
+  basePrice: number;
+  expressCharge: number;
+  extraPiecesCharge: number;
+  total: number;
+};
+
+export type ArabicInternationalQuoteData = {
+  destination: string;
+  zone: string;
+  weight: number;
+  firstKgPrice: number;
+  additionalKgPrice: number;
+  total: number;
+};
+
 const W = 794;
 const H = 1123;
 const FONT = "Tajawal, Cairo, Arial, Tahoma, sans-serif";
+
+function arDate() {
+  return new Date().toLocaleDateString("ar-AE", { dateStyle: "long" });
+}
 
 function write(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, align: CanvasTextAlign, dir: CanvasDirection, color: string, font: string) {
   ctx.save();
@@ -82,4 +107,33 @@ export async function exportArabicQuotePdfImage(input: ArabicQuotePdfInput) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   doc.addImage(image, "PNG", 0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), undefined, "FAST");
   doc.save(input.fileName.split("/").join("_"));
+}
+
+export function exportArabicDomesticQuotePdf(data: ArabicDomesticQuoteData) {
+  return exportArabicQuotePdfImage({
+    fileName: `DayNight_عرض_محلي_${data.pickupCity}_to_${data.deliveryCity}.pdf`,
+    title: "عرض سعر التوصيل المحلي",
+    sections: [
+      { title: "بيانات الشحنة", rows: [["مدينة الاستلام", data.pickupCity], ["مدينة التسليم", data.deliveryCity], ["نوع الخدمة", data.service === "express" ? "سريع" : "قياسي"], ["الوزن", `${data.weight} kg`], ["عدد القطع", String(data.pieces)], ["تاريخ العرض", arDate()]] },
+      { title: "تفاصيل السعر", rows: [["رسوم التوصيل الأساسية", `${data.basePrice.toFixed(2)} AED`], ["رسوم الخدمة السريعة", data.expressCharge > 0 ? `+${data.expressCharge.toFixed(2)} AED` : "مشمول"], ["رسوم القطع الإضافية", data.extraPiecesCharge > 0 ? `+${data.extraPiecesCharge.toFixed(2)} AED` : "مشمول"]] },
+    ],
+    totalLabel: "إجمالي رسوم التوصيل",
+    totalValue: `${data.total.toFixed(2)} AED`,
+    note: "هذا عرض سعر تقديري تشغيلي من داي نايت لخدمات التوصيل والشحن.",
+  });
+}
+
+export function exportArabicInternationalQuotePdf(data: ArabicInternationalQuoteData) {
+  const addKg = Math.max(0, data.weight - 1);
+  return exportArabicQuotePdfImage({
+    fileName: `DayNight_عرض_دولي_${data.destination}.pdf`,
+    title: "عرض سعر الشحن الدولي",
+    sections: [
+      { title: "بيانات الشحنة", rows: [["نقطة الانطلاق", "الإمارات - أبوظبي / دبي"], ["الوجهة", data.destination], ["النطاق", data.zone], ["الوزن", `${data.weight} kg`], ["تاريخ العرض", arDate()]] },
+      { title: "تفاصيل السعر", rows: [["سعر أول كيلو", `${data.firstKgPrice.toFixed(2)} AED`], ["سعر الكيلو الإضافي", `${data.additionalKgPrice.toFixed(2)} AED/kg`], ["الوزن الإضافي", `${addKg.toFixed(1)} kg × ${data.additionalKgPrice} = ${(addKg * data.additionalKgPrice).toFixed(2)} AED`]] },
+    ],
+    totalLabel: "إجمالي تكلفة الشحن",
+    totalValue: `${data.total.toFixed(2)} AED`,
+    note: "السعر تقديري وقد يتغير حسب الأبعاد النهائية ومتطلبات الجمارك.",
+  });
 }
