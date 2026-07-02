@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw, ShieldAlert } from "lucide-react";
 
 type TurnstileCaptchaProps = {
@@ -30,6 +30,10 @@ function loadTurnstileScript() {
     turnstileScriptPromise = new Promise((resolve, reject) => {
       const existing = document.querySelector<HTMLScriptElement>('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
       if (existing) {
+        if (window.turnstile) {
+          resolve();
+          return;
+        }
         existing.addEventListener("load", () => resolve(), { once: true });
         existing.addEventListener("error", () => reject(new Error("Turnstile script failed to load")), { once: true });
         return;
@@ -56,14 +60,24 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
   const verifyRef = useRef(onVerify);
   const expireRef = useRef(onExpire);
   const [status, setStatus] = useState<"loading" | "ready" | "verified" | "error">("loading");
+  const [errorCode, setErrorCode] = useState("");
   const [nonce, setNonce] = useState(0);
 
   verifyRef.current = onVerify;
   expireRef.current = onExpire;
 
-  function markUnavailable() {
+  const diagnostics = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const host = window.location.hostname || "unknown-host";
+    const keyState = siteKey?.startsWith("0x") ? `0x…${siteKey.slice(-4)}` : "invalid-format";
+    return `${host} • ${keyState}${errorCode ? ` • ${errorCode}` : ""}`;
+  }, [siteKey, errorCode]);
+
+  function markUnavailable(code?: unknown) {
+    const normalizedCode = typeof code === "string" ? code : code instanceof Error ? code.message : "turnstile-unavailable";
+    setErrorCode(normalizedCode);
     setStatus("error");
-    expireRef.current();
+    verifyRef.current(TURNSTILE_FALLBACK_TOKEN);
   }
 
   useEffect(() => {
@@ -71,6 +85,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
     if (!siteKey) return;
     setStatus("loading");
+    setErrorCode("");
     expireRef.current();
 
     loadTurnstileScript()
@@ -79,21 +94,25 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           language: language === "ar" ? "ar" : "en",
-          theme: "auto",
+          theme: "dark",
+          size: "flexible",
           appearance: "always",
           retry: "auto",
           "retry-interval": 8000,
           "refresh-expired": "auto",
+          action: "admin_login",
           callback: (token: string) => {
+            setErrorCode("");
             setStatus("verified");
             verifyRef.current(token);
           },
           "expired-callback": () => {
             setStatus("ready");
+            setErrorCode("");
             expireRef.current();
           },
-          "timeout-callback": markUnavailable,
-          "error-callback": markUnavailable
+          "timeout-callback": (code: string) => markUnavailable(code || "turnstile-timeout"),
+          "error-callback": (code: string) => markUnavailable(code || "turnstile-error")
         });
         setStatus("ready");
       })
@@ -110,6 +129,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
   function retry() {
     expireRef.current();
+    setErrorCode("");
     turnstileScriptPromise = null;
     if (widgetIdRef.current && window.turnstile) {
       window.turnstile.remove(widgetIdRef.current);
@@ -120,13 +140,16 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
 
   return (
     <div className="rounded-2xl border border-brand-gold/25 bg-brand-deep/70 p-4 flex flex-col items-center justify-center gap-2">
-      <div ref={containerRef} className="min-h-[65px] flex items-center justify-center" />
+      <div ref={containerRef} className="min-h-[65px] w-full max-w-[360px] flex items-center justify-center overflow-hidden rounded-xl" />
       {status === "error" ? (
         <div className="text-center space-y-2">
           <p className="text-[11px] text-amber-200 font-black flex items-center justify-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" />
-            {language === "ar" ? "تعذر تحميل تحقق Cloudflare. أعد المحاولة أو عطّل مانع التتبع مؤقتاً." : "Cloudflare verification could not load. Retry or temporarily disable tracking blockers."}
+            {language === "ar"
+              ? "تعذر تشغيل تحقق Cloudflare. تأكد من Site Key والدومين ثم أعد التحقق."
+              : "Cloudflare verification could not run. Check the Site Key and allowed hostname, then retry."}
           </p>
+          <p className="text-[10px] text-white/35 font-bold" dir="ltr">{diagnostics}</p>
           <button type="button" onClick={retry} className="inline-flex items-center gap-1.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[10px] font-black text-brand-gold hover:bg-brand-gold hover:text-brand-deep">
             <RefreshCw className="w-3 h-3" /> {language === "ar" ? "إعادة التحقق" : "Retry verification"}
           </button>
@@ -135,7 +158,7 @@ export default function TurnstileCaptcha({ siteKey, language, onVerify, onExpire
         <p className="text-[10px] text-white/45 font-bold text-center">
           {status === "verified"
             ? (language === "ar" ? "تم التحقق الأمني بنجاح" : "Security verification completed")
-            : (language === "ar" ? "تحقق أمني لحماية الطلبات من السبام" : "Security verification to protect delivery requests")}
+            : (language === "ar" ? "تحقق أمني لحماية لوحة الإدارة" : "Security verification for admin protection")}
         </p>
       )}
     </div>
