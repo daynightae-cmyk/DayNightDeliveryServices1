@@ -10,6 +10,10 @@ import {
   Globe,
   Search,
   FileText,
+  MapPin,
+  Instagram,
+  Music2,
+  BadgeDollarSign,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../lib/AppContext";
@@ -20,6 +24,13 @@ import {
   buildRequestDeliveryQrUrl,
   buildContactQrUrl,
   buildWebsiteQrUrl,
+  buildQrHubQrUrl,
+  buildPricingQrUrl,
+  buildTrackingPageQrUrl,
+  buildMapsQrUrl,
+  buildInstagramQrUrl,
+  buildTikTokQrUrl,
+  buildVCardData,
   downloadQr,
   downloadQrAsPdf,
   copyToClipboard,
@@ -139,7 +150,7 @@ export default function QR({ onNavigate }: QRProps) {
 
   const handleTrackNow = useCallback(() => {
     if (trimmed) {
-      navigate(`/tracking?code=${encodeURIComponent(trimmed)}`);
+      navigate(`/tracking/${encodeURIComponent(trimmed)}`);
       onNavigate?.("tracking");
     }
   }, [trimmed, navigate, onNavigate]);
@@ -156,15 +167,37 @@ export default function QR({ onNavigate }: QRProps) {
 
   const fixedCards: QrCardDef[] = [
     {
+      id: "qr-hub",
+      icon: QrCode,
+      iconColor: "text-brand-gold",
+      titleEn: "QR Hub",
+      titleAr: "QR مجمع",
+      subtitleEn: "All DAY NIGHT official links in one smart QR page",
+      subtitleAr: "كل روابط داي نايت الرسمية في صفحة QR واحدة",
+      url: buildQrHubQrUrl(),
+      dataUrl: `${companyMeta.website}/qr`,
+    },
+    {
       id: "whatsapp",
       icon: MessageSquare,
       iconColor: "text-[#25D366]",
       titleEn: "WhatsApp Support",
-      titleAr: "واتساب الدعم",
+      titleAr: "واتساب مباشر",
       subtitleEn: "Scan to open WhatsApp chat with our support team",
-      subtitleAr: "امسح للتحدث مع فريق الدعم عبر واتساب",
+      subtitleAr: "امسح للتواصل المباشر عبر واتساب",
       url: buildWhatsappSupportQrUrl(),
-      dataUrl: "https://wa.me/971568757331",
+      dataUrl: companyMeta.whatsappUrl,
+    },
+    {
+      id: "tracking",
+      icon: Search,
+      iconColor: "text-brand-gold",
+      titleEn: "Track Shipment",
+      titleAr: "تتبع الشحنة",
+      subtitleEn: "Scan to open the shipment tracking page",
+      subtitleAr: "امسح لفتح صفحة تتبع الشحنة",
+      url: buildTrackingPageQrUrl(),
+      dataUrl: `${companyMeta.website}/tracking`,
     },
     {
       id: "request",
@@ -175,18 +208,18 @@ export default function QR({ onNavigate }: QRProps) {
       subtitleEn: "Scan to open the delivery request form",
       subtitleAr: "امسح لفتح نموذج طلب التوصيل",
       url: buildRequestDeliveryQrUrl(),
-      dataUrl: "https://daynightae.com/request",
+      dataUrl: `${companyMeta.website}/request`,
     },
     {
-      id: "contact",
-      icon: Phone,
+      id: "pricing",
+      icon: BadgeDollarSign,
       iconColor: "text-brand-gold",
-      titleEn: "Company Contact",
-      titleAr: "بيانات التواصل",
-      subtitleEn: "Scan to save our contact info to your phone",
-      subtitleAr: "امسح لحفظ بياناتنا في هاتفك",
-      url: buildContactQrUrl(),
-      dataUrl: `${companyMeta.website}`,
+      titleEn: "Prices",
+      titleAr: "الأسعار",
+      subtitleEn: "Scan to open UAE and international pricing",
+      subtitleAr: "امسح لفتح أسعار التوصيل والشحن",
+      url: buildPricingQrUrl(),
+      dataUrl: `${companyMeta.website}/pricing`,
     },
     {
       id: "website",
@@ -197,7 +230,51 @@ export default function QR({ onNavigate }: QRProps) {
       subtitleEn: "Scan to open daynightae.com",
       subtitleAr: "امسح لفتح الموقع الرسمي",
       url: buildWebsiteQrUrl(),
-      dataUrl: "https://daynightae.com",
+      dataUrl: companyMeta.website,
+    },
+    {
+      id: "maps",
+      icon: MapPin,
+      iconColor: "text-brand-gold",
+      titleEn: "Google Maps",
+      titleAr: "خرائط Google",
+      subtitleEn: "Scan to open our Abu Dhabi Mussafah location",
+      subtitleAr: "امسح لفتح موقعنا في أبوظبي مصفح",
+      url: buildMapsQrUrl(),
+      dataUrl: companyMeta.mapUrl,
+    },
+    {
+      id: "instagram",
+      icon: Instagram,
+      iconColor: "text-pink-400",
+      titleEn: "Instagram",
+      titleAr: "إنستغرام",
+      subtitleEn: "Scan to follow our updated Instagram profile",
+      subtitleAr: "امسح لمتابعة حساب إنستغرام المحدث",
+      url: buildInstagramQrUrl(),
+      dataUrl: companyMeta.socials.instagram,
+    },
+    {
+      id: "tiktok",
+      icon: Music2,
+      iconColor: "text-white",
+      titleEn: "TikTok",
+      titleAr: "تيك توك",
+      subtitleEn: "Scan to follow DAY NIGHT on TikTok",
+      subtitleAr: "امسح لمتابعة داي نايت على تيك توك",
+      url: buildTikTokQrUrl(),
+      dataUrl: companyMeta.socials.tiktok,
+    },
+    {
+      id: "vcard",
+      icon: Phone,
+      iconColor: "text-brand-gold",
+      titleEn: "Save Contact",
+      titleAr: "vCard الشركة",
+      subtitleEn: "Scan to save DAY NIGHT contact details to your phone",
+      subtitleAr: "امسح لحفظ بيانات الشركة في هاتفك",
+      url: buildContactQrUrl(),
+      dataUrl: buildVCardData(),
     },
   ];
 
@@ -342,7 +419,7 @@ export default function QR({ onNavigate }: QRProps) {
                       : "Download PDF"}
                   </button>
                   <CopyBtn
-                    text={`https://daynightae.com/tracking?code=${trimmed}`}
+                    text={`${companyMeta.website}/tracking/${trimmed}`}
                   />
                 </div>
               </div>
@@ -374,7 +451,7 @@ export default function QR({ onNavigate }: QRProps) {
         </h2>
         <div
           id="qr-cards-grid"
-          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4"
         >
           {fixedCards.map((card) => (
             <QrCardItem key={card.id} card={card} language={language} />
