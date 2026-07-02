@@ -54,6 +54,14 @@ function normalizeStatusNote(note?: string | null) {
   return clean || "Admin status update";
 }
 
+function normalizePhoneForMatching(value?: string | null) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function cleanText(value?: string | null) {
+  return String(value || "").trim();
+}
+
 async function getSignedInCustomerIdentity() {
   if (!supabase) return null;
 
@@ -62,10 +70,16 @@ async function getSignedInCustomerIdentity() {
     const user = data.session?.user;
     if (!user?.id) return null;
 
+    const metadata = user.user_metadata || {};
+    const email = cleanText(user.email || (typeof metadata.email === "string" ? metadata.email : "")).toLowerCase() || null;
+    const rawPhone = cleanText(user.phone || (typeof metadata.phone === "string" ? metadata.phone : "") || (typeof metadata.phone_number === "string" ? metadata.phone_number : ""));
+
     return {
       id: user.id,
-      email: user.email || null,
-      name: String(user.user_metadata?.full_name || user.user_metadata?.name || user.email || "").trim() || null
+      email,
+      phone: rawPhone || null,
+      phoneDigits: normalizePhoneForMatching(rawPhone) || null,
+      name: cleanText(String(metadata.full_name || metadata.name || user.email || "")) || null
     };
   } catch {
     return null;
@@ -80,8 +94,41 @@ async function withSignedInCustomer(payload: Record<string, unknown>) {
     ...payload,
     customer_id: typeof payload.customer_id === "string" && payload.customer_id ? payload.customer_id : customer.id,
     customer_email: typeof payload.customer_email === "string" && payload.customer_email ? payload.customer_email : customer.email,
+    customer_phone: typeof payload.customer_phone === "string" && payload.customer_phone ? payload.customer_phone : customer.phone,
     customer_name: typeof payload.customer_name === "string" && payload.customer_name ? payload.customer_name : customer.name
   };
+}
+
+function dedupeOrders(orders: Order[]) {
+  const seen = new Set<string>();
+  const output: Order[] = [];
+
+  for (const order of orders) {
+    const key = String(order.id || order.tracking_code || order.tracking_number || "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    output.push(order);
+  }
+
+  return output.slice(0, 25);
+}
+
+async function fetchOrdersByColumn(column: string, value?: string | null, limit = 25): Promise<Order[]> {
+  if (!supabase || !value) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq(column, value)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return [];
+    return (data || []) as Order[];
+  } catch {
+    return [];
+  }
 }
 
 export async function calculateDeliveryPrice(payload: {
@@ -260,21 +307,36 @@ export async function fetchCustomerOrders(customerId?: string | null): Promise<O
 
   const customer = await getSignedInCustomerIdentity();
   const activeCustomerId = customerId || customer?.id;
-  if (!activeCustomerId) return [];
+  if (!activeCustomerId && !customer?.email && !customer?.phone) return [];
 
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("customer_id", activeCustomerId)
-    .order("created_at", { ascending: false })
-    .limit(25);
-
-  if (error) {
-    console.warn("Customer order fetch failed.");
-    return [];
+  const rpcResult = await supabase.rpc("public_customer_orders", { p_limit: 25 });
+  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+    return dedupeOrders(rpcResult.data as Order[]);
   }
 
-  return (data || []) as Order[];
+  const directOrders: Order[] = [];
+
+  if (activeCustomerId) {
+    directOrders.push(...await fetchOrdersByColumn("customer_id", activeCustomerId));
+  }
+
+  if (directOrders.length) return dedupeOrders(directOrders);
+
+  const email = customer?.email || "";
+  for (const column of ["customer_email", "sender_email", "receiver_email", "email"]) {
+    directOrders.push(...await fetchOrdersByColumn(column, email));
+  }
+
+  if (directOrders.length) return dedupeOrders(directOrders);
+
+  const phoneCandidates = Array.from(new Set([customer?.phone, customer?.phoneDigits].filter(Boolean) as string[]));
+  for (const phone of phoneCandidates) {
+    for (const column of ["customer_phone", "sender_phone", "receiver_phone", "phone"]) {
+      directOrders.push(...await fetchOrdersByColumn(column, phone));
+    }
+  }
+
+  return dedupeOrders(directOrders);
 }
 
 export async function fetchOrderStatusHistory(orderId: string): Promise<OrderStatusHistoryItem[]> {
