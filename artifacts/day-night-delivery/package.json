@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.ts",
+    "dev": "node scripts/install-local-assets.mjs && vite --config vite.config.ts",
     "assets:install": "node scripts/install-local-assets.mjs",
-    "build": "node scripts/build-vite.mjs",
+    "build": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs",
     "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "production:gate": "node scripts/production-hardening-gate.mjs",
-    "build:spa": "node scripts/build-vite.mjs"
+    "build:spa": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
