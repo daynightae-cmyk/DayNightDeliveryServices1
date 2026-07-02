@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
 import companyMeta from "../data/companyMeta";
+import localAssets, { withRemoteFallback } from "../data/localAssets";
 import { getCompanySocialLinks } from "./ui/SocialLinks";
 import "../styles/dn-day-mode.css";
 
@@ -53,7 +54,7 @@ export default function Footer() {
     <footer className={`${isLight ? "bg-white/55 border-brand-deep/10" : "bg-brand-deep/80 border-white/10"} border-t mt-16`} dir={isArabic ? "rtl" : "ltr"}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-10">
-          <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="mx-auto h-16 w-16 rounded-full border border-brand-gold/40 object-contain" />
+          <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" className="mx-auto h-16 w-16 rounded-full border border-brand-gold/40 object-contain" />
           <h2 className={`mt-4 text-2xl font-black ${isLight ? "text-brand-deep" : "text-white"}`}>DAY NIGHT DELIVERY SERVICES</h2>
           <p className="text-brand-gold font-bold mt-1">{tf.company}</p>
           <p className={`max-w-3xl mx-auto mt-4 text-sm leading-7 ${isLight ? "text-brand-deep/65" : "text-white/55"}`}>{tf.description}</p>
