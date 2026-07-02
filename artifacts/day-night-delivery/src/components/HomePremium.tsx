@@ -10,10 +10,11 @@ import WorldClock from "./home/WorldClock";
 import Premium3DIcon from "./ui/Premium3DIcon";
 import { DNBadge, DNButton, DNCard, DNInput, DNSelect } from "./ui/DNDesignSystem";
 import companyMeta from "../data/companyMeta";
+import localAssets, { withRemoteFallback } from "../data/localAssets";
 
 type HomePremiumProps = { onNavigate: (tab: string) => void };
 
-const heroPosterUrl = "https://i.postimg.cc/cJ7MbD6R/Chat-GPT-Image-22-ywnyw-2026-04-52-05-m-(10).png";
+const heroPosterUrl = localAssets.hero;
 
 export default function HomePremium({ onNavigate }: HomePremiumProps) {
   const { language } = useAppContext();
@@ -43,14 +44,14 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
   return (
     <div className="space-y-10 sm:space-y-14" dir={isArabic ? "rtl" : "ltr"}>
       <section className="dn-poster-hero relative overflow-hidden rounded-[2.3rem] border px-5 pb-7 pt-10 sm:px-8 lg:px-10 lg:pt-12">
-        <img src={heroPosterUrl} alt="" aria-hidden="true" className="dn-hero-poster-img pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-screen" />
+        <img src={heroPosterUrl} onError={(event) => withRemoteFallback(event, localAssets.remote.hero)} alt="" aria-hidden="true" className="dn-hero-poster-img pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-screen" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,18,38,0.92),rgba(3,18,38,0.78),rgba(3,18,38,0.92))]" />
         <div className="absolute inset-x-0 bottom-0 h-48 bg-[radial-gradient(ellipse_at_center,rgba(25,167,255,0.22),transparent_62%)]" />
 
         <div className="relative z-10 grid grid-cols-1 gap-8 lg:grid-cols-[0.92fr_1.18fr_0.9fr] lg:items-center">
           <motion.div initial={{ opacity: 0, x: isArabic ? 24 : -24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.55 }} className="order-2 lg:order-1">
             <div className="relative mx-auto aspect-[1.18/1] max-w-[520px] overflow-hidden rounded-[2rem] border border-brand-sky/20 bg-brand-deep/45 shadow-2xl shadow-brand-sky/10 lg:mx-0">
-              <img src={heroPosterUrl} alt="DAY NIGHT UAE delivery coverage" className="h-full w-full object-cover" />
+              <img src={heroPosterUrl} onError={(event) => withRemoteFallback(event, localAssets.remote.hero)} alt="DAY NIGHT UAE delivery coverage" className="h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#031226] via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-brand-gold/25 bg-[#031226]/76 p-3 text-center text-xs font-black text-brand-gold backdrop-blur-xl">
                 {isArabic ? "نصل إليك في كل وقت" : "Fast • Reliable • Every Time"}
