@@ -15,12 +15,47 @@ export interface OrderStatusHistoryItem {
   changed_by?: string | null;
 }
 
+export interface Merchant {
+  id: string;
+  merchant_code?: string;
+  trade_name: string;
+  owner_name?: string;
+  phone: string;
+  alt_phone?: string;
+  email?: string;
+  emirate?: string;
+  city?: string;
+  address?: string;
+  pickup_address?: string;
+  license_number?: string;
+  trn?: string;
+  tax_number?: string;
+  logo_url?: string;
+  bank_name?: string;
+  iban?: string;
+  settlement_cycle?: string;
+  commission_type?: string;
+  default_payment_method?: string;
+  notes?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Order {
   id: string; // Tracking Number e.g., DN-491026-X or database UUID depending on source
   tracking_code?: string;
   tracking_number?: string;
   invoice_number?: string;
   invoiceNumber?: string;
+  coupon_number?: string;
+  merchant_id?: string;
+  merchant_name?: string;
+  merchant_code?: string;
+  order_count?: number;
+  shipping_scope?: "local" | "international" | string;
+  destination_country?: string;
+  source_channel?: string;
   sender_name: string;
   sender_phone: string;
   sender_email?: string;
