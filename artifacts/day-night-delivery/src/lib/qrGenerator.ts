@@ -1,43 +1,76 @@
+import companyMeta from "../data/companyMeta";
+
 const QR_BASE = "https://api.qrserver.com/v1/create-qr-code";
 
 function qrUrl(data: string, size = 512) {
   return `${QR_BASE}/?size=${size}x${size}&color=071A33&bgcolor=FFFFFF&data=${encodeURIComponent(data)}`;
 }
 
+const site = companyMeta.website.replace(/\/$/, "");
+
 export function buildTrackingQrUrl(trackingCode: string) {
-  return qrUrl(`https://www.daynightae.com/tracking?code=${trackingCode}`);
+  return qrUrl(`${site}/tracking/${encodeURIComponent(trackingCode)}`);
 }
 
 export function buildWhatsappQrUrl(trackingCode: string) {
   const msg = `Tracking code: ${trackingCode}`;
-  return qrUrl(`https://wa.me/971568757331?text=${encodeURIComponent(msg)}`);
+  return qrUrl(`${companyMeta.whatsappUrl}?text=${encodeURIComponent(msg)}`);
 }
 
 export function buildWhatsappSupportQrUrl() {
-  return qrUrl("https://wa.me/971568757331");
+  return qrUrl(companyMeta.whatsappUrl);
 }
 
 export function buildRequestDeliveryQrUrl() {
-  return qrUrl("https://daynightae.com/request");
+  return qrUrl(`${site}/request`);
+}
+
+export function buildPricingQrUrl() {
+  return qrUrl(`${site}/pricing`);
+}
+
+export function buildTrackingPageQrUrl() {
+  return qrUrl(`${site}/tracking`);
+}
+
+export function buildQrHubQrUrl() {
+  return qrUrl(`${site}/qr`);
+}
+
+export function buildMapsQrUrl() {
+  return qrUrl(companyMeta.mapUrl);
+}
+
+export function buildInstagramQrUrl() {
+  return qrUrl(companyMeta.socials.instagram);
+}
+
+export function buildTikTokQrUrl() {
+  return qrUrl(companyMeta.socials.tiktok);
+}
+
+export function buildVCardData() {
+  return [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    "N:;DAY NIGHT DELIVERY SERVICES;;;",
+    "FN:DAY NIGHT DELIVERY SERVICES",
+    "ORG:DAY NIGHT DELIVERY SERVICES",
+    `TEL;TYPE=CELL:${companyMeta.phone.replace(/\s/g, "")}`,
+    `EMAIL:${companyMeta.email}`,
+    `URL:${companyMeta.website}`,
+    "ADR;TYPE=WORK:;;Mussafah 40;Abu Dhabi;;UAE;United Arab Emirates",
+    "NOTE:Fast Reliable Delivery Services 24/7 - UAE Delivery and International Shipping",
+    "END:VCARD",
+  ].join("\n");
 }
 
 export function buildContactQrUrl() {
-  const vcard = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    "FN:DAY NIGHT DELIVERY SERVICES",
-    "ORG:DAY NIGHT DELIVERY SERVICES",
-    "TEL:+971568757331",
-    "EMAIL:Admin@daynightae.com",
-    "URL:https://daynightae.com",
-    "ADR:;;Mussafah 40;Abu Dhabi;;UAE",
-    "END:VCARD",
-  ].join("\n");
-  return qrUrl(vcard);
+  return qrUrl(buildVCardData());
 }
 
 export function buildWebsiteQrUrl() {
-  return qrUrl("https://daynightae.com");
+  return qrUrl(site);
 }
 
 export function downloadQr(url: string, filename: string) {
@@ -82,7 +115,7 @@ export async function downloadQrAsPdf(
 
   doc.setFontSize(7.5);
   doc.setTextColor(212, 175, 55);
-  doc.text("daynightae.com  |  +971 56 875 7331", W / 2, 31, { align: "center" });
+  doc.text(`${companyMeta.displayWebsite}  |  ${companyMeta.phone}`, W / 2, 31, { align: "center" });
 
   doc.setDrawColor(212, 175, 55);
   doc.setLineWidth(0.7);
@@ -110,7 +143,7 @@ export async function downloadQrAsPdf(
   doc.setTextColor(110, 110, 110);
   doc.setFontSize(7.5);
   doc.text(
-    "Admin@daynightae.com  |  daynightae.com",
+    `${companyMeta.email}  |  ${companyMeta.displayWebsite}`,
     W / 2,
     167,
     { align: "center" }
