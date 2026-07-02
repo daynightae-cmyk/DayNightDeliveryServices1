@@ -47,7 +47,20 @@ export const companyMeta = {
   socials: {
     facebook: "https://www.facebook.com/profile.php?id=61590600606676",
     instagram: "https://www.instagram.com/day_night_delivery_services",
-    tiktok: "https://www.tiktok.com/@daynight4767"
+    threads: "https://www.threads.com/@day_night_delivery_services",
+    tiktok: "https://www.tiktok.com/@daynightae",
+    youtube: "https://www.youtube.com/@daynightae",
+    linkedin: "https://www.linkedin.com/in/day-night-9643b941b/",
+    snapchat: "https://www.snapchat.com/add/daynightae"
+  },
+  socialHandles: {
+    facebook: "DAY NIGHT Express",
+    instagram: "@day_night_delivery_services",
+    threads: "@day_night_delivery_services",
+    tiktok: "@daynightae",
+    youtube: "@daynightae",
+    linkedin: "day-night-9643b941b",
+    snapchat: "daynightae"
   }
 };
 
