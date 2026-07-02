@@ -48,6 +48,14 @@ function normalizePhoneForMatching(value?: string | null) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function createInvoiceNumber(seed?: unknown, date = new Date()) {
+  const year = date.getUTCFullYear();
+  const fallback = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const clean = String(seed || fallback).replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const core = clean.replace(/^DNINV/i, "").replace(/^INV/i, "").replace(/^DN/i, "").slice(-12) || fallback.toUpperCase();
+  return `DN-INV-${year}-${core}`;
+}
+
 function normalizeOrderStatus(value?: unknown) {
   const raw = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   const map: Record<string, string> = {
@@ -85,11 +93,15 @@ function normalizeNumber(value: unknown, fallback = 0) {
 function normalizePublicOrderPayload(payload: Record<string, unknown>) {
   const notes = typeof payload.notes === "string" ? payload.notes.trim() : "";
   const status = normalizeOrderStatus(payload.status);
+  const createdAt = cleanText(String(payload.created_at || "")) || new Date().toISOString();
+  const providedInvoice = cleanText(String(payload.invoice_number || payload.invoiceNumber || ""));
 
   return {
     ...payload,
     notes: notes || "N/A",
     status,
+    created_at: createdAt,
+    invoice_number: providedInvoice || createInvoiceNumber(payload.tracking_code || payload.tracking_number || payload.id || undefined, new Date(createdAt)),
     status_history: normalizeStatusHistory(payload.status_history)
   };
 }
@@ -98,6 +110,7 @@ function buildPublicOrderInsertPayload(payload: Record<string, unknown>) {
   const description = cleanText(String(payload.package_description || payload.package_type || "Local delivery item"));
   const createdAt = cleanText(String(payload.created_at || "")) || new Date().toISOString();
   const total = normalizeNumber(payload.total_price ?? payload.total ?? payload.delivery_price ?? payload.price ?? payload.amount, 30);
+  const invoiceNumber = cleanText(String(payload.invoice_number || payload.invoiceNumber || "")) || createInvoiceNumber(payload.tracking_code || payload.tracking_number || payload.id || undefined, new Date(createdAt));
 
   const directPayload: Record<string, unknown> = {
     sender_name: cleanText(String(payload.sender_name || "")),
@@ -124,6 +137,7 @@ function buildPublicOrderInsertPayload(payload: Record<string, unknown>) {
     price: total,
     currency: cleanText(String(payload.currency || "AED")) || "AED",
     source_domain: cleanText(String(payload.source_domain || "daynightae.com")) || "daynightae.com",
+    invoice_number: invoiceNumber,
     notes: cleanText(String(payload.notes || "N/A")) || "N/A",
     status: normalizeOrderStatus(payload.status),
     created_at: createdAt,
@@ -137,6 +151,14 @@ function buildPublicOrderInsertPayload(payload: Record<string, unknown>) {
   }
 
   return directPayload;
+}
+
+function buildLegacyOrderInsertPayload(payload: Record<string, unknown>) {
+  const copy = { ...payload };
+  for (const optional of ["invoice_number", "package_description", "source_domain", "status_history", "subtotal", "base_price", "total", "total_price", "amount", "price", "currency", "customer_email", "customer_phone", "customer_name"]) {
+    delete copy[optional];
+  }
+  return copy;
 }
 
 function extractTrackingId(data: any): string | null {
@@ -188,7 +210,7 @@ function dedupeOrders(orders: Order[]) {
   const output: Order[] = [];
 
   for (const order of orders) {
-    const key = String(order.id || order.tracking_code || order.tracking_number || "");
+    const key = String(order.id || order.tracking_code || order.tracking_number || order.invoice_number || "");
     if (!key || seen.has(key)) continue;
     seen.add(key);
     output.push(order);
@@ -213,6 +235,16 @@ async function fetchOrdersByColumn(column: string, value?: string | null, limit 
   } catch {
     return [];
   }
+}
+
+async function fetchOrderByReference(reference: string): Promise<Order | null> {
+  const ref = cleanText(reference);
+  if (!ref) return null;
+  for (const column of ["tracking_code", "tracking_number", "invoice_number", "id"]) {
+    const rows = await fetchOrdersByColumn(column, ref, 1);
+    if (rows[0]) return rows[0];
+  }
+  return null;
 }
 
 export async function calculateDeliveryPrice(payload: {
@@ -305,22 +337,24 @@ export async function createPublicOrder(payload: Record<string, unknown>): Promi
     }
   }
 
-  try {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(safePayload)
-      .select("*")
-      .single();
+  for (const candidate of [safePayload, buildLegacyOrderInsertPayload(safePayload)]) {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .insert(candidate)
+        .select("*")
+        .single();
 
-    if (!error && data) {
-      return extractTrackingId(data);
-    }
+      if (!error && data) {
+        return extractTrackingId(data);
+      }
 
-    if (error) {
-      console.error("direct public order insert failed:", error.message, error.details || "");
+      if (error) {
+        console.error("direct public order insert failed:", error.message, error.details || "");
+      }
+    } catch (error) {
+      console.error("direct public order insert crashed:", error);
     }
-  } catch (error) {
-    console.error("direct public order insert crashed:", error);
   }
 
   return null;
@@ -351,12 +385,15 @@ export async function trackOrder(trackingCode: string): Promise<any> {
     p_tracking_code: trackingCode
   });
 
-  if (error) {
-    console.error("track_order RPC failed.");
-    return null;
+  if (!error && data) {
+    return data;
   }
 
-  return data;
+  if (error) {
+    console.error("track_order RPC failed. Falling back to direct reference lookup.");
+  }
+
+  return fetchOrderByReference(trackingCode);
 }
 
 export async function trackOrderRpc(trackingCode: string): Promise<any> {
