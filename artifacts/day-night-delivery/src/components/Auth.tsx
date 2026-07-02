@@ -19,6 +19,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaUnavailable, setCaptchaUnavailable] = useState(false);
   const captchaSiteKey = String(((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || "")).trim();
   const captchaEnabled = Boolean(captchaSiteKey);
   const usableCaptchaToken = captchaToken && captchaToken !== TURNSTILE_FALLBACK_TOKEN ? captchaToken : "";
@@ -39,7 +40,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   function guardHumanCheck() {
-    if (captchaEnabled && (!captchaToken || captchaToken === TURNSTILE_FALLBACK_TOKEN)) {
+    if (captchaEnabled && !usableCaptchaToken && !captchaUnavailable) {
       setErrorMsg(isArabic ? "يرجى إكمال التحقق الأمني أولاً." : "Please complete the security check first.");
       return false;
     }
@@ -65,7 +66,14 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       } as any);
 
       if (error) {
-        setErrorMsg(isArabic ? "بيانات الدخول غير صحيحة أو غير مخولة." : "Invalid or unauthorized credentials.");
+        const message = String(error.message || "").toLowerCase();
+        if (message.includes("captcha")) {
+          setErrorMsg(isArabic
+            ? "Cloudflare Turnstile غير مفعل لهذا الدومين داخل Cloudflare أو Supabase. أضف daynightae.com في Hostname Management ثم أعد المحاولة."
+            : "Cloudflare Turnstile is not authorized for this domain in Cloudflare or Supabase. Add daynightae.com in Hostname Management, then retry.");
+        } else {
+          setErrorMsg(isArabic ? "بيانات الدخول غير صحيحة أو غير مخولة." : "Invalid or unauthorized credentials.");
+        }
         setLoading(false);
         return;
       }
@@ -135,10 +143,25 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                 <KeyRound className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
               </div>
             </div>
-            {captchaEnabled && <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />}
-            {captchaToken === TURNSTILE_FALLBACK_TOKEN && (
+            {captchaEnabled && (
+              <TurnstileCaptcha
+                siteKey={captchaSiteKey}
+                language={language}
+                onVerify={(token) => {
+                  setCaptchaToken(token);
+                  setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN);
+                }}
+                onExpire={() => {
+                  setCaptchaToken("");
+                  setCaptchaUnavailable(false);
+                }}
+              />
+            )}
+            {captchaUnavailable && (
               <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">
-                {isArabic ? "تعذر تحميل تحقق Cloudflare. أعد المحاولة أو عطّل مانع التتبع مؤقتاً." : "Cloudflare verification could not load. Retry or temporarily disable tracking blockers."}
+                {isArabic
+                  ? "تنبيه تشغيل: Turnstile لم يعتمد هذا الدومين بعد. يمكنك محاولة الدخول الآن، وإذا رفض Supabase الطلب أضف daynightae.com داخل Cloudflare Hostname Management."
+                  : "Operations notice: Turnstile has not authorized this hostname yet. You may try signing in now; if Supabase rejects it, add daynightae.com in Cloudflare Hostname Management."}
               </p>
             )}
             <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
