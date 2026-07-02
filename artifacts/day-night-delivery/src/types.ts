@@ -21,10 +21,12 @@ export interface Order {
   tracking_number?: string;
   sender_name: string;
   sender_phone: string;
+  sender_email?: string;
   sender_city: string;
   sender_address: string;
   receiver_name: string;
   receiver_phone: string;
+  receiver_email?: string;
   receiver_city: string;
   receiver_address: string;
   package_type: string;
@@ -41,6 +43,9 @@ export interface Order {
   express_surcharge?: number;
   additional_piece_fee?: number;
   customer_id?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  customer_name?: string;
   driver_code?: string;
   driver_phone?: string;
   driver_name?: string;
