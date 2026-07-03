@@ -3,15 +3,15 @@ export const CURRENCY = "AED";
 export const domesticPricing = {
   main: {
     id: "uae-main",
-    labelEn: "UAE Main Areas",
-    labelAr: "المناطق الرئيسية داخل الإمارات",
+    labelEn: "UAE City Routes",
+    labelAr: "مسارات المدن داخل الإمارات",
     base: 30,
     total: 30
   },
   extended: {
-    id: "uae-extended",
-    labelEn: "UAE Extended Areas",
-    labelAr: "المناطق الممتدة داخل الإمارات",
+    id: "uae-special-routes",
+    labelEn: "UAE Special Routes",
+    labelAr: "المسارات الخاصة داخل الإمارات",
     base: 50,
     total: 50
   },
