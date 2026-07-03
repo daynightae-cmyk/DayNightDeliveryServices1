@@ -116,13 +116,13 @@ function AppContent() {
     { key: "home", path: "/", label: t.nav.home },
     { key: "about", path: "/about", label: t.nav.about },
     { key: "services", path: "/services", label: t.nav.services },
-    { key: "suburbs", path: "/uae-delivery", label: t.nav.suburbs },
-    { key: "international", path: "/international-shipping", label: t.nav.international },
+    { key: "suburbs", path: "/uae-delivery", label: isArabic ? "محلي بالطلبية" : "Local by Order" },
+    { key: "international", path: "/international-shipping", label: isArabic ? "دولي بالكيلو" : "Intl by Kg" },
     { key: "ecommerce", path: "/ecommerce", label: t.nav.ecommerce },
     { key: "corporate", path: "/corporate", label: t.nav.corporate },
-    { key: "pricing", path: "/pricing", label: t.nav.pricing },
+    { key: "pricing", path: "/pricing", label: isArabic ? "الأسعار والحاسبات" : "Prices & Calculators" },
     { key: "gallery", path: "/gallery", label: t.nav.gallery },
-    { key: "tracking", path: "/tracking", label: t.nav.tracking },
+    { key: "tracking", path: "/tracking", label: isArabic ? "تتبع/هاتف" : "Track/Phone" },
     { key: "qr", path: "/qr", label: t.nav.qr },
     { key: "faqs", path: "/faq", label: t.nav.faqs },
     { key: "contact", path: "/contact", label: t.nav.contact },
@@ -139,10 +139,11 @@ function AppContent() {
     >
       <div className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}>
         <div className={`text-[11px] py-2 px-4 sm:px-8 border-b flex flex-col sm:flex-row items-center justify-between gap-2 font-bold ${isLight ? "bg-[#E0EAFA]/80 border-[#071A33]/10 text-[#071A33]/80" : "bg-brand-cool/90 border-white/10 text-white"}`}>
-          <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
+          <div className={`flex flex-wrap items-center justify-center gap-2 sm:gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
             <span className="text-brand-gold font-mono tracking-wider">{companyMeta.sloganEn}</span>
             <span className={isLight ? "text-[#071A33]/20" : "text-white/20"}>|</span>
             <span className={isLight ? "text-[#071A33]/70" : "text-white/70"}>{companyMeta.sloganAr}</span>
+            <span className="rounded-full border border-brand-gold/25 bg-brand-gold/10 px-2 py-0.5 text-[10px] font-black text-brand-gold">{isArabic ? "المحلي بالطلبية لا بالكيلو" : "Local: by order, not kg"}</span>
           </div>
           <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
             <ThemeToggle />
@@ -200,7 +201,7 @@ function AppContent() {
         </header>
       </div>
 
-      <div className="h-[96px] sm:h-[108px]" aria-hidden="true" />
+      <div className="h-[108px] sm:h-[118px]" aria-hidden="true" />
 
       <main className="flex-1 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
         <Suspense fallback={<div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}><div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" /></div>}>
