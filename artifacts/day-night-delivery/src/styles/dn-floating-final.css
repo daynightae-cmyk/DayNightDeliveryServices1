@@ -1,4 +1,5 @@
 .fixed.top-0>div:first-child>div:first-child span:last-child{display:none!important}
+section[dir="rtl"] aside.space-y-3>div:first-child p{display:none!important}
 footer{background:radial-gradient(circle at 18% 0%,rgba(24,168,232,.16),transparent 28rem),linear-gradient(180deg,rgba(6,18,37,.98),rgba(2,9,20,.99))!important;border-color:rgba(79,215,255,.18)!important;color:#dce7f5!important}
 footer h2,footer h3,footer h4,footer .text-white{color:#fff!important}
 footer p,footer a,footer span{color:rgba(220,231,245,.78)!important}
