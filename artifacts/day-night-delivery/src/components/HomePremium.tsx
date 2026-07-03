@@ -37,7 +37,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
 
   const stats = [
     { icon: Zap, value: "24/7", title: isArabic ? "خدمة على مدار الساعة" : "Around the clock", body: isArabic ? "طوال أيام الأسبوع" : "Every day of the week" },
-    { icon: Calculator, value: "30 AED", title: isArabic ? "للطلبية الواحدة" : "Per local order", body: isArabic ? "لا نحسب المحلي بالكيلو" : "Local is not by kg" },
+    { icon: Calculator, value: "30 AED", title: isArabic ? "سعر الطلبيات المحلية" : "Local order pricing", body: isArabic ? "تسعير واضح ومباشر" : "Clear and direct pricing" },
     { icon: MapPin, value: "7+", title: isArabic ? "إمارات مغطاة" : "Emirates covered", body: isArabic ? "تغطية شاملة" : "Full UAE coverage" },
     { icon: ShieldCheck, value: "100%", title: isArabic ? "أمان وثقة" : "Safe and trusted", body: isArabic ? "فريق محترف" : "Professional team" },
   ];
@@ -83,8 +83,8 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
                   <DNBadge tone="blue"><Calculator className="h-3.5 w-3.5" /> {isArabic ? "احسب توصيلك المحلي" : "Local UAE estimate"}</DNBadge>
                   <p className="mt-3 text-sm font-bold leading-7 text-white/55">
                     {isArabic
-                      ? "التوصيل المحلي يحسب بعدد الطلبيات فقط: 30 درهم للمناطق الرئيسية أو 50 درهم للمناطق الممتدة. لا يوجد حساب بالكيلو محلياً."
-                      : "Local UAE delivery is priced by order count only: 30 AED main areas or 50 AED extended areas. No local kg pricing."}
+                      ? "احسب تكلفة التوصيل داخل الإمارات خلال ثوانٍ حسب مدينة الاستلام ومدينة التسليم وعدد الطلبيات."
+                      : "Estimate UAE delivery in seconds by pickup city, delivery city, and order count."}
                   </p>
                 </div>
                 <Premium3DIcon icon={Package} color="gold" size="md" animate />
@@ -95,7 +95,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
                 <label className="space-y-1 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبيات" : "Number of orders"}</span><DNInput type="number" value={orderCount} min="1" step="1" onChange={(e) => setOrderCount(e.target.value)} dir="ltr" /></label>
               </div>
               <div className="mt-5 rounded-2xl border border-brand-gold/35 bg-[#020914]/62 p-5 text-center">
-                <p className="text-xs font-black text-white/52">{isArabic ? "السعر المحلي حسب عدد الطلبيات" : "Local total by order count"}</p>
+                <p className="text-xs font-black text-white/52">{isArabic ? "إجمالي السعر التقديري" : "Estimated total"}</p>
                 <p className="mt-2 text-4xl font-black text-brand-gold" dir="ltr">{totalEstimate ? formatAedRange(totalEstimate.min, totalEstimate.max) : "---"}</p>
                 <p className="mt-2 text-[11px] font-bold text-white/38">
                   {baseEstimate
