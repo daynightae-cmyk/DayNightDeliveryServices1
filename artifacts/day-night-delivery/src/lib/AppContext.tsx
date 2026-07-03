@@ -19,29 +19,21 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const THEME_MODE_KEY = "dn_theme_mode";
 const THEME_TOUCHED_KEY = "dn_theme_user_selected";
 const THEME_DEFAULT_VERSION_KEY = "dn_theme_default_version";
-const THEME_DEFAULT_VERSION = "20260703-force-night-final";
+const THEME_DEFAULT_VERSION = "20260703-night-only-production";
+
+function forceNightStorage() {
+  try {
+    localStorage.setItem(THEME_MODE_KEY, "dark");
+    localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
+    localStorage.removeItem(THEME_TOUCHED_KEY);
+  } catch {
+    // ignore storage issues
+  }
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
-    try {
-      const saved = localStorage.getItem(THEME_MODE_KEY);
-      const defaultVersion = localStorage.getItem(THEME_DEFAULT_VERSION_KEY);
-
-      // Production baseline: always return visitors to the premium night theme once per release.
-      // They can still toggle to daylight afterwards, but old cached light mode will not open first.
-      if (defaultVersion !== THEME_DEFAULT_VERSION) {
-        localStorage.setItem(THEME_MODE_KEY, "dark");
-        localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
-        localStorage.removeItem(THEME_TOUCHED_KEY);
-        return "dark";
-      }
-
-      if (saved === "light" || saved === "dark" || saved === "system") {
-        return saved;
-      }
-    } catch {
-      // ignore storage issues
-    }
+    forceNightStorage();
     return "dark";
   });
 
@@ -49,27 +41,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || "ar");
 
   useEffect(() => {
-    const prefersDark = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const nextTheme = themeMode === "system" ? (prefersDark ? "dark" : "light") : themeMode;
-    setTheme(nextTheme);
-
-    try {
-      localStorage.setItem(THEME_MODE_KEY, themeMode);
-      localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
-    } catch {
-      // ignore
-    }
+    forceNightStorage();
+    if (themeMode !== "dark") setThemeModeState("dark");
+    setTheme("dark");
   }, [themeMode]);
 
   useEffect(() => {
-    if (theme === "light") {
-      document.documentElement.classList.add("light-theme");
-      document.documentElement.classList.remove("dark-theme");
-    } else {
-      document.documentElement.classList.add("dark-theme");
-      document.documentElement.classList.remove("light-theme");
-    }
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.add("dark-theme");
+    document.documentElement.classList.remove("light-theme");
+    document.documentElement.dataset.theme = "dark";
+    document.documentElement.style.colorScheme = "dark";
+    document.body?.classList.remove("light-theme");
+    document.body?.classList.add("dark-theme");
   }, [theme]);
 
   useEffect(() => {
@@ -78,17 +61,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLanguage(language);
   }, [language]);
 
-  const setThemeMode = (mode: ThemeMode) => {
-    try {
-      localStorage.setItem(THEME_TOUCHED_KEY, "1");
-    } catch {
-      // ignore
-    }
-    setThemeModeState(mode);
+  const setThemeMode = (_mode: ThemeMode) => {
+    forceNightStorage();
+    setThemeModeState("dark");
+    setTheme("dark");
   };
 
-  const toggleTheme = () => setThemeMode(themeMode === "dark" ? "light" : "dark");
-
+  const toggleTheme = () => setThemeMode("dark");
   const setLanguage = (lang: Language) => setLanguageState(lang);
   const toggleLanguage = () => setLanguageState((prev) => (prev === "ar" ? "en" : "ar"));
 
