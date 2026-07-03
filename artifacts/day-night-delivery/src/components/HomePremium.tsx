@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { BadgeCheck, Calculator, ClipboardCheck, MapPin, MessageCircle, Package, ShieldCheck, Truck, Zap } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
-import { cities, getQuickEstimate, getWeightSurcharge } from "../data/pricingEstimate";
+import { cities, getQuickEstimate } from "../data/pricingEstimate";
 import TestimonialCarousel from "./home/TestimonialCarousel";
 import UAEInteractiveMap from "./home/UAEInteractiveMap";
 import WorldClock from "./home/WorldClock";
@@ -19,15 +19,16 @@ const heroPosterUrl = localAssets.hero;
 export default function HomePremium({ onNavigate }: HomePremiumProps) {
   const { language } = useAppContext();
   const t = translations[language];
-  const tP = t.pricingWeight;
   const isArabic = language === "ar";
   const [estimateFrom, setEstimateFrom] = useState(cities[1]);
   const [estimateTo, setEstimateTo] = useState(cities[0]);
-  const [weight, setWeight] = useState<number | string>("1");
+  const [orderCount, setOrderCount] = useState<number | string>("1");
 
   const baseEstimate = getQuickEstimate(estimateFrom, estimateTo);
-  const surcharge = getWeightSurcharge(weight);
-  const totalEstimate = baseEstimate ? { min: baseEstimate.min + surcharge.min, max: baseEstimate.max + surcharge.max } : null;
+  const normalizedOrderCount = Math.max(1, Math.ceil(Number(orderCount) || 1));
+  const totalEstimate = baseEstimate
+    ? { min: baseEstimate.min * normalizedOrderCount, max: baseEstimate.max * normalizedOrderCount }
+    : null;
 
   function formatAedRange(min: number, max: number) {
     if (language === "ar") return min === max ? `${min} درهم` : `${min}-${max} درهم`;
@@ -36,7 +37,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
 
   const stats = [
     { icon: Zap, value: "24/7", title: isArabic ? "خدمة على مدار الساعة" : "Around the clock", body: isArabic ? "طوال أيام الأسبوع" : "Every day of the week" },
-    { icon: Calculator, value: "30 AED", title: isArabic ? "تبدأ الأسعار من" : "Prices start from", body: isArabic ? "للمدن الرئيسية" : "Main UAE cities" },
+    { icon: Calculator, value: "30 AED", title: isArabic ? "للطلبية الواحدة" : "Per local order", body: isArabic ? "لا نحسب المحلي بالكيلو" : "Local is not by kg" },
     { icon: MapPin, value: "7+", title: isArabic ? "إمارات مغطاة" : "Emirates covered", body: isArabic ? "تغطية شاملة" : "Full UAE coverage" },
     { icon: ShieldCheck, value: "100%", title: isArabic ? "أمان وثقة" : "Safe and trusted", body: isArabic ? "فريق محترف" : "Professional team" },
   ];
@@ -79,20 +80,28 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
             <DNCard premium className="mx-auto max-w-[470px] p-5 sm:p-6 lg:mx-0">
               <div className="flex items-center justify-between gap-4">
                 <div className={isArabic ? "text-right" : "text-left"}>
-                  <DNBadge tone="blue"><Calculator className="h-3.5 w-3.5" /> {isArabic ? "احسب سعر شحنتك" : "Estimate your shipment"}</DNBadge>
-                  <p className="mt-3 text-sm font-bold leading-7 text-white/55">{t.pricingWidget.description}</p>
+                  <DNBadge tone="blue"><Calculator className="h-3.5 w-3.5" /> {isArabic ? "احسب توصيلك المحلي" : "Local UAE estimate"}</DNBadge>
+                  <p className="mt-3 text-sm font-bold leading-7 text-white/55">
+                    {isArabic
+                      ? "التوصيل المحلي يحسب بعدد الطلبيات فقط: 30 درهم للمناطق الرئيسية أو 50 درهم للمناطق الممتدة. لا يوجد حساب بالكيلو محلياً."
+                      : "Local UAE delivery is priced by order count only: 30 AED main areas or 50 AED extended areas. No local kg pricing."}
+                  </p>
                 </div>
                 <Premium3DIcon icon={Package} color="gold" size="md" animate />
               </div>
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="space-y-1"><span className="text-xs font-black text-white/50">{isArabic ? "من" : "From"}</span><DNSelect value={estimateFrom} onChange={(e) => setEstimateFrom(e.target.value)}>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</DNSelect></label>
                 <label className="space-y-1"><span className="text-xs font-black text-white/50">{isArabic ? "إلى" : "To"}</span><DNSelect value={estimateTo} onChange={(e) => setEstimateTo(e.target.value)}>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</DNSelect></label>
-                <label className="space-y-1 sm:col-span-2"><span className="text-xs font-black text-white/50">{tP?.enterWeight || (isArabic ? "الوزن بالكجم" : "Weight in kg")}</span><DNInput type="number" value={weight} min="0.5" step="0.5" onChange={(e) => setWeight(e.target.value)} dir="ltr" /></label>
+                <label className="space-y-1 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبيات" : "Number of orders"}</span><DNInput type="number" value={orderCount} min="1" step="1" onChange={(e) => setOrderCount(e.target.value)} dir="ltr" /></label>
               </div>
               <div className="mt-5 rounded-2xl border border-brand-gold/35 bg-[#020914]/62 p-5 text-center">
-                <p className="text-xs font-black text-white/52">{tP?.totalRange || (isArabic ? "السعر التقديري" : "Estimated total")}</p>
+                <p className="text-xs font-black text-white/52">{isArabic ? "السعر المحلي حسب عدد الطلبيات" : "Local total by order count"}</p>
                 <p className="mt-2 text-4xl font-black text-brand-gold" dir="ltr">{totalEstimate ? formatAedRange(totalEstimate.min, totalEstimate.max) : "---"}</p>
-                <p className="mt-2 text-[11px] font-bold text-white/38">{tP?.disclaimer}</p>
+                <p className="mt-2 text-[11px] font-bold text-white/38">
+                  {baseEstimate
+                    ? (isArabic ? `${normalizedOrderCount} طلبية × ${baseEstimate.base} درهم` : `${normalizedOrderCount} order(s) × ${baseEstimate.base} AED`)
+                    : (isArabic ? "اختر مدينة الاستلام والتسليم." : "Select pickup and delivery cities.")}
+                </p>
               </div>
               <button onClick={() => onNavigate("pricing")} className="dn-btn dn-btn-primary dn-btn-lg mt-4 w-full">{isArabic ? "احسب السعر بالتفصيل" : "Calculate full price"}</button>
             </DNCard>
