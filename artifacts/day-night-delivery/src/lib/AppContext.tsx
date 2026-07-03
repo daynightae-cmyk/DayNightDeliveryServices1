@@ -16,16 +16,29 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+const THEME_MODE_KEY = "dn_theme_mode";
+const THEME_TOUCHED_KEY = "dn_theme_user_selected";
+const THEME_DEFAULT_VERSION_KEY = "dn_theme_default_version";
+const THEME_DEFAULT_VERSION = "20260703-night-first";
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     try {
-      const saved = localStorage.getItem("dn_theme_mode");
-      if (saved === "light" || saved === "dark" || saved === "system") {
+      const saved = localStorage.getItem(THEME_MODE_KEY);
+      const touched = localStorage.getItem(THEME_TOUCHED_KEY) === "1";
+      const defaultVersion = localStorage.getItem(THEME_DEFAULT_VERSION_KEY);
+
+      if (defaultVersion !== THEME_DEFAULT_VERSION && !touched) {
+        localStorage.setItem(THEME_MODE_KEY, "dark");
+        localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
+        return "dark";
+      }
+
+      if (touched && (saved === "light" || saved === "dark" || saved === "system")) {
         return saved;
       }
     } catch {
-      // ignore
+      // ignore storage issues
     }
     return "dark";
   });
@@ -39,7 +52,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTheme(nextTheme);
 
     try {
-      localStorage.setItem("dn_theme_mode", themeMode);
+      localStorage.setItem(THEME_MODE_KEY, themeMode);
+      localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
     } catch {
       // ignore
     }
@@ -53,6 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       document.documentElement.classList.add("dark-theme");
       document.documentElement.classList.remove("light-theme");
     }
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {
@@ -61,11 +76,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLanguage(language);
   }, [language]);
 
-  const toggleTheme = () => setThemeMode((prev) => {
-    if (prev === "dark") return "light";
-    if (prev === "light") return "system";
-    return "dark";
-  });
+  const setThemeMode = (mode: ThemeMode) => {
+    try {
+      localStorage.setItem(THEME_TOUCHED_KEY, "1");
+    } catch {
+      // ignore
+    }
+    setThemeModeState(mode);
+  };
+
+  const toggleTheme = () => setThemeMode(themeMode === "dark" ? "light" : "dark");
 
   const setLanguage = (lang: Language) => setLanguageState(lang);
   const toggleLanguage = () => setLanguageState((prev) => (prev === "ar" ? "en" : "ar"));
@@ -80,7 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export function useAppContext() {
   const context = useContext(AppContext);
   if (!context) {
-    throw new Error("useAppContext must be used within an AppProvider");
+    throw new Error("useAppContext must be used within AppProvider");
   }
   return context;
 }
