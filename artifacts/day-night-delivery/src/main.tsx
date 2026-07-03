@@ -6,6 +6,7 @@ import { reportError } from './lib/monitoring';
 import './index.css';
 import './styles/dn-premium.css';
 import './styles/dn-ui-fixes.css';
+import './styles/dn-support-polish.css';
 
 const FALLBACK_LOGO = 'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png';
 
