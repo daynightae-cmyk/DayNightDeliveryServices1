@@ -5,6 +5,7 @@ import { AppProvider } from './lib/AppContext.tsx';
 import { reportError } from './lib/monitoring';
 import './index.css';
 import './styles/dn-premium.css';
+import './styles/dn-ui-fixes.css';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
