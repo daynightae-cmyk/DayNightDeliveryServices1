@@ -1,11 +1,11 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
-import { MessageCircle, X, Phone, ExternalLink } from "lucide-react";
+import { MessageCircle, X, Phone, ExternalLink, ShieldCheck } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { useAppContext } from "../lib/AppContext";
 import { useLocation } from "react-router-dom";
 
-const HIDDEN_ON = ["/admin", "/driver", "/customer", "/auth"];
+const HIDDEN_ON = ["/admin", "/driver", "/customer", "/auth", "/update-password"];
 
 export default function FloatingWhatsApp() {
   const [open, setOpen] = useState(false);
@@ -16,10 +16,7 @@ export default function FloatingWhatsApp() {
   if (HIDDEN_ON.some((r) => location.pathname.startsWith(r))) return null;
 
   return (
-    <div
-      className="hidden md:flex fixed flex-col items-start gap-3"
-      style={{ left: 24, bottom: 28, zIndex: 70 }}
-    >
+    <div className="dn-wa-widget fixed flex flex-col items-start gap-3" dir={isArabic ? "rtl" : "ltr"}>
       <AnimatePresence>
         {open && (
           <motion.div
@@ -27,61 +24,63 @@ export default function FloatingWhatsApp() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.92 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="glass-strong rounded-2xl p-5 w-68 max-w-[calc(100vw-2rem)] shadow-2xl border border-[#25D366]/20"
-            dir={isArabic ? "rtl" : "ltr"}
+            className="dn-wa-panel w-[min(330px,calc(100vw-28px))] rounded-[1.6rem] border border-[#25D366]/30 bg-[#061225]/92 p-4 shadow-2xl backdrop-blur-2xl"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className={`flex items-center gap-2 ${isArabic ? "flex-row-reverse" : ""}`}>
-                <div className="w-9 h-9 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5 text-[#25D366]" />
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#25D366]/35 bg-[#25D366]/14 shadow-[0_0_30px_rgba(37,211,102,.18)]">
+                  <MessageCircle className="h-5 w-5 text-[#25D366]" />
                 </div>
-                <div className={isArabic ? "text-right" : "text-left"}>
-                  <p className="text-white text-xs font-bold leading-none">DAY NIGHT</p>
-                  <p className="text-white/50 text-[10px] mt-0.5">
-                    {isArabic ? "متاح الآن • 24/7" : "Available now • 24/7"}
+                <div>
+                  <p className="text-sm font-black leading-none text-white">DAY NIGHT</p>
+                  <p className="mt-1 text-[11px] font-bold text-white/55">
+                    {isArabic ? "دعم مباشر على مدار الساعة" : "Live support 24/7"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                aria-label="Close"
+                className="grid h-8 w-8 place-items-center rounded-xl text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="Close WhatsApp panel"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className={`text-white/70 text-xs mb-4 leading-relaxed ${isArabic ? "text-right" : "text-left"}`}>
-              {isArabic
-                ? "تواصل معنا عبر واتساب للاستفسار عن الأسعار والخدمات أو لطلب التوصيل."
-                : "Chat with us on WhatsApp for pricing, services, or to book a delivery."}
-            </p>
+            <div className="mb-4 rounded-2xl border border-brand-gold/20 bg-brand-gold/8 p-3">
+              <p className="flex items-start gap-2 text-xs font-bold leading-6 text-white/72">
+                <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-brand-gold" />
+                {isArabic
+                  ? "اضغط للتواصل الفوري بخصوص التتبع، الأسعار، الطلبات، أو حسابات التجار."
+                  : "Tap for instant help with tracking, pricing, orders, or merchant accounts."}
+              </p>
+            </div>
 
             <div className="flex flex-col gap-2">
               <a
                 href={companyMeta.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-whatsapp flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold"
+                className="btn-whatsapp flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black"
               >
-                <MessageCircle className="w-4 h-4" />
-                <span>{isArabic ? "تواصل عبر واتساب" : "Chat on WhatsApp"}</span>
+                <MessageCircle className="h-4 w-4" />
+                <span>{isArabic ? "ابدأ المحادثة الآن" : "Start WhatsApp Chat"}</span>
               </a>
               <a
                 href={companyMeta.whatsappCatalog}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold bg-amber-500/10 border border-amber-400/25 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-2xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3 text-xs font-black text-brand-gold transition-colors hover:bg-brand-gold hover:text-brand-deep"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>{isArabic ? "عرض الكتالوج" : "View Catalog"}</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>{isArabic ? "فتح كتالوج واتساب" : "Open WhatsApp Catalog"}</span>
               </a>
               <a
                 href={`tel:${companyMeta.phone}`}
-                className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                 dir="ltr"
               >
-                <Phone className="w-3.5 h-3.5" />
+                <Phone className="h-3.5 w-3.5" />
                 <span>{companyMeta.phone}</span>
               </a>
             </div>
@@ -91,43 +90,26 @@ export default function FloatingWhatsApp() {
 
       <motion.button
         id="whatsapp_widget_trigger"
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
         onClick={() => setOpen(!open)}
-        aria-label="WhatsApp"
-        className="relative rounded-2xl flex items-center justify-center shadow-2xl"
-        style={{
-          width: 56,
-          height: 56,
-          background: "linear-gradient(135deg, #128C7E 0%, #25D366 100%)",
-          boxShadow: "0 14px 34px rgba(37,211,102,0.42)",
-        }}
+        aria-label="WhatsApp support"
+        className="dn-wa-trigger relative grid place-items-center overflow-hidden rounded-[1.35rem] border border-[#25D366]/40 text-white shadow-2xl"
       >
-        {!open && (
-          <span
-            className="absolute inset-0 rounded-2xl"
-            style={{ animation: "waPulse 2.5s ease-in-out infinite", background: "rgba(37,211,102,0.35)" }}
-          />
-        )}
+        <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.35),transparent_26%),linear-gradient(135deg,#128C7E,#25D366)]" />
+        {!open && <span className="dn-wa-pulse absolute inset-0 rounded-[1.35rem] bg-[#25D366]/35" />}
         <AnimatePresence mode="wait">
           {open ? (
-            <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
-              <X className="w-6 h-6 text-white" />
+            <motion.div key="x" className="relative z-10" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
+              <X className="h-6 w-6" />
             </motion.div>
           ) : (
-            <motion.div key="msg" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
-              <MessageCircle className="w-6 h-6 text-white" />
+            <motion.div key="msg" className="relative z-10" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
+              <MessageCircle className="h-6 w-6" />
             </motion.div>
           )}
         </AnimatePresence>
       </motion.button>
-
-      <style>{`
-        @keyframes waPulse {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(1.35); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 }
