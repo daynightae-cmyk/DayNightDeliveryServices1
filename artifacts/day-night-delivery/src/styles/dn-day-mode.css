@@ -11,3 +11,6 @@ footer a:hover{color:#f6c94a!important}
 .dn-smartchat-trigger{right:24px!important;bottom:24px!important;top:auto!important;z-index:74!important}
 .dn-smartchat-panel{right:24px!important;bottom:96px!important;top:auto!important;z-index:75!important}
 .dn-chat-bubble{right:24px!important;bottom:96px!important;top:auto!important}
+.dn-live-map-shell,.dn-3d-tracking-map{background:#020812!important;box-shadow:0 30px 96px rgba(0,0,0,.44),0 0 48px rgba(24,168,232,.14)!important}
+.dn-live-map-shell .leaflet-container{background:#020812!important;filter:saturate(1.15) contrast(1.05) brightness(.82)}
+.dn-live-map-shell .leaflet-control-attribution{display:none!important}
