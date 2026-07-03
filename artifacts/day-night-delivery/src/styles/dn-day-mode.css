@@ -1,3 +1,9 @@
 /* DAY NIGHT night-only: day mode removed */
 :root.light-theme{color-scheme:dark!important}
-:root.light-theme body{background:#020914!important;color:#f4f8ff!important}
+:root.light-theme body,body{background:#020914!important;color:#f4f8ff!important}
+#root,#root>div,main{background:transparent!important;color:#f4f8ff!important}
+.fixed.top-0>div:first-child>div:first-child span:last-child{display:none!important}
+footer{background:#020914!important;color:#dce7f5!important}
+footer h2,footer h3,footer h4{color:#fff!important}
+footer p,footer a,footer span{color:rgba(220,231,245,.88)!important}
+footer a:hover{color:#f6c94a!important}
