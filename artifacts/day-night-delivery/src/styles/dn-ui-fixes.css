@@ -1,0 +1,117 @@
+/* DAY NIGHT UI precision fixes — select menus, daylight contrast, and form readability */
+
+main select,
+main input,
+main textarea,
+.dn-input,
+.dn-input-control,
+.dn-select-control {
+  color-scheme: dark;
+  caret-color: #f2c94c;
+}
+
+main select,
+.dn-select-control {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  background-color: #061b36 !important;
+  color: #f4f8ff !important;
+  font-weight: 900 !important;
+  line-height: 1.35 !important;
+}
+
+main select option,
+main select optgroup,
+.dn-select-control option,
+.dn-select-control optgroup {
+  background: #061b36 !important;
+  color: #f4f8ff !important;
+  font-weight: 800 !important;
+}
+
+main select option:checked,
+.dn-select-control option:checked {
+  background: #0f64c7 !important;
+  color: #ffffff !important;
+}
+
+main select option:disabled,
+.dn-select-control option:disabled {
+  color: rgba(244, 248, 255, 0.46) !important;
+}
+
+:root.light-theme body {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(0, 87, 184, 0.12), transparent 30rem),
+    radial-gradient(circle at 78% 12%, rgba(212, 175, 55, 0.12), transparent 26rem),
+    linear-gradient(145deg, #e9f2ff 0%, #f8fbff 46%, #dfeeff 100%) !important;
+}
+
+:root.light-theme .fixed.top-0 > div:first-child,
+:root.light-theme .fixed.top-0 header,
+:root.light-theme header {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0, 123, 255, 0.10), transparent 20rem),
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(232,243,255,0.92)) !important;
+  border-color: rgba(7, 26, 51, 0.12) !important;
+  box-shadow: 0 18px 55px rgba(7, 26, 51, 0.10) !important;
+}
+
+:root.light-theme main section[class*="rounded"],
+:root.light-theme main div[class*="rounded-3xl"][class*="border"],
+:root.light-theme .dn-card,
+:root.light-theme .dn-card-premium {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.94), rgba(225,240,255,0.86)),
+    radial-gradient(circle at 12% 0%, rgba(212,175,55,0.08), transparent 20rem),
+    radial-gradient(circle at 92% 8%, rgba(0,123,255,0.08), transparent 22rem) !important;
+  border-color: rgba(7, 26, 51, 0.14) !important;
+  box-shadow: 0 26px 76px rgba(7, 26, 51, 0.12), inset 0 1px 0 rgba(255,255,255,0.98) !important;
+}
+
+:root.light-theme main input,
+:root.light-theme main select,
+:root.light-theme main textarea,
+:root.light-theme .dn-input,
+:root.light-theme .dn-input-control,
+:root.light-theme .dn-select-control {
+  color-scheme: light;
+  background: linear-gradient(180deg, #ffffff, #eef6ff) !important;
+  color: #071a33 !important;
+  border-color: rgba(7, 26, 51, 0.24) !important;
+  box-shadow: 0 10px 24px rgba(7, 26, 51, 0.10), inset 0 1px 0 rgba(255,255,255,0.96) !important;
+}
+
+:root.light-theme main select option,
+:root.light-theme main select optgroup,
+:root.light-theme .dn-select-control option,
+:root.light-theme .dn-select-control optgroup {
+  background: #ffffff !important;
+  color: #071a33 !important;
+}
+
+:root.light-theme main select option:checked,
+:root.light-theme .dn-select-control option:checked {
+  background: #cfe5ff !important;
+  color: #071a33 !important;
+}
+
+:root.light-theme main .bg-brand-deep\/70,
+:root.light-theme main .bg-brand-deep\/75,
+:root.light-theme main .bg-brand-deep\/50,
+:root.light-theme main .bg-brand-cool\/30,
+:root.light-theme main .bg-brand-cool\/35,
+:root.light-theme main .bg-brand-cool\/40 {
+  background: rgba(255, 255, 255, 0.62) !important;
+}
+
+@media (max-width: 768px) {
+  main select,
+  main input,
+  .dn-input,
+  .dn-input-control,
+  .dn-select-control {
+    min-height: 48px !important;
+    font-size: 16px !important;
+  }
+}
