@@ -13,9 +13,10 @@ const state = {
 };
 
 const isDev = (import.meta as any).env?.DEV === true;
+const monitoringWritesEnabled = String((import.meta as any).env?.VITE_ENABLE_MONITORING_WRITES || "").toLowerCase() === "true";
 
 async function safeInsert(table: string, payload: Record<string, unknown>) {
-  if (!supabase || state.disabledTables.has(table)) return;
+  if (!monitoringWritesEnabled || !supabase || state.disabledTables.has(table)) return;
 
   try {
     const { error } = await supabase.from(table).insert(payload);
