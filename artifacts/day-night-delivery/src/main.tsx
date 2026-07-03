@@ -7,10 +7,24 @@ import './index.css';
 import './styles/dn-premium.css';
 import './styles/dn-ui-fixes.css';
 
+const FALLBACK_LOGO = 'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png';
+
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.tagName === 'IMG') {
+      const img = target as HTMLImageElement;
+      if (!img.dataset.dnFallbackApplied) {
+        img.dataset.dnFallbackApplied = '1';
+        img.decoding = 'async';
+        img.loading = img.loading || 'lazy';
+        img.src = FALLBACK_LOGO;
+        img.classList.add('dn-image-fallback-applied');
+        return;
+      }
+    }
     reportError(event.error || event.message, 'window_error');
-  });
+  }, true);
 
   window.addEventListener('unhandledrejection', (event) => {
     reportError(event.reason, 'unhandled_rejection');
