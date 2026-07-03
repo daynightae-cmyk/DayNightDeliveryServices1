@@ -1,35 +1,15 @@
-import { Moon, Sun } from "lucide-react";
-import { useAppContext } from "../lib/AppContext";
+import { Moon, Sparkles } from "lucide-react";
 
 export default function ThemeToggle() {
-  const { themeMode, setThemeMode } = useAppContext();
-
   return (
-    <div className="flex items-center gap-0.5 bg-white/8 border border-white/12 rounded-xl p-1">
-      <button
-        aria-label="Light mode"
-        onClick={() => setThemeMode("light")}
-        title="Light mode"
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-          themeMode === "light"
-            ? "bg-brand-gold text-brand-deep shadow-sm"
-            : "text-white/60 hover:text-white/85"
-        }`}
-      >
-        <Sun className="w-3.5 h-3.5" />
-      </button>
-      <button
-        aria-label="Dark mode"
-        onClick={() => setThemeMode("dark")}
-        title="Dark mode"
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-          themeMode === "dark"
-            ? "bg-brand-gold text-brand-deep shadow-sm"
-            : "text-white/60 hover:text-white/85"
-        }`}
-      >
-        <Moon className="w-3.5 h-3.5" />
-      </button>
+    <div
+      className="inline-flex items-center gap-1.5 rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-brand-gold shadow-[0_0_24px_rgba(245,183,0,0.10)]"
+      title="DAY NIGHT premium night theme"
+      aria-label="DAY NIGHT premium night theme"
+    >
+      <Moon className="h-3.5 w-3.5" />
+      <span className="hidden sm:inline">Night</span>
+      <Sparkles className="h-3 w-3 text-brand-sky" />
     </div>
   );
 }
