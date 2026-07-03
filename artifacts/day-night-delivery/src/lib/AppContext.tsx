@@ -19,22 +19,24 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const THEME_MODE_KEY = "dn_theme_mode";
 const THEME_TOUCHED_KEY = "dn_theme_user_selected";
 const THEME_DEFAULT_VERSION_KEY = "dn_theme_default_version";
-const THEME_DEFAULT_VERSION = "20260703-night-first";
+const THEME_DEFAULT_VERSION = "20260703-force-night-final";
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     try {
       const saved = localStorage.getItem(THEME_MODE_KEY);
-      const touched = localStorage.getItem(THEME_TOUCHED_KEY) === "1";
       const defaultVersion = localStorage.getItem(THEME_DEFAULT_VERSION_KEY);
 
-      if (defaultVersion !== THEME_DEFAULT_VERSION && !touched) {
+      // Production baseline: always return visitors to the premium night theme once per release.
+      // They can still toggle to daylight afterwards, but old cached light mode will not open first.
+      if (defaultVersion !== THEME_DEFAULT_VERSION) {
         localStorage.setItem(THEME_MODE_KEY, "dark");
         localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
+        localStorage.removeItem(THEME_TOUCHED_KEY);
         return "dark";
       }
 
-      if (touched && (saved === "light" || saved === "dark" || saved === "system")) {
+      if (saved === "light" || saved === "dark" || saved === "system") {
         return saved;
       }
     } catch {
