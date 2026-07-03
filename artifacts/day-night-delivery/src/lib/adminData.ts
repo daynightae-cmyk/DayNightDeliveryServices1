@@ -18,6 +18,33 @@ function merchantCode(seed?: string) {
   return `DN-MER-${suffix}-${serial}`;
 }
 
+function removeEmptyUndefined<T extends Record<string, unknown>>(payload: T): T {
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as T;
+}
+
+function isMissingSchemaError(error: unknown) {
+  const message = String((error as { message?: string })?.message || error || "").toLowerCase();
+  return message.includes("schema cache") ||
+    message.includes("could not find") ||
+    message.includes("does not exist") ||
+    message.includes("column") ||
+    message.includes("permission denied") ||
+    message.includes("violates row-level security") ||
+    message.includes("not_authorized");
+}
+
+async function callRpc<T>(fn: string, args: Record<string, unknown>): Promise<T | null> {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.rpc(fn, args);
+  if (!error && data) return data as T;
+
+  if (error) {
+    console.warn(`${fn} RPC failed. Falling back where possible:`, error.message);
+  }
+  return null;
+}
+
 export type MerchantInput = {
   trade_name: string;
   owner_name?: string;
@@ -84,7 +111,7 @@ export async function createMerchant(input: MerchantInput): Promise<Merchant> {
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const now = new Date().toISOString();
-  const payload = {
+  const payload = removeEmptyUndefined({
     merchant_code: merchantCode(input.trade_name),
     trade_name: clean(input.trade_name),
     owner_name: clean(input.owner_name),
@@ -108,7 +135,10 @@ export async function createMerchant(input: MerchantInput): Promise<Merchant> {
     status: clean(input.status || "active"),
     created_at: now,
     updated_at: now,
-  };
+  });
+
+  const rpcMerchant = await callRpc<Merchant>("admin_create_merchant", { p_merchant: payload });
+  if (rpcMerchant?.id) return rpcMerchant;
 
   const { data, error } = await supabase
     .from("merchants")
@@ -141,6 +171,34 @@ export function calculateAdminOrderPrice(input: AdminOrderInput) {
   };
 }
 
+function buildLegacyAdminOrderPayload(payload: Record<string, unknown>) {
+  const legacy = { ...payload };
+  for (const key of [
+    "invoice_number",
+    "coupon_number",
+    "merchant_id",
+    "merchant_name",
+    "merchant_code",
+    "order_count",
+    "shipping_scope",
+    "destination_country",
+    "source_channel",
+    "package_description",
+    "source_domain",
+    "subtotal",
+    "base_price",
+    "total",
+    "total_price",
+    "amount",
+    "price",
+    "currency",
+    "status_history",
+  ]) {
+    delete legacy[key];
+  }
+  return legacy;
+}
+
 export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   if (!supabase) throw new Error("Supabase is not configured.");
 
@@ -155,8 +213,14 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   const senderCity = clean(merchant?.city || merchant?.emirate || input.pickup_city || "Abu Dhabi");
   const senderAddress = clean(merchant?.pickup_address || merchant?.address || senderCity);
   const description = clean(input.package_description || input.package_type || "Admin shipment");
+  const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "sender_pays");
+  const isInternational = input.shipping_scope === "international";
+  const receiverCity = isInternational
+    ? clean(input.destination_country || input.delivery_city || "WORLD")
+    : clean(input.delivery_city || "Dubai");
+  const deliveryWeight = isInternational ? Math.max(1, numberValue(input.weight, 1)) : 1;
 
-  const payload: Record<string, unknown> = {
+  const payload: Record<string, unknown> = removeEmptyUndefined({
     invoice_number: invoiceNumber,
     coupon_number: clean(input.coupon_number),
     merchant_id: merchant?.id || clean(input.merchant_id) || null,
@@ -164,23 +228,24 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     merchant_code: merchant?.merchant_code || clean(input.merchant_code),
     order_count: count,
     shipping_scope: input.shipping_scope,
-    destination_country: input.shipping_scope === "international" ? clean(input.destination_country || "WORLD") : null,
+    destination_country: isInternational ? clean(input.destination_country || receiverCity || "WORLD") : null,
     source_channel: "admin_panel",
+    source_domain: "daynightae.com",
     sender_name: senderName,
     sender_phone: senderPhone,
     sender_city: senderCity,
     sender_address: senderAddress,
     receiver_name: clean(input.receiver_name),
     receiver_phone: clean(input.receiver_phone),
-    receiver_city: clean(input.delivery_city),
+    receiver_city: receiverCity,
     receiver_address: clean(input.receiver_address),
     package_type: description,
     package_description: description,
-    weight: input.shipping_scope === "international" ? Math.max(1, numberValue(input.weight, 1)) : 1,
+    weight: deliveryWeight,
     pieces: count,
-    service_type: input.shipping_scope === "international" ? "international" : "standard",
-    payment_method: clean(input.payment_method || merchant?.default_payment_method || "sender_pays"),
-    cod_amount: input.payment_method === "cod" ? Math.max(0, numberValue(input.cod_amount, 0)) : null,
+    service_type: isInternational ? "international" : "standard",
+    payment_method: paymentMethod,
+    cod_amount: paymentMethod === "cod" ? Math.max(0, numberValue(input.cod_amount, 0)) : null,
     delivery_price: pricing.total,
     subtotal: pricing.total,
     base_price: pricing.total,
@@ -189,19 +254,27 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     amount: pricing.total,
     price: pricing.total,
     currency: "AED",
-    notes: clean(input.notes),
+    notes: clean(input.notes) || "N/A",
     status: clean(input.status || "pending"),
     created_at: createdAt,
     updated_at: createdAt,
     status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: "Created from DAY NIGHT admin merchant operations hub" }],
-  };
+  });
 
-  const { data, error } = await supabase
-    .from("orders")
-    .insert(payload)
-    .select("*")
-    .single();
+  const rpcOrder = await callRpc<Order>("admin_create_coupon_order", { p_order: payload });
+  if (rpcOrder?.id || rpcOrder?.invoice_number) return rpcOrder;
 
-  if (error) throw new Error(error.message);
-  return data as Order;
+  for (const candidate of [payload, buildLegacyAdminOrderPayload(payload)]) {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(candidate)
+      .select("*")
+      .single();
+
+    if (!error && data) return data as Order;
+    if (error && !isMissingSchemaError(error)) throw new Error(error.message);
+    if (error) console.warn("Admin order insert fallback failed:", error.message);
+  }
+
+  throw new Error("Order could not be created. Confirm the admin SQL migration was applied and the signed-in user has admin/support role.");
 }
