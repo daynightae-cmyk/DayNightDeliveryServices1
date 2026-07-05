@@ -9,9 +9,10 @@ export default function AdminDrawerMini() {
         </div>
         <a href="#dn-admin-top" className="mb-2 block rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/10">Overview</a>
         <a href="#dn-admin-ai" className="mb-2 block rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/10">Merchant Search</a>
+        <a href="#dn-admin-prospect" className="mb-2 block rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-sm font-bold text-brand-gold hover:bg-brand-gold/20">AI Lead Hunter</a>
         <a href="#dn-admin-core" className="mb-2 block rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/10">Orders Workspace</a>
         <a href="#dn-admin-ai" className="mb-2 block rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/10">Admin Alerts</a>
-        <div className="mt-5 rounded-2xl border border-brand-gold/20 bg-brand-gold/10 p-4 text-xs font-bold leading-6 text-white/65">Use this side menu to jump between live merchant intelligence, order creation, and operations data.</div>
+        <div className="mt-5 rounded-2xl border border-brand-gold/20 bg-brand-gold/10 p-4 text-xs font-bold leading-6 text-white/65">Use this side menu to jump between live merchant intelligence, lead hunting, order creation, and operations data.</div>
       </div>
     </details>
   );
