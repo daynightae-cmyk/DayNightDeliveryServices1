@@ -4,172 +4,70 @@ import { CheckCircle, KeyRound, Lock, Mail, ShieldAlert, ShieldCheck } from "luc
 import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
 import { useAppContext } from "../lib/AppContext";
 import CustomerDashboard from "./customer/CustomerDashboard";
+import companyMeta from "../data/companyMeta";
+import { CartoonMascot } from "./admin/AdminMascotWelcome";
+import "../styles/dn-admin-cartoon-command.css";
 
-interface AuthProps {
-  onAuthSuccess: () => void;
+interface AuthProps { onAuthSuccess: () => void; }
+
+function LoginEntry() {
+  return <div className="dn-admin-intro-overlay"><div className="dn-admin-intro-card"><div className="dn-cartoon-stage"><CartoonMascot /><div className="dn-speech-runner" dir="rtl"><span>هلا أبو خليفة يا قيادة</span></div><div className="dn-admin-loading"><i /></div><p className="text-center text-xs font-black text-white/45">جاري تجهيز بوابة الإدارة...</p></div></div></div>;
 }
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
   const { language } = useAppContext();
-  const isArabic = language === "ar";
   const isCustomerRoute = typeof window !== "undefined" && window.location.pathname === "/customer";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [entry, setEntry] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaUnavailable, setCaptchaUnavailable] = useState(false);
   const captchaSiteKey = String(((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || "")).trim();
   const captchaEnabled = Boolean(captchaSiteKey);
   const usableCaptchaToken = captchaToken && captchaToken !== TURNSTILE_FALLBACK_TOKEN ? captchaToken : "";
 
-  useEffect(() => {
-    if (isCustomerRoute) return;
-    async function verifyCurrentAdmin() {
-      if (!supabase) return;
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
-      if (user && await isAdminUser(user.id)) onAuthSuccess();
-    }
-    void verifyCurrentAdmin();
-  }, [onAuthSuccess, isCustomerRoute]);
-
-  if (isCustomerRoute) {
-    return <CustomerDashboard />;
-  }
-
-  function guardHumanCheck() {
-    if (captchaEnabled && !usableCaptchaToken) {
-      setErrorMsg(isArabic ? "يرجى إكمال التحقق الأمني أولاً." : "Please complete the security check first.");
-      return false;
-    }
-    return true;
-  }
+  useEffect(() => { if (isCustomerRoute) return; void (async () => { if (!supabase) return; const { data } = await supabase.auth.getUser(); const user = data?.user; if (user && await isAdminUser(user.id)) onAuthSuccess(); })(); }, [onAuthSuccess, isCustomerRoute]);
+  if (isCustomerRoute) return <CustomerDashboard />;
 
   async function handleAdminLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setErrorMsg("");
-    setSuccessMsg("");
-    if (!guardHumanCheck()) return;
-    if (!supabase) {
-      setErrorMsg(isArabic ? "خدمة الدخول غير متاحة حالياً." : "Secure sign-in is currently unavailable.");
-      return;
-    }
-
+    e.preventDefault(); setErrorMsg(""); setSuccessMsg("");
+    if (captchaEnabled && !usableCaptchaToken) { setErrorMsg("يرجى إكمال التحقق الأمني أولاً."); return; }
+    if (!supabase) { setErrorMsg("خدمة الدخول غير متاحة حالياً."); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-        options: usableCaptchaToken ? { captchaToken: usableCaptchaToken } : undefined,
-      } as any);
-
-      if (error) {
-        const message = String(error.message || "").toLowerCase();
-        if (message.includes("captcha")) {
-          setErrorMsg(isArabic
-            ? "تحقق Cloudflare لم يكتمل أو لم يتم قبول المفتاح السري داخل Supabase. تأكد من Captcha secret ثم أعد المحاولة."
-            : "Cloudflare verification was not completed or the secret was not accepted in Supabase. Check the Captcha secret, then retry.");
-        } else {
-          setErrorMsg(isArabic ? "بيانات الدخول غير صحيحة أو غير مخولة." : "Invalid or unauthorized credentials.");
-        }
-        setLoading(false);
-        return;
-      }
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, options: usableCaptchaToken ? { captchaToken: usableCaptchaToken } : undefined } as any);
+      if (error) { setErrorMsg("بيانات الدخول غير صحيحة أو غير مخولة."); setLoading(false); return; }
       const user = data?.user;
-      if (!user || !(await isAdminUser(user.id))) {
-        await supabase.auth.signOut();
-        setErrorMsg(isArabic ? "هذه البوابة مخصصة للإدارة فقط." : "This portal is restricted to administrators only.");
-        setLoading(false);
-        return;
-      }
-
-      setSuccessMsg(isArabic ? "تم التحقق. جاري فتح لوحة الإدارة..." : "Verified. Opening admin panel...");
-      onAuthSuccess();
-    } catch {
-      setErrorMsg(isArabic ? "حدث خطأ أثناء تسجيل الدخول." : "A sign-in error occurred.");
-    } finally {
-      setLoading(false);
-    }
+      if (!user || !(await isAdminUser(user.id))) { await supabase.auth.signOut(); setErrorMsg("هذه البوابة مخصصة للإدارة فقط."); setLoading(false); return; }
+      setSuccessMsg("تم التحقق. جاري فتح لوحة الإدارة..."); setEntry(true); window.setTimeout(onAuthSuccess, 2600);
+    } catch { setErrorMsg("حدث خطأ أثناء تسجيل الدخول."); setLoading(false); }
   }
 
   return (
-    <div className="max-w-xl mx-auto my-10">
-      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-brand-deep/85 p-8 sm:p-10 shadow-2xl text-right" dir={isArabic ? "rtl" : "ltr"}>
-        <div className="absolute -top-20 -left-20 h-56 w-56 rounded-full bg-brand-gold/10 blur-3xl" />
-        <div className="relative">
-          <div className="mx-auto -mt-2 mb-6 w-16 h-16 bg-brand-gold rounded-2xl flex items-center justify-center border border-white/10 shadow-lg shadow-brand-gold/10">
-            <Lock className="w-7 h-7 text-brand-deep" />
-          </div>
-
-          <div className="text-center space-y-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/10 px-3 py-1 text-[11px] font-black text-brand-gold">
-              <ShieldCheck className="w-4 h-4" /> {isArabic ? "دخول الإدارة فقط" : "Admin access only"}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">{isArabic ? "بوابة الإدارة الآمنة" : "Secure Admin Portal"}</h2>
-            <p className="text-xs text-white/50 leading-relaxed">
-              {isArabic ? "هذه الصفحة مخصصة للحسابات الإدارية المخولة لإدارة الطلبات والتشغيل." : "This page is restricted to authorized administrative accounts for operations management."}
-            </p>
-          </div>
-
-          {errorMsg && (
-            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs p-4 rounded-xl flex items-start gap-2 mt-5">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="font-bold">{errorMsg}</p>
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs p-4 rounded-xl flex items-start gap-2 mt-5">
-              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="font-bold">{successMsg}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleAdminLogin} className="space-y-4 mt-7">
-            <div className="space-y-1.5">
-              <label className="text-white/80 text-xs font-bold">{isArabic ? "بريد الإدارة" : "Admin email"}</label>
-              <div className="relative">
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin@daynightae.com" className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-right" dir="ltr" />
-                <Mail className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-white/80 text-xs font-bold">{isArabic ? "كلمة المرور" : "Password"}</label>
-              <div className="relative">
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••••••" className="w-full bg-brand-cool/50 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white text-sm focus:outline-none focus:border-brand-gold placeholder:text-white/20 text-left tracking-widest" dir="ltr" />
-                <KeyRound className="absolute right-3 top-3.5 w-5 h-5 text-white/30" />
-              </div>
-            </div>
-            {captchaEnabled && (
-              <TurnstileCaptcha
-                siteKey={captchaSiteKey}
-                language={language}
-                onVerify={(token) => {
-                  setCaptchaToken(token);
-                  setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN);
-                }}
-                onExpire={() => {
-                  setCaptchaToken("");
-                  setCaptchaUnavailable(false);
-                }}
-              />
-            )}
-            {captchaUnavailable && (
-              <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">
-                {isArabic
-                  ? "تعذر تشغيل Turnstile لهذا المتصفح. لا يمكن فتح لوحة الإدارة بدون تحقق أمني مكتمل."
-                  : "Turnstile could not run in this browser. Admin access requires a completed security check."}
-              </p>
-            )}
-            <button type="submit" disabled={loading} className="w-full py-3.5 bg-brand-gold hover:bg-white text-brand-deep font-black rounded-xl text-sm transition-all disabled:opacity-50">
-              {loading ? (isArabic ? "جاري التحقق..." : "Verifying...") : (isArabic ? "دخول لوحة الإدارة" : "Open Admin Panel")}
-            </button>
+    <div className="relative min-h-[calc(100vh-90px)] overflow-hidden px-4 py-8 text-right" dir="rtl">
+      {entry && <LoginEntry />}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(245,183,0,0.12),transparent_28rem),radial-gradient(circle_at_80%_18%,rgba(24,168,232,0.2),transparent_32rem),linear-gradient(135deg,#020914,#071a33_52%,#020713)]" />
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-150px)] max-w-7xl grid-cols-1 items-center gap-8 lg:grid-cols-[0.92fr_1.08fr]">
+        <section className="rounded-[2.4rem] border border-brand-sky/20 bg-[#031226]/90 p-6 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:p-9">
+          <div className="mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full border-2 border-brand-gold/45 bg-white p-2"><img src={companyMeta.logoUrl} onError={(e) => { e.currentTarget.src = companyMeta.logoRemoteUrl; }} alt="DAY NIGHT" className="h-full w-full rounded-full object-contain" /></div>
+          <div className="text-center"><h1 className="text-4xl font-black text-brand-gold">بوابة الإدارة</h1><p className="mt-3 text-sm font-bold text-white/62">تسجيل الدخول للوصول إلى لوحة التحكم</p></div>
+          {errorMsg && <div className="mt-5 rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4 text-xs font-bold text-rose-200"><ShieldAlert className="ml-2 inline h-4 w-4" />{errorMsg}</div>}
+          {successMsg && <div className="mt-5 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-xs font-bold text-emerald-200"><CheckCircle className="ml-2 inline h-4 w-4" />{successMsg}</div>}
+          <form onSubmit={handleAdminLogin} className="mt-7 space-y-4">
+            <label className="block"><span className="mb-2 block text-xs font-black text-white/65">البريد الإلكتروني أو اسم المستخدم</span><div className="relative"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin@daynightae.com" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 pr-12 text-sm font-bold text-white outline-none placeholder:text-white/25 focus:border-brand-gold" dir="ltr" /><Mail className="absolute right-4 top-4 h-5 w-5 text-white/35" /></div></label>
+            <label className="block"><span className="mb-2 block text-xs font-black text-white/65">كلمة المرور</span><div className="relative"><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••••" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-4 pr-12 text-sm font-bold text-white outline-none placeholder:text-white/25 focus:border-brand-gold" dir="ltr" /><KeyRound className="absolute right-4 top-4 h-5 w-5 text-white/35" /></div></label>
+            <div className="flex items-center justify-between gap-3 text-xs font-bold text-white/55"><label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 rounded" /> تذكرني</label><a href="mailto:Admin@daynightae.com" className="text-brand-sky">نسيت كلمة المرور؟</a></div>
+            {captchaEnabled && <TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={(token) => { setCaptchaToken(token); setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN); }} onExpire={() => { setCaptchaToken(""); setCaptchaUnavailable(false); }} />}
+            {captchaUnavailable && <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[11px] font-bold text-amber-200">تعذر تشغيل التحقق الأمني لهذا المتصفح.</p>}
+            <button type="submit" disabled={loading || entry} className="w-full rounded-2xl bg-brand-gold px-5 py-4 text-base font-black text-brand-deep shadow-lg shadow-brand-gold/20 hover:bg-white disabled:opacity-55"><Lock className="ml-2 inline h-5 w-5" />{loading ? "جاري التحقق..." : "تسجيل الدخول"}</button>
+            <p className="text-center text-[11px] font-bold text-white/42"><ShieldCheck className="ml-1 inline h-4 w-4 text-brand-gold" /> دخول آمن ومشفر للحسابات الإدارية فقط</p>
           </form>
-        </div>
-      </section>
+        </section>
+        <section className="hidden min-h-[560px] items-center justify-center lg:flex"><div className="relative flex items-center gap-8"><div className="scale-[1.15]"><CartoonMascot /></div><div className="rounded-[2rem] border border-brand-sky/60 bg-black/20 px-8 py-6 text-3xl font-black text-white shadow-[0_0_40px_rgba(24,168,232,0.35)]">هلا أبو خليفة يا قيادة</div></div></section>
+      </div>
     </div>
   );
 }
