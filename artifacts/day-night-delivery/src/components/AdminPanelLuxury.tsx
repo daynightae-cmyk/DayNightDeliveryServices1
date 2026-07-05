@@ -1,58 +1,52 @@
 import { useState } from "react";
-import { Activity, BarChart3, Database, Download, ShieldCheck, Store, Truck } from "lucide-react";
-import { useAppContext } from "../lib/AppContext";
+import { BarChart3, ClipboardList, Database, FileText, Headphones, Home, Import, Menu, PackageCheck, PackagePlus, Printer, ReceiptText, RotateCcw, Settings, ShieldCheck, Store, Truck, UserRound, UserRoundPlus, Wallet, X } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import AdminPanelCore from "./AdminPanel";
 import AdminMerchantIntelligence from "./AdminMerchantIntelligence";
-import AdminDrawerMini from "./AdminDrawerMini";
 import AdminProspectingLinks from "./AdminProspectingLinks";
-import AdminMascotWelcome from "./admin/AdminMascotWelcome";
 import AdminFloatingHelper from "./admin/AdminFloatingHelper";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-admin-drawer.css";
 import "../styles/dn-admin-cartoon-command.css";
 
-export default function AdminPanelLuxury() {
-  const { language } = useAppContext();
-  const isArabic = language === "ar";
-  const [intro, setIntro] = useState(true);
-  const cards = [
-    { icon: Activity, value: "Live", label: isArabic ? "متابعة مباشرة" : "Live view" },
-    { icon: Database, value: "Data", label: isArabic ? "بيانات الطلبات" : "Order data" },
-    { icon: Download, value: "Export", label: isArabic ? "تصدير فوري" : "Quick export" },
-    { icon: Truck, value: "Fleet", label: isArabic ? "تشغيل الشحنات" : "Shipment flow" },
-  ];
+const menu = [
+  ["dashboard", "لوحة التحكم", Home],
+  ["new_order", "إضافة طلب جديد", PackagePlus],
+  ["new_merchant", "إضافة تاجر", UserRoundPlus],
+  ["merchants", "التجار", Store],
+  ["all_orders", "كافة الطلبات", ClipboardList],
+  ["cancelled", "الطلبات الملغية", X],
+  ["review", "الطلبات قيد المراجعة", ShieldCheck],
+  ["postponed", "الطلبات المؤجلة", PackageCheck],
+  ["returned", "الطلبات الراجعة", RotateCcw],
+  ["pickup", "الطلبات قيد الإحضار", Truck],
+  ["abu_dhabi", "طلبات أبوظبي", Truck],
+  ["external", "الطلبات الخارجية", Import],
+  ["out_scope", "الطلبات خارج النطاق", Database],
+  ["driver_statements", "كشوفات المناديب", FileText],
+  ["merchant_statements", "كشوفات التجار", ReceiptText],
+  ["income", "الدخل", Wallet],
+  ["expenses", "المصروفات", Database],
+  ["import", "استيراد الشحنات", Import],
+  ["print", "طباعة فواتير", Printer],
+  ["reports", "التقارير", BarChart3],
+  ["settings", "الإعدادات", Settings],
+  ["support", "الدعم الفني", Headphones],
+  ["logout", "تسجيل الخروج", X]
+] as const;
 
-  return (
-    <div id="dn-admin-top" className="dn-admin-luxury-shell space-y-7 scroll-smooth" dir={isArabic ? "rtl" : "ltr"}>
-      {intro && <AdminMascotWelcome onComplete={() => setIntro(false)} />}
-      <AdminFloatingHelper />
-      <AdminDrawerMini />
-      <section className="relative overflow-hidden rounded-[2.35rem] border border-brand-sky/20 bg-[#031226] p-5 shadow-2xl shadow-black/30 sm:p-7 lg:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(212,166,42,0.18),transparent_24rem),radial-gradient(circle_at_90%_12%,rgba(25,167,255,0.24),transparent_30rem)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(79,215,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(79,215,255,0.045)_1px,transparent_1px)] bg-[size:48px_48px] opacity-70" />
-        <div className="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
-          <div>
-            <div className="mb-5 flex items-center gap-3">
-              <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border-2 border-brand-gold/55 bg-white object-contain shadow-xl shadow-brand-sky/10" />
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT</p>
-                <p className="text-sm font-black text-white/78">منصور أبو خليفه — إدارة العمليات</p>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-1.5 text-xs font-black text-brand-gold"><ShieldCheck className="h-4 w-4" /> لوحة تشغيل الطلبات</span>
-            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight text-white sm:text-5xl">لوحة إدارة داي نايت</h1>
-            <p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-white/58">مركز واحد للتجار، الطلبيات، الكوبونات، الفواتير، البحث الذكي، والتقارير بنفس هوية DAY NIGHT.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {cards.map(({ icon: Icon, value, label }) => <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 backdrop-blur-xl"><Icon className="mb-3 h-5 w-5 text-brand-gold" /><p className="font-mono text-xl font-black text-brand-gold" dir="ltr">{value}</p><p className="mt-1 text-xs font-bold text-white/58">{label}</p></div>)}
-            <div className="col-span-2 rounded-2xl border border-brand-gold/25 bg-brand-gold/10 p-4"><div className="flex items-center gap-3"><BarChart3 className="h-5 w-5 text-brand-gold" /><div><p className="text-sm font-black text-white">ذكاء تشغيلي للتجار</p><p className="text-xs font-bold text-white/50">بحث، تقييم، مخاطر، وقرارات أسرع</p></div></div></div>
-          </div>
-        </div>
-      </section>
-      <section id="dn-admin-ai" className="scroll-mt-28"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => undefined} onCreateOrder={() => undefined} /></section>
-      <AdminProspectingLinks />
-      <section id="dn-admin-core" className="scroll-mt-28 rounded-[2rem] border border-white/10 bg-brand-cool/20 p-4 sm:p-5"><div className="mb-4 flex items-center gap-3 text-brand-gold"><Store className="h-5 w-5" /><strong>مستودع الطلبات والتجار</strong></div><AdminPanelCore /></section>
-    </div>
-  );
+type SectionId = typeof menu[number][0];
+
+export default function AdminPanelLuxury() {
+  const [active, setActive] = useState<SectionId>("dashboard");
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const activeTitle = menu.find((item) => item[0] === active)?.[1] || "لوحة التحكم";
+  function content() {
+    if (active === "dashboard") return <div className="dn-command-panel p-7"><h2 className="text-3xl font-black text-white">مرحباً يا أبو خليفة</h2><p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-white/55">اختر القسم من القائمة اليمنى. لا يتم عرض أسماء أو أرقام أو إحصائيات غير حقيقية.</p></div>;
+    if (active === "merchants") return <AdminMerchantIntelligence isArabic onSearchOrders={() => setActive("all_orders")} onCreateOrder={() => setActive("new_order")} />;
+    if (active === "support") return <AdminProspectingLinks />;
+    if (["expenses", "import", "settings"].includes(active)) return <div className="dn-command-panel p-8 text-center"><Database className="mx-auto mb-4 h-7 w-7 text-brand-gold" /><h2 className="text-2xl font-black text-white">{activeTitle}</h2><p className="mt-3 text-sm font-bold leading-7 text-white/50">هذا القسم قيد التجهيز، وسيتم عرض البيانات الحقيقية هنا عند توفرها.</p></div>;
+    return <AdminPanelCore />;
+  }
+  return <div id="dn-admin-top" className="dn-admin-luxury-shell dn-admin-cinematic scroll-smooth" dir="rtl"><AdminFloatingHelper /><button type="button" className="dn-command-menu-button" onClick={() => setMobileMenu(true)}><Menu className="h-5 w-5" /> قائمة الإدارة</button>{mobileMenu && <button type="button" className="dn-command-backdrop" aria-label="Close" onClick={() => setMobileMenu(false)} />}<div className="dn-command-layout"><aside className={`dn-command-sidebar p-4 ${mobileMenu ? "is-open" : ""}`}><button type="button" className="mb-3 hidden rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 max-[1100px]:block" onClick={() => setMobileMenu(false)}><X className="h-4 w-4" /></button><div className="mb-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 text-center"><img src={companyMeta.logoUrl} onError={(e) => { e.currentTarget.src = companyMeta.logoRemoteUrl; }} alt="DAY NIGHT" className="mx-auto h-20 w-20 rounded-full border-2 border-brand-gold/45 bg-white object-contain" /><div className="mx-auto mt-4 grid h-11 w-11 place-items-center rounded-2xl border border-brand-gold/30 bg-brand-gold/10 text-brand-gold"><UserRound className="h-5 w-5" /></div><h2 className="mt-3 text-xl font-black text-white">أبو خليفة</h2><p className="text-xs font-bold text-white/45">مدير النظام</p><p className="mt-3 text-[11px] font-bold leading-5 text-brand-gold">نصل إليك في كل وقت</p></div><nav className="space-y-2">{menu.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => { setActive(id); setMobileMenu(false); }} className={`dn-command-nav-item ${active === id ? "is-active" : ""}`}><span className="dn-command-nav-icon"><Icon className="h-5 w-5" /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-black">{label}</strong></span></button>)}</nav></aside><main className="dn-command-main space-y-5"><section className="dn-command-panel p-6"><span className="inline-flex rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-1.5 text-xs font-black text-brand-gold">مركز القيادة</span><h1 className="mt-4 text-4xl font-black text-white">{activeTitle}</h1><p className="mt-3 text-sm font-bold leading-7 text-white/55">واجهة هادئة متصلة بالبيانات الحالية.</p></section><section>{content()}</section></main></div></div>;
 }
