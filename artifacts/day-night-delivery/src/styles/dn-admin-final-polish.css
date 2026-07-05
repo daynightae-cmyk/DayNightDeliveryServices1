@@ -2,3 +2,16 @@
 .dn-admin-luxury-shell details a {
   margin-bottom: 0.25rem;
 }
+
+.dn-admin-luxury-shell details[open] summary {
+  border-color: rgba(242, 201, 76, 0.65) !important;
+}
+
+.dn-admin-luxury-shell details > div {
+  animation: dnAdminMenuIn 180ms ease-out both;
+}
+
+@keyframes dnAdminMenuIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
