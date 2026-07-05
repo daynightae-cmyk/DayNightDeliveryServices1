@@ -7,6 +7,7 @@ import AdminDrawerMini from "./AdminDrawerMini";
 import AdminProspectingLinks from "./AdminProspectingLinks";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-admin-drawer.css";
+import "../styles/dn-admin-cartoon-command.css";
 
 export default function AdminPanelLuxury() {
   const { language } = useAppContext();
