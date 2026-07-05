@@ -18,7 +18,7 @@ export default function AdminPanelLuxury() {
   ];
 
   return (
-    <div className="dn-admin-luxury-shell space-y-7" dir={isArabic ? "rtl" : "ltr"}>
+    <div id="dn-admin-top" className="dn-admin-luxury-shell space-y-7 scroll-smooth" dir={isArabic ? "rtl" : "ltr"}>
       <AdminDrawerMini />
       <section className="relative overflow-hidden rounded-[2.35rem] border border-brand-sky/20 bg-[#031226] p-5 shadow-2xl shadow-black/30 sm:p-7 lg:p-8">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(212,166,42,0.18),transparent_24rem),radial-gradient(circle_at_90%_12%,rgba(25,167,255,0.24),transparent_30rem)]" />
@@ -42,8 +42,8 @@ export default function AdminPanelLuxury() {
           </div>
         </div>
       </section>
-      <AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => undefined} onCreateOrder={() => undefined} />
-      <section className="rounded-[2rem] border border-white/10 bg-brand-cool/20 p-4 sm:p-5"><div className="mb-4 flex items-center gap-3 text-brand-gold"><Store className="h-5 w-5" /><strong>{isArabic ? "مستودع الطلبات والتجار" : "Orders and merchants workspace"}</strong></div><AdminPanelCore /></section>
+      <section id="dn-admin-ai" className="scroll-mt-28"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => undefined} onCreateOrder={() => undefined} /></section>
+      <section id="dn-admin-core" className="scroll-mt-28 rounded-[2rem] border border-white/10 bg-brand-cool/20 p-4 sm:p-5"><div className="mb-4 flex items-center gap-3 text-brand-gold"><Store className="h-5 w-5" /><strong>{isArabic ? "مستودع الطلبات والتجار" : "Orders and merchants workspace"}</strong></div><AdminPanelCore /></section>
     </div>
   );
 }
