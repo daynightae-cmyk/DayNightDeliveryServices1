@@ -4,6 +4,7 @@ import companyMeta from "../data/companyMeta";
 import AdminPanelCore from "./AdminPanel";
 import AdminMerchantIntelligence from "./AdminMerchantIntelligence";
 import AdminDrawerMini from "./AdminDrawerMini";
+import AdminProspectingLinks from "./AdminProspectingLinks";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-admin-drawer.css";
 
@@ -43,6 +44,7 @@ export default function AdminPanelLuxury() {
         </div>
       </section>
       <section id="dn-admin-ai" className="scroll-mt-28"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => undefined} onCreateOrder={() => undefined} /></section>
+      <AdminProspectingLinks />
       <section id="dn-admin-core" className="scroll-mt-28 rounded-[2rem] border border-white/10 bg-brand-cool/20 p-4 sm:p-5"><div className="mb-4 flex items-center gap-3 text-brand-gold"><Store className="h-5 w-5" /><strong>{isArabic ? "مستودع الطلبات والتجار" : "Orders and merchants workspace"}</strong></div><AdminPanelCore /></section>
     </div>
   );
