@@ -1,8 +1,8 @@
 export default function AdminDrawerMini() {
   return (
     <details className="group fixed bottom-24 left-5 z-50">
-      <summary className="cursor-pointer list-none rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep shadow-2xl">Operations Menu</summary>
-      <div className="fixed left-0 top-0 h-dvh w-[min(92vw,390px)] overflow-y-auto border-r border-brand-sky/20 bg-[#031226]/95 p-5 shadow-2xl backdrop-blur-xl">
+      <summary className="relative z-[2] cursor-pointer list-none rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep shadow-2xl">Operations Menu / Close</summary>
+      <div className="fixed left-0 top-0 z-[1] h-dvh w-[min(92vw,390px)] overflow-y-auto border-r border-brand-sky/20 bg-[#031226]/95 p-5 shadow-2xl backdrop-blur-xl">
         <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
           <strong className="block text-xl font-black text-white">DAY NIGHT</strong>
           <span className="text-xs font-bold text-white/45">Admin Operations Hub</span>
