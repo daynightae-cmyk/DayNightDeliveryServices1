@@ -1,7 +1,6 @@
-01-auth-first-screen.png | https://i.postimg.cc/7hdxkFff/allwjw.png
-02-auth-login-screen.png | https://i.postimg.cc/PqyTxpCT/tany-shashh.png
-03-auth-loading-screen.png | https://i.postimg.cc/pVcF1yXm/Chat-GPT-Image-Jul-6-2026-05-50-14-PM-(5).png
-04-logo-glass.png | https://i.postimg.cc/jdW7VKLP/Chat-GPT-Image-Jul-6-2026-05-50-15-PM-(8).png
-05-admin-dashboard-reference.png | https://i.postimg.cc/657vswy0/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(10).png
-06-admin-live-map.png | https://i.postimg.cc/vH1VRMcr/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(9).png
-07-auth-login-reference-original.png | https://i.postimg.cc/xjpzFqTC/Chat-GPT-Image-Jul-6-2026-05-50-13-PM-(4).png
+01-auth-first-screen.png | approved first gateway screen | 1672x941
+02-auth-login-screen.png | approved admin login screen | 1672x941
+03-auth-loading-screen.png | approved command center loading screen | 1672x941
+04-logo-glass.png | approved glass logo | 872x872
+05-admin-dashboard-reference.png | approved admin dashboard visual reference | 1672x941
+06-admin-khalifa-card.png | approved Khalifa assistant sidebar card | 1122x1402

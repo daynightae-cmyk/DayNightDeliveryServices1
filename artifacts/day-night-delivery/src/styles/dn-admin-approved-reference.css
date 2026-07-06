@@ -1,0 +1,6 @@
+/* Optional approved admin visual reference assets. This file does NOT overlay duplicate Khalifa images. */
+:root{
+  --dn-approved-admin-map:url('/assets/daynight/premium-auth/05-admin-dashboard-reference.png?v=approved-20260706-3');
+  --dn-approved-admin-khalifa:url('/assets/daynight/premium-auth/06-admin-khalifa-card.png?v=approved-20260706-3');
+}
+body:has([class*="Admin"]),body:has([class*="admin"]){background:#020814!important}
