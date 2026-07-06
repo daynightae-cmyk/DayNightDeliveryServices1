@@ -68,13 +68,9 @@
 }
 
 .dn-admin-fullscreen[dir="rtl"] .dn-admin-menu-full button {
-  flex-direction: row-reverse !important;
+  flex-direction: row !important;
+  direction: rtl !important;
   text-align: right !important;
-}
-
-.dn-admin-menu-full button span svg {
-  display: block !important;
-  opacity: 1 !important;
 }
 
 .dn-auth-hero-bubble,
@@ -82,81 +78,12 @@
   display: none !important;
 }
 
-/* Phase 6 Task 2: visible icon fallbacks for admin navigation */
-.dn-admin-menu-full button span,
-.dn-admin-sidebar-item .dn-admin-sidebar-icon {
-  position: relative !important;
-  display: grid !important;
-  place-items: center !important;
-  overflow: hidden !important;
-  font-size: 0 !important;
-  color: #f5b700 !important;
-}
-
-.dn-admin-menu-full button span svg,
-.dn-admin-sidebar-item .dn-admin-sidebar-icon svg {
-  display: none !important;
-}
-
-.dn-admin-menu-full button span::before,
-.dn-admin-sidebar-item .dn-admin-sidebar-icon::before {
-  display: block !important;
-  color: #f5b700 !important;
-  font-family: Arial, sans-serif !important;
-  font-size: 18px !important;
-  font-weight: 950 !important;
-  line-height: 1 !important;
-  text-shadow: 0 0 12px rgba(245, 183, 0, 0.28) !important;
-}
-
-.dn-admin-menu-full button:nth-child(1) span::before,.dn-admin-sidebar-item:nth-child(1) .dn-admin-sidebar-icon::before{content:"⌂"}
-.dn-admin-menu-full button:nth-child(2) span::before,.dn-admin-sidebar-item:nth-child(2) .dn-admin-sidebar-icon::before{content:"+"}
-.dn-admin-menu-full button:nth-child(3) span::before,.dn-admin-sidebar-item:nth-child(3) .dn-admin-sidebar-icon::before{content:"U"}
-.dn-admin-menu-full button:nth-child(4) span::before,.dn-admin-sidebar-item:nth-child(4) .dn-admin-sidebar-icon::before{content:"S"}
-.dn-admin-menu-full button:nth-child(5) span::before,.dn-admin-sidebar-item:nth-child(5) .dn-admin-sidebar-icon::before{content:"O"}
-.dn-admin-menu-full button:nth-child(6) span::before,.dn-admin-sidebar-item:nth-child(6) .dn-admin-sidebar-icon::before{content:"X"}
-.dn-admin-menu-full button:nth-child(7) span::before,.dn-admin-sidebar-item:nth-child(7) .dn-admin-sidebar-icon::before{content:"✓"}
-.dn-admin-menu-full button:nth-child(8) span::before,.dn-admin-sidebar-item:nth-child(8) .dn-admin-sidebar-icon::before{content:"T"}
-.dn-admin-menu-full button:nth-child(9) span::before,.dn-admin-sidebar-item:nth-child(9) .dn-admin-sidebar-icon::before{content:"↺"}
-.dn-admin-menu-full button:nth-child(10) span::before,.dn-admin-sidebar-item:nth-child(10) .dn-admin-sidebar-icon::before{content:"V"}
-.dn-admin-menu-full button:nth-child(11) span::before,.dn-admin-sidebar-item:nth-child(11) .dn-admin-sidebar-icon::before{content:"A"}
-.dn-admin-menu-full button:nth-child(12) span::before,.dn-admin-sidebar-item:nth-child(12) .dn-admin-sidebar-icon::before{content:"↥"}
-.dn-admin-menu-full button:nth-child(13) span::before,.dn-admin-sidebar-item:nth-child(13) .dn-admin-sidebar-icon::before{content:"!"}
-.dn-admin-menu-full button:nth-child(14) span::before,.dn-admin-sidebar-item:nth-child(14) .dn-admin-sidebar-icon::before{content:"D"}
-.dn-admin-menu-full button:nth-child(15) span::before,.dn-admin-sidebar-item:nth-child(15) .dn-admin-sidebar-icon::before{content:"M"}
-.dn-admin-menu-full button:nth-child(16) span::before,.dn-admin-sidebar-item:nth-child(16) .dn-admin-sidebar-icon::before{content:"$"}
-.dn-admin-menu-full button:nth-child(17) span::before,.dn-admin-sidebar-item:nth-child(17) .dn-admin-sidebar-icon::before{content:"E"}
-.dn-admin-menu-full button:nth-child(18) span::before,.dn-admin-sidebar-item:nth-child(18) .dn-admin-sidebar-icon::before{content:"↓"}
-.dn-admin-menu-full button:nth-child(19) span::before,.dn-admin-sidebar-item:nth-child(19) .dn-admin-sidebar-icon::before{content:"P"}
-.dn-admin-menu-full button:nth-child(20) span::before,.dn-admin-sidebar-item:nth-child(20) .dn-admin-sidebar-icon::before{content:"R"}
-.dn-admin-menu-full button:nth-child(21) span::before,.dn-admin-sidebar-item:nth-child(21) .dn-admin-sidebar-icon::before{content:"⚙"}
-.dn-admin-menu-full button:nth-child(22) span::before,.dn-admin-sidebar-item:nth-child(22) .dn-admin-sidebar-icon::before{content:"?"}
-.dn-admin-menu-full button:nth-child(23) span::before,.dn-admin-sidebar-item:nth-child(23) .dn-admin-sidebar-icon::before{content:"↪"}
-
-.dn-admin-bottom-cards article div,
-.dn-admin-mini-card div {
-  position: relative !important;
-  display: grid !important;
-  place-items: center !important;
-  color: rgba(245, 183, 0, 0.95) !important;
-  font-size: 0 !important;
-}
-
-.dn-admin-bottom-cards article div svg,
-.dn-admin-mini-card div svg {
-  display: none !important;
-}
-
-.dn-admin-bottom-cards article div::before,
-.dn-admin-mini-card div::before {
-  display: block !important;
-  font-family: Arial, sans-serif !important;
-  font-size: 22px !important;
-  font-weight: 950 !important;
-  color: #f5b700 !important;
-}
-
-.dn-admin-bottom-cards article:nth-child(1) div::before,.dn-admin-mini-card:nth-child(1) div::before{content:"R"}
-.dn-admin-bottom-cards article:nth-child(2) div::before,.dn-admin-mini-card:nth-child(2) div::before{content:"I"}
-.dn-admin-bottom-cards article:nth-child(3) div::before,.dn-admin-mini-card:nth-child(3) div::before{content:"D"}
-.dn-admin-bottom-cards article:nth-child(4) div::before,.dn-admin-mini-card:nth-child(4) div::before{content:"?"}
+/* Phase 6 Task 2: professional SVG icon system */
+.dn-admin-menu-full button { display:flex!important; align-items:center!important; gap:12px!important; }
+.dn-admin-menu-full button span { width:38px!important; height:38px!important; min-width:38px!important; display:grid!important; place-items:center!important; font-size:0!important; }
+.dn-admin-menu-full button span::before { display:none!important; }
+.dn-admin-menu-full button span svg { display:block!important; opacity:1!important; visibility:visible!important; width:20px!important; height:20px!important; }
+.dn-admin-menu-full button strong { flex:1 1 auto!important; }
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-menu-full button { flex-direction:row!important; direction:rtl!important; text-align:right!important; }
+.dn-admin-bottom-cards article div::before { display:none!important; }
+.dn-admin-bottom-cards article div svg { display:block!important; opacity:1!important; width:24px!important; height:24px!important; }
