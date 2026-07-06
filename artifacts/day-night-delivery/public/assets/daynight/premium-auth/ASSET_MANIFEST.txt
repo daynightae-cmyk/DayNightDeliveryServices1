@@ -1,11 +1,7 @@
-DAY NIGHT PREMIUM AUTH ASSETS
-Generated: 2026-07-06 18:08:37Z
-
-dn-auth-intro-hero.png | Intro landing / Khalifa points to login | https://i.postimg.cc/T1s5yNHc/Chat-GPT-Image-Jul-6-2026-05-50-12-PM-(3).png
-dn-auth-login-reference.png | Premium login reference | https://i.postimg.cc/xjpzFqTC/Chat-GPT-Image-Jul-6-2026-05-50-13-PM-(4).png
-dn-auth-loading-bridge.png | Loading bridge | https://i.postimg.cc/pVcF1yXm/Chat-GPT-Image-Jul-6-2026-05-50-14-PM-(5).png
-dn-khalifa-assistant-card.png | Khalifa assistant card | https://i.postimg.cc/HWvyPjsy/Chat-GPT-Image-Jul-6-2026-05-50-15-PM-(6).png
-dn-khalifa-robot.png | Khalifa robot | https://i.postimg.cc/fWq9gkT0/Chat-GPT-Image-Jul-6-2026-05-50-15-PM-(7).png
-dn-logo-premium-glass.png | Premium circular logo | https://i.postimg.cc/jdW7VKLP/Chat-GPT-Image-Jul-6-2026-05-50-15-PM-(8).png
-dn-admin-dashboard-reference.png | Dashboard reference | https://i.postimg.cc/657vswy0/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(10).png
-dn-admin-live-map.png | Live map background | https://i.postimg.cc/vH1VRMcr/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(9).png
+01-auth-first-screen.png | https://i.postimg.cc/7hdxkFff/allwjw.png
+02-auth-login-screen.png | https://i.postimg.cc/PqyTxpCT/tany-shashh.png
+03-auth-loading-screen.png | https://i.postimg.cc/pVcF1yXm/Chat-GPT-Image-Jul-6-2026-05-50-14-PM-(5).png
+04-logo-glass.png | https://i.postimg.cc/jdW7VKLP/Chat-GPT-Image-Jul-6-2026-05-50-15-PM-(8).png
+05-admin-dashboard-reference.png | https://i.postimg.cc/657vswy0/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(10).png
+06-admin-live-map.png | https://i.postimg.cc/vH1VRMcr/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(9).png
+07-auth-login-reference-original.png | https://i.postimg.cc/xjpzFqTC/Chat-GPT-Image-Jul-6-2026-05-50-13-PM-(4).png

@@ -1,39 +1,62 @@
 import React, { useEffect, useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
-import {
-  ArrowRight,
-  CheckCircle,
-  Eye,
-  KeyRound,
-  Lock,
-  Mail,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
-  UserCog,
-} from "lucide-react";
+import { CheckCircle, Eye, KeyRound, Lock, Mail, ShieldAlert, ShieldCheck } from "lucide-react";
 import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
 import { useAppContext } from "../lib/AppContext";
 import CustomerDashboard from "./customer/CustomerDashboard";
 import companyMeta from "../data/companyMeta";
 import AdminMascotWelcome from "./admin/AdminMascotWelcome";
-import "../styles/dn-khalifa-final.css";
-import "../styles/dn-auth-gateway-phase1.css";
 import "../styles/dn-premium-auth-assets.css";
 
-interface AuthProps {
-  onAuthSuccess: () => void;
-}
+interface AuthProps { onAuthSuccess: () => void; }
 
-const premiumAssets = {
-  introHero: "/assets/daynight/premium-auth/dn-auth-intro-hero.png",
-  loginReference: "/assets/daynight/premium-auth/dn-auth-login-reference.png",
-  loadingBridge: "/assets/daynight/premium-auth/dn-auth-loading-bridge.png",
-  khalifaAssistant: "/assets/daynight/premium-auth/dn-khalifa-assistant-card.png",
-  khalifaRobot: "/assets/daynight/premium-auth/dn-khalifa-robot.png",
-  logo: "/assets/daynight/premium-auth/dn-logo-premium-glass.png",
-  dashboardReference: "/assets/daynight/premium-auth/dn-admin-dashboard-reference.png",
-  liveMap: "/assets/daynight/premium-auth/dn-admin-live-map.png",
+const assets = {
+  first: "/assets/daynight/premium-auth/01-auth-first-screen.png",
+  login: "/assets/daynight/premium-auth/02-auth-login-screen.png",
+  loading: "/assets/daynight/premium-auth/03-auth-loading-screen.png",
+  logo: "/assets/daynight/premium-auth/04-logo-glass.png",
+};
+
+const ar = {
+  lang: "English",
+  enterPortal: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0628\u0648\u0627\u0628\u0629",
+  title: "\u0628\u0648\u0627\u0628\u0629 \u0627\u0644\u0625\u062F\u0627\u0631\u0629",
+  subtitle: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645",
+  email: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645",
+  password: "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
+  remember: "\u062A\u0630\u0643\u0631\u0646\u064A",
+  forgot: "\u0646\u0633\u064A\u062A \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631\u061F",
+  submit: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644",
+  loading: "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0642\u0642...",
+  secure: "\u062F\u062E\u0648\u0644 \u0622\u0645\u0646 \u0648\u0645\u0634\u0641\u0631 \u0644\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0625\u062F\u0627\u0631\u064A\u0629 \u0641\u0642\u0637",
+  captchaRequired: "\u064A\u0631\u062C\u0649 \u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u0623\u0645\u0646\u064A \u0623\u0648\u0644\u0627\u064B.",
+  loginUnavailable: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B.",
+  invalid: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629 \u0623\u0648 \u063A\u064A\u0631 \u0645\u062E\u0648\u0644\u0629.",
+  adminOnly: "\u0647\u0630\u0647 \u0627\u0644\u0628\u0648\u0627\u0628\u0629 \u0645\u062E\u0635\u0635\u0629 \u0644\u0644\u0625\u062F\u0627\u0631\u0629 \u0641\u0642\u0637.",
+  success: "\u062A\u0645 \u0627\u0644\u062A\u062D\u0642\u0642. \u062C\u0627\u0631\u064A \u062A\u062C\u0647\u064A\u0632 \u0645\u0631\u0643\u0632 \u0627\u0644\u0642\u064A\u0627\u062F\u0629...",
+  genericError: "\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644.",
+  captchaIssue: "\u062A\u0639\u0630\u0631 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u0623\u0645\u0646\u064A \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u0635\u0641\u062D.",
+};
+
+const en = {
+  lang: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629",
+  enterPortal: "Enter Admin Portal",
+  title: "Admin Portal",
+  subtitle: "Sign in to access the control dashboard",
+  email: "Email or username",
+  password: "Password",
+  remember: "Remember me",
+  forgot: "Forgot password?",
+  submit: "Sign in",
+  loading: "Checking...",
+  secure: "Secure encrypted access for admin accounts only",
+  captchaRequired: "Please complete the security check first.",
+  loginUnavailable: "Login service is currently unavailable.",
+  invalid: "Invalid or unauthorized login details.",
+  adminOnly: "This portal is for administrators only.",
+  success: "Verified. Preparing command center...",
+  genericError: "An error occurred during login.",
+  captchaIssue: "Security check could not run in this browser.",
 };
 
 function LoginEntry({ isArabic }: { isArabic: boolean }) {
@@ -43,18 +66,16 @@ function LoginEntry({ isArabic }: { isArabic: boolean }) {
 export default function Auth({ onAuthSuccess }: AuthProps) {
   const { language, toggleLanguage } = useAppContext();
   const isArabic = language === "ar";
+  const ui = isArabic ? ar : en;
   const isCustomerRoute = typeof window !== "undefined" && window.location.pathname === "/customer";
 
+  const [stage, setStage] = useState<"intro" | "login">("intro");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [entry, setEntry] = useState(false);
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.sessionStorage.getItem("dnAuthIntroSeen") !== "yes";
-  });
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaUnavailable, setCaptchaUnavailable] = useState(false);
 
@@ -62,75 +83,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const captchaEnabled = Boolean(captchaSiteKey);
   const usableCaptchaToken = captchaToken && captchaToken !== TURNSTILE_FALLBACK_TOKEN ? captchaToken : "";
 
-  const ui = isArabic
-    ? {
-        lang: "English",
-        introBadge: "Ù…Ø±Ø­Ø¨Ù‹Ø§ Ø¨Ùƒ ÙÙŠ",
-        introTitle: "Ø¨ÙˆØ§Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©",
-        introText: "ØªØ¬Ø±Ø¨Ø© Ø¯Ø®ÙˆÙ„ ÙØ§Ø®Ø±Ø© Ù„Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø·Ù„Ø¨Ø§Øª ÙˆØ§Ù„ØªØ¬Ø§Ø± ÙˆØ§Ù„ØªØ­ØµÙŠÙ„ Ø¨ÙƒÙ„ Ø³Ø±Ø¹Ø© ÙˆÙˆØ¶ÙˆØ­.",
-        introButton: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ø§Ù„Ø¨ÙˆØ§Ø¨Ø©",
-        title: "Ø¨ÙˆØ§Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©",
-        subtitle: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù„Ù„ÙˆØµÙˆÙ„ Ø¥Ù„Ù‰ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…",
-        email: "Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…",
-        password: "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±",
-        remember: "ØªØ°ÙƒØ±Ù†ÙŠ",
-        forgot: "Ù†Ø³ÙŠØª ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±ØŸ",
-        submit: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„",
-        loading: "Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù‚Ù‚...",
-        secure: "Ø¯Ø®ÙˆÙ„ Ø¢Ù…Ù† ÙˆÙ…Ø´ÙØ± Ù„Ù„Ø­Ø³Ø§Ø¨Ø§Øª Ø§Ù„Ø¥Ø¯Ø§Ø±ÙŠØ© ÙÙ‚Ø·",
-        captchaRequired: "ÙŠØ±Ø¬Ù‰ Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ø£Ù…Ù†ÙŠ Ø£ÙˆÙ„Ø§Ù‹.",
-        loginUnavailable: "Ø®Ø¯Ù…Ø© Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠØ§Ù‹.",
-        invalid: "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± ØµØ­ÙŠØ­Ø© Ø£Ùˆ ØºÙŠØ± Ù…Ø®ÙˆÙ„Ø©.",
-        adminOnly: "Ù‡Ø°Ù‡ Ø§Ù„Ø¨ÙˆØ§Ø¨Ø© Ù…Ø®ØµØµØ© Ù„Ù„Ø¥Ø¯Ø§Ø±Ø© ÙÙ‚Ø·.",
-        success: "ØªÙ… Ø§Ù„ØªØ­Ù‚Ù‚. Ø¬Ø§Ø±ÙŠ ØªØ¬Ù‡ÙŠØ² Ù…Ø±ÙƒØ² Ø§Ù„Ù‚ÙŠØ§Ø¯Ø©...",
-        genericError: "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„.",
-        captchaIssue: "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ø£Ù…Ù†ÙŠ Ù„Ù‡Ø°Ø§ Ø§Ù„Ù…ØªØµÙØ­.",
-        feature1: "Ø¢Ù…Ù† ÙˆÙ…ÙˆØ«ÙˆÙ‚",
-        feature2: "Ø³Ø±ÙŠØ¹ ÙˆÙØ¹Ø§Ù„",
-        feature3: "ØªØªØ¨Ø¹ Ù„Ø­Ø¸ÙŠ",
-        feature4: "Ø¯Ø¹Ù… 24/7",
-        sideTitle: "Ø®Ù„ÙŠÙØ© Ø¬Ø§Ù‡Ø² Ù„Ø®Ø¯Ù…ØªÙƒ",
-        sideText: "Ù…Ø³Ø§Ø¹Ø¯Ùƒ Ø§Ù„Ø°ÙƒÙŠ ÙŠØ¬Ù‡Ù‘Ø² ØªØ¬Ø±Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø© Ù‚Ø¨Ù„ Ø¯Ø®ÙˆÙ„Ùƒ Ø¥Ù„Ù‰ Ù…Ø±ÙƒØ² Ø§Ù„Ù‚ÙŠØ§Ø¯Ø©.",
-        checkpoint1: "ÙØ­Øµ Ø§Ù„Ø£Ù…Ø§Ù†",
-        checkpoint2: "Ø¬Ù„Ø¨ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª",
-        checkpoint3: "ØªÙ‡ÙŠØ¦Ø© Ø§Ù„Ù†Ø¸Ø§Ù…",
-      }
-    : {
-        lang: "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
-        introBadge: "Welcome to",
-        introTitle: "Admin Portal",
-        introText: "A premium gateway for managing orders, merchants, collections, and operations.",
-        introButton: "Enter Admin Portal",
-        title: "Admin Portal",
-        subtitle: "Sign in to access the control dashboard",
-        email: "Email or username",
-        password: "Password",
-        remember: "Remember me",
-        forgot: "Forgot password?",
-        submit: "Sign in",
-        loading: "Checking...",
-        secure: "Secure encrypted access for admin accounts only",
-        captchaRequired: "Please complete the security check first.",
-        loginUnavailable: "Login service is currently unavailable.",
-        invalid: "Invalid or unauthorized login details.",
-        adminOnly: "This portal is for administrators only.",
-        success: "Verified. Preparing command center...",
-        genericError: "An error occurred during login.",
-        captchaIssue: "Security check could not run in this browser.",
-        feature1: "Secure",
-        feature2: "Fast",
-        feature3: "Live tracking",
-        feature4: "24/7 support",
-        sideTitle: "Khalifa is ready",
-        sideText: "Your smart assistant prepares the command center before you enter operations.",
-        checkpoint1: "Security check",
-        checkpoint2: "Fetching data",
-        checkpoint3: "System setup",
-      };
-
   useEffect(() => {
     if (isCustomerRoute) return;
-
     void (async () => {
       if (!supabase) return;
       const { data } = await supabase.auth.getUser();
@@ -141,13 +95,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
   if (isCustomerRoute) return <CustomerDashboard />;
 
-  function enterLogin() {
-    window.sessionStorage.setItem("dnAuthIntroSeen", "yes");
-    setShowIntro(false);
-  }
-
-  async function handleAdminLogin(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleAdminLogin(event: React.FormEvent) {
+    event.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
 
@@ -193,153 +142,39 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     }
   }
 
-  if (showIntro) {
+  if (stage === "intro") {
     return (
-      <div className="dn-premium-intro-page" dir={isArabic ? "rtl" : "ltr"}>
-        <button type="button" className="dn-premium-language-switch" onClick={toggleLanguage}>
-          {ui.lang}
-        </button>
-
-        <div className="dn-premium-intro-bg" aria-hidden="true" />
-        <section className="dn-premium-intro-shell">
-          <div className="dn-premium-intro-copy">
-            <span>{ui.introBadge}</span>
-            <h1>{ui.introTitle}</h1>
-            <p>{ui.introText}</p>
-
-            <div className="dn-premium-intro-features">
-              <strong><ShieldCheck />{ui.feature1}</strong>
-              <strong><Sparkles />{ui.feature2}</strong>
-              <strong><UserCog />{ui.feature3}</strong>
-              <strong><Lock />{ui.feature4}</strong>
-            </div>
-
-            <button type="button" onClick={enterLogin} className="dn-premium-intro-button">
-              {ui.introButton}
-              <ArrowRight />
-            </button>
-          </div>
-
-          <div className="dn-premium-intro-image-card">
-            <img src={premiumAssets.introHero} alt={ui.introTitle} />
-          </div>
-        </section>
+      <div className="dn-clean-auth-root dn-clean-auth-intro" dir={isArabic ? "rtl" : "ltr"}>
+        <button type="button" className="dn-clean-auth-lang" onClick={toggleLanguage}>{ui.lang}</button>
+        <img className="dn-clean-auth-full-image" src={assets.first} alt={ui.title} />
+        <button type="button" className="dn-clean-auth-enter" onClick={() => setStage("login")}>{ui.enterPortal}</button>
       </div>
     );
   }
 
   return (
-    <div className="dn-auth-page-final dn-auth-assets-page" dir={isArabic ? "rtl" : "ltr"}>
+    <div className="dn-clean-auth-root dn-clean-auth-login" dir={isArabic ? "rtl" : "ltr"}>
       {entry && <LoginEntry isArabic={isArabic} />}
+      <button type="button" className="dn-clean-auth-lang" onClick={toggleLanguage}>{ui.lang}</button>
+      <img className="dn-clean-auth-bg-image" src={assets.login} alt={ui.title} />
+      <main className="dn-clean-auth-shell">
+        <section className="dn-clean-auth-form-card" aria-label={ui.title}>
+          <div className="dn-clean-auth-logo"><img src={assets.logo} alt="DAY NIGHT DELIVERY SERVICES" /></div>
+          <header className="dn-clean-auth-heading"><span>DAY NIGHT COMMAND GATEWAY</span><h1>{ui.title}</h1><p>{ui.subtitle}</p></header>
 
-      <button type="button" className="dn-premium-language-switch" onClick={toggleLanguage}>
-        {ui.lang}
-      </button>
+          {errorMsg && <div className="dn-clean-auth-alert is-error"><ShieldAlert />{errorMsg}</div>}
+          {successMsg && <div className="dn-clean-auth-alert is-success"><CheckCircle />{successMsg}</div>}
 
-      <main className="dn-auth-assets-shell">
-        <section className="dn-auth-assets-visual-card" aria-label="DAY NIGHT Khalifa">
-          <img src={premiumAssets.loginReference} alt="DAY NIGHT admin gateway visual" />
-          <div className="dn-auth-assets-visual-glow" />
-        </section>
+          <form onSubmit={handleAdminLogin} className="dn-clean-auth-form">
+            <label className="dn-clean-auth-field"><span>{ui.email}</span><div><Mail /><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin@daynightae.com" dir="ltr" /></div></label>
+            <label className="dn-clean-auth-field"><span>{ui.password}</span><div><KeyRound /><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" dir="ltr" /><Eye /></div></label>
+            <div className="dn-clean-auth-options"><label><input type="checkbox" /> {ui.remember}</label><a href={`mailto:${companyMeta.email}`}>{ui.forgot}</a></div>
 
-        <section className="dn-auth-assets-login-card" aria-label={ui.title}>
-          <div className="dn-auth-assets-logo">
-            <img src={premiumAssets.logo} alt="DAY NIGHT DELIVERY SERVICES" />
-          </div>
+            {captchaEnabled && <div className="dn-clean-auth-captcha"><TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={(token) => { setCaptchaToken(token); setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN); }} onExpire={() => { setCaptchaToken(""); setCaptchaUnavailable(false); }} /></div>}
+            {captchaUnavailable && <p className="dn-clean-auth-captcha-note">{ui.captchaIssue}</p>}
 
-          <div className="dn-auth-assets-heading">
-            <span>DAY NIGHT COMMAND GATEWAY</span>
-            <h1>{ui.title}</h1>
-            <p>{ui.subtitle}</p>
-          </div>
-
-          <div className="dn-auth-assets-checks">
-            <span><ShieldCheck />{ui.checkpoint1}</span>
-            <span><UserCog />{ui.checkpoint2}</span>
-            <span><CheckCircle />{ui.checkpoint3}</span>
-          </div>
-
-          {errorMsg && (
-            <div className="dn-auth-alert-final is-error">
-              <ShieldAlert className="ml-2 inline h-4 w-4" />
-              {errorMsg}
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="dn-auth-alert-final is-success">
-              <CheckCircle className="ml-2 inline h-4 w-4" />
-              {successMsg}
-            </div>
-          )}
-
-          <form onSubmit={handleAdminLogin} className="dn-auth-assets-form">
-            <label className="dn-auth-assets-field">
-              <span>{ui.email}</span>
-              <div>
-                <Mail />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="Admin@daynightae.com"
-                  dir="ltr"
-                />
-              </div>
-            </label>
-
-            <label className="dn-auth-assets-field">
-              <span>{ui.password}</span>
-              <div>
-                <KeyRound />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                  dir="ltr"
-                />
-                <Eye />
-              </div>
-            </label>
-
-            <div className="dn-auth-assets-options">
-              <label><input type="checkbox" /> {ui.remember}</label>
-              <a href={`mailto:${companyMeta.email}`}>{ui.forgot}</a>
-            </div>
-
-            {captchaEnabled && (
-              <div className="dn-auth-captcha-final">
-                <TurnstileCaptcha
-                  siteKey={captchaSiteKey}
-                  language={language}
-                  onVerify={(token) => {
-                    setCaptchaToken(token);
-                    setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN);
-                  }}
-                  onExpire={() => {
-                    setCaptchaToken("");
-                    setCaptchaUnavailable(false);
-                  }}
-                />
-              </div>
-            )}
-
-            {captchaUnavailable && (
-              <p className="dn-auth-captcha-note-final">{ui.captchaIssue}</p>
-            )}
-
-            <button type="submit" disabled={loading || entry} className="dn-auth-assets-submit">
-              <Lock />
-              {loading ? ui.loading : ui.submit}
-            </button>
-
-            <p className="dn-auth-assets-secure">
-              <ShieldCheck />
-              {ui.secure}
-            </p>
+            <button type="submit" disabled={loading || entry} className="dn-clean-auth-submit"><Lock />{loading ? ui.loading : ui.submit}</button>
+            <p className="dn-clean-auth-secure"><ShieldCheck />{ui.secure}</p>
           </form>
         </section>
       </main>

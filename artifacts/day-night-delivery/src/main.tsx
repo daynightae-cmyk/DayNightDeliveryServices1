@@ -4,7 +4,7 @@ import App from './App.tsx';
 import { AppProvider } from './lib/AppContext.tsx';
 import { reportError } from './lib/monitoring';
 import './index.css';
-import "./styles/dn-premium-assets-global.css";
+import "./styles/dn-premium-admin-corrections.css";
 import './styles/dn-premium.css';
 import './styles/dn-ui-fixes.css';
 import './styles/dn-support-polish.css';
