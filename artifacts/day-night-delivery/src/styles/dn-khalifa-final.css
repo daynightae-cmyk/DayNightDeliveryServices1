@@ -807,3 +807,159 @@
     font-size: 1.25rem;
   }
 }
+
+/* ============================================================
+   HOTFIX: DAY NIGHT admin/auth final route layout
+   - remove duplicate Khalifa greeting bubbles
+   - hide public website header/footer on /auth and /admin
+   - force auth/admin to use full page width
+   ============================================================ */
+
+.dn-auth-hero-bubble,
+.dn-khalifa-speech {
+  display: none !important;
+}
+
+/* Hide public site chrome when admin/auth route is active */
+body:has(.dn-auth-page),
+body:has(.dn-auth-page-final),
+body:has(.dn-admin-phase3),
+body:has(.dn-admin-fullscreen) {
+  overflow-x: hidden !important;
+}
+
+body:has(.dn-auth-page) .fixed.top-0.left-0.right-0.z-50,
+body:has(.dn-auth-page-final) .fixed.top-0.left-0.right-0.z-50,
+body:has(.dn-admin-phase3) .fixed.top-0.left-0.right-0.z-50,
+body:has(.dn-admin-fullscreen) .fixed.top-0.left-0.right-0.z-50,
+body:has(.dn-auth-page) footer,
+body:has(.dn-auth-page-final) footer,
+body:has(.dn-admin-phase3) footer,
+body:has(.dn-admin-fullscreen) footer {
+  display: none !important;
+}
+
+/* Remove the artificial header spacer */
+body:has(.dn-auth-page) [aria-hidden="true"],
+body:has(.dn-auth-page-final) [aria-hidden="true"],
+body:has(.dn-admin-phase3) [aria-hidden="true"],
+body:has(.dn-admin-fullscreen) [aria-hidden="true"] {
+  display: none !important;
+}
+
+/* Force App route wrapper to full viewport */
+body:has(.dn-auth-page) #root > div > main,
+body:has(.dn-auth-page-final) #root > div > main,
+body:has(.dn-admin-phase3) #root > div > main,
+body:has(.dn-admin-fullscreen) #root > div > main {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Auth page: better full-frame sizing */
+.dn-auth-page,
+.dn-auth-page-final {
+  min-height: 100dvh !important;
+  width: 100% !important;
+  padding: clamp(16px, 2.2vw, 34px) !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.dn-auth-shell,
+.dn-auth-frame-final {
+  width: min(100%, 1280px) !important;
+  min-height: min(760px, calc(100dvh - 48px)) !important;
+  margin: 0 auto !important;
+  align-items: center !important;
+}
+
+.dn-auth-hero,
+.dn-auth-khalifa-final {
+  min-height: 560px !important;
+  overflow: hidden !important;
+}
+
+.dn-auth-hero-image,
+.dn-auth-khalifa-frame-final img {
+  width: min(430px, 88%) !important;
+  max-height: 500px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+/* Admin dashboard: full width, not centered/narrow */
+.dn-admin-phase3,
+.dn-admin-fullscreen {
+  min-height: 100dvh !important;
+  width: 100% !important;
+  padding: 16px !important;
+  overflow-x: hidden !important;
+}
+
+.dn-admin-phase3-layout,
+.dn-admin-layout-full {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.dn-admin-main,
+.dn-admin-content-full {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.dn-admin-sidebar-final,
+.dn-admin-right-sidebar {
+  width: 300px !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow-y: auto !important;
+  position: sticky !important;
+  top: 16px !important;
+}
+
+.dn-admin-dashboard-grid,
+.dn-admin-home-full {
+  width: 100% !important;
+}
+
+.dn-admin-map-placeholder,
+.dn-admin-map-live {
+  min-height: 460px !important;
+}
+
+@media (max-width: 1024px) {
+  .dn-auth-shell,
+  .dn-auth-frame-final {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-auth-hero,
+  .dn-auth-khalifa-final {
+    min-height: 340px !important;
+  }
+
+  .dn-admin-phase3-layout,
+  .dn-admin-layout-full {
+    display: block !important;
+  }
+
+  .dn-admin-sidebar-final,
+  .dn-admin-right-sidebar {
+    position: fixed !important;
+    inset-block: 0 !important;
+    right: 0 !important;
+    width: min(88vw, 340px) !important;
+    max-height: none !important;
+    z-index: 110 !important;
+  }
+}
+
