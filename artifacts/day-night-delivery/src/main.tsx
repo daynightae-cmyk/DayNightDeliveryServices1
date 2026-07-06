@@ -32,14 +32,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     reportError(event.reason, 'unhandled_rejection');
   });
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((error) => {
-        reportError(error, 'service_worker_register');
-      });
-    });
-  }
 }
 
 createRoot(document.getElementById('root')!).render(
