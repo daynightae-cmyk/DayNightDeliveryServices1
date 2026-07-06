@@ -37,6 +37,7 @@ import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-khalifa-final.css";
 import "../styles/dn-admin-task2.css";
+import "../styles/dn-admin-task3.css";
 
 const menu = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: Home },
@@ -80,7 +81,27 @@ type MetricMap = {
   income: number;
 };
 
-const liveCoreSections: SectionId[] = ["new_order", "new_merchant", "all_orders"];
+const coreFormSections: SectionId[] = ["new_order", "new_merchant"];
+
+const filteredSectionIds = new Set<SectionId>([
+  "all_orders",
+  "cancelled",
+  "review",
+  "postponed",
+  "returned",
+  "pickup",
+  "abu_dhabi",
+  "external",
+  "out_scope",
+  "driver_statements",
+  "merchant_statements",
+  "income",
+  "expenses",
+  "import",
+  "print",
+  "reports",
+  "settings",
+]);
 
 const siteLinks = [
   { ar: "الموقع الرئيسي", en: "Website", href: "/" },
@@ -126,11 +147,22 @@ const copy = {
     liveOrders: "طلبات حية",
     actionPlan: "خطة العمل داخل القسم",
     quickActions: "إجراءات سريعة",
-    openOperations: "فتح مستودع العمليات",
+    openOperations: "فتح مستودع العمليات الكامل",
     totalOrders: "إجمالي الطلبات",
     sectionCount: "عدد هذا القسم",
     codTotal: "إجمالي التحصيل COD",
     income: "دخل التوصيل",
+    filteredData: "البيانات المفلترة لهذا القسم",
+    tableTracking: "التتبع",
+    tableStatus: "الحالة",
+    tableMerchant: "التاجر / المرسل",
+    tableRoute: "المسار",
+    tableReceiver: "المستلم",
+    tableAmount: "المبلغ",
+    tableDate: "التاريخ",
+    noSectionOrders: "لا توجد طلبات مطابقة لهذا القسم حالياً.",
+    liveFilter: "فلتر حي من بيانات Supabase",
+    rowsShown: "صفوف معروضة",
   },
   en: {
     owner: "Abu Khalifa",
@@ -164,11 +196,22 @@ const copy = {
     liveOrders: "Live Orders",
     actionPlan: "Section Action Plan",
     quickActions: "Quick Actions",
-    openOperations: "Open Operations Warehouse",
+    openOperations: "Open Full Operations Warehouse",
     totalOrders: "Total Orders",
     sectionCount: "Section Count",
     codTotal: "COD Total",
     income: "Delivery Income",
+    filteredData: "Filtered data for this section",
+    tableTracking: "Tracking",
+    tableStatus: "Status",
+    tableMerchant: "Merchant / Sender",
+    tableRoute: "Route",
+    tableReceiver: "Receiver",
+    tableAmount: "Amount",
+    tableDate: "Date",
+    noSectionOrders: "No matching orders for this section right now.",
+    liveFilter: "Live filter from Supabase data",
+    rowsShown: "Rows shown",
   },
 };
 
@@ -184,7 +227,86 @@ function money(value: number) {
   return `${value.toFixed(2)} AED`;
 }
 
-function getSectionCount(id: SectionId, metrics: MetricMap) {
+function getOrderAmount(order: any) {
+  return Number(order.cod_amount || order.delivery_price || order.price || order.total_amount || 0);
+}
+
+function getOrderIncome(order: any) {
+  return Number(order.delivery_price || order.price || order.service_fee || 0);
+}
+
+function getRoute(order: any) {
+  const from = order.sender_city || order.pickup_city || order.origin_city || order.from_city || "—";
+  const to = order.receiver_city || order.delivery_city || order.destination_city || order.to_city || "—";
+  return `${from} → ${to}`;
+}
+
+function getTracking(order: any) {
+  return order.tracking_number || order.tracking_code || order.invoice_number || order.id || "—";
+}
+
+function translateStatus(status: unknown, isArabic: boolean) {
+  const raw = normalize(status);
+  if (!raw) return isArabic ? "غير محدد" : "Unspecified";
+  if (raw.includes("cancel") || raw.includes("fail")) return isArabic ? "ملغي / فشل" : "Cancelled / Failed";
+  if (raw.includes("pending") || raw.includes("confirm") || raw.includes("review")) return isArabic ? "قيد المراجعة" : "Under Review";
+  if (raw.includes("postpone") || raw.includes("defer") || raw.includes("schedule")) return isArabic ? "مؤجل" : "Postponed";
+  if (raw.includes("return")) return isArabic ? "راجع" : "Returned";
+  if (raw.includes("pick") || raw.includes("assign") || raw.includes("collect")) return isArabic ? "قيد الإحضار" : "Pickup";
+  if (raw.includes("deliver") || raw.includes("complete")) return isArabic ? "تم التسليم" : "Delivered";
+  if (raw.includes("transit") || raw.includes("progress")) return isArabic ? "جاري التوصيل" : "In Transit";
+  return isArabic ? String(status).replace(/_/g, " ") : String(status).replace(/_/g, " ");
+}
+
+function filterOrdersForSection(id: SectionId, orders: any[]) {
+  return orders.filter((order) => {
+    const status = normalize(order.status);
+    const route = `${order.sender_city || ""} ${order.receiver_city || ""} ${order.pickup_city || ""} ${order.delivery_city || ""}`;
+    const routeLower = route.toLowerCase();
+    const notes = normalize(order.notes || order.internal_notes || order.admin_notes);
+    const scope = normalize(order.shipping_scope || order.scope || order.service_type);
+    const destination = normalize(order.destination_country || order.country || order.receiver_country);
+
+    switch (id) {
+      case "all_orders":
+      case "reports":
+      case "print":
+        return true;
+      case "cancelled":
+        return status.includes("cancel") || status.includes("fail");
+      case "review":
+        return status.includes("pending") || status.includes("confirm") || status.includes("review");
+      case "postponed":
+        return status.includes("postpone") || status.includes("defer") || status.includes("schedule");
+      case "returned":
+        return status.includes("return");
+      case "pickup":
+        return status.includes("pick") || status.includes("assign") || status.includes("collect");
+      case "abu_dhabi":
+        return routeLower.includes("abu dhabi") || route.includes("أبوظبي") || route.includes("ابوظبي");
+      case "external":
+        return scope.includes("international") || scope.includes("external") || Boolean(destination && !destination.includes("uae") && !destination.includes("emirates"));
+      case "out_scope":
+        return status.includes("scope") || notes.includes("out of scope") || notes.includes("خارج النطاق");
+      case "income":
+        return getOrderIncome(order) > 0 || getOrderAmount(order) > 0;
+      case "driver_statements":
+        return Boolean(order.driver_id || order.driver_name || status.includes("deliver") || status.includes("assign"));
+      case "merchant_statements":
+        return Boolean(order.merchant_id || order.merchant_name || order.sender_name);
+      case "import":
+        return Boolean(order.batch_id || order.import_id || order.source_file || order.created_at);
+      case "expenses":
+      case "settings":
+        return false;
+      default:
+        return true;
+    }
+  });
+}
+
+function getSectionCount(id: SectionId, metrics: MetricMap, orders: any[]) {
+  if (filteredSectionIds.has(id)) return filterOrdersForSection(id, orders).length;
   const counts: Partial<Record<SectionId, number>> = {
     cancelled: metrics.cancelled,
     review: metrics.review,
@@ -201,6 +323,7 @@ function getSectionCount(id: SectionId, metrics: MetricMap) {
 
 function sectionDescription(id: SectionId, isArabic: boolean) {
   const ar: Partial<Record<SectionId, string>> = {
+    all_orders: "مستودع تشغيلي شامل يعرض كل الطلبات الحية مع فلترة سريعة حسب الحالة والمسار والتحصيل.",
     cancelled: "مراجعة أسباب الإلغاء، فصل الطلبات الفاشلة، وتحديد ما يحتاج اتصالاً أو إعادة جدولة.",
     review: "قائمة متابعة للطلبات التي تحتاج تأكيد بيانات، مراجعة تاجر، أو قرار إداري قبل التحريك.",
     postponed: "إدارة الطلبات المؤجلة حسب التاريخ والسبب، مع تجهيزها للرجوع إلى مسار التوصيل.",
@@ -219,6 +342,7 @@ function sectionDescription(id: SectionId, isArabic: boolean) {
     settings: "إعدادات النظام والهوية، الأسعار، المستخدمين، وربط الخدمات الخارجية.",
   };
   const en: Partial<Record<SectionId, string>> = {
+    all_orders: "Full operations warehouse showing all live orders with quick status, route, and collection filtering.",
     cancelled: "Review cancellation reasons, separate failed orders, and decide which ones need calls or rescheduling.",
     review: "Follow-up queue for orders that need data confirmation, merchant review, or an admin decision.",
     postponed: "Manage postponed orders by date and reason, then move them back to the delivery workflow.",
@@ -242,24 +366,29 @@ function sectionDescription(id: SectionId, isArabic: boolean) {
 function sectionBullets(id: SectionId, isArabic: boolean) {
   if (isArabic) {
     return [
-      "مراجعة البيانات الحية وربطها بقرار تشغيلي واضح.",
-      "تجهيز الإجراءات اليومية: اتصال، متابعة، طباعة، أو تحديث حالة.",
-      "فتح مستودع العمليات عند الحاجة لعرض الجدول الكامل والفلاتر المتقدمة.",
+      "تصفية تلقائية حسب نوع القسم من بيانات الطلبات الحية.",
+      "إظهار أهم الأعمدة التشغيلية: التتبع، الحالة، التاجر، المسار، المستلم، والمبلغ.",
+      "الانتقال إلى مستودع العمليات الكامل عند الحاجة لإدارة متقدمة أو إنشاء طلب جديد.",
     ];
   }
   return [
-    "Review live data and connect it to a clear operational decision.",
-    "Prepare daily actions: call, follow-up, print, or update status.",
-    "Open Operations Warehouse when full table filters are needed.",
+    "Automatic filtering by section type from live order data.",
+    "Shows key operational columns: tracking, status, merchant, route, receiver, and amount.",
+    "Open the full operations warehouse for advanced management or new order creation.",
   ];
 }
 
-function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, onOpenOperations }: { id: SectionId; title: string; ui: typeof copy.ar; isArabic: boolean; metrics: MetricMap; onOpenOperations: () => void }) {
-  const count = getSectionCount(id, metrics);
+function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpenOperations }: { id: SectionId; title: string; ui: typeof copy.ar; isArabic: boolean; metrics: MetricMap; orders: any[]; onOpenOperations: () => void }) {
+  const filteredOrders = filterOrdersForSection(id, orders);
+  const count = filteredOrders.length;
+  const totalAmount = filteredOrders.reduce((sum, order) => sum + getOrderAmount(order), 0);
+  const totalIncome = filteredOrders.reduce((sum, order) => sum + getOrderIncome(order), 0);
+  const rows = filteredOrders.slice(0, 30);
+
   return (
     <section className="dn-admin-section-workspace">
       <header className="dn-admin-section-hero">
-        <span>{isArabic ? "مركز تشغيل مخصص" : "Dedicated Operations Center"}</span>
+        <span>{ui.liveFilter}</span>
         <h1>{title}</h1>
         <p>{sectionDescription(id, isArabic)}</p>
       </header>
@@ -267,8 +396,8 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, onOpenOperati
       <div className="dn-admin-section-kpis">
         <article><strong>{metrics.total}</strong><span>{ui.totalOrders}</span></article>
         <article><strong>{count}</strong><span>{ui.sectionCount}</span></article>
-        <article><strong>{money(metrics.codTotal)}</strong><span>{ui.codTotal}</span></article>
-        <article><strong>{money(metrics.income)}</strong><span>{ui.income}</span></article>
+        <article><strong>{money(totalAmount || metrics.codTotal)}</strong><span>{ui.codTotal}</span></article>
+        <article><strong>{money(totalIncome || metrics.income)}</strong><span>{ui.income}</span></article>
       </div>
 
       <div className="dn-admin-section-panels">
@@ -279,8 +408,48 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, onOpenOperati
         <div>
           <h2>{ui.quickActions}</h2>
           <button type="button" onClick={onOpenOperations}>{ui.openOperations}</button>
-          <small>{isArabic ? "يتم الاعتماد على بيانات Supabase الحية في مستودع العمليات." : "Uses live Supabase data inside the Operations Warehouse."}</small>
+          <small>{isArabic ? "الفلتر يعمل مباشرة من بيانات Supabase الحالية، وليس صفحة فارغة." : "This filter reads current Supabase data directly; it is not an empty placeholder."}</small>
         </div>
+      </div>
+
+      <div className="dn-admin-filter-table-card">
+        <div className="dn-admin-filter-table-head">
+          <div><span>{ui.filteredData}</span><strong>{title}</strong></div>
+          <p>{ui.rowsShown}: {rows.length} / {count}</p>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="dn-admin-filter-empty"><Package className="h-8 w-8" /><strong>{ui.noSectionOrders}</strong></div>
+        ) : (
+          <div className="dn-admin-filter-table-wrap">
+            <table className="dn-admin-filter-table">
+              <thead>
+                <tr>
+                  <th>{ui.tableTracking}</th>
+                  <th>{ui.tableStatus}</th>
+                  <th>{ui.tableMerchant}</th>
+                  <th>{ui.tableRoute}</th>
+                  <th>{ui.tableReceiver}</th>
+                  <th>{ui.tableAmount}</th>
+                  <th>{ui.tableDate}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((order, index) => (
+                  <tr key={String(order.id || order.tracking_number || index)}>
+                    <td><b>{getTracking(order)}</b></td>
+                    <td><span className="dn-admin-status-chip">{translateStatus(order.status, isArabic)}</span></td>
+                    <td>{order.merchant_name || order.sender_name || order.customer_name || "—"}</td>
+                    <td>{getRoute(order)}</td>
+                    <td>{order.receiver_name || order.recipient_name || order.customer_name || "—"}</td>
+                    <td>{money(getOrderAmount(order))}</td>
+                    <td>{order.created_at ? new Date(order.created_at).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -306,16 +475,16 @@ export default function AdminPanelLuxury() {
   }, []);
 
   const metrics = useMemo<MetricMap>(() => {
-    const cancelled = orders.filter((o) => normalize(o.status).includes("cancel") || normalize(o.status).includes("fail")).length;
-    const review = orders.filter((o) => normalize(o.status).includes("pending") || normalize(o.status).includes("confirm") || normalize(o.status).includes("review")).length;
-    const postponed = orders.filter((o) => normalize(o.status).includes("postpone") || normalize(o.status).includes("defer") || normalize(o.status).includes("schedule")).length;
-    const returned = orders.filter((o) => normalize(o.status).includes("return")).length;
-    const pickup = orders.filter((o) => normalize(o.status).includes("pick") || normalize(o.status).includes("assign")).length;
-    const abuDhabi = orders.filter((o) => `${o.sender_city || ""} ${o.receiver_city || ""}`.toLowerCase().includes("abu dhabi") || `${o.sender_city || ""} ${o.receiver_city || ""}`.includes("أبوظبي")).length;
-    const external = orders.filter((o) => normalize(o.shipping_scope).includes("international") || normalize(o.destination_country)).length;
-    const outScope = orders.filter((o) => normalize(o.status).includes("scope") || normalize(o.notes).includes("out of scope")).length;
+    const cancelled = filterOrdersForSection("cancelled", orders).length;
+    const review = filterOrdersForSection("review", orders).length;
+    const postponed = filterOrdersForSection("postponed", orders).length;
+    const returned = filterOrdersForSection("returned", orders).length;
+    const pickup = filterOrdersForSection("pickup", orders).length;
+    const abuDhabi = filterOrdersForSection("abu_dhabi", orders).length;
+    const external = filterOrdersForSection("external", orders).length;
+    const outScope = filterOrdersForSection("out_scope", orders).length;
     const codTotal = orders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0);
-    const income = orders.reduce((sum, order) => sum + Number(order.delivery_price || order.price || 0), 0);
+    const income = orders.reduce((sum, order) => sum + getOrderIncome(order), 0);
     return { total: orders.length, cancelled, review, postponed, returned, pickup, abuDhabi, external, outScope, codTotal, income };
   }, [orders]);
 
@@ -388,10 +557,11 @@ export default function AdminPanelLuxury() {
 
   function renderContent() {
     if (active === "dashboard") return renderDashboard();
-    if (liveCoreSections.includes(active)) return <div className="dn-admin-core-full"><AdminPanelCore /></div>;
+    if (coreFormSections.includes(active)) return <div className="dn-admin-core-full"><AdminPanelCore /></div>;
     if (active === "merchants") return <div className="dn-admin-core-full"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => setActive("all_orders")} onCreateOrder={() => setActive("new_order")} /></div>;
     if (active === "support") return <div className="dn-admin-core-full"><AdminProspectingLinks /></div>;
-    return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} onOpenOperations={openOperations} />;
+    if (filteredSectionIds.has(active)) return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
+    return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
   }
 
   return (
