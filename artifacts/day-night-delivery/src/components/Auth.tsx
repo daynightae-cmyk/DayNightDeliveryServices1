@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
-import { CheckCircle, KeyRound, Lock, Mail, ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle,
+  KeyRound,
+  Lock,
+  Mail,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  UserCog,
+} from "lucide-react";
 import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
 import { useAppContext } from "../lib/AppContext";
 import CustomerDashboard from "./customer/CustomerDashboard";
@@ -8,17 +17,18 @@ import companyMeta from "../data/companyMeta";
 import AdminMascotWelcome from "./admin/AdminMascotWelcome";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-khalifa-final.css";
+import "../styles/dn-auth-gateway-phase1.css";
 
 interface AuthProps {
   onAuthSuccess: () => void;
 }
 
-function LoginEntry() {
-  return <AdminMascotWelcome />;
+function LoginEntry({ isArabic }: { isArabic: boolean }) {
+  return <AdminMascotWelcome isArabic={isArabic} />;
 }
 
 export default function Auth({ onAuthSuccess }: AuthProps) {
-  const { language } = useAppContext();
+  const { language, toggleLanguage } = useAppContext();
   const isArabic = language === "ar";
   const isCustomerRoute = typeof window !== "undefined" && window.location.pathname === "/customer";
 
@@ -38,26 +48,37 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const ui = isArabic
     ? {
         title: "بوابة الإدارة",
-        subtitle: "تسجيل الدخول للوصول إلى لوحة التحكم",
+        subtitle: "دخول آمن إلى مركز قيادة DAY NIGHT",
+        eyebrow: "DAY NIGHT COMMAND GATEWAY",
         email: "البريد الإلكتروني أو اسم المستخدم",
         password: "كلمة المرور",
         remember: "تذكرني",
-        forgot: "نسيت كلمة المرور",
+        forgot: "نسيت كلمة المرور؟",
         submit: "تسجيل الدخول",
         loading: "جاري التحقق...",
         secure: "دخول آمن ومشفر للحسابات الإدارية فقط",
-        captchaRequired: "يرجى إكمال التحقق الأمني أولا.",
-        loginUnavailable: "خدمة الدخول غير متاحة حاليا.",
+        captchaRequired: "يرجى إكمال التحقق الأمني أولاً.",
+        loginUnavailable: "خدمة الدخول غير متاحة حالياً.",
         invalid: "بيانات الدخول غير صحيحة أو غير مخولة.",
         adminOnly: "هذه البوابة مخصصة للإدارة فقط.",
-        success: "تم التحقق. جاري فتح لوحة الإدارة...",
+        success: "تم التحقق. جاري تجهيز مركز القيادة...",
         genericError: "حدث خطأ أثناء تسجيل الدخول.",
         captchaIssue: "تعذر تشغيل التحقق الأمني لهذا المتصفح.",
         imageLabel: "خليفة",
+        language: "English",
+        mascotTitle: "خليفة جاهز لخدمتك",
+        mascotText: "مساعد الإدارة الذكي يجهّز لك لوحة التحكم والطلبات والتحصيل لحظة الدخول.",
+        stat1: "تشغيل 24/7",
+        stat2: "إدارة الطلبات",
+        stat3: "أمان إداري",
+        checkpoint1: "التحقق من هوية المدير",
+        checkpoint2: "تحميل بيانات التشغيل",
+        checkpoint3: "فتح مركز القيادة",
       }
     : {
         title: "Admin Portal",
-        subtitle: "Sign in to access the control dashboard",
+        subtitle: "Secure access to the DAY NIGHT command center",
+        eyebrow: "DAY NIGHT COMMAND GATEWAY",
         email: "Email or username",
         password: "Password",
         remember: "Remember me",
@@ -69,10 +90,19 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         loginUnavailable: "Login service is currently unavailable.",
         invalid: "Invalid or unauthorized login details.",
         adminOnly: "This portal is for administrators only.",
-        success: "Verified. Opening the admin dashboard...",
+        success: "Verified. Preparing the command center...",
         genericError: "An error occurred during login.",
         captchaIssue: "Security check could not run in this browser.",
         imageLabel: "Khalifa",
+        language: "العربية",
+        mascotTitle: "Khalifa is ready",
+        mascotText: "Your smart admin assistant prepares operations, orders, and collections as you sign in.",
+        stat1: "24/7 Operations",
+        stat2: "Order Control",
+        stat3: "Admin Security",
+        checkpoint1: "Verifying admin identity",
+        checkpoint2: "Loading operation data",
+        checkpoint3: "Opening command center",
       };
 
   useEffect(() => {
@@ -128,7 +158,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
       setSuccessMsg(ui.success);
       setEntry(true);
-      window.setTimeout(onAuthSuccess, 1500);
+      window.setTimeout(onAuthSuccess, 2400);
     } catch {
       setErrorMsg(ui.genericError);
       setLoading(false);
@@ -136,12 +166,33 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   return (
-    <div className="dn-auth-page-final" dir={isArabic ? "rtl" : "ltr"}>
-      {entry && <LoginEntry />}
+    <div className="dn-auth-page-final dn-auth-gateway-phase1" dir={isArabic ? "rtl" : "ltr"}>
+      {entry && <LoginEntry isArabic={isArabic} />}
 
-      <main className="dn-auth-frame-final">
-        <section className="dn-auth-card-final" aria-label={ui.title}>
-          <div className="dn-auth-logo-final">
+      <button type="button" className="dn-auth-lang-switch" onClick={toggleLanguage}>
+        {ui.language}
+      </button>
+
+      <main className="dn-auth-frame-final dn-auth-gateway-shell">
+        <section className="dn-auth-khalifa-final dn-auth-showcase-card" aria-label={ui.imageLabel}>
+          <div className="dn-auth-showcase-glow" />
+          <div className="dn-auth-khalifa-frame-final dn-auth-khalifa-glass-frame">
+            <img src={khalifaAssets.staticMascot} alt={ui.imageLabel} />
+          </div>
+          <div className="dn-auth-showcase-copy">
+            <span><Sparkles className="h-4 w-4" /> {ui.eyebrow}</span>
+            <h2>{ui.mascotTitle}</h2>
+            <p>{ui.mascotText}</p>
+          </div>
+          <div className="dn-auth-showcase-stats">
+            <strong>{ui.stat1}</strong>
+            <strong>{ui.stat2}</strong>
+            <strong>{ui.stat3}</strong>
+          </div>
+        </section>
+
+        <section className="dn-auth-card-final dn-auth-login-glass" aria-label={ui.title}>
+          <div className="dn-auth-logo-final dn-auth-premium-logo">
             <img
               src={companyMeta.logoUrl}
               onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }}
@@ -149,9 +200,16 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             />
           </div>
 
-          <div className="dn-auth-heading-final">
+          <div className="dn-auth-heading-final dn-auth-heading-premium">
+            <span>{ui.eyebrow}</span>
             <h1>{ui.title}</h1>
             <p>{ui.subtitle}</p>
+          </div>
+
+          <div className="dn-auth-checkpoints">
+            <span><ShieldCheck className="h-4 w-4" />{ui.checkpoint1}</span>
+            <span><UserCog className="h-4 w-4" />{ui.checkpoint2}</span>
+            <span><Lock className="h-4 w-4" />{ui.checkpoint3}</span>
           </div>
 
           {errorMsg && (
@@ -168,7 +226,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           )}
 
-          <form onSubmit={handleAdminLogin} className="dn-auth-form-final">
+          <form onSubmit={handleAdminLogin} className="dn-auth-form-final dn-auth-form-premium">
             <label className="dn-auth-field-final">
               <span>{ui.email}</span>
               <div>
@@ -225,7 +283,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               <p className="dn-auth-captcha-note-final">{ui.captchaIssue}</p>
             )}
 
-            <button type="submit" disabled={loading || entry} className="dn-auth-submit-final">
+            <button type="submit" disabled={loading || entry} className="dn-auth-submit-final dn-auth-submit-premium">
               <Lock className="ml-2 inline h-5 w-5" />
               {loading ? ui.loading : ui.submit}
             </button>
@@ -235,12 +293,6 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               {ui.secure}
             </p>
           </form>
-        </section>
-
-        <section className="dn-auth-khalifa-final" aria-label={ui.imageLabel}>
-          <div className="dn-auth-khalifa-frame-final">
-            <img src={khalifaAssets.staticMascot} alt={ui.imageLabel} />
-          </div>
         </section>
       </main>
     </div>
