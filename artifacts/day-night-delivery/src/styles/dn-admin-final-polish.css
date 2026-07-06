@@ -19,3 +19,65 @@
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Phase 6 Task 1: admin layout direction */
+.dn-admin-layout-full {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+  grid-template-areas: "content sidebar" !important;
+  direction: ltr !important;
+}
+
+.dn-admin-content-full {
+  grid-area: content !important;
+  min-width: 0 !important;
+}
+
+.dn-admin-right-sidebar {
+  grid-area: sidebar !important;
+  width: 300px !important;
+}
+
+.dn-admin-home-full {
+  display: grid !important;
+  grid-template-columns: 300px minmax(0, 1fr) !important;
+  grid-template-areas: "assistant center" !important;
+  direction: ltr !important;
+}
+
+.dn-admin-left-ai {
+  grid-area: assistant !important;
+}
+
+.dn-admin-center-zone {
+  grid-area: center !important;
+}
+
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-content-full,
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-right-sidebar,
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-left-ai,
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-center-zone {
+  direction: rtl !important;
+}
+
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-content-full,
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-right-sidebar,
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-left-ai,
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-center-zone {
+  direction: ltr !important;
+}
+
+.dn-admin-fullscreen[dir="rtl"] .dn-admin-menu-full button {
+  flex-direction: row-reverse !important;
+  text-align: right !important;
+}
+
+.dn-admin-menu-full button span svg {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+.dn-auth-hero-bubble,
+.dn-khalifa-speech {
+  display: none !important;
+}
