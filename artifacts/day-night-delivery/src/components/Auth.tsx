@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
 import {
   CheckCircle,
@@ -7,7 +7,6 @@ import {
   Mail,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   UserCog,
 } from "lucide-react";
 import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
@@ -18,6 +17,7 @@ import AdminMascotWelcome from "./admin/AdminMascotWelcome";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-khalifa-final.css";
 import "../styles/dn-auth-gateway-phase1.css";
+import "../styles/dn-auth-reference-upgrade.css";
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -48,7 +48,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const ui = isArabic
     ? {
         title: "بوابة الإدارة",
-        subtitle: "دخول آمن إلى مركز قيادة DAY NIGHT",
+        subtitle: "تسجيل الدخول للوصول إلى لوحة التحكم",
         eyebrow: "DAY NIGHT COMMAND GATEWAY",
         email: "البريد الإلكتروني أو اسم المستخدم",
         password: "كلمة المرور",
@@ -166,33 +166,39 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   return (
-    <div className="dn-auth-page-final dn-auth-gateway-phase1" dir={isArabic ? "rtl" : "ltr"}>
+    <div className="dn-auth-page-final dn-auth-ref-upgrade" dir={isArabic ? "rtl" : "ltr"}>
       {entry && <LoginEntry isArabic={isArabic} />}
 
       <button type="button" className="dn-auth-lang-switch" onClick={toggleLanguage}>
         {ui.language}
       </button>
 
-      <main className="dn-auth-frame-final dn-auth-gateway-shell">
-        <section className="dn-auth-khalifa-final dn-auth-showcase-card" aria-label={ui.imageLabel}>
-          <div className="dn-auth-showcase-glow" />
-          <div className="dn-auth-khalifa-frame-final dn-auth-khalifa-glass-frame">
-            <img src={khalifaAssets.staticMascot} alt={ui.imageLabel} />
-          </div>
-          <div className="dn-auth-showcase-copy">
-            <span><Sparkles className="h-4 w-4" /> {ui.eyebrow}</span>
-            <h2>{ui.mascotTitle}</h2>
-            <p>{ui.mascotText}</p>
-          </div>
-          <div className="dn-auth-showcase-stats">
-            <strong>{ui.stat1}</strong>
-            <strong>{ui.stat2}</strong>
-            <strong>{ui.stat3}</strong>
-          </div>
-        </section>
+      <main className="dn-auth-frame-final dn-auth-reference-shell">
+        <section className="dn-auth-showcase-ref" aria-label={ui.imageLabel}>
+  <div className="dn-auth-cityline" />
+  <div className="dn-auth-roadline" />
 
-        <section className="dn-auth-card-final dn-auth-login-glass" aria-label={ui.title}>
-          <div className="dn-auth-logo-final dn-auth-premium-logo">
+  <div className="dn-auth-khalifa-wrap">
+    <div className="dn-auth-khalifa-main">
+      <img src={khalifaAssets.staticMascot} alt={ui.imageLabel} />
+      <div className="dn-auth-bubble-ref">
+        <span>
+          {isArabic ? (
+            <>
+              هلا أبو خليفة<br />يا قيادة
+            </>
+          ) : (
+            <>
+              Welcome Abu Khalifa<br />Leader
+            </>
+          )}
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+<section className="dn-auth-card-final dn-auth-reference-card" aria-label={ui.title}>
+          <div className="dn-auth-logo-final dn-auth-reference-logo">
             <img
               src={companyMeta.logoUrl}
               onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }}
@@ -200,7 +206,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             />
           </div>
 
-          <div className="dn-auth-heading-final dn-auth-heading-premium">
+          <div className="dn-auth-heading-final dn-auth-reference-heading">
             <span>{ui.eyebrow}</span>
             <h1>{ui.title}</h1>
             <p>{ui.subtitle}</p>
@@ -226,7 +232,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           )}
 
-          <form onSubmit={handleAdminLogin} className="dn-auth-form-final dn-auth-form-premium">
+          <form onSubmit={handleAdminLogin} className="dn-auth-form-final dn-auth-reference-form">
             <label className="dn-auth-field-final">
               <span>{ui.email}</span>
               <div>
@@ -283,7 +289,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               <p className="dn-auth-captcha-note-final">{ui.captchaIssue}</p>
             )}
 
-            <button type="submit" disabled={loading || entry} className="dn-auth-submit-final dn-auth-submit-premium">
+            <button type="submit" disabled={loading || entry} className="dn-auth-submit-final dn-auth-reference-submit">
               <Lock className="ml-2 inline h-5 w-5" />
               {loading ? ui.loading : ui.submit}
             </button>
@@ -298,3 +304,4 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     </div>
   );
 }
+

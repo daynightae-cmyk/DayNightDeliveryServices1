@@ -1,0 +1,428 @@
+﻿/* =========================================================
+   DAY NIGHT AUTH  REFERENCE STYLE UPGRADE
+   Target: close to user reference image
+========================================================= */
+
+.dn-auth-page-final.dn-auth-ref-upgrade {
+  min-height: 100dvh !important;
+  padding: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 15% 18%, rgba(24,168,232,.18), transparent 28rem),
+    radial-gradient(circle at 85% 18%, rgba(245,183,0,.12), transparent 24rem),
+    linear-gradient(180deg, rgba(2,10,28,.92), rgba(1,7,20,.98)),
+    #030c1f !important;
+}
+
+.dn-auth-page-final.dn-auth-ref-upgrade::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(56,120,180,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56,120,180,.07) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: .55;
+}
+
+.dn-auth-page-final.dn-auth-ref-upgrade::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.0) 0%, rgba(0,0,0,.20) 100%);
+}
+
+.dn-auth-lang-switch {
+  position: fixed;
+  top: 16px;
+  inset-inline-start: 16px;
+  z-index: 20;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(245,183,0,.34);
+  background: rgba(4,18,42,.78);
+  color: #f5b700;
+  padding: 6px 14px;
+  font-size: .74rem;
+  font-weight: 900;
+  box-shadow: 0 12px 32px rgba(0,0,0,.25);
+  backdrop-filter: blur(14px);
+}
+
+.dn-auth-frame-final.dn-auth-reference-shell {
+  width: min(100%, 1380px) !important;
+  min-height: min(780px, calc(100dvh - 48px)) !important;
+  display: grid !important;
+  grid-template-columns: minmax(480px, 620px) minmax(420px, 1fr) !important;
+  gap: clamp(18px, 3vw, 44px) !important;
+  align-items: center !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.dn-auth-card-final.dn-auth-reference-card {
+  border-radius: 38px !important;
+  padding: 32px 28px !important;
+  background:
+    linear-gradient(180deg, rgba(9,24,55,.92), rgba(5,15,36,.95)) !important;
+  border: 1px solid rgba(93,179,255,.26) !important;
+  box-shadow:
+    0 0 0 1px rgba(56,157,255,.12),
+    0 24px 90px rgba(0,0,0,.42),
+    0 0 38px rgba(57,153,255,.12),
+    inset 0 1px 0 rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(18px) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.dn-auth-card-final.dn-auth-reference-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(81,173,255,.08);
+}
+
+.dn-auth-logo-final.dn-auth-reference-logo {
+  width: 112px !important;
+  height: 112px !important;
+  margin: 0 auto 18px auto !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(245,183,0,.55) !important;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,.96), rgba(250,250,250,.84) 58%, rgba(216,227,245,.68) 100%) !important;
+  box-shadow:
+    0 0 0 8px rgba(245,183,0,.045),
+    0 12px 42px rgba(245,183,0,.12),
+    0 0 24px rgba(79,166,255,.15),
+    inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+
+.dn-auth-logo-final.dn-auth-reference-logo img {
+  width: 84% !important;
+  height: 84% !important;
+  object-fit: contain !important;
+}
+
+.dn-auth-heading-final.dn-auth-reference-heading {
+  text-align: center !important;
+  gap: 8px !important;
+  margin-bottom: 18px !important;
+}
+
+.dn-auth-heading-final.dn-auth-reference-heading span {
+  display: none !important;
+}
+
+.dn-auth-heading-final.dn-auth-reference-heading h1 {
+  margin: 0 !important;
+  color: #f0c95f !important;
+  font-size: clamp(2.25rem, 3vw, 3.35rem) !important;
+  font-weight: 950 !important;
+  line-height: 1.1 !important;
+  text-shadow: 0 0 18px rgba(245,183,0,.10) !important;
+}
+
+.dn-auth-heading-final.dn-auth-reference-heading p {
+  margin: 0 !important;
+  color: rgba(255,255,255,.88) !important;
+  font-size: 1.02rem !important;
+  line-height: 1.6 !important;
+}
+
+.dn-auth-checkpoints {
+  display: none !important;
+}
+
+.dn-auth-form-final.dn-auth-reference-form {
+  margin-top: 14px !important;
+  gap: 14px !important;
+}
+
+.dn-auth-field-final {
+  gap: 6px !important;
+}
+
+.dn-auth-field-final > span {
+  color: rgba(255,255,255,.80) !important;
+  font-size: .84rem !important;
+  font-weight: 800 !important;
+}
+
+.dn-auth-field-final > div {
+  min-height: 60px !important;
+  border-radius: 16px !important;
+  background: rgba(4,17,40,.78) !important;
+  border: 1px solid rgba(110,165,225,.20) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+
+.dn-auth-field-final input {
+  color: #ffffff !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+.dn-auth-field-final input::placeholder {
+  color: rgba(255,255,255,.36) !important;
+}
+
+.dn-auth-field-final svg {
+  color: rgba(255,255,255,.54) !important;
+}
+
+.dn-auth-options-final {
+  margin-top: -2px !important;
+  font-size: .88rem !important;
+}
+
+.dn-auth-options-final label,
+.dn-auth-options-final a {
+  color: rgba(255,255,255,.78) !important;
+}
+
+.dn-auth-captcha-final {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  background: rgba(255,255,255,.025) !important;
+  padding: 12px !important;
+}
+
+.dn-auth-submit-final.dn-auth-reference-submit {
+  min-height: 64px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,225,145,.5) !important;
+  background:
+    linear-gradient(180deg, #f5d36d 0%, #e8b82c 100%) !important;
+  color: #151515 !important;
+  font-size: 1.18rem !important;
+  font-weight: 950 !important;
+  box-shadow:
+    0 18px 42px rgba(232,184,44,.22),
+    inset 0 1px 0 rgba(255,255,255,.48) !important;
+}
+
+.dn-auth-submit-final.dn-auth-reference-submit:hover {
+  filter: brightness(1.04);
+}
+
+.dn-auth-secure-final {
+  text-align: center !important;
+  color: rgba(255,255,255,.72) !important;
+  font-size: .88rem !important;
+  margin-top: 8px !important;
+}
+
+.dn-auth-showcase-ref {
+  position: relative !important;
+  min-height: 760px !important;
+  border-radius: 42px !important;
+  display: grid !important;
+  align-items: center !important;
+  padding: 10px 24px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(24,168,232,.08), transparent 20rem),
+    linear-gradient(180deg, rgba(0,0,0,.0), rgba(0,0,0,.0)) !important;
+}
+
+.dn-auth-showcase-ref::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0,0,0,0), rgba(0,0,0,0) 55%, rgba(0,0,0,.08) 100%);
+  pointer-events: none;
+}
+
+.dn-auth-cityline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 86px;
+  height: 170px;
+  pointer-events: none;
+  opacity: .95;
+  background:
+    radial-gradient(circle at 8% 90%, rgba(255,210,120,.26), transparent 12px),
+    radial-gradient(circle at 15% 82%, rgba(255,210,120,.22), transparent 8px),
+    radial-gradient(circle at 24% 88%, rgba(255,210,120,.20), transparent 8px),
+    radial-gradient(circle at 34% 80%, rgba(255,210,120,.18), transparent 10px),
+    radial-gradient(circle at 48% 90%, rgba(255,210,120,.25), transparent 10px),
+    radial-gradient(circle at 58% 82%, rgba(255,210,120,.18), transparent 8px),
+    radial-gradient(circle at 66% 89%, rgba(255,210,120,.20), transparent 8px),
+    radial-gradient(circle at 74% 80%, rgba(255,210,120,.18), transparent 10px),
+    radial-gradient(circle at 86% 88%, rgba(255,210,120,.24), transparent 12px),
+    linear-gradient(180deg, transparent 0 58%, rgba(12,20,40,.18) 58% 100%);
+}
+
+.dn-auth-roadline {
+  position: absolute;
+  left: 7%;
+  right: 0;
+  bottom: 30px;
+  height: 140px;
+  pointer-events: none;
+}
+
+.dn-auth-roadline::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 12%;
+  bottom: 18px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(24,168,232,.35), rgba(24,168,232,.02));
+  box-shadow: 0 0 20px rgba(24,168,232,.12);
+}
+
+.dn-auth-roadline::after {
+  content: "";
+  position: absolute;
+  left: 55%;
+  right: 6%;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(245,183,0,.18), rgba(245,183,0,.0));
+  box-shadow: 0 0 18px rgba(245,183,0,.16);
+  transform: perspective(300px) rotateX(65deg);
+}
+
+.dn-auth-khalifa-wrap {
+  position: relative;
+  z-index: 2;
+  min-height: 720px;
+  display: grid;
+  place-items: center;
+}
+
+.dn-auth-khalifa-main {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 760px);
+  min-height: 680px;
+}
+
+.dn-auth-khalifa-main img {
+  width: min(480px, 72%) !important;
+  max-height: 630px !important;
+  object-fit: contain !important;
+  filter:
+    drop-shadow(0 20px 55px rgba(0,0,0,.58))
+    drop-shadow(0 0 26px rgba(24,168,232,.16));
+}
+
+.dn-auth-bubble-ref {
+  position: absolute;
+  top: 145px;
+  inset-inline-end: 18px;
+  max-width: 320px;
+  min-height: 160px;
+  padding: 22px 26px;
+  border-radius: 28px;
+  border: 2px solid rgba(70,160,255,.92);
+  background: rgba(4,20,44,.76);
+  color: #fff;
+  font-size: clamp(1.55rem, 2vw, 2.2rem);
+  font-weight: 950;
+  line-height: 1.3;
+  box-shadow:
+    0 0 26px rgba(59,149,255,.20),
+    inset 0 0 18px rgba(59,149,255,.06);
+  display: grid;
+  align-items: center;
+  text-align: center;
+}
+
+.dn-auth-bubble-ref::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: -18px;
+  bottom: 26px;
+  width: 34px;
+  height: 34px;
+  border-inline-start: 2px solid rgba(70,160,255,.92);
+  border-bottom: 2px solid rgba(70,160,255,.92);
+  background: rgba(4,20,44,.76);
+  transform: rotate(45deg);
+  box-shadow: -5px 5px 12px rgba(0,0,0,.10);
+}
+
+.dn-auth-alert-final.is-error,
+.dn-auth-alert-final.is-success {
+  border-radius: 14px !important;
+}
+
+@media (max-width: 1180px) {
+  .dn-auth-frame-final.dn-auth-reference-shell {
+    grid-template-columns: 1fr !important;
+    width: min(100%, 860px) !important;
+  }
+
+  .dn-auth-showcase-ref {
+    min-height: 620px !important;
+    order: -1;
+  }
+
+  .dn-auth-bubble-ref {
+    top: 100px;
+    inset-inline-end: 8px;
+    max-width: 280px;
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .dn-auth-page-final.dn-auth-ref-upgrade {
+    padding: 72px 14px 18px !important;
+  }
+
+  .dn-auth-card-final.dn-auth-reference-card {
+    padding: 22px 18px !important;
+    border-radius: 26px !important;
+  }
+
+  .dn-auth-logo-final.dn-auth-reference-logo {
+    width: 92px !important;
+    height: 92px !important;
+  }
+
+  .dn-auth-heading-final.dn-auth-reference-heading h1 {
+    font-size: 2rem !important;
+  }
+
+  .dn-auth-showcase-ref {
+    min-height: 460px !important;
+    padding: 0 !important;
+  }
+
+  .dn-auth-khalifa-wrap,
+  .dn-auth-khalifa-main {
+    min-height: 420px !important;
+  }
+
+  .dn-auth-khalifa-main img {
+    width: min(280px, 70%) !important;
+    max-height: 340px !important;
+  }
+
+  .dn-auth-bubble-ref {
+    top: 36px;
+    inset-inline-end: 8px;
+    max-width: 190px;
+    min-height: 96px;
+    padding: 14px 14px;
+    font-size: 1.02rem;
+    border-radius: 18px;
+  }
+}
