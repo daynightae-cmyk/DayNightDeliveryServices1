@@ -19,27 +19,28 @@ const assets = {
 
 const ar = {
   lang: "English",
-  enterPortal: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0628\u0648\u0627\u0628\u0629",
-  title: "\u0628\u0648\u0627\u0628\u0629 \u0627\u0644\u0625\u062F\u0627\u0631\u0629",
-  subtitle: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645",
-  email: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645",
-  password: "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
-  remember: "\u062A\u0630\u0643\u0631\u0646\u064A",
-  forgot: "\u0646\u0633\u064A\u062A \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631\u061F",
-  submit: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644",
-  loading: "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0642\u0642...",
-  secure: "\u062F\u062E\u0648\u0644 \u0622\u0645\u0646 \u0648\u0645\u0634\u0641\u0631 \u0644\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0625\u062F\u0627\u0631\u064A\u0629 \u0641\u0642\u0637",
-  captchaRequired: "\u064A\u0631\u062C\u0649 \u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u0623\u0645\u0646\u064A \u0623\u0648\u0644\u0627\u064B.",
-  loginUnavailable: "\u062E\u062F\u0645\u0629 \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629 \u062D\u0627\u0644\u064A\u0627\u064B.",
-  invalid: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629 \u0623\u0648 \u063A\u064A\u0631 \u0645\u062E\u0648\u0644\u0629.",
-  adminOnly: "\u0647\u0630\u0647 \u0627\u0644\u0628\u0648\u0627\u0628\u0629 \u0645\u062E\u0635\u0635\u0629 \u0644\u0644\u0625\u062F\u0627\u0631\u0629 \u0641\u0642\u0637.",
-  success: "\u062A\u0645 \u0627\u0644\u062A\u062D\u0642\u0642. \u062C\u0627\u0631\u064A \u062A\u062C\u0647\u064A\u0632 \u0645\u0631\u0643\u0632 \u0627\u0644\u0642\u064A\u0627\u062F\u0629...",
-  genericError: "\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644.",
-  captchaIssue: "\u062A\u0639\u0630\u0631 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u0623\u0645\u0646\u064A \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u0635\u0641\u062D.",
+  enterPortal: "تسجيل الدخول إلى البوابة",
+  title: "بوابة الإدارة",
+  subtitle: "تسجيل الدخول للوصول إلى لوحة التحكم",
+  email: "البريد الإلكتروني أو اسم المستخدم",
+  password: "كلمة المرور",
+  remember: "تذكرني",
+  forgot: "نسيت كلمة المرور؟",
+  submit: "تسجيل الدخول",
+  loading: "جاري التحقق...",
+  secure: "دخول آمن ومشفر للحسابات الإدارية فقط",
+  captchaRequired: "يرجى إكمال التحقق الأمني أولاً.",
+  loginUnavailable: "خدمة الدخول غير متاحة حالياً.",
+  invalid: "بيانات الدخول غير صحيحة أو غير مخولة.",
+  adminOnly: "هذه البوابة مخصصة للإدارة فقط.",
+  success: "تم التحقق. جاري تجهيز مركز القيادة...",
+  genericError: "حدث خطأ أثناء تسجيل الدخول.",
+  captchaIssue: "تعذر تشغيل التحقق الأمني لهذا المتصفح.",
+  visualAlt: "بوابة إدارة DAY NIGHT",
 };
 
 const en = {
-  lang: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629",
+  lang: "العربية",
   enterPortal: "Enter Admin Portal",
   title: "Admin Portal",
   subtitle: "Sign in to access the control dashboard",
@@ -57,6 +58,7 @@ const en = {
   success: "Verified. Preparing command center...",
   genericError: "An error occurred during login.",
   captchaIssue: "Security check could not run in this browser.",
+  visualAlt: "DAY NIGHT admin gateway",
 };
 
 function LoginEntry({ isArabic }: { isArabic: boolean }) {
@@ -156,7 +158,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     <div className="dn-clean-auth-root dn-clean-auth-login" dir={isArabic ? "rtl" : "ltr"}>
       {entry && <LoginEntry isArabic={isArabic} />}
       <button type="button" className="dn-clean-auth-lang" onClick={toggleLanguage}>{ui.lang}</button>
-      <img className="dn-clean-auth-bg-image" src={assets.login} alt={ui.title} />
+
       <main className="dn-clean-auth-shell">
         <section className="dn-clean-auth-form-card" aria-label={ui.title}>
           <div className="dn-clean-auth-logo"><img src={assets.logo} alt="DAY NIGHT DELIVERY SERVICES" /></div>
@@ -167,7 +169,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
           <form onSubmit={handleAdminLogin} className="dn-clean-auth-form">
             <label className="dn-clean-auth-field"><span>{ui.email}</span><div><Mail /><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin@daynightae.com" dir="ltr" /></div></label>
-            <label className="dn-clean-auth-field"><span>{ui.password}</span><div><KeyRound /><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" dir="ltr" /><Eye /></div></label>
+            <label className="dn-clean-auth-field"><span>{ui.password}</span><div><KeyRound /><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="**********" dir="ltr" /><Eye /></div></label>
             <div className="dn-clean-auth-options"><label><input type="checkbox" /> {ui.remember}</label><a href={`mailto:${companyMeta.email}`}>{ui.forgot}</a></div>
 
             {captchaEnabled && <div className="dn-clean-auth-captcha"><TurnstileCaptcha siteKey={captchaSiteKey} language={language} onVerify={(token) => { setCaptchaToken(token); setCaptchaUnavailable(token === TURNSTILE_FALLBACK_TOKEN); }} onExpire={() => { setCaptchaToken(""); setCaptchaUnavailable(false); }} /></div>}
@@ -177,6 +179,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             <p className="dn-clean-auth-secure"><ShieldCheck />{ui.secure}</p>
           </form>
         </section>
+
+        <aside className="dn-clean-auth-preview" aria-label={ui.visualAlt}>
+          <img src={assets.login} alt={ui.visualAlt} />
+        </aside>
       </main>
     </div>
   );
