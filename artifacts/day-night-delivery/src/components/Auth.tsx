@@ -1,12 +1,15 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase, isAdminUser } from "../supabase";
 import {
+  ArrowRight,
   CheckCircle,
+  Eye,
   KeyRound,
   Lock,
   Mail,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   UserCog,
 } from "lucide-react";
 import TurnstileCaptcha, { TURNSTILE_FALLBACK_TOKEN } from "./security/TurnstileCaptcha";
@@ -14,14 +17,24 @@ import { useAppContext } from "../lib/AppContext";
 import CustomerDashboard from "./customer/CustomerDashboard";
 import companyMeta from "../data/companyMeta";
 import AdminMascotWelcome from "./admin/AdminMascotWelcome";
-import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-khalifa-final.css";
 import "../styles/dn-auth-gateway-phase1.css";
-import "../styles/dn-auth-reference-upgrade.css";
+import "../styles/dn-premium-auth-assets.css";
 
 interface AuthProps {
   onAuthSuccess: () => void;
 }
+
+const premiumAssets = {
+  introHero: "/assets/daynight/premium-auth/dn-auth-intro-hero.png",
+  loginReference: "/assets/daynight/premium-auth/dn-auth-login-reference.png",
+  loadingBridge: "/assets/daynight/premium-auth/dn-auth-loading-bridge.png",
+  khalifaAssistant: "/assets/daynight/premium-auth/dn-khalifa-assistant-card.png",
+  khalifaRobot: "/assets/daynight/premium-auth/dn-khalifa-robot.png",
+  logo: "/assets/daynight/premium-auth/dn-logo-premium-glass.png",
+  dashboardReference: "/assets/daynight/premium-auth/dn-admin-dashboard-reference.png",
+  liveMap: "/assets/daynight/premium-auth/dn-admin-live-map.png",
+};
 
 function LoginEntry({ isArabic }: { isArabic: boolean }) {
   return <AdminMascotWelcome isArabic={isArabic} />;
@@ -38,6 +51,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [entry, setEntry] = useState(false);
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.sessionStorage.getItem("dnAuthIntroSeen") !== "yes";
+  });
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaUnavailable, setCaptchaUnavailable] = useState(false);
 
@@ -47,38 +64,45 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
   const ui = isArabic
     ? {
-        title: "بوابة الإدارة",
-        subtitle: "تسجيل الدخول للوصول إلى لوحة التحكم",
-        eyebrow: "DAY NIGHT COMMAND GATEWAY",
-        email: "البريد الإلكتروني أو اسم المستخدم",
-        password: "كلمة المرور",
-        remember: "تذكرني",
-        forgot: "نسيت كلمة المرور؟",
-        submit: "تسجيل الدخول",
-        loading: "جاري التحقق...",
-        secure: "دخول آمن ومشفر للحسابات الإدارية فقط",
-        captchaRequired: "يرجى إكمال التحقق الأمني أولاً.",
-        loginUnavailable: "خدمة الدخول غير متاحة حالياً.",
-        invalid: "بيانات الدخول غير صحيحة أو غير مخولة.",
-        adminOnly: "هذه البوابة مخصصة للإدارة فقط.",
-        success: "تم التحقق. جاري تجهيز مركز القيادة...",
-        genericError: "حدث خطأ أثناء تسجيل الدخول.",
-        captchaIssue: "تعذر تشغيل التحقق الأمني لهذا المتصفح.",
-        imageLabel: "خليفة",
-        language: "English",
-        mascotTitle: "خليفة جاهز لخدمتك",
-        mascotText: "مساعد الإدارة الذكي يجهّز لك لوحة التحكم والطلبات والتحصيل لحظة الدخول.",
-        stat1: "تشغيل 24/7",
-        stat2: "إدارة الطلبات",
-        stat3: "أمان إداري",
-        checkpoint1: "التحقق من هوية المدير",
-        checkpoint2: "تحميل بيانات التشغيل",
-        checkpoint3: "فتح مركز القيادة",
+        lang: "English",
+        introBadge: "Ù…Ø±Ø­Ø¨Ù‹Ø§ Ø¨Ùƒ ÙÙŠ",
+        introTitle: "Ø¨ÙˆØ§Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©",
+        introText: "ØªØ¬Ø±Ø¨Ø© Ø¯Ø®ÙˆÙ„ ÙØ§Ø®Ø±Ø© Ù„Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø·Ù„Ø¨Ø§Øª ÙˆØ§Ù„ØªØ¬Ø§Ø± ÙˆØ§Ù„ØªØ­ØµÙŠÙ„ Ø¨ÙƒÙ„ Ø³Ø±Ø¹Ø© ÙˆÙˆØ¶ÙˆØ­.",
+        introButton: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ø§Ù„Ø¨ÙˆØ§Ø¨Ø©",
+        title: "Ø¨ÙˆØ§Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©",
+        subtitle: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù„Ù„ÙˆØµÙˆÙ„ Ø¥Ù„Ù‰ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…",
+        email: "Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…",
+        password: "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±",
+        remember: "ØªØ°ÙƒØ±Ù†ÙŠ",
+        forgot: "Ù†Ø³ÙŠØª ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±ØŸ",
+        submit: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„",
+        loading: "Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù‚Ù‚...",
+        secure: "Ø¯Ø®ÙˆÙ„ Ø¢Ù…Ù† ÙˆÙ…Ø´ÙØ± Ù„Ù„Ø­Ø³Ø§Ø¨Ø§Øª Ø§Ù„Ø¥Ø¯Ø§Ø±ÙŠØ© ÙÙ‚Ø·",
+        captchaRequired: "ÙŠØ±Ø¬Ù‰ Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ø£Ù…Ù†ÙŠ Ø£ÙˆÙ„Ø§Ù‹.",
+        loginUnavailable: "Ø®Ø¯Ù…Ø© Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠØ§Ù‹.",
+        invalid: "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ØºÙŠØ± ØµØ­ÙŠØ­Ø© Ø£Ùˆ ØºÙŠØ± Ù…Ø®ÙˆÙ„Ø©.",
+        adminOnly: "Ù‡Ø°Ù‡ Ø§Ù„Ø¨ÙˆØ§Ø¨Ø© Ù…Ø®ØµØµØ© Ù„Ù„Ø¥Ø¯Ø§Ø±Ø© ÙÙ‚Ø·.",
+        success: "ØªÙ… Ø§Ù„ØªØ­Ù‚Ù‚. Ø¬Ø§Ø±ÙŠ ØªØ¬Ù‡ÙŠØ² Ù…Ø±ÙƒØ² Ø§Ù„Ù‚ÙŠØ§Ø¯Ø©...",
+        genericError: "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„.",
+        captchaIssue: "ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ø£Ù…Ù†ÙŠ Ù„Ù‡Ø°Ø§ Ø§Ù„Ù…ØªØµÙØ­.",
+        feature1: "Ø¢Ù…Ù† ÙˆÙ…ÙˆØ«ÙˆÙ‚",
+        feature2: "Ø³Ø±ÙŠØ¹ ÙˆÙØ¹Ø§Ù„",
+        feature3: "ØªØªØ¨Ø¹ Ù„Ø­Ø¸ÙŠ",
+        feature4: "Ø¯Ø¹Ù… 24/7",
+        sideTitle: "Ø®Ù„ÙŠÙØ© Ø¬Ø§Ù‡Ø² Ù„Ø®Ø¯Ù…ØªÙƒ",
+        sideText: "Ù…Ø³Ø§Ø¹Ø¯Ùƒ Ø§Ù„Ø°ÙƒÙŠ ÙŠØ¬Ù‡Ù‘Ø² ØªØ¬Ø±Ø¨Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø© Ù‚Ø¨Ù„ Ø¯Ø®ÙˆÙ„Ùƒ Ø¥Ù„Ù‰ Ù…Ø±ÙƒØ² Ø§Ù„Ù‚ÙŠØ§Ø¯Ø©.",
+        checkpoint1: "ÙØ­Øµ Ø§Ù„Ø£Ù…Ø§Ù†",
+        checkpoint2: "Ø¬Ù„Ø¨ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª",
+        checkpoint3: "ØªÙ‡ÙŠØ¦Ø© Ø§Ù„Ù†Ø¸Ø§Ù…",
       }
     : {
+        lang: "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
+        introBadge: "Welcome to",
+        introTitle: "Admin Portal",
+        introText: "A premium gateway for managing orders, merchants, collections, and operations.",
+        introButton: "Enter Admin Portal",
         title: "Admin Portal",
-        subtitle: "Secure access to the DAY NIGHT command center",
-        eyebrow: "DAY NIGHT COMMAND GATEWAY",
+        subtitle: "Sign in to access the control dashboard",
         email: "Email or username",
         password: "Password",
         remember: "Remember me",
@@ -90,19 +114,18 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         loginUnavailable: "Login service is currently unavailable.",
         invalid: "Invalid or unauthorized login details.",
         adminOnly: "This portal is for administrators only.",
-        success: "Verified. Preparing the command center...",
+        success: "Verified. Preparing command center...",
         genericError: "An error occurred during login.",
         captchaIssue: "Security check could not run in this browser.",
-        imageLabel: "Khalifa",
-        language: "العربية",
-        mascotTitle: "Khalifa is ready",
-        mascotText: "Your smart admin assistant prepares operations, orders, and collections as you sign in.",
-        stat1: "24/7 Operations",
-        stat2: "Order Control",
-        stat3: "Admin Security",
-        checkpoint1: "Verifying admin identity",
-        checkpoint2: "Loading operation data",
-        checkpoint3: "Opening command center",
+        feature1: "Secure",
+        feature2: "Fast",
+        feature3: "Live tracking",
+        feature4: "24/7 support",
+        sideTitle: "Khalifa is ready",
+        sideText: "Your smart assistant prepares the command center before you enter operations.",
+        checkpoint1: "Security check",
+        checkpoint2: "Fetching data",
+        checkpoint3: "System setup",
       };
 
   useEffect(() => {
@@ -117,6 +140,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }, [onAuthSuccess, isCustomerRoute]);
 
   if (isCustomerRoute) return <CustomerDashboard />;
+
+  function enterLogin() {
+    window.sessionStorage.setItem("dnAuthIntroSeen", "yes");
+    setShowIntro(false);
+  }
 
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -158,64 +186,77 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
       setSuccessMsg(ui.success);
       setEntry(true);
-      window.setTimeout(onAuthSuccess, 2400);
+      window.setTimeout(onAuthSuccess, 2450);
     } catch {
       setErrorMsg(ui.genericError);
       setLoading(false);
     }
   }
 
-  return (
-    <div className="dn-auth-page-final dn-auth-ref-upgrade" dir={isArabic ? "rtl" : "ltr"}>
-      {entry && <LoginEntry isArabic={isArabic} />}
+  if (showIntro) {
+    return (
+      <div className="dn-premium-intro-page" dir={isArabic ? "rtl" : "ltr"}>
+        <button type="button" className="dn-premium-language-switch" onClick={toggleLanguage}>
+          {ui.lang}
+        </button>
 
-      <button type="button" className="dn-auth-lang-switch" onClick={toggleLanguage}>
-        {ui.language}
-      </button>
+        <div className="dn-premium-intro-bg" aria-hidden="true" />
+        <section className="dn-premium-intro-shell">
+          <div className="dn-premium-intro-copy">
+            <span>{ui.introBadge}</span>
+            <h1>{ui.introTitle}</h1>
+            <p>{ui.introText}</p>
 
-      <main className="dn-auth-frame-final dn-auth-reference-shell">
-        <section className="dn-auth-showcase-ref" aria-label={ui.imageLabel}>
-  <div className="dn-auth-cityline" />
-  <div className="dn-auth-roadline" />
+            <div className="dn-premium-intro-features">
+              <strong><ShieldCheck />{ui.feature1}</strong>
+              <strong><Sparkles />{ui.feature2}</strong>
+              <strong><UserCog />{ui.feature3}</strong>
+              <strong><Lock />{ui.feature4}</strong>
+            </div>
 
-  <div className="dn-auth-khalifa-wrap">
-    <div className="dn-auth-khalifa-main">
-      <img src={khalifaAssets.staticMascot} alt={ui.imageLabel} />
-      <div className="dn-auth-bubble-ref">
-        <span>
-          {isArabic ? (
-            <>
-              هلا أبو خليفة<br />يا قيادة
-            </>
-          ) : (
-            <>
-              Welcome Abu Khalifa<br />Leader
-            </>
-          )}
-        </span>
-      </div>
-    </div>
-  </div>
-</section>
-<section className="dn-auth-card-final dn-auth-reference-card" aria-label={ui.title}>
-          <div className="dn-auth-logo-final dn-auth-reference-logo">
-            <img
-              src={companyMeta.logoUrl}
-              onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }}
-              alt="DAY NIGHT DELIVERY SERVICES"
-            />
+            <button type="button" onClick={enterLogin} className="dn-premium-intro-button">
+              {ui.introButton}
+              <ArrowRight />
+            </button>
           </div>
 
-          <div className="dn-auth-heading-final dn-auth-reference-heading">
-            <span>{ui.eyebrow}</span>
+          <div className="dn-premium-intro-image-card">
+            <img src={premiumAssets.introHero} alt={ui.introTitle} />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dn-auth-page-final dn-auth-assets-page" dir={isArabic ? "rtl" : "ltr"}>
+      {entry && <LoginEntry isArabic={isArabic} />}
+
+      <button type="button" className="dn-premium-language-switch" onClick={toggleLanguage}>
+        {ui.lang}
+      </button>
+
+      <main className="dn-auth-assets-shell">
+        <section className="dn-auth-assets-visual-card" aria-label="DAY NIGHT Khalifa">
+          <img src={premiumAssets.loginReference} alt="DAY NIGHT admin gateway visual" />
+          <div className="dn-auth-assets-visual-glow" />
+        </section>
+
+        <section className="dn-auth-assets-login-card" aria-label={ui.title}>
+          <div className="dn-auth-assets-logo">
+            <img src={premiumAssets.logo} alt="DAY NIGHT DELIVERY SERVICES" />
+          </div>
+
+          <div className="dn-auth-assets-heading">
+            <span>DAY NIGHT COMMAND GATEWAY</span>
             <h1>{ui.title}</h1>
             <p>{ui.subtitle}</p>
           </div>
 
-          <div className="dn-auth-checkpoints">
-            <span><ShieldCheck className="h-4 w-4" />{ui.checkpoint1}</span>
-            <span><UserCog className="h-4 w-4" />{ui.checkpoint2}</span>
-            <span><Lock className="h-4 w-4" />{ui.checkpoint3}</span>
+          <div className="dn-auth-assets-checks">
+            <span><ShieldCheck />{ui.checkpoint1}</span>
+            <span><UserCog />{ui.checkpoint2}</span>
+            <span><CheckCircle />{ui.checkpoint3}</span>
           </div>
 
           {errorMsg && (
@@ -232,10 +273,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             </div>
           )}
 
-          <form onSubmit={handleAdminLogin} className="dn-auth-form-final dn-auth-reference-form">
-            <label className="dn-auth-field-final">
+          <form onSubmit={handleAdminLogin} className="dn-auth-assets-form">
+            <label className="dn-auth-assets-field">
               <span>{ui.email}</span>
               <div>
+                <Mail />
                 <input
                   type="email"
                   required
@@ -244,26 +286,26 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   placeholder="Admin@daynightae.com"
                   dir="ltr"
                 />
-                <Mail />
               </div>
             </label>
 
-            <label className="dn-auth-field-final">
+            <label className="dn-auth-assets-field">
               <span>{ui.password}</span>
               <div>
+                <KeyRound />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="••••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   dir="ltr"
                 />
-                <KeyRound />
+                <Eye />
               </div>
             </label>
 
-            <div className="dn-auth-options-final">
+            <div className="dn-auth-assets-options">
               <label><input type="checkbox" /> {ui.remember}</label>
               <a href={`mailto:${companyMeta.email}`}>{ui.forgot}</a>
             </div>
@@ -289,13 +331,13 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               <p className="dn-auth-captcha-note-final">{ui.captchaIssue}</p>
             )}
 
-            <button type="submit" disabled={loading || entry} className="dn-auth-submit-final dn-auth-reference-submit">
-              <Lock className="ml-2 inline h-5 w-5" />
+            <button type="submit" disabled={loading || entry} className="dn-auth-assets-submit">
+              <Lock />
               {loading ? ui.loading : ui.submit}
             </button>
 
-            <p className="dn-auth-secure-final">
-              <ShieldCheck className="ml-1 inline h-4 w-4" />
+            <p className="dn-auth-assets-secure">
+              <ShieldCheck />
               {ui.secure}
             </p>
           </form>
@@ -304,4 +346,3 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     </div>
   );
 }
-

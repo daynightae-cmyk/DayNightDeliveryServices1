@@ -51,3 +51,6 @@ attached_assets/Pasted-*.txt
 .github/instructions/nx.instructions.md
 .expo/
 .expo-shared/
+
+backup_auth_ref_*/
+backup_premium_auth_*/
