@@ -36,7 +36,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const t = copy[authLanguage];
 
   const [stage, setStage] = useState<AuthStage>("intro");
-  const [email, setEmail] = useState("daynight.ae@gmail.com");
+  const [email, setEmail] = useState("daynightae@gmail.com");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
