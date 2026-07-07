@@ -23,6 +23,8 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL === EX
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+const ADMIN_STATUS_RPC = "admin_update_order_status";
+
 export type PublicLiveMapOrder = {
   tracking_ref?: string | null;
   status?: string | null;

@@ -39,5 +39,17 @@ async function downloadAsset(asset) {
   console.log(`[assets] installed ${asset.name}: ${asset.output} (${Math.round(size / 1024)} KB)`);
 }
 const failures = [];
-for (const asset of assets) { try { await downloadAsset(asset); } catch (error) { failures.push(asset.name); console.warn(`[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`); console.warn(error instanceof Error ? error.message : error); } }
-if (strict && failures.length) { console.error(`[assets] strict mode failed for: ${failures.join(", ")}`); process.exit(1); }
+for (const asset of assets) {
+  try {
+    await downloadAsset(asset);
+  } catch (error) {
+    const optional = asset.output.includes("/admin-auth-v3/");
+    if (!optional) failures.push(asset.name);
+    console.warn(`[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`);
+    console.warn(error instanceof Error ? error.message : error);
+  }
+}
+if (strict && failures.length) {
+  console.error(`[assets] strict mode failed for: ${failures.join(", ")}`);
+  process.exit(1);
+}

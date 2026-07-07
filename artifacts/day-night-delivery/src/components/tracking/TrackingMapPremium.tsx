@@ -92,14 +92,15 @@ export default function TrackingMapPremium({ order }: TrackingMapProps) {
     setLiveOrder(null);
     setLastLiveAt(null);
     if (!supabase || !order?.id) return;
-    const channel = supabase
+    const supabaseClient = supabase;
+    const channel = supabaseClient
       .channel(`dn-premium-live-order-${order.id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${order.id}` }, (payload) => {
         setLiveOrder(payload.new as Order);
         setLastLiveAt(new Date());
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabaseClient.removeChannel(channel); };
   }, [order?.id]);
 
   const activeOrder = liveOrder || order || null;
