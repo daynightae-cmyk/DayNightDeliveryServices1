@@ -3,13 +3,11 @@ import { supabase, isAdminUser } from "../supabase";
 import { useAppContext } from "../lib/AppContext";
 import companyMeta from "../data/companyMeta";
 
-import AuthIntroScreen from "./auth-v3/AuthIntroScreen";
-import AuthLoginScreen from "./auth-v3/AuthLoginScreen";
-import AuthLoadingScreen from "./auth-v3/AuthLoadingScreen";
+import AuthIntroScreen from "./auth-clean/AuthIntroScreen";
+import AuthLoginScreen from "./auth-clean/AuthLoginScreen";
+import AuthLoadingScreen from "./auth-clean/AuthLoadingScreen";
 
-import "./auth-v3/day-night-auth-intro.css";
-import "./auth-v3/day-night-auth-login.css";
-import "./auth-v3/day-night-auth-loading.css";
+import "./auth-clean/auth-clean.css";
 
 interface AuthProps {
   onAuthSuccess: () => void;

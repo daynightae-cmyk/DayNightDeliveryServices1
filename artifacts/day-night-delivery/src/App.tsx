@@ -132,6 +132,16 @@ function AppContent() {
   const customerLabel = isArabic ? "حسابي" : "My Account";
   const currentPath = location.pathname;
 
+  if (location.pathname === "/auth") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#071A33]" />}>
+        <Routes>
+          <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen flex flex-col justify-between antialiased leading-normal selection:bg-brand-gold/30 ${isLight ? "text-[#071A33]" : "text-white"}`}
@@ -247,7 +257,9 @@ function AppContent() {
 }
 
 export default function App() {
-  const skipSplash = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("nosplash");
+  const skipSplash =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/auth" || new URLSearchParams(window.location.search).has("nosplash"));
   const [showSplash, setShowSplash] = useState(!skipSplash);
 
   return (
