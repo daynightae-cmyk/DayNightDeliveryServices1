@@ -51,7 +51,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       return;
     }
 
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setErrorMessage(t.invalid);
       return;
     }
@@ -59,10 +62,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
 
       if (error || !data?.user) {
-        if (error) console.error("[DAY NIGHT auth signIn error]", error);
+        if (error) console.error("[DAY NIGHT auth signIn error]", { message: error.message, status: error.status, name: error.name, email: cleanEmail });
         setErrorMessage(t.invalid);
         return;
       }
