@@ -37,11 +37,11 @@ export default function AuthLoginScreen(props: AuthLoginScreenProps) {
         <p className="auth-clean__eyebrow">{t.eyebrow}</p>
         <h1 className="auth-clean__card-title" id="auth-clean-title">{t.title}</h1>
         <p className="auth-clean__card-subtitle">{t.sub}</p>
-        <form className="auth-clean__form" onSubmit={submit} noValidate>
+        <form className="auth-clean__form" onSubmit={submit} autoComplete="off" noValidate>
           <label className="auth-clean__label" htmlFor="dn-admin-email">{t.email}</label>
-          <input id="dn-admin-email" className="auth-clean__input" type="email" value={props.email} onChange={(event) => props.onEmailChange(event.target.value)} autoComplete="username" dir="ltr" />
+          <input id="dn-admin-email" name="dn-admin-email" className="auth-clean__input" type="email" value={props.email} onChange={(event) => props.onEmailChange(event.target.value)} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} dir="ltr" />
           <label className="auth-clean__label" htmlFor="dn-admin-password">{t.password}</label>
-          <input id="dn-admin-password" className="auth-clean__input" type="password" value={props.password} onChange={(event) => props.onPasswordChange(event.target.value)} autoComplete="current-password" dir="ltr" />
+          <input id="dn-admin-password" name="dn-admin-password" className="auth-clean__input" type="password" value={props.password} onChange={(event) => props.onPasswordChange(event.target.value)} autoComplete="new-password" autoCorrect="off" autoCapitalize="none" spellCheck={false} dir="ltr" />
           <div className="auth-clean__options">
             <label className="auth-clean__remember"><input type="checkbox" checked={props.rememberMe} onChange={(event) => props.onRememberChange(event.target.checked)} />{t.remember}</label>
             <button type="button" className="auth-clean__link" onClick={props.onForgotPassword}>{t.forgot}</button>
