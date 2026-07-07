@@ -252,8 +252,9 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     setLastLiveAt(null);
     setTileFailed(false);
     if (!supabase || !order?.id) return;
+    const supabaseClient = supabase;
 
-    const channel = supabase
+    const channel = supabaseClient
       .channel(`dn-live-order-${order.id}`)
       .on(
         "postgres_changes",
@@ -266,7 +267,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabaseClient.removeChannel(channel);
     };
   }, [order?.id]);
 

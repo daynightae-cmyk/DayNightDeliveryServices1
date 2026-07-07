@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "corepack enable && corepack prepare pnpm@10.34.4 --activate && pnpm install --frozen-lockfile --config.optional=true",
-  "buildCommand": "pnpm run build",
+  "installCommand": "cd ../.. && corepack enable && corepack prepare pnpm@10.34.4 --activate && pnpm install --frozen-lockfile --config.optional=true",
+  "buildCommand": "cd ../.. && BASE_PATH=/ PORT=3000 pnpm --dir artifacts/day-night-delivery run build",
   "outputDirectory": "dist/public",
   "cleanUrls": true,
   "trailingSlash": false,
