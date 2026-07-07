@@ -20,12 +20,13 @@ export default function Pricing() {
   const isArabic = language === "ar";
   const [domesticPickupCity, setDomesticPickupCity] = useState("Abu Dhabi");
   const [domesticDeliveryCity, setDomesticDeliveryCity] = useState("Dubai");
-  const [localOrderCount, setLocalOrderCount] = useState(1);
+  const [domesticPieces, setDomesticPieces] = useState(1);
+  const domesticWeight = LOCAL_WEIGHT;
   const [internationalDestination, setInternationalDestination] = useState("SA");
   const [internationalWeight, setInternationalWeight] = useState(1);
   const cityRoutes = coverageAreas.filter((a) => a.zoneType !== "extended");
   const specialRoutes = coverageAreas.filter((a) => a.zoneType === "extended");
-  const domestic = useMemo(() => calculateDomesticPrice({ pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, serviceType: LOCAL_SERVICE, weight: LOCAL_WEIGHT, pieces: localOrderCount }), [domesticPickupCity, domesticDeliveryCity, localOrderCount]);
+  const domestic = useMemo(() => calculateDomesticPrice({ pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, serviceType: LOCAL_SERVICE, weight: domesticWeight, pieces: domesticPieces }), [domesticPickupCity, domesticDeliveryCity, domesticPieces]);
   const international = useMemo(() => calculateInternationalPrice({ countryCode: internationalDestination, weight: internationalWeight }), [internationalDestination, internationalWeight]);
   const statCards = [
     [isArabic ? "طلب واحد" : "1 local order", domesticPricing.main.total, isArabic ? "مسار أساسي" : "standard route", "gold"],
@@ -36,10 +37,10 @@ export default function Pricing() {
   ] as const;
   const dest = internationalDestinations.find((d) => d.countryCode === internationalDestination) || internationalDestinations[0];
 
-  const resetDomestic = () => { setDomesticPickupCity("Abu Dhabi"); setDomesticDeliveryCity("Dubai"); setLocalOrderCount(1); };
+  const resetDomestic = () => { setDomesticPickupCity("Abu Dhabi"); setDomesticDeliveryCity("Dubai"); setDomesticPieces(1); };
   const resetInternational = () => { setInternationalDestination("SA"); setInternationalWeight(1); };
   const domesticPdf = () => {
-    const quote = { pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, service: LOCAL_SERVICE, weight: LOCAL_WEIGHT, pieces: localOrderCount, basePrice: domestic.total, expressCharge: 0, extraPiecesCharge: 0, total: domestic.total };
+    const quote = { pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, service: LOCAL_SERVICE, weight: domesticWeight, pieces: domesticPieces, basePrice: domestic.total, expressCharge: 0, extraPiecesCharge: 0, total: domestic.total };
     if (isArabic) { void exportArabicDomesticQuotePdf(quote); return; }
     exportDomesticQuotePDF(quote, "en");
   };
@@ -48,7 +49,7 @@ export default function Pricing() {
     if (isArabic) { void exportArabicInternationalQuotePdf({ ...quote, destination: dest ? dest.countryNameAr : internationalDestination }); return; }
     exportIntlQuotePDF(quote, "en");
   };
-  const domesticTxt = () => exportQuoteTXT("domestic", { "Pickup Area": domesticPickupCity, "Delivery Area": domesticDeliveryCity, "Order Count": localOrderCount, Service: LOCAL_SERVICE, Total: formatAED(domestic.total) });
+  const domesticTxt = () => exportQuoteTXT("domestic", { "Pickup Area": domesticPickupCity, "Delivery Area": domesticDeliveryCity, "Order Count": domesticPieces, Service: LOCAL_SERVICE, Total: formatAED(domestic.total) });
   const intlTxt = () => exportQuoteTXT("international", { Destination: dest ? (isArabic ? dest.countryNameAr : dest.countryNameEn) : internationalDestination, Weight: `${internationalWeight} kg`, Zone: international.pricingCategory, Total: formatAED(international.total) });
 
   const renderAreaOptions = () => <>
@@ -67,7 +68,7 @@ export default function Pricing() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة الاستلام" : "Pickup area"}</span><DNSelect value={domesticPickupCity} onChange={(e) => setDomesticPickupCity(e.target.value)}>{renderAreaOptions()}</DNSelect></label>
           <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة التسليم" : "Delivery area"}</span><DNSelect value={domesticDeliveryCity} onChange={(e) => setDomesticDeliveryCity(e.target.value)}>{renderAreaOptions()}</DNSelect></label>
-          <label className="space-y-1.5 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبات" : "Order count"}</span><input className="dn-input" type="number" min="1" step="1" value={localOrderCount} onChange={(e) => setLocalOrderCount(Math.max(1, Math.round(Number(e.target.value) || 1)))} dir="ltr" /></label>
+          <label className="space-y-1.5 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبات" : "Order count"}</span><input className="dn-input" type="number" min="1" step="1" value={domesticPieces} onChange={(e) => setDomesticPieces(Math.max(1, Math.round(Number(e.target.value) || 1)))} dir="ltr" /></label>
         </div>
         <div className="mt-5 rounded-2xl border border-white/10 bg-brand-deep/70 p-5">{domestic.breakdown.map((line) => <div key={line} className={`mb-2 flex items-center justify-between gap-3 text-xs font-bold text-white/65 ${isArabic ? "flex-row-reverse" : ""}`}><Check className="h-4 w-4 text-emerald-300" /><span dir="ltr">{line}</span></div>)}<p className="mt-3 text-xs font-bold text-white/45">{isArabic ? "تقدير سريع ونهائي للتوصيل داخل الإمارات حسب المسار وعدد الطلبات." : "Fast final UAE delivery estimate based on route and order count."}</p><div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4"><span className="font-black text-white">{tp.totalPrice}</span><span className="font-mono text-3xl font-black text-brand-gold" dir="ltr">{formatAED(domestic.total)}</span></div></div>
         <div className="mt-5 flex flex-wrap gap-2"><Link to="/request" className="dn-btn dn-btn-primary dn-btn-md flex-1">{tp.requestDelivery}</Link><a href={companyMeta.whatsappUrl} target="_blank" rel="noopener noreferrer" className="dn-btn dn-btn-whatsapp dn-btn-md flex-1">WhatsApp</a><DNButton variant="secondary" size="sm" onClick={domesticPdf}><FileText className="h-3.5 w-3.5" />PDF</DNButton><DNButton variant="ghost" size="sm" onClick={domesticTxt}>TXT</DNButton></div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, CheckCircle, Fingerprint, KeyRound, LogOut, Mail, PackageCheck, RefreshCw, ShieldCheck, Truck, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle, Fingerprint, KeyRound, LogOut, Mail, PackageCheck, RefreshCw, ShieldCheck, Truck, Upload, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import type { Order } from "../../types";
 import { fetchCustomerOrders, supabase } from "../../supabase";
@@ -99,6 +99,10 @@ export default function CustomerDashboard() {
   const [ordersError, setOrdersError] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaNonce, setCaptchaNonce] = useState(0);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState("");
+  const [avatarError, setAvatarError] = useState("");
 
   const captchaSiteKey = String(((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || "")).trim();
   const captchaEnabled = Boolean(captchaSiteKey);
@@ -301,6 +305,29 @@ export default function CustomerDashboard() {
     setMessage(isArabic ? "الدخول بالبصمة سيظهر بعد تفعيل مفاتيح المرور لحسابك." : "Passkey sign-in appears after passkeys are enabled for your account.");
   }
 
+
+  async function previewAvatar(file?: File) {
+    setAvatarMessage("");
+    setAvatarError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setAvatarError(isArabic ? "اختر ملف صورة صالح." : "Choose a valid image file.");
+      return;
+    }
+    setAvatarLoading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreview(String(reader.result || ""));
+      setAvatarLoading(false);
+      setAvatarMessage(isArabic ? "تم تجهيز المعاينة. سيتم ربط الحفظ لاحقاً مع bucket avatars." : "Preview ready. Saving will be connected later to the avatars bucket.");
+    };
+    reader.onerror = () => {
+      setAvatarLoading(false);
+      setAvatarError(isArabic ? "تعذر قراءة الصورة." : "Could not read the image.");
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function signOut() {
     await supabase?.auth.signOut();
     setUser(null);
@@ -373,7 +400,7 @@ export default function CustomerDashboard() {
         <div className="overflow-hidden rounded-[2.25rem] border border-brand-gold/25 bg-[#061225] shadow-2xl">
           <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="p-7 sm:p-12 lg:p-14 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),transparent_35%)] flex flex-col justify-center">
-              <div className="mx-auto mb-6 h-24 w-24 rounded-full border border-brand-gold/40 bg-white/5 flex items-center justify-center overflow-hidden">{avatarUrl ? <img src={avatarUrl} alt={customerName} className="h-full w-full object-cover" /> : <UserRound className="w-11 h-11 text-brand-gold" />}</div>
+              <div className="mx-auto mb-6 h-24 w-24 rounded-full border border-brand-gold/40 bg-white/5 flex items-center justify-center overflow-hidden">{avatarPreview || avatarUrl ? <img src={avatarPreview || avatarUrl} alt={customerName} className="h-full w-full object-cover" /> : <UserRound className="w-11 h-11 text-brand-gold" />}</div>
               <div className="text-center"><span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-4 py-1.5 text-xs font-black text-emerald-200"><ShieldCheck className="w-4 h-4" /> {isArabic ? "تم تسجيل الدخول" : "Signed in"}</span><h1 className="mt-5 text-3xl sm:text-5xl font-black text-white leading-tight">{customerName}</h1><p className="mt-3 text-brand-gold text-xs font-mono break-all" dir="ltr">{customerIdentity}</p></div>
             </div>
 
@@ -381,6 +408,18 @@ export default function CustomerDashboard() {
               <h2 className="text-3xl sm:text-5xl font-black text-white leading-tight">{isArabic ? "مركز حساب العميل" : "Customer Account Hub"}</h2>
               <p className="mt-4 text-white/60 text-sm leading-relaxed max-w-2xl">{isArabic ? "حسابك متصل الآن. الطلبات الجديدة التي تنشئها أثناء تسجيل الدخول ستظهر هنا تلقائياً." : "Your account is connected. New delivery requests created while signed in will appear here automatically."}</p>
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3"><Link to="/tracking" className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 p-5 text-center text-brand-gold font-black text-xs hover:bg-brand-gold/20 transition-colors">{isArabic ? "تتبع شحنة" : "Track shipment"}</Link><Link to="/request" className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-white font-black text-xs hover:bg-white/10 transition-colors">{isArabic ? "طلب توصيل" : "Request delivery"}</Link><Link to="/policy" className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-white font-black text-xs hover:bg-white/10 transition-colors">{isArabic ? "حقوق العميل" : "Customer rights"}</Link></div>
+              <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/[0.05] p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                  <div><p className="text-white text-sm font-black">{isArabic ? "صورة الحساب" : "Account photo"}</p><p className="mt-1 text-white/45 text-xs">{isArabic ? "واجهة جاهزة للربط لاحقاً مع Supabase Storage bucket: avatars." : "Prepared for later Supabase Storage bucket integration: avatars."}</p></div>
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-brand-gold text-xs font-black hover:bg-brand-gold/20">
+                    {avatarLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {isArabic ? "رفع صورة" : "Upload photo"}
+                    <input type="file" accept="image/*" className="hidden" onChange={(event) => void previewAvatar(event.target.files?.[0])} />
+                  </label>
+                </div>
+                {avatarMessage && <p className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-200">{avatarMessage}</p>}
+                {avatarError && <p className="mt-3 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs font-bold text-rose-200">{avatarError}</p>}
+              </div>
               <button onClick={signOut} className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/25 bg-rose-500/10 px-5 py-3 text-rose-200 text-xs font-black hover:bg-rose-500/20 transition-colors"><LogOut className="w-4 h-4" /> {isArabic ? "تسجيل الخروج" : "Sign out"}</button>
             </div>
           </div>
