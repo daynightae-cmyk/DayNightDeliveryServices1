@@ -17,6 +17,8 @@ type TrackingMapProps = {
   order?: Order | null;
 };
 
+type MapMode = "standard" | "satellite" | "terrain";
+
 type CityPoint = {
   labelEn: string;
   labelAr: string;
@@ -243,6 +245,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   const [liveOrder, setLiveOrder] = useState<Order | null>(null);
   const [lastLiveAt, setLastLiveAt] = useState<Date | null>(null);
   const [tileFailed, setTileFailed] = useState(false);
+  const [mapMode, setMapMode] = useState<MapMode>("satellite");
   const isArabic = language === "ar";
 
   useEffect(() => setIsMounted(true), []);
@@ -252,8 +255,9 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     setLastLiveAt(null);
     setTileFailed(false);
     if (!supabase || !order?.id) return;
+    const supabaseClient = supabase;
 
-    const channel = supabase
+    const channel = supabaseClient
       .channel(`dn-live-order-${order.id}`)
       .on(
         "postgres_changes",
@@ -265,8 +269,24 @@ export default function TrackingMap({ order }: TrackingMapProps) {
       )
       .subscribe();
 
+    const driverId = String((order as unknown as { driver_id?: string | null })?.driver_id || "").trim();
+    const driverChannel = driverId
+      ? supabaseClient
+        .channel(`dn-driver-location-${driverId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "driver_locations", filter: `driver_id=eq.${driverId}` },
+          (payload) => {
+            setLiveOrder((current) => ({ ...(current || order), ...(payload.new as Record<string, unknown>) } as Order));
+            setLastLiveAt(new Date());
+          }
+        )
+        .subscribe()
+      : null;
+
     return () => {
-      supabase.removeChannel(channel);
+      supabaseClient.removeChannel(channel);
+      if (driverChannel) supabaseClient.removeChannel(driverChannel);
     };
   }, [order?.id]);
 
@@ -373,11 +393,31 @@ export default function TrackingMap({ order }: TrackingMapProps) {
         </div>
       </div>
 
+
+      <div className="absolute left-3 top-24 z-[660] flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-[#071A33]/88 p-1 backdrop-blur-xl">
+        {(["standard", "satellite", "terrain"] as MapMode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => { setTileFailed(false); setMapMode(mode); }}
+            className={`pointer-events-auto rounded-xl px-3 py-2 text-[10px] font-black transition-colors ${mapMode === mode ? "bg-brand-gold text-brand-deep" : "text-white/75 hover:bg-white/10"}`}
+          >
+            {mode === "standard" ? (isArabic ? "قياسية" : "Standard") : mode === "satellite" ? (isArabic ? "أقمار" : "Satellite") : (isArabic ? "تضاريس" : "Terrain")}
+          </button>
+        ))}
+      </div>
+
       <MapContainer center={driverPos} zoom={10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false} zoomControl>
-        {tileFailed ? (
+        {tileFailed || mapMode === "standard" ? (
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
+          />
+        ) : mapMode === "terrain" ? (
+          <TileLayer
+            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+            attribution="Map data &copy; OpenStreetMap contributors, SRTM | OpenTopoMap"
+            eventHandlers={tileHandlers}
           />
         ) : (
           <>

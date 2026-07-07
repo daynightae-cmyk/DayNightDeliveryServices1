@@ -1,15 +1,14 @@
 import React, { useState } from "react";
-import { supabase, isAdminUser } from "../supabase";
+import { supabase } from "../supabase";
+import { isAdminUser } from "../supabaseAdminOps";
 import { useAppContext } from "../lib/AppContext";
 import companyMeta from "../data/companyMeta";
 
-import AuthIntroScreen from "./auth-v3/AuthIntroScreen";
-import AuthLoginScreen from "./auth-v3/AuthLoginScreen";
-import AuthLoadingScreen from "./auth-v3/AuthLoadingScreen";
+import AuthIntroScreen from "./auth-clean/AuthIntroScreen";
+import AuthLoginScreen from "./auth-clean/AuthLoginScreen";
+import AuthLoadingScreen from "./auth-clean/AuthLoadingScreen";
 
-import "./auth-v3/day-night-auth-intro.css";
-import "./auth-v3/day-night-auth-login.css";
-import "./auth-v3/day-night-auth-loading.css";
+import "./auth-clean/auth-clean.css";
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -38,7 +37,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const t = copy[authLanguage];
 
   const [stage, setStage] = useState<AuthStage>("intro");
-  const [email, setEmail] = useState("daynight.ae@gmail.com");
+  const [email, setEmail] = useState("daynightae@gmail.com");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -52,7 +51,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       return;
     }
 
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setErrorMessage(t.invalid);
       return;
     }
@@ -60,9 +62,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
 
       if (error || !data?.user) {
+        if (error) console.error("[DAY NIGHT auth signIn error]", error);
         setErrorMessage(t.invalid);
         return;
       }
@@ -81,7 +84,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       setStage("loading");
       window.setTimeout(() => onAuthSuccess(), 2500);
     } catch (error) {
-      console.error("[DAY NIGHT auth]", error);
+      console.error("[DAY NIGHT auth signIn error]", error);
       setErrorMessage(t.generic);
     } finally {
       setIsSubmitting(false);

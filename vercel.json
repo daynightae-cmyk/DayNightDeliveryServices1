@@ -3,7 +3,7 @@
   "version": 2,
   "framework": "vite",
   "installCommand": "corepack enable && corepack prepare pnpm@10.34.4 --activate && pnpm install --frozen-lockfile --config.optional=true",
-  "buildCommand": "BASE_PATH=/ PORT=3000 pnpm --filter @workspace/day-night-delivery run build",
+  "buildCommand": "BASE_PATH=/ PORT=3000 pnpm --dir artifacts/day-night-delivery run build",
   "outputDirectory": "artifacts/day-night-delivery/dist/public",
   "redirects": [
     {

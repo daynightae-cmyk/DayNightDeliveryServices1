@@ -82,14 +82,88 @@ export type AdminOrderInput = {
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  customer_name?: string;
+  customer_phone?: string;
+  pickup_address?: string;
+  delivery_address?: string;
+  emirate?: string;
+  city?: string;
   package_type: string;
   package_description?: string;
   weight?: number;
   payment_method: string;
   cod_amount?: number | string | null;
+  delivery_fee?: number | string | null;
   notes?: string;
   status?: string;
 };
+
+export type AdminStats = {
+  total: number;
+  pending: number;
+  in_transit: number;
+  delivered: number;
+  cancelled: number;
+};
+
+export function calculateOrderStats(orders: Array<Pick<Order, "status"> | Record<string, unknown>>): AdminStats {
+  const stats: AdminStats = { total: orders.length, pending: 0, in_transit: 0, delivered: 0, cancelled: 0 };
+  for (const order of orders) {
+    const status = String((order as { status?: unknown }).status || "pending").toLowerCase().replace(/[\s-]+/g, "_");
+    if (status.includes("cancel") || status.includes("fail")) stats.cancelled += 1;
+    else if (status.includes("deliver") || status.includes("complete")) stats.delivered += 1;
+    else if (status.includes("transit") || status.includes("out_for_delivery") || status.includes("pickup") || status.includes("assign")) stats.in_transit += 1;
+    else stats.pending += 1;
+  }
+  return stats;
+}
+
+export async function fetchAdminStats(orders?: Order[]): Promise<AdminStats> {
+  if (orders) return calculateOrderStats(orders);
+  if (!supabase) return calculateOrderStats([]);
+
+  const rpcStats = await callRpc<AdminStats>("admin_get_order_stats", {});
+  if (rpcStats && typeof rpcStats.total === "number") return rpcStats;
+
+  const fetched = await fetchAdminOrders();
+  return calculateOrderStats(fetched);
+}
+
+export async function fetchAdminOrders(): Promise<Order[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) {
+    console.warn("Failed to fetch admin orders:", error.message);
+    return [];
+  }
+  return (data || []) as Order[];
+}
+
+export async function updateAdminOrderStatus(orderId: string, status: string): Promise<boolean> {
+  if (!supabase || !orderId) return false;
+  const rpcResult = await callRpc<boolean>("admin_update_order_status", { p_order_id: orderId, p_status: status, p_note: "Admin dashboard update" });
+  if (rpcResult) return true;
+  const { error } = await supabase.from("orders").update({ status, updated_at: new Date().toISOString() }).eq("id", orderId);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function createInvoiceData(order: Order): Promise<Record<string, unknown>> {
+  const payload = {
+    order_id: order.id,
+    invoice_number: order.invoice_number || createDayNightInvoiceNumber(order.id),
+    amount: Number((order as any).total_price || (order as any).total || order.delivery_price || 0),
+    currency: "AED",
+    created_at: new Date().toISOString(),
+  };
+  if (!supabase) return payload;
+  const rpcInvoice = await callRpc<Record<string, unknown>>("admin_create_invoice", { p_invoice: payload });
+  return rpcInvoice || payload;
+}
 
 export async function fetchMerchants(): Promise<Merchant[]> {
   if (!supabase) return [];
@@ -210,14 +284,14 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   const invoiceNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
   const senderName = clean(merchant?.trade_name || input.merchant_name || "DAY NIGHT Merchant");
   const senderPhone = clean(merchant?.phone || "971568757331");
-  const senderCity = clean(merchant?.city || merchant?.emirate || input.pickup_city || "Abu Dhabi");
-  const senderAddress = clean(merchant?.pickup_address || merchant?.address || senderCity);
+  const senderCity = clean(merchant?.city || merchant?.emirate || input.pickup_city || input.emirate || "Abu Dhabi");
+  const senderAddress = clean(input.pickup_address || merchant?.pickup_address || merchant?.address || senderCity);
   const description = clean(input.package_description || input.package_type || "Admin shipment");
   const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "sender_pays");
   const isInternational = input.shipping_scope === "international";
   const receiverCity = isInternational
     ? clean(input.destination_country || input.delivery_city || "WORLD")
-    : clean(input.delivery_city || "Dubai");
+    : clean(input.delivery_city || input.city || "Dubai");
   const deliveryWeight = isInternational ? Math.max(1, numberValue(input.weight, 1)) : 1;
 
   const payload: Record<string, unknown> = removeEmptyUndefined({
@@ -235,10 +309,10 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     sender_phone: senderPhone,
     sender_city: senderCity,
     sender_address: senderAddress,
-    receiver_name: clean(input.receiver_name),
-    receiver_phone: clean(input.receiver_phone),
+    receiver_name: clean(input.receiver_name || input.customer_name),
+    receiver_phone: clean(input.receiver_phone || input.customer_phone),
     receiver_city: receiverCity,
-    receiver_address: clean(input.receiver_address),
+    receiver_address: clean(input.receiver_address || input.delivery_address),
     package_type: description,
     package_description: description,
     weight: deliveryWeight,
@@ -246,7 +320,7 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
     cod_amount: paymentMethod === "cod" ? Math.max(0, numberValue(input.cod_amount, 0)) : null,
-    delivery_price: pricing.total,
+    delivery_price: Number(input.delivery_fee || 0) > 0 ? numberValue(input.delivery_fee, pricing.total) : pricing.total,
     subtotal: pricing.total,
     base_price: pricing.total,
     total: pricing.total,

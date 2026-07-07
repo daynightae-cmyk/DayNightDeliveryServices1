@@ -27,12 +27,15 @@ import {
   X,
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
-import { fetchAllOrders, supabase } from "../supabase";
+import { supabase } from "../supabase";
+import { calculateOrderStats, fetchAdminOrders, fetchAdminStats, fetchMerchants, type AdminStats } from "../lib/adminData";
 import { useAppContext } from "../lib/AppContext";
 import AdminPanelCore from "./AdminPanel";
 import AdminMerchantIntelligence from "./AdminMerchantIntelligence";
 import AdminProspectingLinks from "./AdminProspectingLinks";
 import AdminFloatingHelper from "./admin/AdminFloatingHelper";
+import AdminNewMerchant from "./admin/AdminNewMerchant";
+import AdminNewOrder from "./admin/AdminNewOrder";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-khalifa-final.css";
@@ -79,6 +82,9 @@ type MetricMap = {
   outScope: number;
   codTotal: number;
   income: number;
+  pending: number;
+  inTransit: number;
+  delivered: number;
 };
 
 const coreFormSections: SectionId[] = ["new_order", "new_merchant"];
@@ -163,6 +169,12 @@ const copy = {
     noSectionOrders: "لا توجد طلبات مطابقة لهذا القسم حالياً.",
     liveFilter: "فلتر حي من بيانات Supabase",
     rowsShown: "صفوف معروضة",
+    loadingData: "جاري تحميل بيانات الإدارة...",
+    errorData: "تعذر تحميل بعض بيانات الإدارة. يمكنك التحديث أو متابعة الأقسام المتاحة.",
+    emptyData: "لا توجد طلبات حتى الآن.",
+    retry: "إعادة المحاولة",
+    pending: "قيد الانتظار",
+    delivered: "تم التسليم",
   },
   en: {
     owner: "Abu Khalifa",
@@ -212,6 +224,12 @@ const copy = {
     noSectionOrders: "No matching orders for this section right now.",
     liveFilter: "Live filter from Supabase data",
     rowsShown: "Rows shown",
+    loadingData: "Loading admin data...",
+    errorData: "Some admin data could not be loaded. Refresh or continue with available sections.",
+    emptyData: "No orders yet.",
+    retry: "Retry",
+    pending: "Pending",
+    delivered: "Delivered",
   },
 };
 
@@ -462,17 +480,50 @@ export default function AdminPanelLuxury() {
   const [active, setActive] = useState<SectionId>("dashboard");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminStats>({ total: 0, pending: 0, in_transit: 0, delivered: 0, cancelled: 0 });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
 
+  async function refreshAdminData() {
+    setDataLoading(true);
+    setDataError("");
+    try {
+      const [ordersResult, statsResult] = await Promise.allSettled([fetchAdminOrders(), fetchAdminStats()]);
+      const nextOrders = ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) ? ordersResult.value : [];
+      setOrders(nextOrders);
+      setAdminStats(statsResult.status === "fulfilled" ? statsResult.value : calculateOrderStats(nextOrders));
+      if (ordersResult.status === "rejected" || statsResult.status === "rejected") setDataError(ui.errorData);
+    } catch {
+      setOrders([]);
+      setAdminStats({ total: 0, pending: 0, in_transit: 0, delivered: 0, cancelled: 0 });
+      setDataError(ui.errorData);
+    } finally {
+      setDataLoading(false);
+    }
+  }
+
   useEffect(() => {
     let alive = true;
-    fetchAllOrders()
-      .then((data) => { if (alive) setOrders(Array.isArray(data) ? data : []); })
-      .catch(() => { if (alive) setOrders([]); });
+    setDataLoading(true);
+    void Promise.allSettled([fetchAdminOrders(), fetchMerchants(), fetchAdminStats()]).then(([ordersResult, merchantsResult, statsResult]) => {
+      if (!alive) return;
+      const nextOrders = ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) ? ordersResult.value : [];
+      setOrders(nextOrders);
+      setAdminStats(statsResult.status === "fulfilled" ? statsResult.value : calculateOrderStats(nextOrders));
+      if (ordersResult.status === "rejected" || merchantsResult.status === "rejected" || statsResult.status === "rejected") setDataError(ui.errorData);
+      setDataLoading(false);
+    }).catch(() => {
+      if (!alive) return;
+      setOrders([]);
+      setAdminStats({ total: 0, pending: 0, in_transit: 0, delivered: 0, cancelled: 0 });
+      setDataError(ui.errorData);
+      setDataLoading(false);
+    });
     return () => { alive = false; };
-  }, []);
+  }, [ui.errorData]);
 
   const metrics = useMemo<MetricMap>(() => {
     const cancelled = filterOrdersForSection("cancelled", orders).length;
@@ -485,8 +536,8 @@ export default function AdminPanelLuxury() {
     const outScope = filterOrdersForSection("out_scope", orders).length;
     const codTotal = orders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0);
     const income = orders.reduce((sum, order) => sum + getOrderIncome(order), 0);
-    return { total: orders.length, cancelled, review, postponed, returned, pickup, abuDhabi, external, outScope, codTotal, income };
-  }, [orders]);
+    return { total: adminStats.total || orders.length, cancelled: adminStats.cancelled || cancelled, review, postponed, returned, pickup, abuDhabi, external, outScope, codTotal, income, pending: adminStats.pending, inTransit: adminStats.in_transit, delivered: adminStats.delivered };
+  }, [adminStats, orders]);
 
   async function handleLogout() {
     if (supabase) await supabase.auth.signOut();
@@ -545,7 +596,7 @@ export default function AdminPanelLuxury() {
           </div>
 
           <div className="dn-admin-bottom-cards">
-            {[[ui.latest, ui.noUpdates, FileText], [ui.shipmentInfo, ui.noData, Package], [ui.details, `${metrics.total} ${ui.liveOrders}`, ClipboardList], [ui.quickHelp, ui.preparing, Headphones]].map(([title, text, Icon]) => {
+            {[[ui.pending, `${metrics.pending} ${ui.liveOrders}`, FileText], [ui.inTransit, `${metrics.inTransit} ${ui.liveOrders}`, Package], [ui.delivered, `${metrics.delivered} ${ui.liveOrders}`, ClipboardList], [ui.quickHelp, ui.preparing, Headphones]].map(([title, text, Icon]) => {
               const CardIcon = Icon as typeof FileText;
               return <article key={String(title)}><div><CardIcon className="h-6 w-6" /></div><strong>{title as string}</strong><p>{text as string}</p></article>;
             })}
@@ -556,7 +607,11 @@ export default function AdminPanelLuxury() {
   }
 
   function renderContent() {
+    if (dataLoading) return <div className="dn-admin-filter-empty"><Package className="h-8 w-8 animate-pulse" /><strong>{ui.loadingData}</strong></div>;
+    if (dataError) return <div className="dn-admin-section-workspace"><div className="dn-admin-filter-empty"><AlertTriangle className="h-8 w-8" /><strong>{dataError}</strong><button type="button" onClick={() => void refreshAdminData()}>{ui.retry}</button></div></div>;
     if (active === "dashboard") return renderDashboard();
+    if (active === "new_order") return <AdminNewOrder isArabic={isArabic} onSaved={() => void refreshAdminData()} />;
+    if (active === "new_merchant") return <AdminNewMerchant isArabic={isArabic} onSaved={() => void refreshAdminData()} />;
     if (coreFormSections.includes(active)) return <div className="dn-admin-core-full"><AdminPanelCore /></div>;
     if (active === "merchants") return <div className="dn-admin-core-full"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => setActive("all_orders")} onCreateOrder={() => setActive("new_order")} /></div>;
     if (active === "support") return <div className="dn-admin-core-full"><AdminProspectingLinks /></div>;
