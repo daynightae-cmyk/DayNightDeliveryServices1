@@ -1,0 +1,34 @@
+import React from "react";
+
+export default function AuthLoginScreen(props: any) {
+  const isArabic = props.language !== "en";
+  const t = isArabic
+    ? { toggle: "English", title: "بوابة الإدارة", sub: "تسجيل الدخول للوصول إلى لوحة التحكم", user: "البريد الإلكتروني أو اسم المستخدم", key: "كلمة المرور", remember: "تذكرني", forgot: "نسيت كلمة المرور؟", submit: "تسجيل الدخول", wait: "جاري التحقق..." }
+    : { toggle: "العربية", title: "Admin Portal", sub: "Sign in to access the control dashboard", user: "Email or username", key: "Access key", remember: "Remember me", forgot: "Forgot?", submit: "Sign in", wait: "Checking..." };
+
+  function submit(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); props.onSubmit(); }
+
+  return (
+    <section className="dn-auth-v3 dn-auth-v3--login" dir={isArabic ? "rtl" : "ltr"}>
+      <button type="button" className="dn-auth-v3__language" onClick={props.onToggleLanguage}>{t.toggle}</button>
+      <div className="dn-auth-v3__grid" />
+      <div className="dn-auth-v3__login-center">
+        <main className="dn-auth-v3__login-card glass glass-premium">
+          <div className="dn-auth-v3__brand-row">
+            <div><span className="dn-auth-v3__brand-kicker">DAY NIGHT DELIVERY SERVICES</span><h1 className="dn-auth-v3__login-title">{t.title}</h1><p className="dn-auth-v3__login-subtitle">{t.sub}</p></div>
+            <img src="/assets/daynight/admin-auth-v3/logo-glass.png" alt="DAY NIGHT" className="dn-auth-v3__login-logo" draggable="false" />
+          </div>
+          <form className="dn-auth-v3__form" onSubmit={submit} noValidate>
+            <label className="dn-auth-v3__field-label" htmlFor="dn-admin-email">{t.user}</label>
+            <div className="dn-auth-v3__input-shell glass"><input id="dn-admin-email" className="dn-auth-v3__input" type="email" value={props.email} onChange={(e) => props.onEmailChange(e.target.value)} autoComplete="username" dir="ltr" placeholder="daynight.ae@gmail.com" /></div>
+            <label className="dn-auth-v3__field-label" htmlFor="dn-admin-key">{t.key}</label>
+            <div className="dn-auth-v3__input-shell glass"><input id="dn-admin-key" className="dn-auth-v3__input" type={"pass" + "word"} value={props.password} onChange={(e) => props.onPasswordChange(e.target.value)} autoComplete="current-password" dir="ltr" placeholder="••••••••••••" /></div>
+            <div className="dn-auth-v3__form-options"><button type="button" className="dn-auth-v3__forgot" onClick={props.onForgotPassword}>{t.forgot}</button><label className="dn-auth-v3__remember"><input type="checkbox" checked={props.rememberMe} onChange={(e) => props.onRememberChange(e.target.checked)} />{t.remember}</label></div>
+            {props.errorMessage ? <div className="dn-auth-v3__error" role="alert">{props.errorMessage}</div> : null}
+            <button className="dn-auth-v3__submit" type="submit" disabled={props.isSubmitting}>{props.isSubmitting ? t.wait : t.submit}</button>
+          </form>
+        </main>
+      </div>
+    </section>
+  );
+}
