@@ -178,14 +178,14 @@ export default function SmartChat() {
     setMessages((prev) => {
       const id = `page-${location.pathname}`;
       if (prev.some((m) => m.id === id)) return prev;
-      return [...prev, { id, sender: "bot", text: `${title}: ${prompt}` }].slice(-40);
+      return [...prev, { id, sender: "bot" as const, text: `${title}: ${prompt}` }].slice(-40);
     });
   }, [location.pathname, open, minimized, title, prompt]);
 
   const sendText = useCallback(async (input: string) => {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
-    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, sender: "user", text: trimmed }]);
+    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, sender: "user" as const, text: trimmed }]);
     setLoading(true);
 
     const contextualMessage = `${isArabic ? "سياق الصفحة" : "Page context"}: ${title}. ${prompt}\n${isArabic ? "رسالة العميل" : "Customer message"}: ${trimmed}`;
