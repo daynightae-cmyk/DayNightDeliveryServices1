@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { supabase, isAdminUser } from "../supabase";
+import { supabase } from "../supabase";
+import { isAdminUser } from "../supabaseAdminOps";
 import { useAppContext } from "../lib/AppContext";
 import companyMeta from "../data/companyMeta";
 
@@ -61,6 +62,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
       if (error || !data?.user) {
+        if (error) console.error("[DAY NIGHT auth signIn error]", error);
         setErrorMessage(t.invalid);
         return;
       }
@@ -79,7 +81,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       setStage("loading");
       window.setTimeout(() => onAuthSuccess(), 2500);
     } catch (error) {
-      console.error("[DAY NIGHT auth]", error);
+      console.error("[DAY NIGHT auth signIn error]", error);
       setErrorMessage(t.generic);
     } finally {
       setIsSubmitting(false);
