@@ -10,6 +10,7 @@ import './styles/dn-support-polish.css';
 import './styles/dn-floating-final.css';
 import './styles/dn-admin-final-polish.css';
 import './styles/dn-admin-approved-reference.css';
+import './styles/dn-global-refactor.css';
 
 const FALLBACK_LOGO = 'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png';
 
