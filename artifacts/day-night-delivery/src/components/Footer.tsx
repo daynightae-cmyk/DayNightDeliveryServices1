@@ -49,6 +49,9 @@ export default function Footer() {
   const linkClass = `group flex items-center gap-2 text-sm transition-colors duration-200 ${isArabic ? "flex-row-reverse" : ""} ${isLight ? "text-brand-deep/70 hover:text-brand-gold" : "text-white/60 hover:text-brand-gold"}`;
   const headingClass = `text-sm font-bold uppercase tracking-wider mb-5 ${isLight ? "text-brand-deep" : "text-white/90"}`;
   const columnTitle = (label: string) => <h3 className={headingClass}>{label}</h3>;
+  const footerText = tf as typeof tf & { companyLinks?: string; rights?: string };
+  const companyLinksTitle = footerText.companyLinks ?? (isArabic ? "روابط الشركة" : "Company");
+  const rightsText = footerText.rights ?? footerText.allRights;
 
   return (
     <footer className={`${isLight ? "bg-white/55 border-brand-deep/10" : "bg-brand-deep/80 border-white/10"} border-t mt-16`} dir={isArabic ? "rtl" : "ltr"}>
@@ -61,7 +64,7 @@ export default function Footer() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div>{columnTitle(tf.companyLinks)}<div className="space-y-3">{companyLinks.map((item) => <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link>)}</div></div>
+          <div>{columnTitle(companyLinksTitle)}<div className="space-y-3">{companyLinks.map((item) => <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link>)}</div></div>
           <div>{columnTitle(tf.services)}<div className="space-y-3">{serviceLinks.map((item) => <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link>)}</div></div>
           <div>{columnTitle(tf.support)}<div className="space-y-3">{supportLinks.map((item) => item.route ? <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link> : <a key={item.path} href={item.path} target="_blank" rel="noopener noreferrer" className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</a>)}</div></div>
           <div>
@@ -89,7 +92,7 @@ export default function Footer() {
         </div>
 
         <div className={`mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs ${isLight ? "border-brand-deep/10 text-brand-deep/50" : "border-white/10 text-white/40"}`}>
-          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-brand-gold" />{tf.rights}</div>
+          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-brand-gold" />{rightsText}</div>
           <motion.div whileHover={{ scale: 1.02 }} className="flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-2 text-brand-gold font-black"><Code2 className="w-4 h-4" />Creating by Eng Sadek Elgazar</motion.div>
         </div>
       </div>

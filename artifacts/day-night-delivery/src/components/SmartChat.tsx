@@ -178,14 +178,14 @@ export default function SmartChat() {
     setMessages((prev) => {
       const id = `page-${location.pathname}`;
       if (prev.some((m) => m.id === id)) return prev;
-      return [...prev, { id, sender: "bot", text: `${title}: ${prompt}` }].slice(-40);
+      return [...prev, { id, sender: "bot" as const, text: `${title}: ${prompt}` }].slice(-40);
     });
   }, [location.pathname, open, minimized, title, prompt]);
 
   const sendText = useCallback(async (input: string) => {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
-    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, sender: "user", text: trimmed }]);
+    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, sender: "user" as const, text: trimmed }]);
     setLoading(true);
 
     const contextualMessage = `${isArabic ? "سياق الصفحة" : "Page context"}: ${title}. ${prompt}\n${isArabic ? "رسالة العميل" : "Customer message"}: ${trimmed}`;
@@ -217,6 +217,6 @@ export default function SmartChat() {
       <div className="p-3 border-t border-white/10 flex items-center gap-2"><input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }} placeholder={isArabic ? "اسألني عن هذه الصفحة..." : "Ask about this page..."} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-white/35 outline-none focus:border-brand-gold/50" /><button onClick={sendMessage} disabled={loading} className="w-10 h-10 rounded-xl bg-brand-gold text-brand-deep grid place-items-center hover:bg-brand-gold-light transition-colors disabled:opacity-60" aria-label="Send message"><Send className="w-4 h-4" /></button></div>
     </div>}
 
-    {(!open || minimized) && <button onClick={toggleOpen} className={`dn-smartchat-trigger fixed rounded-[1.35rem] shadow-2xl grid place-items-center transition-all hover:scale-105 ${open ? "bg-brand-gold text-brand-deep" : "bg-[#061225]/92 border border-brand-gold/35 text-brand-gold backdrop-blur-2xl"}`} aria-label="Smart chat"><MessageSquare className="w-6 h-6" />{!open && <span className="absolute inset-0 rounded-[1.35rem] border border-brand-gold/45 animate-ping" />}</button>}
+    {(!open || minimized) && <button onClick={toggleOpen} className={`dn-smartchat-trigger fixed rounded-[1.35rem] shadow-2xl grid place-items-center transition-all hover:scale-105 ${open ? "bg-brand-gold text-brand-deep" : "bg-[#061225]/92 border border-brand-gold/35 text-brand-gold backdrop-blur-2xl"}`} aria-label="Smart chat"><MessageSquare className="w-6 h-6" />{!open && <span className="chatPulse absolute inset-0 rounded-[1.35rem] border border-brand-gold/45 animate-ping" />}</button>}
   </>;
 }
