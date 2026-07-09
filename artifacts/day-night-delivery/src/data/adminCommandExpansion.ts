@@ -4,19 +4,21 @@ import type { Merchant } from "../types";
 export type AdminMapRegion = { id: string; ar: string; en: string; center: [number, number]; zoom: number; keywords: string[] };
 export const adminMapRegions: AdminMapRegion[] = [
   { id: "all", ar: "كل الإمارات", en: "All UAE", center: [24.4539, 54.3773], zoom: 8, keywords: [] },
-  { id: "abu_dhabi", ar: "أبوظبي", en: "Abu Dhabi", center: [24.4539, 54.3773], zoom: 10, keywords: ["abu dhabi", "أبوظبي", "ابوظبي", "mussafah", "khalifa", "mbz", "al ain", "العين"] },
+  { id: "abu_dhabi", ar: "أبوظبي", en: "Abu Dhabi", center: [24.4539, 54.3773], zoom: 10, keywords: ["abu dhabi", "أبوظبي", "ابوظبي", "mussafah", "khalifa", "mbz"] },
   { id: "dubai", ar: "دبي", en: "Dubai", center: [25.2048, 55.2708], zoom: 11, keywords: ["dubai", "دبي", "jebel ali", "deira", "bur dubai"] },
   { id: "sharjah", ar: "الشارقة", en: "Sharjah", center: [25.3463, 55.4209], zoom: 11, keywords: ["sharjah", "الشارقة"] },
   { id: "ajman", ar: "عجمان", en: "Ajman", center: [25.4052, 55.5136], zoom: 12, keywords: ["ajman", "عجمان"] },
   { id: "al_ain", ar: "العين", en: "Al Ain", center: [24.1302, 55.8023], zoom: 11, keywords: ["al ain", "العين"] },
   { id: "external", ar: "خارجي", en: "External", center: [24.4539, 54.3773], zoom: 5, keywords: ["international", "external", "gcc", "worldwide", "خارج", "دولي"] },
 ];
+
 export const adminSettingsCatalog = [
   { id: "company", ar: "ملف الشركة", en: "Company profile", fieldsAr: ["اسم الشركة", "الشعار", "البريد", "الهاتف"], fieldsEn: ["Company name", "Logo", "Email", "Phone"] },
   { id: "interface", ar: "واجهة الإدارة", en: "Admin interface", fieldsAr: ["اللغة الافتراضية", "الوضع النهاري", "كثافة البطاقات", "المنطقة الافتراضية"], fieldsEn: ["Default language", "Day mode", "Card density", "Default region"] },
   { id: "map", ar: "إعدادات الخريطة", en: "Map defaults", fieldsAr: ["طبقة الخريطة", "الإمارة الافتراضية", "عرض المسار", "تحديث البلاطات"], fieldsEn: ["Map layer", "Default emirate", "Route display", "Tile refresh"] },
   { id: "finance", ar: "المالية والحسابات", en: "Finance & accounts", fieldsAr: ["حد تحذير COD", "تكلفة تشغيل تقديرية", "VAT", "تصدير PDF"], fieldsEn: ["COD warning threshold", "Estimated operating cost", "VAT", "PDF export"] },
 ] as const;
+
 function norm(value: unknown) { return String(value || "").toLowerCase().replace(/[_-]/g, " "); }
 function amountFrom(order: any, keys: string[]) { for (const key of keys) { const value = Number(order?.[key] || 0); if (Number.isFinite(value) && value > 0) return value; } return 0; }
 export function orderRegionId(order: any) { const text = `${order?.sender_city || ""} ${order?.pickup_city || ""} ${order?.receiver_city || ""} ${order?.delivery_city || ""} ${order?.destination_country || ""} ${order?.shipping_scope || ""} ${order?.service_type || ""}`.toLowerCase(); return adminMapRegions.find((region) => region.id !== "all" && region.keywords.some((keyword) => text.includes(keyword.toLowerCase())))?.id || "all"; }
