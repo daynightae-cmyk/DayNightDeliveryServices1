@@ -322,10 +322,20 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  v_record_id uuid;
 begin
+  if tg_op = 'DELETE' then
+    v_record_id := old.id;
+    insert into public.finance_audit_log(table_name, record_id, action, old_values, new_values, created_by)
+    values (tg_table_name, v_record_id, tg_op, to_jsonb(old), null, auth.uid());
+    return old;
+  end if;
+
+  v_record_id := new.id;
   insert into public.finance_audit_log(table_name, record_id, action, old_values, new_values, created_by)
-  values (tg_table_name, coalesce(new.id, old.id), tg_op, case when tg_op in ('UPDATE','DELETE') then to_jsonb(old) else null end, case when tg_op in ('INSERT','UPDATE') then to_jsonb(new) else null end, auth.uid());
-  return coalesce(new, old);
+  values (tg_table_name, v_record_id, tg_op, case when tg_op = 'UPDATE' then to_jsonb(old) else null end, to_jsonb(new), auth.uid());
+  return new;
 end;
 $$;
 
@@ -336,10 +346,10 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if new.status = 'approved' and (tg_op = 'INSERT' or coalesce(old.status, '') <> 'approved') then
+  if new.status = 'approved' and (tg_op = 'INSERT' or (tg_op = 'UPDATE' and coalesce(old.status, '') <> 'approved')) then
     insert into public.ledger_entries(entry_type, source_table, source_id, account_id, debit, credit, description, created_by)
     values ('expense', 'expenses', new.id, new.account_id, coalesce(new.amount, 0) + coalesce(new.vat_amount, 0), 0, coalesce(new.notes, 'Approved expense'), auth.uid());
-  elsif new.status = 'void' and tg_op = 'UPDATE' and coalesce(old.status, '') <> 'void' then
+  elsif tg_op = 'UPDATE' and new.status = 'void' and coalesce(old.status, '') <> 'void' then
     insert into public.ledger_entries(entry_type, source_table, source_id, account_id, debit, credit, description, status, created_by)
     values ('expense_reversal', 'expenses', new.id, new.account_id, 0, coalesce(old.amount, 0) + coalesce(old.vat_amount, 0), coalesce(new.void_reason, 'Expense void reversal'), 'posted', auth.uid());
   end if;
