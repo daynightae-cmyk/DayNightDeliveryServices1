@@ -1,0 +1,104 @@
+/* DAY NIGHT real-map + admin localization polish
+   Purpose: remove the fake/diagram-only admin map feeling and make the admin UI read cleanly in AR/EN. */
+
+.dn-admin-map-live{
+  border-color:rgba(245,183,0,.28)!important;
+  background:#061a33!important;
+  box-shadow:0 26px 80px rgba(0,0,0,.32),0 0 0 1px rgba(24,168,232,.08) inset!important;
+}
+
+.dn-admin-map-live .dn-admin-map-bg{
+  position:absolute!important;
+  inset:0!important;
+  z-index:0!important;
+  background-repeat:no-repeat!important;
+  background-size:50% 50%,50% 50%,50% 50%,50% 50%!important;
+  background-position:left bottom,right bottom,left top,right top!important;
+  filter:saturate(1.18) contrast(1.06) brightness(.82)!important;
+  opacity:.92!important;
+  transform:scale(1.04)!important;
+}
+
+.dn-admin-map-live.is-standard .dn-admin-map-bg{
+  background-image:
+    url("https://a.tile.openstreetmap.org/7/82/55.png"),
+    url("https://b.tile.openstreetmap.org/7/83/55.png"),
+    url("https://c.tile.openstreetmap.org/7/82/54.png"),
+    url("https://a.tile.openstreetmap.org/7/83/54.png")!important;
+}
+
+.dn-admin-map-live.is-satellite .dn-admin-map-bg{
+  background-image:
+    url("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/7/55/82"),
+    url("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/7/55/83"),
+    url("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/7/54/82"),
+    url("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/7/54/83")!important;
+}
+
+.dn-admin-map-live.is-terrain .dn-admin-map-bg{
+  background-image:
+    url("https://a.tile.opentopomap.org/7/82/55.png"),
+    url("https://b.tile.opentopomap.org/7/83/55.png"),
+    url("https://c.tile.opentopomap.org/7/82/54.png"),
+    url("https://a.tile.opentopomap.org/7/83/54.png")!important;
+}
+
+.dn-admin-map-live:before{
+  z-index:1!important;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(0,123,255,.08),transparent 42%),
+    linear-gradient(90deg,rgba(3,18,38,.72),rgba(3,18,38,.2) 34%,rgba(3,18,38,.5) 100%)!important;
+  mask-image:none!important;
+  pointer-events:none!important;
+}
+
+.dn-admin-map-live:after{
+  z-index:1!important;
+  opacity:.58!important;
+  background:
+    linear-gradient(rgba(24,168,232,.08) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(24,168,232,.08) 1px,transparent 1px),
+    radial-gradient(circle at 52% 48%,transparent 0 48%,rgba(1,8,18,.64) 100%)!important;
+  background-size:42px 42px,42px 42px,100% 100%!important;
+  mix-blend-mode:normal!important;
+}
+
+.dn-admin-route-line{display:none!important}
+.dn-admin-van{z-index:5!important;box-shadow:0 0 0 8px rgba(24,168,232,.14),0 0 30px rgba(245,183,0,.28)!important}
+.dn-admin-pin{z-index:5!important;background:rgba(2,9,20,.82)!important;border-color:rgba(245,183,0,.42)!important}
+.dn-admin-pin.is-current{border-color:rgba(24,168,232,.5)!important;background:rgba(0,87,184,.38)!important}
+.dn-admin-map-heading{z-index:6!important;background:rgba(2,9,20,.64);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:14px!important;backdrop-filter:blur(18px)}
+
+.dn-admin-map-heading button{font-size:0!important;min-width:58px;text-align:center}
+.dn-admin-map-heading button::after{font-size:10px;font-weight:950}
+.dn-admin-map-heading button:nth-of-type(1)::after{content:"عادي"}
+.dn-admin-map-heading button:nth-of-type(2)::after{content:"ساتلايت"}
+.dn-admin-map-heading button:nth-of-type(3)::after{content:"تضاريس"}
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-map-heading button:nth-of-type(1)::after{content:"Standard"}
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-map-heading button:nth-of-type(2)::after{content:"Satellite"}
+.dn-admin-fullscreen[dir="ltr"] .dn-admin-map-heading button:nth-of-type(3)::after{content:"Terrain"}
+
+.dn-admin-support-card h3,.dn-admin-support-card p,
+.dn-admin-section-hero h1,.dn-admin-section-hero p,
+.dn-admin-filter-table th,.dn-admin-filter-table td,
+.dn-admin-menu-full strong,.dn-admin-menu-group{
+  unicode-bidi:plaintext;
+}
+
+.dn-live-map-shell .leaflet-container{height:100%;width:100%;background:#061a33;font-family:inherit}
+.dn-live-map-shell .leaflet-control-attribution{display:none}
+.dn-live-map-shell .leaflet-control-zoom a{background:rgba(2,9,20,.84);border-color:rgba(255,255,255,.12);color:#f5b700;font-weight:950}
+.dn-live-map-shell .leaflet-popup-content-wrapper,.dn-live-map-shell .leaflet-popup-tip{background:#071a33;color:#fff;border:1px solid rgba(245,183,0,.25);box-shadow:0 20px 50px rgba(0,0,0,.34)}
+.dn-live-map-marker,.dn-live-map-driver{background:transparent;border:0}
+.dn-marker-core{width:34px;height:34px;border-radius:999px;display:grid;place-items:center;background:rgba(245,183,0,.16);border:1px solid rgba(245,183,0,.55);box-shadow:0 0 0 8px rgba(245,183,0,.12),0 0 28px rgba(245,183,0,.35)}
+.dn-live-map-marker-pickup .dn-marker-core{background:rgba(24,168,232,.16);border-color:rgba(24,168,232,.58);box-shadow:0 0 0 8px rgba(24,168,232,.12),0 0 28px rgba(24,168,232,.35)}
+.dn-marker-core span{width:12px;height:12px;border-radius:999px;background:#f5b700;display:block}.dn-live-map-marker-pickup .dn-marker-core span{background:#18a8e8}
+.dn-driver-pulse{width:48px;height:48px;border-radius:999px;display:grid;place-items:center;background:radial-gradient(circle,#f5b700,#d4af37);color:#071a33;font-size:11px;font-weight:950;border:2px solid rgba(255,255,255,.72);box-shadow:0 0 0 9px rgba(245,183,0,.14),0 0 34px rgba(245,183,0,.42)}
+
+@media(max-width:720px){
+  .dn-admin-map-live .dn-admin-map-bg{background-size:100% 50%,100% 50%,0 0,0 0!important;background-position:left bottom,left top,left top,left top!important}
+  .dn-admin-map-heading{position:relative!important;inset:auto!important;margin-bottom:10px!important}
+  .dn-admin-map-heading button{min-width:54px!important}
+  .dn-live-map-shell{min-height:330px!important}
+  .dn-live-map-shell .leaflet-control-zoom{display:none}
+}
