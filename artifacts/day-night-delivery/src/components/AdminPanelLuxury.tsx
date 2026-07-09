@@ -37,6 +37,8 @@ import AdminProspectingLinks from "./AdminProspectingLinks";
 import AdminFloatingHelper from "./admin/AdminFloatingHelper";
 import AdminNewMerchant from "./admin/AdminNewMerchant";
 import AdminNewOrder from "./admin/AdminNewOrder";
+import AdminLiveOperationsMap from "./admin/AdminLiveOperationsMap";
+import KhalifaGuidanceFeed from "./admin/KhalifaGuidanceFeed";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-khalifa-final.css";
@@ -169,6 +171,7 @@ const copy = {
     tableReceiver: "المستلم",
     tableAmount: "المبلغ",
     tableDate: "التاريخ",
+    tableAction: "الإجراء",
     noSectionOrders: "لا توجد طلبات مطابقة لهذا القسم حالياً.",
     liveFilter: "فلتر حي من بيانات Supabase",
     rowsShown: "صفوف معروضة",
@@ -218,6 +221,7 @@ const copy = {
     tableReceiver: "Receiver",
     tableAmount: "Amount",
     tableDate: "Date",
+    tableAction: "Action",
     noSectionOrders: "No matching orders for this section right now.",
     liveFilter: "Live filter from Supabase data",
     rowsShown: "Rows shown",
@@ -257,13 +261,16 @@ function getTracking(order: any) {
 function translateStatus(status: unknown, isArabic: boolean) {
   const raw = normalize(status);
   if (!raw) return isArabic ? "غير محدد" : "Unspecified";
-  if (raw.includes("cancel") || raw.includes("fail")) return isArabic ? "ملغي / فشل" : "Cancelled / Failed";
-  if (raw.includes("pending") || raw.includes("confirm") || raw.includes("review")) return isArabic ? "قيد المراجعة" : "Under Review";
+  if (raw === "pending" || raw.includes("pending")) return isArabic ? "قيد الانتظار" : "Pending";
+  if (raw === "confirmed" || raw.includes("confirm")) return isArabic ? "مؤكد" : "Confirmed";
+  if (raw.includes("under review") || raw.includes("review")) return isArabic ? "قيد المراجعة" : "Under Review";
   if (raw.includes("postpone") || raw.includes("defer") || raw.includes("schedule")) return isArabic ? "مؤجل" : "Postponed";
   if (raw.includes("return")) return isArabic ? "راجع" : "Returned";
-  if (raw.includes("pick") || raw.includes("assign") || raw.includes("collect")) return isArabic ? "قيد الإحضار" : "Pickup";
-  if (raw.includes("deliver") || raw.includes("complete")) return isArabic ? "تم التسليم" : "Delivered";
+  if (raw.includes("cancel") || raw.includes("fail")) return isArabic ? "ملغي" : "Cancelled";
+  if (raw.includes("assign")) return isArabic ? "تم التعيين" : "Assigned";
+  if (raw.includes("pick") || raw.includes("collect")) return isArabic ? "قيد الإحضار" : "Pickup";
   if (raw.includes("transit") || raw.includes("progress")) return isArabic ? "جاري التوصيل" : "In Transit";
+  if (raw.includes("deliver") || raw.includes("complete")) return isArabic ? "تم التسليم" : "Delivered";
   return isArabic ? String(status).replace(/_/g, " ") : String(status).replace(/_/g, " ");
 }
 
@@ -460,18 +467,20 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
                   <th>{ui.tableReceiver}</th>
                   <th>{ui.tableAmount}</th>
                   <th>{ui.tableDate}</th>
+                  <th>{ui.tableAction}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((order, index) => (
                   <tr key={String(order.id || order.tracking_number || index)}>
                     <td><b>{getTracking(order)}</b></td>
-                    <td><select disabled={statusSavingId === String(order.id || "")} value={String(order.status || "pending")} onChange={(event) => void changeStatus(order, event.target.value)} className="rounded-xl border border-white/10 bg-brand-deep px-2 py-1 text-xs font-black text-white"><option value="pending">pending</option><option value="confirmed">confirmed</option><option value="assigned">assigned</option><option value="picked_up">picked_up</option><option value="in_transit">in_transit</option><option value="delivered">delivered</option><option value="cancelled">cancelled</option></select></td>
+                    <td><select disabled={statusSavingId === String(order.id || "")} value={String(order.status || "pending")} onChange={(event) => void changeStatus(order, event.target.value)} className="rounded-xl border border-white/10 bg-brand-deep px-2 py-1 text-xs font-black text-white">{["pending", "confirmed", "assigned", "picked_up", "in_transit", "delivered", "cancelled"].map((status) => <option key={status} value={status}>{translateStatus(status, isArabic)}</option>)}</select></td>
                     <td>{order.merchant_name || order.sender_name || order.customer_name || "—"}</td>
                     <td>{getRoute(order)}</td>
                     <td>{order.receiver_name || order.recipient_name || order.customer_name || "—"}</td>
                     <td>{money(getOrderAmount(order))}</td>
                     <td>{order.created_at ? new Date(order.created_at).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td>
+                    <td><button type="button" onClick={onOpenOperations}>{isArabic ? "فتح" : "Open"}</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -549,7 +558,6 @@ export default function AdminPanelLuxury() {
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
-  const [mapMode, setMapMode] = useState<"standard" | "satellite" | "terrain">("standard");
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
@@ -619,25 +627,13 @@ export default function AdminPanelLuxury() {
             <button type="button">{ui.ask}</button>
           </div>
 
-          <div className="dn-admin-support-card">
-            <Headphones className="h-9 w-9" />
-            <h3>{ui.help}</h3>
-            <p>{ui.preparing}</p>
-          </div>
+          <KhalifaGuidanceFeed isArabic={isArabic} orders={orders} merchants={merchants} financeSummary={financeSummary} />
         </aside>
 
         <section className="dn-admin-center-zone">
           <header className="dn-admin-main-title"><span>{ui.commandCenter}</span><h1>{ui.welcome}</h1><p>{ui.subtitle}</p></header>
 
-          <div className={`dn-admin-map-live is-${mapMode}`}>
-            <div className="dn-admin-map-bg" />
-            <div className="dn-admin-map-heading"><Truck className="h-5 w-5" /><strong>{ui.trackingTitle}</strong><p>{ui.trackingSubtitle}</p><div className="mt-2 flex flex-wrap gap-2">{(["standard", "satellite", "terrain"] as const).map((mode) => <button key={mode} type="button" onClick={() => setMapMode(mode)} className={`rounded-full border px-3 py-1 text-[10px] font-black ${mapMode === mode ? "border-brand-gold bg-brand-gold text-brand-deep" : "border-white/15 bg-white/10 text-white"}`}>{mode}</button>)}</div></div>
-            <div className="dn-admin-route-line" />
-            <div className="dn-admin-pin is-pickup"><strong>{ui.pickupPoint}</strong><span>{ui.pickupText}</span></div>
-            <div className="dn-admin-pin is-current"><strong>{ui.inTransit}</strong><span>{ui.inTransitText}</span></div>
-            <div className="dn-admin-pin is-delivery"><strong>{ui.deliveryPoint}</strong><span>{ui.deliveryText}</span></div>
-            <div className="dn-admin-van"><Truck className="h-7 w-7" /></div>
-          </div>
+          <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
 
           <div className="dn-admin-bottom-cards">
             {[[ui.latest, ui.noUpdates, FileText], [ui.shipmentInfo, ui.noData, Package], [ui.details, `${metrics.total} ${ui.liveOrders}`, ClipboardList], [ui.quickHelp, ui.preparing, Headphones]].map(([title, text, Icon]) => {
