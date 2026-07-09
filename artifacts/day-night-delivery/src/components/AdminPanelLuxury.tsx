@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { fetchAllOrders, supabase } from "../supabase";
-import { fetchAdminStats, fetchFinanceSummary, fetchExpenses, createExpense, voidExpense, fetchLedgerEntries, fetchMerchantStatements, fetchDriverStatements, fetchMerchants, fetchAdminOrders, updateOrderStatus, type AdminStats, type FinanceSummary, type FinanceRow } from "../lib/adminData";
+import { fetchAdminStats, fetchFinanceSummary, fetchExpenses, createExpense, voidExpense, fetchLedgerEntries, fetchMerchantStatements, fetchDriverStatements, fetchMerchants, fetchAdminOrders, updateOrderStatus, buildIncomeRowsFromOrders, buildCodRowsFromOrders, calculateFinanceSummaryFromOrders, type AdminStats, type FinanceSummary, type FinanceRow } from "../lib/adminData";
 import type { Merchant } from "../types";
 import { useAppContext } from "../lib/AppContext";
 import AdminPanelCore from "./AdminPanel";
@@ -37,6 +37,8 @@ import AdminProspectingLinks from "./AdminProspectingLinks";
 import AdminFloatingHelper from "./admin/AdminFloatingHelper";
 import AdminNewMerchant from "./admin/AdminNewMerchant";
 import AdminNewOrder from "./admin/AdminNewOrder";
+import AdminLiveOperationsMap from "./admin/AdminLiveOperationsMap";
+import KhalifaAssistantPanel from "./admin/KhalifaAssistantPanel";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-khalifa-final.css";
@@ -169,6 +171,7 @@ const copy = {
     tableReceiver: "المستلم",
     tableAmount: "المبلغ",
     tableDate: "التاريخ",
+    tableAction: "الإجراء",
     noSectionOrders: "لا توجد طلبات مطابقة لهذا القسم حالياً.",
     liveFilter: "فلتر حي من بيانات Supabase",
     rowsShown: "صفوف معروضة",
@@ -218,6 +221,7 @@ const copy = {
     tableReceiver: "Receiver",
     tableAmount: "Amount",
     tableDate: "Date",
+    tableAction: "Action",
     noSectionOrders: "No matching orders for this section right now.",
     liveFilter: "Live filter from Supabase data",
     rowsShown: "Rows shown",
@@ -257,13 +261,16 @@ function getTracking(order: any) {
 function translateStatus(status: unknown, isArabic: boolean) {
   const raw = normalize(status);
   if (!raw) return isArabic ? "غير محدد" : "Unspecified";
-  if (raw.includes("cancel") || raw.includes("fail")) return isArabic ? "ملغي / فشل" : "Cancelled / Failed";
-  if (raw.includes("pending") || raw.includes("confirm") || raw.includes("review")) return isArabic ? "قيد المراجعة" : "Under Review";
+  if (raw === "pending" || raw.includes("pending")) return isArabic ? "قيد الانتظار" : "Pending";
+  if (raw === "confirmed" || raw.includes("confirm")) return isArabic ? "مؤكد" : "Confirmed";
+  if (raw.includes("under review") || raw.includes("review")) return isArabic ? "قيد المراجعة" : "Under Review";
   if (raw.includes("postpone") || raw.includes("defer") || raw.includes("schedule")) return isArabic ? "مؤجل" : "Postponed";
   if (raw.includes("return")) return isArabic ? "راجع" : "Returned";
-  if (raw.includes("pick") || raw.includes("assign") || raw.includes("collect")) return isArabic ? "قيد الإحضار" : "Pickup";
-  if (raw.includes("deliver") || raw.includes("complete")) return isArabic ? "تم التسليم" : "Delivered";
+  if (raw.includes("cancel") || raw.includes("fail")) return isArabic ? "ملغي" : "Cancelled";
+  if (raw.includes("assign")) return isArabic ? "تم التعيين" : "Assigned";
+  if (raw.includes("pick") || raw.includes("collect")) return isArabic ? "قيد الإحضار" : "Pickup";
   if (raw.includes("transit") || raw.includes("progress")) return isArabic ? "جاري التوصيل" : "In Transit";
+  if (raw.includes("deliver") || raw.includes("complete")) return isArabic ? "تم التسليم" : "Delivered";
   return isArabic ? String(status).replace(/_/g, " ") : String(status).replace(/_/g, " ");
 }
 
@@ -389,10 +396,12 @@ function sectionBullets(id: SectionId, isArabic: boolean) {
 
 function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpenOperations, onRefresh }: { id: SectionId; title: string; ui: typeof copy.ar; isArabic: boolean; metrics: MetricMap; orders: any[]; onOpenOperations: () => void; onRefresh: () => Promise<void> }) {
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [statusSavingId, setStatusSavingId] = useState("");
   const baseOrders = filterOrdersForSection(id, orders);
   const normalizedQuery = query.toLowerCase().trim();
-  const filteredOrders = normalizedQuery ? baseOrders.filter((order) => [getTracking(order), order.receiver_phone, order.sender_phone, order.receiver_name, order.customer_name, order.merchant_name, order.sender_name].join(" ").toLowerCase().includes(normalizedQuery)) : baseOrders;
+  const searchedOrders = normalizedQuery ? baseOrders.filter((order) => [getTracking(order), order.receiver_phone, order.sender_phone, order.receiver_name, order.customer_name, order.merchant_name, order.sender_name].join(" ").toLowerCase().includes(normalizedQuery)) : baseOrders;
+  const filteredOrders = statusFilter === "all" ? searchedOrders : searchedOrders.filter((order) => normalize(order.status).includes(statusFilter));
   const count = filteredOrders.length;
   const totalAmount = filteredOrders.reduce((sum, order) => sum + getOrderAmount(order), 0);
   const totalIncome = filteredOrders.reduce((sum, order) => sum + getOrderIncome(order), 0);
@@ -440,7 +449,7 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
       </div>
 
       <div className="dn-admin-filter-table-card">
-        <div className="mb-3"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالتتبع / الهاتف / الاسم / التاجر" : "Search tracking / phone / name / merchant"} className="w-full rounded-2xl border border-white/10 bg-brand-deep/70 px-4 py-3 text-sm font-bold text-white outline-none" /></div>
+        <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_190px]"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالتتبع / الهاتف / الاسم / التاجر" : "Search tracking / phone / name / merchant"} className="w-full rounded-2xl border border-white/10 bg-brand-deep/70 px-4 py-3 text-sm font-bold text-white outline-none" /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-brand-deep/70 px-4 py-3 text-sm font-bold text-white outline-none"><option value="all">{isArabic ? "كل الحالات" : "All statuses"}</option><option value="pending">{translateStatus("pending", isArabic)}</option><option value="review">{translateStatus("under_review", isArabic)}</option><option value="assign">{translateStatus("assigned", isArabic)}</option><option value="pick">{translateStatus("pickup", isArabic)}</option><option value="transit">{translateStatus("in_transit", isArabic)}</option><option value="deliver">{translateStatus("delivered", isArabic)}</option><option value="cancel">{translateStatus("cancelled", isArabic)}</option><option value="return">{translateStatus("returned", isArabic)}</option></select></div>
         <div className="dn-admin-filter-table-head">
           <div><span>{ui.filteredData}</span><strong>{title}</strong></div>
           <p>{ui.rowsShown}: {rows.length} / {count}</p>
@@ -460,18 +469,20 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
                   <th>{ui.tableReceiver}</th>
                   <th>{ui.tableAmount}</th>
                   <th>{ui.tableDate}</th>
+                  <th>{ui.tableAction}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((order, index) => (
                   <tr key={String(order.id || order.tracking_number || index)}>
                     <td><b>{getTracking(order)}</b></td>
-                    <td><select disabled={statusSavingId === String(order.id || "")} value={String(order.status || "pending")} onChange={(event) => void changeStatus(order, event.target.value)} className="rounded-xl border border-white/10 bg-brand-deep px-2 py-1 text-xs font-black text-white"><option value="pending">pending</option><option value="confirmed">confirmed</option><option value="assigned">assigned</option><option value="picked_up">picked_up</option><option value="in_transit">in_transit</option><option value="delivered">delivered</option><option value="cancelled">cancelled</option></select></td>
+                    <td><select disabled={statusSavingId === String(order.id || "")} value={String(order.status || "pending")} onChange={(event) => void changeStatus(order, event.target.value)} className="rounded-xl border border-white/10 bg-brand-deep px-2 py-1 text-xs font-black text-white">{["pending", "confirmed", "assigned", "picked_up", "in_transit", "delivered", "cancelled"].map((status) => <option key={status} value={status}>{translateStatus(status, isArabic)}</option>)}</select></td>
                     <td>{order.merchant_name || order.sender_name || order.customer_name || "—"}</td>
                     <td>{getRoute(order)}</td>
                     <td>{order.receiver_name || order.recipient_name || order.customer_name || "—"}</td>
                     <td>{money(getOrderAmount(order))}</td>
                     <td>{order.created_at ? new Date(order.created_at).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td>
+                    <td><div className="flex flex-wrap gap-1"><button type="button" onClick={onOpenOperations}>{isArabic ? "عرض" : "View"}</button><button type="button" disabled title={isArabic ? "يتطلب ربط صلاحيات إضافية" : "Requires additional backend wiring"}>{id === "review" ? (isArabic ? "اعتماد" : "Approve") : id === "cancelled" ? (isArabic ? "إعادة فتح" : "Reopen") : id === "postponed" ? (isArabic ? "استئناف" : "Resume") : id === "pickup" ? (isArabic ? "تعيين مندوب" : "Assign") : (isArabic ? "إجراء" : "Action")}</button></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -488,22 +499,20 @@ function AdminFinanceWorkspace({ id, title, isArabic, summary, orders, merchants
   const [rows, setRows] = useState<FinanceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [detailUnavailable, setDetailUnavailable] = useState(false);
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseNotes, setExpenseNotes] = useState("");
 
   async function loadRows() {
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setDetailUnavailable(false);
     try {
-      if (id === "expenses") setRows(await fetchExpenses());
-      else if (id === "merchant_statements") setRows(await fetchMerchantStatements());
-      else if (id === "driver_statements") setRows(await fetchDriverStatements());
-      else if (["income", "cod", "accounts", "adjustments", "audit_log"].includes(id) && supabase) {
-        const table = id === "income" ? "income_entries" : id === "cod" ? "cod_collections" : id === "accounts" ? "finance_accounts" : id === "adjustments" ? "finance_adjustments" : "finance_audit_log";
-        const { data, error: requestError } = await supabase.from(table).select("*").order("created_at", { ascending: false }).limit(500);
-        if (requestError) throw new Error(requestError.message);
-        setRows((data || []) as FinanceRow[]);
-      } else if (id === "finance_dashboard") setRows(await fetchLedgerEntries());
-    } catch (err) { setError(String((err as Error).message || err)); } finally { setLoading(false); }
+      if (id === "income") { setRows(buildIncomeRowsFromOrders(orders)); setDetailUnavailable(true); }
+      else if (id === "cod") { setRows(buildCodRowsFromOrders(orders)); setDetailUnavailable(true); }
+      else if (id === "expenses") { const expenseRows = await fetchExpenses(); setRows(expenseRows); setDetailUnavailable(expenseRows.length === 0); }
+      else if (id === "merchant_statements") { const statementRows = await fetchMerchantStatements(); setRows(statementRows); setDetailUnavailable(statementRows.length === 0); }
+      else if (id === "driver_statements") { const statementRows = await fetchDriverStatements(); setRows(statementRows); setDetailUnavailable(statementRows.length === 0); }
+      else if (["accounts", "adjustments", "audit_log", "finance_dashboard"].includes(id)) { const ledgerRows = await fetchLedgerEntries(); setRows(ledgerRows); setDetailUnavailable(ledgerRows.length === 0); }
+    } catch { setRows([]); setDetailUnavailable(true); setError(isArabic ? "لا يوجد جدول تفصيلي لهذا القسم بعد. يتم عرض الملخص المحسوب من الطلبات الحالية." : "No detailed table exists for this section yet. Showing calculated summary from current orders."); } finally { setLoading(false); }
   }
 
   useEffect(() => { void loadRows(); }, [id]);
@@ -523,17 +532,22 @@ function AdminFinanceWorkspace({ id, title, isArabic, summary, orders, merchants
     try { await voidExpense(row.id, "Voided from admin finance workspace"); await loadRows(); await onRefresh(); } catch (err) { setError(String((err as Error).message || err)); }
   }
 
+  const calculatedSummary = calculateFinanceSummaryFromOrders(orders);
+  const safeSummary = { ...calculatedSummary, ...(summary || {}) };
+  const financeNotice = isArabic ? "لا يوجد جدول تفصيلي لهذا القسم بعد. يتم عرض الملخص المحسوب من الطلبات الحالية." : "No detailed table exists for this section yet. Showing calculated summary from current orders.";
+  const migrationNote = isArabic ? "يلزم إنشاء جدول تفصيلي للمصروفات والتحصيل لاحقاً إذا أردت قيود مالية كاملة." : "Create detailed expenses/COD tables later if full accounting entries are required.";
+
   const cards = [
-    [isArabic ? "الدخل" : "Income", summary?.total_income || 0], [isArabic ? "المصروفات" : "Expenses", summary?.total_expenses || 0], ["COD", summary?.cod_collected || 0], [isArabic ? "COD معلق" : "COD pending", summary?.cod_pending || 0], [isArabic ? "مستحق التجار" : "Merchant payable", summary?.merchant_payable || 0], [isArabic ? "مستحق المناديب" : "Driver payable", summary?.driver_payable || 0],
+    [isArabic ? "الدخل" : "Income", safeSummary.total_income || 0], [isArabic ? "المصروفات" : "Expenses", safeSummary.total_expenses || 0], ["COD", safeSummary.cod_collected || 0], [isArabic ? "COD معلق" : "COD pending", safeSummary.cod_pending || 0], [isArabic ? "مستحق التجار" : "Merchant payable", safeSummary.merchant_payable || 0], [isArabic ? "مستحق المناديب" : "Driver payable", safeSummary.driver_payable || 0],
   ];
 
   return <section className="dn-admin-section-workspace" dir={isArabic ? "rtl" : "ltr"}>
     <header className="dn-admin-section-hero"><span>{isArabic ? "بيانات مالية حقيقية" : "Live finance data"}</span><h1>{title}</h1><p>{isArabic ? "كل الأرقام تقرأ من جداول Supabase أو views المالية، ولا توجد إجماليات وهمية." : "All figures read from Supabase finance tables/views; no fake totals are displayed."}</p></header>
     <div className="dn-admin-section-kpis">{cards.map(([label, value]) => <article key={String(label)}><strong>{Number(value).toFixed(2)}</strong><span>{label as string}</span></article>)}</div>
-    <div className="dn-admin-section-panels"><div><h2>{isArabic ? "تدفق العمل" : "Workflow"}</h2><p>• {isArabic ? "لا حذف نهائي؛ المصروفات تستخدم void/reversal." : "No hard delete; expenses use void/reversal."}</p><p>• {isArabic ? "عدد التجار" : "Merchants"}: {merchants.length}</p><p>• {isArabic ? "عدد الطلبات" : "Orders"}: {orders.length}</p></div><div><h2>{isArabic ? "تحديث" : "Refresh"}</h2><button type="button" onClick={() => { void loadRows(); void onRefresh(); }}>{isArabic ? "تحديث البيانات" : "Refresh data"}</button><small>{isArabic ? "إذا لم تطبق migration ستظهر رسالة واضحة." : "If the migration is not applied, an explicit error is shown."}</small></div></div>
-    {id === "expenses" && <form onSubmit={addExpense} className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:grid-cols-[180px_1fr_auto]"><input value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} type="number" min="0" placeholder="AED" className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><input value={expenseNotes} onChange={(e) => setExpenseNotes(e.target.value)} placeholder={isArabic ? "ملاحظات المصروف" : "Expense notes"} className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><button className="rounded-xl bg-brand-gold px-4 py-2 font-black text-brand-deep">{isArabic ? "إضافة" : "Add"}</button></form>}
-    {error && <div className="mb-3 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200">{error}</div>}
-    <div className="dn-admin-filter-table-card"><div className="dn-admin-filter-table-head"><div><span>{loading ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "صفوف حية" : "Live rows")}</span><strong>{title}</strong></div><p>{rows.length}</p></div><div className="dn-admin-filter-table-wrap"><table className="dn-admin-filter-table"><thead><tr><th>ID</th><th>{isArabic ? "الحالة" : "Status"}</th><th>{isArabic ? "المبلغ" : "Amount"}</th><th>{isArabic ? "التاريخ" : "Date"}</th><th>{isArabic ? "إجراء" : "Action"}</th></tr></thead><tbody>{rows.length ? rows.slice(0, 40).map((row, index) => <tr key={String(row.id || index)}><td><b>{String(row.id || "—").slice(0, 12)}</b></td><td>{String(row.status || row.entry_type || "—")}</td><td>{Number(row.amount || row.debit || row.credit || row.current_balance || 0).toFixed(2)} AED</td><td>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td><td>{id === "expenses" && row.status !== "void" ? <button type="button" onClick={() => void voidSelectedExpense(row)}>{isArabic ? "إلغاء" : "Void"}</button> : "—"}</td></tr>) : <tr><td colSpan={5}>{isArabic ? "لا توجد بيانات بعد أو لم تطبق الجداول." : "No data yet or finance tables are not applied."}</td></tr>}</tbody></table></div></div>
+    <div className="dn-admin-section-panels"><div><h2>{isArabic ? "تدفق العمل" : "Workflow"}</h2><p>• {isArabic ? "لا حذف نهائي؛ المصروفات تستخدم void/reversal." : "No hard delete; expenses use void/reversal."}</p><p>• {isArabic ? "عدد التجار" : "Merchants"}: {merchants.length}</p><p>• {isArabic ? "عدد الطلبات" : "Orders"}: {orders.length}</p></div><div><h2>{isArabic ? "تحديث" : "Refresh"}</h2><button type="button" onClick={() => { void loadRows(); void onRefresh(); }}>{isArabic ? "تحديث البيانات" : "Refresh data"}</button><small>{migrationNote}</small></div></div>
+    {id === "expenses" && <form onSubmit={addExpense} className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:grid-cols-[180px_1fr_auto]"><input value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} type="number" min="0" placeholder="AED" className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><input value={expenseNotes} onChange={(e) => setExpenseNotes(e.target.value)} placeholder={isArabic ? "ملاحظات المصروف" : "Expense notes"} className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><button disabled={detailUnavailable} title={detailUnavailable ? migrationNote : undefined} className="rounded-xl bg-brand-gold px-4 py-2 font-black text-brand-deep disabled:cursor-not-allowed disabled:opacity-50">{detailUnavailable ? (isArabic ? "بعد الترحيل" : "After migration") : (isArabic ? "إضافة" : "Add")}</button></form>}
+    {(detailUnavailable || error) && <div className="mb-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm font-bold text-amber-100">{error || financeNotice}<br /><small className="text-white/65">{migrationNote}</small></div>}
+    <div className="dn-admin-filter-table-card"><div className="dn-admin-filter-table-head"><div><span>{loading ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "صفوف حية" : "Live rows")}</span><strong>{title}</strong></div><p>{rows.length}</p></div><div className="dn-admin-filter-table-wrap"><table className="dn-admin-filter-table"><thead><tr><th>ID</th><th>{isArabic ? "الحالة" : "Status"}</th><th>{isArabic ? "المبلغ" : "Amount"}</th><th>{isArabic ? "التاريخ" : "Date"}</th><th>{isArabic ? "إجراء" : "Action"}</th></tr></thead><tbody>{rows.length ? rows.slice(0, 40).map((row, index) => <tr key={String(row.id || index)}><td><b>{String(row.id || "—").slice(0, 12)}</b></td><td>{String(row.status || row.entry_type || "—")}</td><td>{Number(row.amount || row.debit || row.credit || row.current_balance || 0).toFixed(2)} AED</td><td>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td><td>{id === "expenses" && row.status !== "void" ? <button type="button" onClick={() => void voidSelectedExpense(row)}>{isArabic ? "إلغاء" : "Void"}</button> : "—"}</td></tr>) : <tr><td colSpan={5}>{detailUnavailable ? financeNotice : (isArabic ? "لا توجد بيانات مالية حالياً." : "No finance rows right now.")}</td></tr>}</tbody></table></div></div>
   </section>;
 }
 
@@ -549,19 +563,23 @@ export default function AdminPanelLuxury() {
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
-  const [mapMode, setMapMode] = useState<"standard" | "satellite" | "terrain">("standard");
+  const [adminNotice, setAdminNotice] = useState("");
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [financeFallback, setFinanceFallback] = useState(false);
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
 
   async function refreshAdminData() {
-    setAdminLoading(true);
-    setAdminError("");
+    setAdminLoading(true); setAdminError(""); setAdminNotice("");
     const [ordersResult, merchantsResult, statsResult, financeResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants(), fetchAdminStats(), fetchFinanceSummary()]);
-    if (ordersResult.status === "fulfilled") setOrders(ordersResult.value); else setAdminError(ordersResult.reason?.message || "Orders request failed");
-    if (merchantsResult.status === "fulfilled") setMerchants(merchantsResult.value);
-    if (statsResult.status === "fulfilled") setLiveStats(statsResult.value);
-    if (financeResult.status === "fulfilled") setFinanceSummary(financeResult.value);
+    let partialFailure = false;
+    if (ordersResult.status === "fulfilled") setOrders(ordersResult.value); else { partialFailure = true; setAdminError(isArabic ? "تعذر تحديث بعض البيانات" : "Some data could not be refreshed"); }
+    if (merchantsResult.status === "fulfilled") setMerchants(merchantsResult.value); else partialFailure = true;
+    if (statsResult.status === "fulfilled") setLiveStats(statsResult.value); else partialFailure = true;
+    if (financeResult.status === "fulfilled") { setFinanceSummary(financeResult.value); setFinanceFallback(true); } else { partialFailure = true; setFinanceSummary(calculateFinanceSummaryFromOrders(ordersResult.status === "fulfilled" ? ordersResult.value : orders)); setFinanceFallback(true); }
+    setLastSyncAt(new Date());
+    setAdminNotice(partialFailure ? (isArabic ? "تعذر تحديث بعض البيانات" : "Some data could not be refreshed") : (isArabic ? "تم تحديث بيانات العمليات" : "Operations data refreshed"));
     setAdminLoading(false);
   }
 
@@ -611,33 +629,13 @@ export default function AdminPanelLuxury() {
             <div><strong>{ui.owner}</strong><span>{ui.role}</span></div>
           </div>
 
-          <div className="dn-admin-khalifa-card">
-            <img src={khalifaAssets.bot} alt={ui.helper} />
-            <h2>{ui.helper}</h2>
-            <p>{ui.helperRole}</p>
-            <small>{ui.helperText}</small>
-            <button type="button">{ui.ask}</button>
-          </div>
-
-          <div className="dn-admin-support-card">
-            <Headphones className="h-9 w-9" />
-            <h3>{ui.help}</h3>
-            <p>{ui.preparing}</p>
-          </div>
+          <KhalifaAssistantPanel isArabic={isArabic} orders={orders} merchants={merchants} financeSummary={financeSummary} lastSyncAt={lastSyncAt} hasFallbackFinance={financeFallback} />
         </aside>
 
         <section className="dn-admin-center-zone">
           <header className="dn-admin-main-title"><span>{ui.commandCenter}</span><h1>{ui.welcome}</h1><p>{ui.subtitle}</p></header>
 
-          <div className={`dn-admin-map-live is-${mapMode}`}>
-            <div className="dn-admin-map-bg" />
-            <div className="dn-admin-map-heading"><Truck className="h-5 w-5" /><strong>{ui.trackingTitle}</strong><p>{ui.trackingSubtitle}</p><div className="mt-2 flex flex-wrap gap-2">{(["standard", "satellite", "terrain"] as const).map((mode) => <button key={mode} type="button" onClick={() => setMapMode(mode)} className={`rounded-full border px-3 py-1 text-[10px] font-black ${mapMode === mode ? "border-brand-gold bg-brand-gold text-brand-deep" : "border-white/15 bg-white/10 text-white"}`}>{mode}</button>)}</div></div>
-            <div className="dn-admin-route-line" />
-            <div className="dn-admin-pin is-pickup"><strong>{ui.pickupPoint}</strong><span>{ui.pickupText}</span></div>
-            <div className="dn-admin-pin is-current"><strong>{ui.inTransit}</strong><span>{ui.inTransitText}</span></div>
-            <div className="dn-admin-pin is-delivery"><strong>{ui.deliveryPoint}</strong><span>{ui.deliveryText}</span></div>
-            <div className="dn-admin-van"><Truck className="h-7 w-7" /></div>
-          </div>
+          <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
 
           <div className="dn-admin-bottom-cards">
             {[[ui.latest, ui.noUpdates, FileText], [ui.shipmentInfo, ui.noData, Package], [ui.details, `${metrics.total} ${ui.liveOrders}`, ClipboardList], [ui.quickHelp, ui.preparing, Headphones]].map(([title, text, Icon]) => {
@@ -675,7 +673,7 @@ export default function AdminPanelLuxury() {
             </nav>
             <button type="button" className="dn-admin-language-button" onClick={toggleLanguage}><Languages className="h-4 w-4" />{ui.language}</button>
           </div>
-          {(adminLoading || adminError) && <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-xs font-black text-white/70"><button type="button" onClick={() => void refreshAdminData()} className="me-3 rounded-xl bg-brand-gold px-3 py-1 text-brand-deep">{isArabic ? "تحديث" : "Refresh"}</button>{adminLoading ? (isArabic ? "تحميل البيانات الحية..." : "Loading live data...") : adminError}</div>}
+          {(adminLoading || adminError || adminNotice) && <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-xs font-black text-white/70"><button type="button" onClick={() => void refreshAdminData()} className="me-3 rounded-xl bg-brand-gold px-3 py-1 text-brand-deep">{isArabic ? "تحديث البيانات" : "Refresh data"}</button>{adminLoading ? (isArabic ? "تحميل البيانات الحية..." : "Loading live data...") : (adminError || adminNotice)}</div>}
           {renderContent()}
         </main>
 

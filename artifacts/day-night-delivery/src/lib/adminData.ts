@@ -322,6 +322,68 @@ function orderDeliveryIncome(order: Order) {
   return numberValue(order.delivery_price ?? order.price ?? order.base_price, 0);
 }
 
+function orderRecord(order: Order) {
+  return order as unknown as Record<string, unknown>;
+}
+
+export function isFinanceDetailUnavailable(error: unknown) {
+  return isMissingSchemaError(error);
+}
+
+export function calculateFinanceSummaryFromOrders(orders: Order[]): FinanceSummary {
+  return orders.reduce<FinanceSummary>((summary, order) => {
+    const record = orderRecord(order);
+    const status = orderStatus(order);
+    const income = orderDeliveryIncome(order) || numberValue(record.delivery_fee ?? record.amount ?? record.total_amount, 0);
+    const cod = numberValue(record.cod_amount, 0);
+    if (status.includes("deliver") || status.includes("complete")) {
+      summary.total_income += income;
+      summary.cod_collected += cod;
+    } else if (!status.includes("cancel") && !status.includes("return")) {
+      summary.cod_pending += cod;
+    }
+    summary.merchant_payable += cod;
+    summary.driver_payable += income;
+    return summary;
+  }, { total_income: 0, total_expenses: 0, cod_collected: 0, cod_pending: 0, merchant_payable: 0, driver_payable: 0 });
+}
+
+export function buildIncomeRowsFromOrders(orders: Order[]): FinanceRow[] {
+  return orders
+    .filter((order) => {
+      const record = orderRecord(order);
+      return orderDeliveryIncome(order) > 0 || numberValue(record.amount ?? record.total_amount, 0) > 0;
+    })
+    .map((order) => {
+      const record = orderRecord(order);
+      return {
+        id: clean(record.id) || clean(record.tracking_number),
+        status: orderStatus(order),
+        amount: orderDeliveryIncome(order) || numberValue(record.amount ?? record.total_amount, 0),
+        created_at: clean(record.created_at),
+        entry_type: "calculated_from_orders",
+        reference: clean(record.tracking_number ?? record.invoice_number),
+      };
+    });
+}
+
+export function buildCodRowsFromOrders(orders: Order[]): FinanceRow[] {
+  return orders
+    .filter((order) => numberValue(orderRecord(order).cod_amount, 0) > 0)
+    .map((order) => {
+      const record = orderRecord(order);
+      const status = orderStatus(order);
+      return {
+        id: clean(record.id) || clean(record.tracking_number),
+        status: status.includes("deliver") ? "collected" : "pending",
+        amount: numberValue(record.cod_amount, 0),
+        created_at: clean(record.created_at),
+        entry_type: "calculated_cod_from_orders",
+        reference: clean(record.tracking_number ?? record.invoice_number),
+      };
+    });
+}
+
 export async function fetchAdminOrders(): Promise<Order[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -372,20 +434,22 @@ export async function updateOrderStatus(orderId: string, status: string, note?: 
 
 export async function fetchFinanceSummary(): Promise<FinanceSummary> {
   const empty: FinanceSummary = { total_income: 0, total_expenses: 0, cod_collected: 0, cod_pending: 0, merchant_payable: 0, driver_payable: 0 };
-  if (!supabase) return empty;
+  const orders = await fetchAdminOrders();
+  const calculated = calculateFinanceSummaryFromOrders(orders);
+  if (!supabase) return { ...empty, ...calculated };
   const { data, error } = await supabase.from("finance_summary").select("*").maybeSingle();
   if (error) {
-    console.warn("Failed to fetch finance summary:", error.message);
-    return empty;
+    console.warn("Finance summary view unavailable; using calculated order summary:", error.message);
+    return { ...empty, ...calculated };
   }
-  return { ...empty, ...(data || {}) } as FinanceSummary;
+  return { ...empty, ...calculated, ...(data || {}) } as FinanceSummary;
 }
 
 export async function fetchExpenses(): Promise<FinanceRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) {
-    console.warn("Failed to fetch expenses:", error.message);
+    console.warn("Optional finance table expenses unavailable:", error.message);
     return [];
   }
   return (data || []) as FinanceRow[];
@@ -425,7 +489,7 @@ export async function fetchLedgerEntries(): Promise<FinanceRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("ledger_entries").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) {
-    console.warn("Failed to fetch ledger entries:", error.message);
+    console.warn("Optional finance table ledger_entries unavailable:", error.message);
     return [];
   }
   return (data || []) as FinanceRow[];
@@ -435,7 +499,7 @@ export async function fetchMerchantStatements(): Promise<FinanceRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("merchant_settlements").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) {
-    console.warn("Failed to fetch merchant statements:", error.message);
+    console.warn("Optional finance table merchant_settlements unavailable:", error.message);
     return [];
   }
   return (data || []) as FinanceRow[];
@@ -445,7 +509,7 @@ export async function fetchDriverStatements(): Promise<FinanceRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("driver_settlements").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) {
-    console.warn("Failed to fetch driver statements:", error.message);
+    console.warn("Optional finance table driver_settlements unavailable:", error.message);
     return [];
   }
   return (data || []) as FinanceRow[];
