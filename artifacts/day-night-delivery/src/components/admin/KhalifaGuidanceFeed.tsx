@@ -1,30 +1,292 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Pause, Pin, Play, RotateCcw, Truck, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Pause,
+  Pin,
+  Play,
+  RotateCcw,
+  Send,
+  Truck,
+  Wallet,
+} from "lucide-react";
 import type { Merchant } from "../../types";
 import type { FinanceSummary } from "../../lib/adminData";
 import { deriveCommandMetrics } from "../../data/adminCommandExpansion";
 
-type Props = { isArabic: boolean; orders: any[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null; sectionTitle?: string };
-type Insight = { icon: typeof AlertTriangle; severity: string; tone: string; title: string; message: string; metric?: string };
-function amount(value: unknown) { return `${Number(value || 0).toFixed(2)} AED`; }
-function norm(value: unknown) { return String(value || "").toLowerCase().replace(/[_-]/g, " "); }
-export default function KhalifaGuidanceFeed({ isArabic, orders, merchants, financeSummary, sectionTitle }: Props) {
-  const [index, setIndex] = useState(0); const [paused, setPaused] = useState(false); const [pinned, setPinned] = useState(false);
-  const metrics = useMemo(() => deriveCommandMetrics(orders, merchants, financeSummary), [orders, merchants, financeSummary]);
-  const today = new Date().toISOString().slice(0, 10); const todayOrders = orders.filter((o) => String(o.created_at || "").slice(0, 10) === today).length; const returned = orders.filter((o) => norm(o.status).includes("return")).length; const pending = orders.filter((o) => /pending|review|confirm/.test(norm(o.status))).length; const sectionPrefix = sectionTitle ? (isArabic ? `قسم ${sectionTitle}: ` : `${sectionTitle}: `) : "";
-  const insights = useMemo<Insight[]>(() => [
-    pending > 0 && { icon: AlertTriangle, severity: isArabic ? "عاجل" : "Urgent", tone: "gold", title: isArabic ? "قرار تشغيلي مطلوب" : "Operational decision needed", metric: String(pending), message: isArabic ? `${sectionPrefix}${pending} طلب يحتاج مراجعة قبل التحريك. ابدأ بالطلبات الأقدم ثم الأعلى قيمة.` : `${sectionPrefix}${pending} orders need review before dispatch. Start with oldest and highest-value orders.` },
-    metrics.unassigned > 0 && { icon: Truck, severity: isArabic ? "توزيع" : "Dispatch", tone: "blue", title: isArabic ? "فجوة مناديب" : "Driver assignment gap", metric: String(metrics.unassigned), message: isArabic ? `${metrics.unassigned} طلب نشط بدون مندوب. افتح التوزيع وعيّن أقرب سيارة لتقليل التأخير.` : `${metrics.unassigned} active orders have no assigned driver. Assign the nearest vehicle to reduce delays.` },
-    Number(metrics.codPending) > 0 && { icon: Wallet, severity: isArabic ? "تحصيل" : "Collection", tone: "gold", title: isArabic ? "تحصيل COD معلق" : "Pending COD collection", metric: amount(metrics.codPending), message: isArabic ? `يوجد COD معلق بقيمة ${amount(metrics.codPending)}. راجع المناديب قبل إغلاق اليوم.` : `Pending COD is ${amount(metrics.codPending)}. Reconcile drivers before day close.` },
-    returned > 0 && { icon: RotateCcw, severity: isArabic ? "متابعة" : "Follow-up", tone: "gold", title: isArabic ? "طلبات راجعة" : "Returned orders", metric: String(returned), message: isArabic ? `${returned} طلب راجع يحتاج سبب إغلاق واضح وملاحظة للتاجر.` : `${returned} returned orders need clear closure reasons and merchant notes.` },
-    { icon: Clock3, severity: isArabic ? "اليوم" : "Today", tone: "blue", title: isArabic ? "ملخص اليوم" : "Today snapshot", metric: String(todayOrders), message: isArabic ? `${todayOrders} طلب جديد اليوم، ${metrics.active} نشط، و${metrics.delivered} تم تسليمه.` : `${todayOrders} new orders today, ${metrics.active} active, and ${metrics.delivered} delivered.` },
-    { icon: Wallet, severity: isArabic ? "مالية" : "Finance", tone: metrics.breakEvenStatus === "positive" ? "blue" : "rose", title: isArabic ? "كسر التشغيل" : "Break-even watch", metric: amount(metrics.netEstimate), message: isArabic ? `صافي التشغيل التقديري ${amount(metrics.netEstimate)}. متوسط دخل الطلب ${amount(metrics.averageOrderRevenue)} ونسبة COD ${metrics.codRatio.toFixed(1)}%.` : `Estimated operating net is ${amount(metrics.netEstimate)}. Average order revenue is ${amount(metrics.averageOrderRevenue)} and COD ratio is ${metrics.codRatio.toFixed(1)}%.` },
-    metrics.bestRegionId !== "all" && { icon: CheckCircle2, severity: isArabic ? "منطقة" : "Region", tone: "blue", title: isArabic ? "أفضل منطقة نشاط" : "Top active region", metric: String(metrics.bestRegionCount), message: isArabic ? `أعلى نشاط حالي في ${metrics.bestRegionId} بعدد ${metrics.bestRegionCount} طلب. استخدم فلتر الخريطة لمتابعتها.` : `Top activity is in ${metrics.bestRegionId} with ${metrics.bestRegionCount} orders. Use the map filter to monitor it.` },
-  ].filter(Boolean) as Insight[], [isArabic, pending, returned, todayOrders, metrics, sectionPrefix]);
-  const visibleInsights = insights.length ? insights : [{ icon: CheckCircle2, severity: isArabic ? "معلومة" : "Info", tone: "blue", title: isArabic ? "العمليات مستقرة" : "Operations stable", metric: "OK", message: isArabic ? "لا توجد تنبيهات عاجلة الآن. خليفة يراقب التوزيع والتحصيل والطلبات الجديدة." : "No urgent alerts right now. Khalifa is watching dispatch, collections, and new orders." }];
-  const active = visibleInsights[index % visibleInsights.length]; const Icon = active.icon;
-  useEffect(() => { setIndex(0); setPaused(false); setPinned(false); }, [sectionTitle, orders.length, merchants.length]);
-  useEffect(() => { if (paused || pinned || visibleInsights.length <= 1) return; const timer = window.setInterval(() => setIndex((current) => (current + 1) % visibleInsights.length), 5200); return () => window.clearInterval(timer); }, [paused, pinned, visibleInsights.length]);
-  const next = () => setIndex((current) => (current + 1) % visibleInsights.length); const previous = () => setIndex((current) => (current - 1 + visibleInsights.length) % visibleInsights.length);
-  return <section className="dn-khalifa-feed dn-khalifa-rotator" aria-label={isArabic ? "تغذية خليفة" : "Khalifa Feed"}><header><span>{isArabic ? "خليفة مباشر" : "Live Khalifa"}</span><strong>{sectionTitle || (isArabic ? "تنبيهات وإرشادات" : "Notifications & Guidance")}</strong></header><article key={`${active.title}-${index}`} className={`dn-khalifa-current is-${active.tone}`}><div className="dn-khalifa-feed-icon"><Icon className="h-5 w-5" /></div><div className="dn-khalifa-current-body"><div className="dn-khalifa-current-top"><strong>{active.title}</strong><span>{active.severity}</span></div><p>{active.message}</p>{active.metric && <b className="dn-khalifa-current-metric">{active.metric}</b>}</div></article><div className="dn-khalifa-rotator-controls"><button type="button" onClick={previous} aria-label={isArabic ? "السابق" : "Previous"}><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={() => setPaused((value) => !value)}>{paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}</button><button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""}><Pin className="h-4 w-4" /></button><button type="button" onClick={next} aria-label={isArabic ? "التالي" : "Next"}><ChevronLeft className="h-4 w-4" /></button><span>{index + 1} / {visibleInsights.length}</span></div></section>;
+type Props = {
+  isArabic: boolean;
+  orders: any[];
+  merchants: Merchant[];
+  financeSummary?: FinanceSummary | null;
+  sectionTitle?: string;
+};
+
+type Insight = {
+  icon: typeof AlertTriangle;
+  severity: string;
+  tone: string;
+  title: string;
+  message: string;
+  metric?: string;
+};
+
+function amount(value: unknown) {
+  return `${Number(value || 0).toFixed(2)} AED`;
+}
+
+function norm(value: unknown) {
+  return String(value || "").toLowerCase().replace(/[_-]/g, " ");
+}
+
+function answerFromData(
+  question: string,
+  isArabic: boolean,
+  metrics: ReturnType<typeof deriveCommandMetrics>,
+  sectionTitle?: string,
+) {
+  const q = question.toLowerCase();
+
+  if (/cod|تحصيل|كاش/.test(q)) {
+    return isArabic
+      ? `تحصيل COD الحالي ${amount(metrics.codTotal)}، والمعلق ${amount(metrics.codPending)}. ابدأ بمراجعة المناديب قبل إغلاق اليوم.`
+      : `Current COD is ${amount(metrics.codTotal)} and pending COD is ${amount(metrics.codPending)}. Reconcile drivers before day close.`;
+  }
+
+  if (/مندوب|driver|assign|توزيع/.test(q)) {
+    return isArabic
+      ? `يوجد ${metrics.unassigned} طلب نشط بدون مندوب. افتح الخريطة وركّز على أقرب منطقة نشطة.`
+      : `${metrics.unassigned} active orders are unassigned. Open the map and focus the nearest active region.`;
+  }
+
+  if (/كسر|ربح|خسارة|break|net|finance/.test(q)) {
+    return isArabic
+      ? `صافي التشغيل التقديري ${amount(metrics.netEstimate)}، ومتوسط دخل الطلب ${amount(metrics.averageOrderRevenue)}، ونسبة COD ${metrics.codRatio.toFixed(1)}%.`
+      : `Estimated net is ${amount(metrics.netEstimate)}, average order revenue is ${amount(metrics.averageOrderRevenue)}, and COD ratio is ${metrics.codRatio.toFixed(1)}%.`;
+  }
+
+  return isArabic
+    ? `ملخص ${sectionTitle || "الإدارة"}: ${metrics.orders} طلب، ${metrics.active} نشط، ${metrics.delivered} مسلم، ${metrics.review} يحتاج مراجعة، وأفضل منطقة نشاط ${metrics.bestRegionId}.`
+    : `${sectionTitle || "Admin"} summary: ${metrics.orders} orders, ${metrics.active} active, ${metrics.delivered} delivered, ${metrics.review} need review, and top active region is ${metrics.bestRegionId}.`;
+}
+
+export default function KhalifaGuidanceFeed({
+  isArabic,
+  orders,
+  merchants,
+  financeSummary,
+  sectionTitle,
+}: Props) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+
+  const metrics = useMemo(
+    () => deriveCommandMetrics(orders, merchants, financeSummary),
+    [orders, merchants, financeSummary],
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayOrders = orders.filter((order) => String(order.created_at || "").slice(0, 10) === today).length;
+  const returned = orders.filter((order) => norm(order.status).includes("return")).length;
+  const pending = orders.filter((order) => /pending|review|confirm/.test(norm(order.status))).length;
+
+  const sectionPrefix = sectionTitle ? (isArabic ? `قسم ${sectionTitle}: ` : `${sectionTitle}: `) : "";
+
+  const insights = useMemo<Insight[]>(
+    () =>
+      [
+        pending > 0 && {
+          icon: AlertTriangle,
+          severity: isArabic ? "عاجل" : "Urgent",
+          tone: "gold",
+          title: isArabic ? "قرار تشغيلي مطلوب" : "Operational decision needed",
+          metric: String(pending),
+          message: isArabic
+            ? `${sectionPrefix}${pending} طلب يحتاج مراجعة قبل التحريك. ابدأ بالطلبات الأقدم ثم الأعلى قيمة.`
+            : `${sectionPrefix}${pending} orders need review before dispatch. Start with oldest and highest-value orders.`,
+        },
+        metrics.unassigned > 0 && {
+          icon: Truck,
+          severity: isArabic ? "توزيع" : "Dispatch",
+          tone: "blue",
+          title: isArabic ? "فجوة مناديب" : "Driver assignment gap",
+          metric: String(metrics.unassigned),
+          message: isArabic
+            ? `${metrics.unassigned} طلب نشط بدون مندوب. افتح التوزيع وعيّن أقرب سيارة لتقليل التأخير.`
+            : `${metrics.unassigned} active orders have no assigned driver. Assign the nearest vehicle to reduce delays.`,
+        },
+        Number(metrics.codPending) > 0 && {
+          icon: Wallet,
+          severity: isArabic ? "تحصيل" : "Collection",
+          tone: "gold",
+          title: isArabic ? "تحصيل COD معلق" : "Pending COD collection",
+          metric: amount(metrics.codPending),
+          message: isArabic
+            ? `يوجد COD معلق بقيمة ${amount(metrics.codPending)}. راجع المناديب قبل إغلاق اليوم.`
+            : `Pending COD is ${amount(metrics.codPending)}. Reconcile drivers before day close.`,
+        },
+        returned > 0 && {
+          icon: RotateCcw,
+          severity: isArabic ? "متابعة" : "Follow-up",
+          tone: "gold",
+          title: isArabic ? "طلبات راجعة" : "Returned orders",
+          metric: String(returned),
+          message: isArabic
+            ? `${returned} طلب راجع يحتاج سبب إغلاق واضح وملاحظة للتاجر.`
+            : `${returned} returned orders need clear closure reasons and merchant notes.`,
+        },
+        {
+          icon: Clock3,
+          severity: isArabic ? "اليوم" : "Today",
+          tone: "blue",
+          title: isArabic ? "ملخص اليوم" : "Today snapshot",
+          metric: String(todayOrders),
+          message: isArabic
+            ? `${todayOrders} طلب جديد اليوم، ${metrics.active} نشط، و${metrics.delivered} تم تسليمه.`
+            : `${todayOrders} new orders today, ${metrics.active} active, and ${metrics.delivered} delivered.`,
+        },
+        {
+          icon: Wallet,
+          severity: isArabic ? "مالية" : "Finance",
+          tone: metrics.breakEvenStatus === "positive" ? "blue" : "rose",
+          title: isArabic ? "كسر التشغيل" : "Break-even watch",
+          metric: amount(metrics.netEstimate),
+          message: isArabic
+            ? `صافي التشغيل التقديري ${amount(metrics.netEstimate)}. متوسط دخل الطلب ${amount(metrics.averageOrderRevenue)} ونسبة COD ${metrics.codRatio.toFixed(1)}%.`
+            : `Estimated operating net is ${amount(metrics.netEstimate)}. Average order revenue is ${amount(metrics.averageOrderRevenue)} and COD ratio is ${metrics.codRatio.toFixed(1)}%.`,
+        },
+        metrics.bestRegionId !== "all" && {
+          icon: CheckCircle2,
+          severity: isArabic ? "منطقة" : "Region",
+          tone: "blue",
+          title: isArabic ? "أفضل منطقة نشاط" : "Top active region",
+          metric: String(metrics.bestRegionCount),
+          message: isArabic
+            ? `أعلى نشاط حالي في ${metrics.bestRegionId} بعدد ${metrics.bestRegionCount} طلب. استخدم فلتر الخريطة لمتابعتها.`
+            : `Top activity is in ${metrics.bestRegionId} with ${metrics.bestRegionCount} orders. Use the map filter to monitor it.`,
+        },
+      ].filter(Boolean) as Insight[],
+    [isArabic, pending, returned, todayOrders, metrics, sectionPrefix],
+  );
+
+  const visibleInsights: Insight[] = insights.length
+    ? insights
+    : [
+        {
+          icon: CheckCircle2,
+          severity: isArabic ? "معلومة" : "Info",
+          tone: "blue",
+          title: isArabic ? "العمليات مستقرة" : "Operations stable",
+          metric: "OK",
+          message: isArabic
+            ? "لا توجد تنبيهات عاجلة الآن. خليفة يراقب التوزيع والتحصيل والطلبات الجديدة."
+            : "No urgent alerts right now. Khalifa is watching dispatch, collections, and new orders.",
+        },
+      ];
+
+  const active = visibleInsights[index % visibleInsights.length];
+  const Icon = active.icon;
+
+  useEffect(() => {
+    setIndex(0);
+    setPaused(false);
+    setPinned(false);
+    setAnswer("");
+  }, [sectionTitle, orders.length, merchants.length]);
+
+  useEffect(() => {
+    if (paused || pinned || visibleInsights.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setIndex((current) => (current + 1) % visibleInsights.length);
+    }, 5200);
+
+    return () => window.clearInterval(timer);
+  }, [paused, pinned, visibleInsights.length]);
+
+  const next = () => {
+    setIndex((current) => (current + 1) % visibleInsights.length);
+  };
+
+  const previous = () => {
+    setIndex((current) => (current - 1 + visibleInsights.length) % visibleInsights.length);
+  };
+
+  const ask = (event: FormEvent) => {
+    event.preventDefault();
+    setAnswer(answerFromData(question, isArabic, metrics, sectionTitle));
+  };
+
+  return (
+    <section className="dn-khalifa-feed dn-khalifa-rotator" aria-label={isArabic ? "تغذية خليفة" : "Khalifa Feed"}>
+      <header>
+        <span>{isArabic ? "خليفة مباشر" : "Live Khalifa"}</span>
+        <strong>{sectionTitle || (isArabic ? "تنبيهات وإرشادات" : "Notifications & Guidance")}</strong>
+      </header>
+
+      <article key={`${active.title}-${index}`} className={`dn-khalifa-current is-${active.tone}`}>
+        <div className="dn-khalifa-feed-icon">
+          <Icon className="h-5 w-5" />
+        </div>
+
+        <div className="dn-khalifa-current-body">
+          <div className="dn-khalifa-current-top">
+            <strong>{active.title}</strong>
+            <span>{active.severity}</span>
+          </div>
+
+          <p>{active.message}</p>
+
+          {active.metric && <b className="dn-khalifa-current-metric">{active.metric}</b>}
+        </div>
+      </article>
+
+      <div className="dn-khalifa-rotator-controls">
+        <button type="button" onClick={previous} aria-label={isArabic ? "السابق" : "Previous"}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+
+        <button type="button" onClick={() => setPaused((value) => !value)}>
+          {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+        </button>
+
+        <button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""}>
+          <Pin className="h-4 w-4" />
+        </button>
+
+        <button type="button" onClick={next} aria-label={isArabic ? "التالي" : "Next"}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        <span>
+          {index + 1} / {visibleInsights.length}
+        </span>
+      </div>
+
+      <form onSubmit={ask} className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+        <input
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder={isArabic ? "اسأل خليفة عن COD أو المناديب أو كسر التشغيل" : "Ask Khalifa about COD, drivers, or break-even"}
+          className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white outline-none"
+        />
+
+        <button type="submit" className="rounded-2xl bg-brand-gold px-3 text-brand-deep">
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+
+      {answer && (
+        <div className="mt-2 rounded-2xl border border-brand-sky/20 bg-brand-sky/10 p-3 text-xs font-bold leading-6 text-white/80">
+          {answer}
+        </div>
+      )}
+    </section>
+  );
 }
