@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { fetchAllOrders, supabase } from "../supabase";
-import { fetchAdminStats, fetchFinanceSummary, fetchExpenses, createExpense, voidExpense, fetchLedgerEntries, fetchMerchantStatements, fetchDriverStatements, fetchMerchants, fetchAdminOrders, type AdminStats, type FinanceSummary, type FinanceRow } from "../lib/adminData";
+import { fetchAdminStats, fetchFinanceSummary, fetchExpenses, createExpense, voidExpense, fetchLedgerEntries, fetchMerchantStatements, fetchDriverStatements, fetchMerchants, fetchAdminOrders, updateOrderStatus, type AdminStats, type FinanceSummary, type FinanceRow } from "../lib/adminData";
 import type { Merchant } from "../types";
 import { useAppContext } from "../lib/AppContext";
 import AdminPanelCore from "./AdminPanel";
@@ -387,12 +387,30 @@ function sectionBullets(id: SectionId, isArabic: boolean) {
   ];
 }
 
-function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpenOperations }: { id: SectionId; title: string; ui: typeof copy.ar; isArabic: boolean; metrics: MetricMap; orders: any[]; onOpenOperations: () => void }) {
-  const filteredOrders = filterOrdersForSection(id, orders);
+function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpenOperations, onRefresh }: { id: SectionId; title: string; ui: typeof copy.ar; isArabic: boolean; metrics: MetricMap; orders: any[]; onOpenOperations: () => void; onRefresh: () => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const [statusSavingId, setStatusSavingId] = useState("");
+  const baseOrders = filterOrdersForSection(id, orders);
+  const normalizedQuery = query.toLowerCase().trim();
+  const filteredOrders = normalizedQuery ? baseOrders.filter((order) => [getTracking(order), order.receiver_phone, order.sender_phone, order.receiver_name, order.customer_name, order.merchant_name, order.sender_name].join(" ").toLowerCase().includes(normalizedQuery)) : baseOrders;
   const count = filteredOrders.length;
   const totalAmount = filteredOrders.reduce((sum, order) => sum + getOrderAmount(order), 0);
   const totalIncome = filteredOrders.reduce((sum, order) => sum + getOrderIncome(order), 0);
   const rows = filteredOrders.slice(0, 30);
+
+  async function changeStatus(order: any, status: string) {
+    const idValue = String(order.id || "");
+    if (!idValue || !status || status === order.status) return;
+    setStatusSavingId(idValue);
+    try {
+      await updateOrderStatus(idValue, status, "Updated from luxury admin control center");
+      await onRefresh();
+    } catch (err) {
+      console.warn("Order status update failed:", err);
+    } finally {
+      setStatusSavingId("");
+    }
+  }
 
   return (
     <section className="dn-admin-section-workspace">
@@ -422,6 +440,7 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
       </div>
 
       <div className="dn-admin-filter-table-card">
+        <div className="mb-3"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالتتبع / الهاتف / الاسم / التاجر" : "Search tracking / phone / name / merchant"} className="w-full rounded-2xl border border-white/10 bg-brand-deep/70 px-4 py-3 text-sm font-bold text-white outline-none" /></div>
         <div className="dn-admin-filter-table-head">
           <div><span>{ui.filteredData}</span><strong>{title}</strong></div>
           <p>{ui.rowsShown}: {rows.length} / {count}</p>
@@ -447,7 +466,7 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
                 {rows.map((order, index) => (
                   <tr key={String(order.id || order.tracking_number || index)}>
                     <td><b>{getTracking(order)}</b></td>
-                    <td><span className="dn-admin-status-chip">{translateStatus(order.status, isArabic)}</span></td>
+                    <td><select disabled={statusSavingId === String(order.id || "")} value={String(order.status || "pending")} onChange={(event) => void changeStatus(order, event.target.value)} className="rounded-xl border border-white/10 bg-brand-deep px-2 py-1 text-xs font-black text-white"><option value="pending">pending</option><option value="confirmed">confirmed</option><option value="assigned">assigned</option><option value="picked_up">picked_up</option><option value="in_transit">in_transit</option><option value="delivered">delivered</option><option value="cancelled">cancelled</option></select></td>
                     <td>{order.merchant_name || order.sender_name || order.customer_name || "—"}</td>
                     <td>{getRoute(order)}</td>
                     <td>{order.receiver_name || order.recipient_name || order.customer_name || "—"}</td>
@@ -638,8 +657,8 @@ export default function AdminPanelLuxury() {
     if (active === "merchants") return <div className="dn-admin-core-full"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => setActive("all_orders")} onCreateOrder={() => setActive("new_order")} /></div>;
     if (["finance_dashboard", "expenses", "income", "cod", "merchant_statements", "driver_statements", "accounts", "adjustments", "audit_log"].includes(active)) return <AdminFinanceWorkspace id={active} title={activeTitle} isArabic={isArabic} summary={financeSummary} orders={orders} merchants={merchants} onRefresh={refreshAdminData} />;
     if (active === "support") return <div className="dn-admin-core-full"><AdminProspectingLinks /></div>;
-    if (filteredSectionIds.has(active)) return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
-    return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
+    if (filteredSectionIds.has(active)) return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} onRefresh={refreshAdminData} />;
+    return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} onRefresh={refreshAdminData} />;
   }
 
   return (

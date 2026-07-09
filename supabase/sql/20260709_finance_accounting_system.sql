@@ -270,6 +270,8 @@ begin
 end;
 $$;
 
+
+
 do $$
 declare t text;
 begin
@@ -311,6 +313,54 @@ create or replace view public.cod_aging as
 select c.*, now() - coalesce(c.collected_at, c.created_at) as age
 from public.cod_collections c
 where c.status in ('pending','collected');
+
+
+-- Audit and ledger automation for finance movements.
+create or replace function public.daynight_finance_audit_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.finance_audit_log(table_name, record_id, action, old_values, new_values, created_by)
+  values (tg_table_name, coalesce(new.id, old.id), tg_op, case when tg_op in ('UPDATE','DELETE') then to_jsonb(old) else null end, case when tg_op in ('INSERT','UPDATE') then to_jsonb(new) else null end, auth.uid());
+  return coalesce(new, old);
+end;
+$$;
+
+create or replace function public.daynight_post_expense_ledger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.status = 'approved' and (tg_op = 'INSERT' or coalesce(old.status, '') <> 'approved') then
+    insert into public.ledger_entries(entry_type, source_table, source_id, account_id, debit, credit, description, created_by)
+    values ('expense', 'expenses', new.id, new.account_id, coalesce(new.amount, 0) + coalesce(new.vat_amount, 0), 0, coalesce(new.notes, 'Approved expense'), auth.uid());
+  elsif new.status = 'void' and tg_op = 'UPDATE' and coalesce(old.status, '') <> 'void' then
+    insert into public.ledger_entries(entry_type, source_table, source_id, account_id, debit, credit, description, status, created_by)
+    values ('expense_reversal', 'expenses', new.id, new.account_id, 0, coalesce(old.amount, 0) + coalesce(old.vat_amount, 0), coalesce(new.void_reason, 'Expense void reversal'), 'posted', auth.uid());
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['finance_accounts','expense_categories','expenses','income_entries','cod_collections','merchant_settlements','driver_settlements','ledger_entries','finance_adjustments'] loop
+    execute format('drop trigger if exists trg_%I_finance_audit on public.%I', t, t);
+    execute format('create trigger trg_%I_finance_audit after insert or update or delete on public.%I for each row execute function public.daynight_finance_audit_trigger()', t, t);
+  end loop;
+end $$;
+
+drop trigger if exists trg_expenses_ledger on public.expenses;
+create trigger trg_expenses_ledger
+after insert or update on public.expenses
+for each row execute function public.daynight_post_expense_ledger();
+
 
 alter table public.finance_accounts enable row level security;
 alter table public.expense_categories enable row level security;
