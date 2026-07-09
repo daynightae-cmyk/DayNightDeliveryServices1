@@ -1,0 +1,11 @@
+/* Prevent global image fallbacks from visually corrupting real map tiles. */
+.dn-live-map-shell .leaflet-tile.dn-image-fallback-applied,
+.dn-3d-tracking-map .leaflet-tile.dn-image-fallback-applied,
+.leaflet-container .leaflet-tile.dn-image-fallback-applied {
+  display: none !important;
+}
+
+.dn-live-map-shell .leaflet-container,
+.dn-3d-tracking-map .leaflet-container {
+  background: #061a33 !important;
+}
