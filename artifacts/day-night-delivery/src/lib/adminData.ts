@@ -381,45 +381,116 @@ export async function fetchFinanceSummary(): Promise<FinanceSummary> {
   return { ...empty, ...(data || {}) } as FinanceSummary;
 }
 
-export async function fetchExpenses(): Promise<FinanceRow[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(500);
+
+export type AdminDateFilters = { dateFrom?: string; dateTo?: string; status?: string; merchantId?: string; driverId?: string; orderId?: string; category?: string; type?: string };
+export type AdminExpensePayload = { expense_date?: string; category: string; amount: number | string; payment_method?: string; status?: string; notes?: string; reference_number?: string; attachment_url?: string };
+export type AdminAdjustmentPayload = { adjustment_type: string; direction: "positive" | "negative"; amount: number | string; order_id?: string; merchant_id?: string; driver_id?: string; reason: string; notes?: string; status?: string };
+export type StatementEntryPayload = Record<string, unknown> & { merchant_id?: string; driver_id?: string; order_id?: string; tracking_number?: string; entry_date?: string; entry_type: string; debit?: number; credit?: number; balance?: number; notes?: string };
+export type ImportRowValidation = { rowIndex: number; raw: Record<string, unknown>; normalized: Record<string, unknown>; errors: string[]; status: "valid" | "invalid"; duplicateWarning?: string };
+
+function cleanAdminError(error: unknown, fallback = "Admin operation is temporarily unavailable.") {
+  if (error) console.warn("Admin operation technical detail:", (error as { message?: string })?.message || error);
+  return new Error(fallback);
+}
+
+function applyAdminFilters(query: any, filters?: AdminDateFilters, dateColumn = "created_at") {
+  let next = query;
+  if (filters?.status) next = next.eq("status", filters.status);
+  if (filters?.merchantId) next = next.eq("merchant_id", filters.merchantId);
+  if (filters?.driverId) next = next.eq("driver_id", filters.driverId);
+  if (filters?.orderId) next = next.eq("order_id", filters.orderId);
+  if (filters?.category) next = next.eq("category", filters.category);
+  if (filters?.type) next = next.eq("entry_type", filters.type);
+  if (filters?.dateFrom) next = next.gte(dateColumn, filters.dateFrom);
+  if (filters?.dateTo) next = next.lte(dateColumn, filters.dateTo);
+  return next;
+}
+
+async function fetchTableRows(table: string, filters?: AdminDateFilters, dateColumn = "created_at") {
+  if (!supabase) return [] as FinanceRow[];
+  const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn).order(dateColumn, { ascending: false }).limit(1000);
   if (error) {
-    console.warn("Failed to fetch expenses:", error.message);
-    return [];
+    if (isMissingSchemaError(error)) return [] as FinanceRow[];
+    throw cleanAdminError(error);
   }
   return (data || []) as FinanceRow[];
 }
 
-export async function createExpense(input: ExpenseInput): Promise<FinanceRow> {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const payload = removeEmptyUndefined({
-    category_id: clean(input.category_id) || undefined,
-    account_id: clean(input.account_id) || undefined,
-    amount: Math.max(0, numberValue(input.amount, 0)),
-    vat_amount: Math.max(0, numberValue(input.vat_amount, 0)),
-    payment_method: clean(input.payment_method || "cash"),
-    paid_at: clean(input.paid_at) || undefined,
-    receipt_url: clean(input.receipt_url) || undefined,
-    notes: clean(input.notes),
-    status: clean(input.status || "draft"),
-  });
-  const { data, error } = await supabase.from("expenses").insert(payload).select("*").single();
-  if (error) throw new Error(error.message);
+async function insertTableRow(table: string, payload: Record<string, unknown>) {
+  if (!supabase) throw cleanAdminError(null, "Supabase is not configured.");
+  const { data, error } = await supabase.from(table).insert(removeEmptyUndefined(payload)).select("*").single();
+  if (error) throw cleanAdminError(error);
   return data as FinanceRow;
 }
 
-export async function voidExpense(expenseId: string, reason: string): Promise<FinanceRow> {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase
-    .from("expenses")
-    .update({ status: "void", voided_at: new Date().toISOString(), void_reason: clean(reason || "Voided by admin") })
-    .eq("id", expenseId)
-    .select("*")
-    .single();
-  if (error) throw new Error(error.message);
+async function updateTableRow(table: string, id: string, payload: Record<string, unknown>) {
+  if (!supabase) throw cleanAdminError(null, "Supabase is not configured.");
+  const { data, error } = await supabase.from(table).update(removeEmptyUndefined({ ...payload, updated_at: new Date().toISOString() })).eq("id", id).select("*").single();
+  if (error) throw cleanAdminError(error);
   return data as FinanceRow;
 }
+
+export async function createAdminAuditEvent(payload: { entity_type: string; entity_id?: string; action: string; before_data?: unknown; after_data?: unknown; metadata?: unknown }): Promise<FinanceRow | null> {
+  if (!supabase) return null;
+  const user = await supabase.auth.getUser().catch(() => null);
+  const actor = user?.data?.user;
+  try {
+    return await insertTableRow("admin_audit_events", { ...payload, actor_id: actor?.id, actor_email: actor?.email, created_at: new Date().toISOString() });
+  } catch (error) { console.warn("Audit event skipped:", (error as Error).message); return null; }
+}
+
+export async function fetchExpenses(filters?: AdminDateFilters): Promise<FinanceRow[]> {
+  const adminRows = await fetchTableRows("admin_expenses", filters, "expense_date");
+  if (adminRows.length) return adminRows;
+  return fetchTableRows("expenses", filters, "created_at");
+}
+
+export async function createExpense(input: AdminExpensePayload | ExpenseInput): Promise<FinanceRow> {
+  const row = await insertTableRow("admin_expenses", { expense_date: (input as AdminExpensePayload).expense_date || new Date().toISOString().slice(0, 10), category: (input as AdminExpensePayload).category || "other", amount: Math.max(0, numberValue(input.amount, 0)), payment_method: input.payment_method || "cash", status: input.status || "draft", notes: input.notes, reference_number: (input as AdminExpensePayload).reference_number, attachment_url: (input as AdminExpensePayload).attachment_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  void createAdminAuditEvent({ entity_type: "admin_expense", entity_id: String(row.id || ""), action: "create", after_data: row });
+  return row;
+}
+
+export async function approveExpense(id: string): Promise<FinanceRow> {
+  const row = await updateTableRow("admin_expenses", id, { status: "approved", approved_at: new Date().toISOString() });
+  void createAdminAuditEvent({ entity_type: "admin_expense", entity_id: id, action: "approve", after_data: row });
+  return row;
+}
+
+export async function voidExpense(expenseId: string, reason: string): Promise<FinanceRow> {
+  const row = await updateTableRow("admin_expenses", expenseId, { status: "void", voided_at: new Date().toISOString(), notes: reason || "Voided by admin" });
+  void createAdminAuditEvent({ entity_type: "admin_expense", entity_id: expenseId, action: "void", metadata: { reason } });
+  return row;
+}
+
+export async function fetchAdjustments(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("admin_adjustments", filters, "created_at"); }
+export async function createAdjustment(payload: AdminAdjustmentPayload): Promise<FinanceRow> { const row = await insertTableRow("admin_adjustments", { ...payload, amount: Math.max(0, numberValue(payload.amount, 0)), status: payload.status || "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
+export async function approveAdjustment(id: string): Promise<FinanceRow> { const row = await updateTableRow("admin_adjustments", id, { status: "approved", approved_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: id, action: "approve", after_data: row }); return row; }
+export async function voidAdjustment(id: string, reason: string): Promise<FinanceRow> { const row = await updateTableRow("admin_adjustments", id, { status: "void", voided_at: new Date().toISOString(), notes: reason }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: id, action: "void", metadata: { reason } }); return row; }
+
+export async function fetchCodCollections(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("cod_collections", filters, "created_at"); }
+export async function createOrSyncCodCollectionFromOrder(order: Order): Promise<FinanceRow | null> { if (!Number(order.cod_amount || 0)) return null; const row = await insertTableRow("cod_collections", { order_id: order.id, merchant_id: order.merchant_id, driver_id: (order as any).driver_id || (order as any).assigned_driver_id, tracking_number: order.tracking_number || order.invoice_number, cod_amount: numberValue(order.cod_amount, 0), collected_amount: 0, status: "pending" }); void createAdminAuditEvent({ entity_type: "cod_collection", entity_id: String(row.id || ""), action: "sync_from_order", after_data: row }); return row; }
+export async function markCodCollected(id: string, amount: number | string, notes?: string): Promise<FinanceRow> { const row = await updateTableRow("cod_collections", id, { status: "collected", collected_amount: numberValue(amount, 0), collection_date: new Date().toISOString().slice(0, 10), notes }); void createAdminAuditEvent({ entity_type: "cod_collection", entity_id: id, action: "mark_collected", after_data: row }); return row; }
+export async function markCodReconciled(id: string, notes?: string): Promise<FinanceRow> { const row = await updateTableRow("cod_collections", id, { status: "reconciled", reconciled_at: new Date().toISOString(), notes }); void createAdminAuditEvent({ entity_type: "cod_collection", entity_id: id, action: "mark_reconciled", after_data: row }); return row; }
+
+export async function fetchDriverStatementEntries(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("driver_statement_entries", filters, "entry_date"); }
+export async function createDriverStatementEntry(payload: StatementEntryPayload): Promise<FinanceRow> { return insertTableRow("driver_statement_entries", { ...payload, entry_date: payload.entry_date || new Date().toISOString().slice(0, 10) }); }
+export function deriveDriverStatementFromOrders(driverId: string | undefined, orders: Order[] = [], filters?: AdminDateFilters): FinanceRow[] { let balance = 0; return orders.filter((o:any)=>!driverId || o.driver_id===driverId || o.assigned_driver_id===driverId).filter((o)=>!filters?.dateFrom || String(o.created_at || "") >= filters.dateFrom!).map((o:any)=>{ const credit = /deliver|complete/.test(orderStatus(o)) ? orderDeliveryIncome(o) : 0; const debit = numberValue(o.cod_amount, 0); balance += credit - debit; return { id: `derived-driver-${o.id}`, driver_id: o.driver_id || o.assigned_driver_id || "unassigned", order_id: o.id, tracking_number: o.tracking_number || o.invoice_number, entry_date: String(o.created_at || new Date().toISOString()).slice(0,10), entry_type: debit ? "cod_collected" : "delivery_earning", debit, credit, balance, notes: "Derived from orders because driver statement entries are empty.", created_at: o.created_at } as FinanceRow; }); }
+
+export async function fetchMerchantStatementEntries(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("merchant_statement_entries", filters, "entry_date"); }
+export async function createMerchantStatementEntry(payload: StatementEntryPayload): Promise<FinanceRow> { return insertTableRow("merchant_statement_entries", { ...payload, entry_date: payload.entry_date || new Date().toISOString().slice(0, 10) }); }
+export function deriveMerchantStatementFromOrders(merchantId: string | undefined, orders: Order[] = [], filters?: AdminDateFilters): FinanceRow[] { let balance = 0; return orders.filter((o)=>!merchantId || o.merchant_id===merchantId).filter((o)=>!filters?.dateFrom || String(o.created_at || "") >= filters.dateFrom!).flatMap((o:any)=>{ const cod = numberValue(o.cod_amount,0); const fee = orderDeliveryIncome(o); balance += cod - fee; return [{ id:`derived-merchant-cod-${o.id}`, merchant_id:o.merchant_id || "unknown", order_id:o.id, tracking_number:o.tracking_number || o.invoice_number, entry_date:String(o.created_at || new Date().toISOString()).slice(0,10), entry_type:"order_cod", debit:0, credit:cod, balance, notes:"Derived COD from orders.", created_at:o.created_at }, { id:`derived-merchant-fee-${o.id}`, merchant_id:o.merchant_id || "unknown", order_id:o.id, tracking_number:o.tracking_number || o.invoice_number, entry_date:String(o.created_at || new Date().toISOString()).slice(0,10), entry_type:"delivery_fee", debit:fee, credit:0, balance: balance - fee, notes:"Derived delivery fee from orders.", created_at:o.created_at }] as FinanceRow[]; }); }
+
+export async function fetchAdminAuditEvents(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("admin_audit_events", filters, "created_at"); }
+
+export async function createImportBatch(payload: { merchant_id?: string; file_name: string; import_mode: string; total_rows?: number; valid_rows?: number; invalid_rows?: number }): Promise<FinanceRow> { return insertTableRow("import_batches", { ...payload, status: "preview", created_at: new Date().toISOString() }); }
+export function validateImportRows(rows: Record<string, unknown>[], merchantId?: string): ImportRowValidation[] { const seen = new Set<string>(); return rows.map((raw, index)=>{ const normalized = { merchant_id: merchantId, receiver_name: clean(raw.receiver_name || raw.name), receiver_phone: clean(raw.receiver_phone || raw.phone), receiver_city: clean(raw.city || raw.receiver_city), receiver_address: clean(raw.address || raw.receiver_address), cod_amount: numberValue(raw.cod_amount, 0), notes: clean(raw.notes) }; const errors = [!normalized.receiver_name && "receiver_name required", !normalized.receiver_phone && "receiver_phone required", !normalized.receiver_city && "city required", !normalized.receiver_address && "address required"].filter(Boolean) as string[]; const dupKey = normalized.receiver_phone; const duplicateWarning = dupKey && seen.has(dupKey) ? "duplicate phone in file" : undefined; if (dupKey) seen.add(dupKey); return { rowIndex:index+1, raw, normalized, errors: duplicateWarning ? [...errors, duplicateWarning] : errors, status: errors.length ? "invalid" : "valid", duplicateWarning }; }); }
+export async function saveImportPreviewRows(batchId: string, rows: ImportRowValidation[]): Promise<FinanceRow[]> { if (!supabase) return []; const payload = rows.map((row)=>({ batch_id: batchId, row_index: row.rowIndex, raw_payload: row.raw, normalized_payload: row.normalized, validation_errors: row.errors, status: row.status })); const { data, error } = await supabase.from("import_batch_rows").insert(payload).select("*"); if (error) throw cleanAdminError(error); return (data || []) as FinanceRow[]; }
+export async function commitValidImportRows(batchId: string): Promise<{ created: number; message: string }> { void createAdminAuditEvent({ entity_type: "import_batch", entity_id: batchId, action: "commit_preview", metadata: { mode: "requires server order creation" } }); return { created: 0, message: "Preview rows saved. Order creation must be confirmed with the admin order workflow before marking import as completed." }; }
+
+export async function createPrintJob(payload: { job_type: string; language: string; order_ids?: unknown[]; merchant_id?: string; filters?: unknown; pdf_payload?: unknown }): Promise<FinanceRow> { const row = await insertTableRow("print_jobs", { ...payload, status: "queued", order_ids: payload.order_ids || [], filters: payload.filters || {}, pdf_payload: payload.pdf_payload || {}, created_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "print_job", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
+export async function fetchPrintJobs(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("print_jobs", filters, "created_at"); }
+export async function markPrintJobPrinted(id: string): Promise<FinanceRow> { const row = await updateTableRow("print_jobs", id, { status: "printed", printed_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "print_job", entity_id: id, action: "mark_printed", after_data: row }); return row; }
 
 export async function fetchLedgerEntries(): Promise<FinanceRow[]> {
   if (!supabase) return [];
