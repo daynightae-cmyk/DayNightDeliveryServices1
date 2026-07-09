@@ -1,5 +1,6 @@
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Clock3, MapPin, PackageCheck, ShieldCheck, Sparkles, Truck } from "lucide-react";
+import { Camera, Clock3, MapPin, PackageCheck, ShieldCheck, Sparkles, Truck, Upload, X } from "lucide-react";
 import { useAppContext } from "../../lib/AppContext";
 import companyMeta from "../../data/companyMeta";
 import CustomerDashboardCore from "./CustomerDashboard";
@@ -10,6 +11,47 @@ export default function CustomerDashboardLuxury() {
   const location = useLocation();
   const isArabic = language === "ar";
   const isPasswordUpdate = location.pathname === "/update-password";
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [avatarName, setAvatarName] = useState("");
+  const [avatarStatus, setAvatarStatus] = useState<"idle" | "ready" | "saving" | "success" | "error">("idle");
+  const avatarMessage = useMemo(() => {
+    if (avatarStatus === "success") return isArabic ? "تم تجهيز الصورة للرفع. سيتم ربطها بسلة avatars بعد تأكيد إعدادات Supabase Storage." : "Photo is ready. Storage upload will be enabled after the avatars bucket/policies are confirmed.";
+    if (avatarStatus === "error") return isArabic ? "تعذر قراءة الصورة. جرّب ملف صورة آخر." : "Could not read this image. Try another image file.";
+    if (avatarStatus === "ready") return isArabic ? "معاينة آمنة فقط — لا يتم رفع أي ملف حالياً." : "Safe preview only — no file is uploaded yet.";
+    return isArabic ? "مكان مخصص لتحديث صورة الحساب لاحقاً بدون تغيير بيانات العميل الحالية." : "Prepared profile-photo update area without changing existing customer data.";
+  }, [avatarStatus, isArabic]);
+
+  function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setAvatarStatus("error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreview(String(reader.result || ""));
+      setAvatarName(file.name);
+      setAvatarStatus("ready");
+    };
+    reader.onerror = () => setAvatarStatus("error");
+    reader.readAsDataURL(file);
+  }
+
+  function clearAvatar() {
+    setAvatarPreview("");
+    setAvatarName("");
+    setAvatarStatus("idle");
+  }
+
+  function simulateAvatarPrepare() {
+    if (!avatarPreview) {
+      setAvatarStatus("error");
+      return;
+    }
+    setAvatarStatus("saving");
+    window.setTimeout(() => setAvatarStatus("success"), 450);
+  }
 
   const quickStats = [
     { icon: Clock3, value: "24/7", label: isArabic ? "متابعة مستمرة" : "Always on" },
@@ -45,6 +87,27 @@ export default function CustomerDashboardLuxury() {
             <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-white/58">
               {isArabic ? "واجهة موحدة للعميل لتسجيل الدخول، إنشاء الطلبات، متابعة الشحنات، والرجوع السريع إلى التتبع والدعم." : "A unified customer workspace for sign-in, delivery requests, live tracking, and support shortcuts."}
             </p>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-2xl shadow-brand-sky/10 backdrop-blur-xl">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-brand-gold/45 bg-brand-deep/80">
+                {avatarPreview ? <img src={avatarPreview} alt={isArabic ? "معاينة صورة الحساب" : "Profile preview"} className="h-full w-full object-cover" /> : <Camera className="h-9 w-9 text-brand-gold" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-white">{isArabic ? "صورة الحساب" : "Profile photo"}</p>
+                <p className="mt-1 text-xs font-bold leading-6 text-white/55">{avatarMessage}</p>
+                {avatarName && <p className="mt-1 truncate font-mono text-[11px] text-brand-gold" dir="ltr">{avatarName}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-3 py-2 text-xs font-black text-brand-gold hover:bg-brand-gold/15">
+                    <Upload className="h-4 w-4" /> {isArabic ? "اختيار صورة" : "Choose image"}
+                    <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarChange} />
+                  </label>
+                  <button type="button" onClick={simulateAvatarPrepare} disabled={!avatarPreview || avatarStatus === "saving"} className="rounded-xl border border-brand-sky/25 bg-brand-sky/10 px-3 py-2 text-xs font-black text-brand-sky disabled:cursor-not-allowed disabled:opacity-45">{avatarStatus === "saving" ? (isArabic ? "جاري التجهيز..." : "Preparing...") : (isArabic ? "تجهيز للرفع" : "Prepare upload")}</button>
+                  {avatarPreview && <button type="button" onClick={clearAvatar} className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/70"><X className="h-4 w-4" /> {isArabic ? "إزالة" : "Remove"}</button>}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
