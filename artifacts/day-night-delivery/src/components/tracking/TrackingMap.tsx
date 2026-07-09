@@ -8,10 +8,11 @@ import localAssets, { withRemoteFallback } from "../../data/localAssets";
 import { useAppContext } from "../../lib/AppContext";
 import { translations } from "../../data/translations";
 import type { Order } from "../../types";
-import { Activity, MapPin, Navigation, Radio, Route, Satellite, Truck } from "lucide-react";
+import { Layers, MapPin, Navigation, Radio, Route, Satellite, Truck } from "lucide-react";
 import { supabase } from "../../supabase";
 
 type LatLngTuple = [number, number];
+type MapMode = "standard" | "satellite" | "terrain";
 
 type TrackingMapProps = {
   order?: Order | null;
@@ -243,6 +244,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   const [liveOrder, setLiveOrder] = useState<Order | null>(null);
   const [lastLiveAt, setLastLiveAt] = useState<Date | null>(null);
   const [tileFailed, setTileFailed] = useState(false);
+  const [mapMode, setMapMode] = useState<MapMode>("satellite");
   const isArabic = language === "ar";
 
   useEffect(() => setIsMounted(true), []);
@@ -254,7 +256,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     if (!supabase || !order?.id) return;
     const supabaseClient = supabase;
 
-    const channel = supabaseClient
+    const orderChannel = supabaseClient
       .channel(`dn-live-order-${order.id}`)
       .on(
         "postgres_changes",
@@ -267,11 +269,39 @@ export default function TrackingMap({ order }: TrackingMapProps) {
       .subscribe();
 
     return () => {
-      supabaseClient.removeChannel(channel);
+      supabaseClient.removeChannel(orderChannel);
     };
   }, [order?.id]);
 
   const activeOrder = liveOrder || order || null;
+  const driverId = String((activeOrder as unknown as Record<string, unknown> | null)?.driver_id || "").trim();
+
+  useEffect(() => {
+    if (!supabase || !driverId) return;
+    const supabaseClient = supabase;
+
+    const driverChannel = supabaseClient
+      .channel(`dn-live-driver-${driverId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "driver_locations", filter: `driver_id=eq.${driverId}` },
+        (payload) => {
+          const location = payload.new as Record<string, unknown>;
+          setLiveOrder((current) => ({
+            ...((current || activeOrder || {}) as Order),
+            driver_lat: location.lat ?? location.latitude ?? location.driver_lat,
+            driver_lng: location.lng ?? location.longitude ?? location.driver_lng,
+          } as Order));
+          setLastLiveAt(new Date());
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabaseClient.removeChannel(driverChannel);
+    };
+  }, [driverId]);
+
   const pickup = resolvePoint(activeOrder?.sender_city, { ...defaultLocations.mussafah, x: 41, y: 73 });
   const destination = resolvePoint(activeOrder?.receiver_city, { ...defaultLocations.abuDhabi, x: 46, y: 68 });
 
@@ -356,6 +386,41 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     tileerror: () => setTileFailed(true),
   };
 
+  const mapModes: { mode: MapMode; label: string; labelAr: string }[] = [
+    { mode: "standard", label: "Standard", labelAr: "عادي" },
+    { mode: "satellite", label: "Satellite", labelAr: "ساتلايت" },
+    { mode: "terrain", label: "Terrain", labelAr: "تضاريس" },
+  ];
+
+  const renderBaseLayers = () => {
+    if (tileFailed) {
+      return <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />;
+    }
+
+    if (mapMode === "standard") {
+      return <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" eventHandlers={tileHandlers} />;
+    }
+
+    if (mapMode === "terrain") {
+      return <TileLayer url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png" attribution="Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap" eventHandlers={tileHandlers} />;
+    }
+
+    return (
+      <>
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          attribution="Tiles &copy; Esri"
+          eventHandlers={tileHandlers}
+        />
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+          attribution="&copy; OpenStreetMap contributors &copy; CARTO"
+          eventHandlers={tileHandlers}
+        />
+      </>
+    );
+  };
+
   return (
     <div className="dn-live-map-shell dn-satellite-map h-full w-full overflow-hidden rounded-2xl border border-brand-gold/20 relative bg-[#020812]">
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-[650] flex flex-wrap items-center justify-between gap-2">
@@ -374,26 +439,25 @@ export default function TrackingMap({ order }: TrackingMapProps) {
         </div>
       </div>
 
+      <div className="absolute right-3 top-24 z-[650] flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-[#071A33]/86 p-1 text-[10px] font-black text-white/70 backdrop-blur-xl" dir={isArabic ? "rtl" : "ltr"}>
+        <Layers className="mx-1 h-3.5 w-3.5 text-brand-gold" />
+        {mapModes.map((item) => (
+          <button
+            key={item.mode}
+            type="button"
+            onClick={() => {
+              setTileFailed(false);
+              setMapMode(item.mode);
+            }}
+            className={`rounded-full px-2.5 py-1 transition ${mapMode === item.mode ? "bg-brand-gold text-brand-deep" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+          >
+            {isArabic ? item.labelAr : item.label}
+          </button>
+        ))}
+      </div>
+
       <MapContainer center={driverPos} zoom={10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false} zoomControl>
-        {tileFailed ? (
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="&copy; OpenStreetMap contributors"
-          />
-        ) : (
-          <>
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution="Tiles &copy; Esri"
-              eventHandlers={tileHandlers}
-            />
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-              attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-              eventHandlers={tileHandlers}
-            />
-          </>
-        )}
+        {renderBaseLayers()}
         <FitBounds points={fitPoints} />
         <Polyline positions={routePoints.length ? routePoints : [pickupPos, destPos]} pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }} />
         <Polyline positions={[pickupPos, driverPos, destPos]} pathOptions={{ color: "#18A8E8", weight: 2.4, opacity: 0.76, dashArray: "10 12" }} />
