@@ -1,0 +1,7 @@
+/* DAY NIGHT admin mobile hotfix — imported by Vite automatically only when this file is imported later.
+   This file is kept as a standalone reference for the phone layout rules used in PR #31 follow-up. */
+
+@media(max-width:1024px){
+  body:has(.dn-admin-fullscreen){overflow-x:hidden!important}
+  .dn-admin-fullscreen{min-width:0!important;overflow-x:hidden!important}
+}
