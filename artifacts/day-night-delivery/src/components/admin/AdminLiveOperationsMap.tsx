@@ -18,8 +18,13 @@ const pickupIcon = L.divIcon({ className: "dn-live-map-marker dn-live-map-marker
 const destinationIcon = L.divIcon({ className: "dn-live-map-marker dn-live-map-marker-dest", html: `<div class="dn-marker-core"><span></span></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 const driverIcon = L.divIcon({ className: "dn-live-map-driver", html: `<div class="dn-driver-pulse"><span>DN</span></div>`, iconSize: [48, 48], iconAnchor: [24, 24] });
 
-function FitBounds({ points }: { points: LatLngTuple[] }) {
+function MapRefresh({ points, mapMode }: { points: LatLngTuple[]; mapMode: MapMode }) {
   const map = useMap();
+  useEffect(() => {
+    const timer = window.setTimeout(() => map.invalidateSize({ animate: true }), 140);
+    return () => window.clearTimeout(timer);
+  }, [map, mapMode]);
+
   useEffect(() => {
     const validPoints = points.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
     if (validPoints.length < 2) return;
@@ -101,9 +106,9 @@ export default function AdminLiveOperationsMap({ isArabic, orders, selectedOrder
 
   const tileHandlers = { tileerror: () => setTileFailed(true) };
   const renderBaseLayers = () => {
-    if (tileFailed || mapMode === "standard") return <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" eventHandlers={tileHandlers} />;
-    if (mapMode === "terrain") return <TileLayer url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png" attribution="Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap" eventHandlers={tileHandlers} />;
-    return <><TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" eventHandlers={tileHandlers} /><TileLayer url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap contributors &copy; CARTO" eventHandlers={tileHandlers} /></>;
+    if (tileFailed || mapMode === "standard") return <TileLayer key={`standard-${tileFailed ? "fallback" : "live"}`} url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" eventHandlers={tileHandlers} />;
+    if (mapMode === "terrain") return <TileLayer key="terrain-opentopo" url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png" attribution="Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap" eventHandlers={tileHandlers} />;
+    return <><TileLayer key="satellite-esri" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" eventHandlers={tileHandlers} /><TileLayer key="satellite-labels" url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap contributors &copy; CARTO" eventHandlers={tileHandlers} /></>;
   };
 
   return (
@@ -122,7 +127,7 @@ export default function AdminLiveOperationsMap({ isArabic, orders, selectedOrder
       </div>
 
       <MapContainer key={mapMode} center={driverPos} zoom={10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false} zoomControl>
-        {renderBaseLayers()}<FitBounds points={fitPoints} />
+        {renderBaseLayers()}<MapRefresh points={fitPoints} mapMode={mapMode} />
         <Polyline positions={routePoints.length ? routePoints : [pickupPos, destPos]} pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }} />
         <Polyline positions={[pickupPos, driverPos, destPos]} pathOptions={{ color: "#18A8E8", weight: 2.5, opacity: 0.76, dashArray: "10 12" }} />
         {(routePoints.length ? routePoints : [pickupPos, driverPos, destPos]).filter((_, index) => index % Math.max(1, Math.floor((routePoints.length || 3) / 12)) === 0).map((point, index) => <CircleMarker key={`${point[0]}-${point[1]}-${index}`} center={point} radius={2.8} pathOptions={{ color: "#F5B700", fillColor: "#F5B700", fillOpacity: 0.75, opacity: 0.55 }} />)}
