@@ -2,12 +2,12 @@ import { AlertTriangle, CheckCircle2, Clock3, RotateCcw, Truck, Wallet } from "l
 import type { Merchant } from "../../types";
 import type { FinanceSummary } from "../../lib/adminData";
 
-type Props = { isArabic: boolean; orders: any[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null };
+type Props = { isArabic: boolean; orders: any[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null; sectionTitle?: string; activeSection?: string; activeOrders?: number };
 
 function amount(value: unknown) { return `${Number(value || 0).toFixed(2)} AED`; }
 function norm(value: unknown) { return String(value || "").toLowerCase().replace(/[_-]/g, " "); }
 
-export default function KhalifaGuidanceFeed({ isArabic, orders, merchants, financeSummary }: Props) {
+export default function KhalifaGuidanceFeed({ isArabic, orders, merchants, financeSummary, sectionTitle, activeSection, activeOrders }: Props) {
   const pending = orders.filter((o) => /pending|review|confirm/.test(norm(o.status))).length;
   const returned = orders.filter((o) => norm(o.status).includes("return")).length;
   const unassigned = orders.filter((o) => !o.driver_id && !o.assigned_driver_id && !o.driver_name && !/deliver|cancel|return/.test(norm(o.status))).length;
@@ -15,8 +15,18 @@ export default function KhalifaGuidanceFeed({ isArabic, orders, merchants, finan
   const todayOrders = orders.filter((o) => String(o.created_at || "").slice(0, 10) === today).length;
   const codPending = financeSummary?.cod_pending ?? orders.reduce((sum, o) => /pending|assigned|transit|pickup/.test(norm(o.status)) ? sum + Number(o.cod_amount || 0) : sum, 0);
 
+  const sectionPrefix = sectionTitle ? (isArabic ? `قسم ${sectionTitle}: ` : `${sectionTitle}: `) : "";
+
+  const sectionKind = String(activeSection || "");
+  const sectionSpecific = sectionKind.includes("finance") || ["income", "cod", "expenses", "accounts", "adjustments", "audit_log", "driver_statements", "merchant_statements"].includes(sectionKind)
+    ? { icon: Wallet, severity: isArabic ? "مالي" : "Finance", tone: "gold", title: isArabic ? "إرشاد مالي" : "Finance guidance", message: isArabic ? `${sectionPrefix}راجع التحصيل والمستحقات من ${orders.length} طلب، وصدّر كشف PDF عند الإغلاق.` : `${sectionPrefix}Review collections and payables from ${orders.length} orders, then export the PDF statement at close.` }
+    : sectionKind.includes("merchant")
+      ? { icon: CheckCircle2, severity: isArabic ? "تجار" : "Merchants", tone: "blue", title: isArabic ? "إرشاد التجار" : "Merchant guidance", message: isArabic ? `${sectionPrefix}${merchants.length} تاجر متاح. راجع النشاط قبل إنشاء طلبات جديدة.` : `${sectionPrefix}${merchants.length} merchants are available. Review activity before creating new orders.` }
+      : { icon: Truck, severity: isArabic ? "عمليات" : "Ops", tone: "blue", title: isArabic ? "إرشاد الطلبات" : "Orders guidance", message: isArabic ? `${sectionPrefix}${activeOrders ?? orders.length} طلب نشط يحتاج متابعة حسب هذا القسم.` : `${sectionPrefix}${activeOrders ?? orders.length} active orders need follow-up for this section.` };
+
   const alerts = [
-    pending > 0 && { icon: AlertTriangle, severity: isArabic ? "عاجل" : "Urgent", tone: "gold", title: isArabic ? "طلبات تحتاج قرار" : "Orders need action", message: isArabic ? `${pending} طلب قيد الانتظار أو المراجعة. راجع البيانات قبل التحريك.` : `${pending} pending/review orders need a decision before dispatch.` },
+    sectionSpecific,
+    pending > 0 && { icon: AlertTriangle, severity: isArabic ? "عاجل" : "Urgent", tone: "gold", title: isArabic ? "طلبات تحتاج قرار" : "Orders need action", message: isArabic ? `${sectionPrefix}${pending} طلب قيد الانتظار أو المراجعة. راجع البيانات قبل التحريك.` : `${sectionPrefix}${pending} pending/review orders need a decision before dispatch.` },
     unassigned > 0 && { icon: Truck, severity: isArabic ? "متابعة" : "Follow-up", tone: "blue", title: isArabic ? "فجوة توزيع" : "Assignment gap", message: isArabic ? `${unassigned} طلب نشط بدون مندوب. افتح التوزيع لتقليل التأخير.` : `${unassigned} active orders have no driver assignment yet.` },
     Number(codPending) > 0 && { icon: Wallet, severity: isArabic ? "متابعة" : "Follow-up", tone: "gold", title: isArabic ? "تذكير COD" : "COD reminder", message: isArabic ? `التحصيل المعلق ${amount(codPending)}. تأكد من إغلاق المبالغ مع المناديب.` : `Pending COD is ${amount(codPending)}. Confirm collection closure with drivers.` },
     returned > 0 && { icon: RotateCcw, severity: isArabic ? "متابعة" : "Follow-up", tone: "gold", title: isArabic ? "طلبات راجعة" : "Returned orders", message: isArabic ? `${returned} طلب راجع يحتاج سبب إغلاق واضح مع التاجر.` : `${returned} returned orders need a clear closure reason with merchants.` },
@@ -28,7 +38,7 @@ export default function KhalifaGuidanceFeed({ isArabic, orders, merchants, finan
 
   return (
     <section className="dn-khalifa-feed" aria-label={isArabic ? "تغذية خليفة" : "Khalifa Feed"}>
-      <header><span>{isArabic ? "تغذية خليفة" : "Khalifa Feed"}</span><strong>{isArabic ? "تنبيهات وإرشادات" : "Notifications & Guidance"}</strong></header>
+      <header><span>{isArabic ? "تغذية خليفة" : "Khalifa Feed"}</span><strong>{sectionTitle || (isArabic ? "تنبيهات وإرشادات" : "Notifications & Guidance")}</strong></header>
       <div className="dn-khalifa-feed-list">
         {visibleAlerts.map((alert, index) => {
           const Icon = alert.icon;
