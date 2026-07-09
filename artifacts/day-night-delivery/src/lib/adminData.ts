@@ -278,3 +278,175 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
 
   throw new Error("Order could not be created. Confirm the admin SQL migration was applied and the signed-in user has admin/support role.");
 }
+
+export type AdminStats = {
+  pending: number;
+  in_transit: number;
+  delivered: number;
+  cancelled: number;
+  total_orders: number;
+  today_orders: number;
+  active_merchants: number;
+  cod_total: number;
+  delivery_income: number;
+};
+
+export type ExpenseInput = {
+  category_id?: string;
+  account_id?: string;
+  amount: number | string;
+  vat_amount?: number | string;
+  payment_method?: string;
+  paid_at?: string;
+  receipt_url?: string;
+  notes?: string;
+  status?: string;
+};
+
+export type FinanceSummary = {
+  total_income: number;
+  total_expenses: number;
+  cod_collected: number;
+  cod_pending: number;
+  merchant_payable: number;
+  driver_payable: number;
+};
+
+export type FinanceRow = Record<string, unknown> & { id?: string; created_at?: string; status?: string };
+
+function orderStatus(order: Order) {
+  return clean(order.status).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function orderDeliveryIncome(order: Order) {
+  return numberValue(order.delivery_price ?? order.price ?? order.base_price, 0);
+}
+
+export async function fetchAdminOrders(): Promise<Order[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) {
+    console.warn("Failed to fetch admin orders:", error.message);
+    return [];
+  }
+  return (data || []) as Order[];
+}
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  const fallback: AdminStats = { pending: 0, in_transit: 0, delivered: 0, cancelled: 0, total_orders: 0, today_orders: 0, active_merchants: 0, cod_total: 0, delivery_income: 0 };
+  const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
+  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
+  const merchants = merchantsResult.status === "fulfilled" ? merchantsResult.value : [];
+  const today = new Date().toISOString().slice(0, 10);
+  return orders.reduce<AdminStats>((stats, order) => {
+    const status = orderStatus(order);
+    stats.total_orders += 1;
+    if (String(order.created_at || "").slice(0, 10) === today) stats.today_orders += 1;
+    if (status.includes("deliver") || status.includes("complete")) stats.delivered += 1;
+    else if (status.includes("cancel") || status.includes("fail")) stats.cancelled += 1;
+    else if (status.includes("transit") || status.includes("assign") || status.includes("pick")) stats.in_transit += 1;
+    else stats.pending += 1;
+    stats.cod_total += numberValue(order.cod_amount, 0);
+    stats.delivery_income += orderDeliveryIncome(order);
+    return stats;
+  }, { ...fallback, active_merchants: merchants.filter((m) => clean(m.status || "active").toLowerCase() !== "paused").length });
+}
+
+export async function updateOrderStatus(orderId: string, status: string, note?: string): Promise<Order | null> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const rpcOrder = await callRpc<Order>("admin_update_order_status", { p_order_id: orderId, p_status: clean(status), p_note: clean(note || "Admin status update") });
+  if (rpcOrder?.id) return rpcOrder;
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ status: clean(status), updated_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Order;
+}
+
+export async function fetchFinanceSummary(): Promise<FinanceSummary> {
+  const empty: FinanceSummary = { total_income: 0, total_expenses: 0, cod_collected: 0, cod_pending: 0, merchant_payable: 0, driver_payable: 0 };
+  if (!supabase) return empty;
+  const { data, error } = await supabase.from("finance_summary").select("*").maybeSingle();
+  if (error) {
+    console.warn("Failed to fetch finance summary:", error.message);
+    return empty;
+  }
+  return { ...empty, ...(data || {}) } as FinanceSummary;
+}
+
+export async function fetchExpenses(): Promise<FinanceRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(500);
+  if (error) {
+    console.warn("Failed to fetch expenses:", error.message);
+    return [];
+  }
+  return (data || []) as FinanceRow[];
+}
+
+export async function createExpense(input: ExpenseInput): Promise<FinanceRow> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const payload = removeEmptyUndefined({
+    category_id: clean(input.category_id) || undefined,
+    account_id: clean(input.account_id) || undefined,
+    amount: Math.max(0, numberValue(input.amount, 0)),
+    vat_amount: Math.max(0, numberValue(input.vat_amount, 0)),
+    payment_method: clean(input.payment_method || "cash"),
+    paid_at: clean(input.paid_at) || undefined,
+    receipt_url: clean(input.receipt_url) || undefined,
+    notes: clean(input.notes),
+    status: clean(input.status || "draft"),
+  });
+  const { data, error } = await supabase.from("expenses").insert(payload).select("*").single();
+  if (error) throw new Error(error.message);
+  return data as FinanceRow;
+}
+
+export async function voidExpense(expenseId: string, reason: string): Promise<FinanceRow> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase
+    .from("expenses")
+    .update({ status: "void", voided_at: new Date().toISOString(), void_reason: clean(reason || "Voided by admin") })
+    .eq("id", expenseId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as FinanceRow;
+}
+
+export async function fetchLedgerEntries(): Promise<FinanceRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("ledger_entries").select("*").order("created_at", { ascending: false }).limit(500);
+  if (error) {
+    console.warn("Failed to fetch ledger entries:", error.message);
+    return [];
+  }
+  return (data || []) as FinanceRow[];
+}
+
+export async function fetchMerchantStatements(): Promise<FinanceRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("merchant_settlements").select("*").order("created_at", { ascending: false }).limit(500);
+  if (error) {
+    console.warn("Failed to fetch merchant statements:", error.message);
+    return [];
+  }
+  return (data || []) as FinanceRow[];
+}
+
+export async function fetchDriverStatements(): Promise<FinanceRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("driver_settlements").select("*").order("created_at", { ascending: false }).limit(500);
+  if (error) {
+    console.warn("Failed to fetch driver statements:", error.message);
+    return [];
+  }
+  return (data || []) as FinanceRow[];
+}

@@ -28,11 +28,15 @@ import {
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { fetchAllOrders, supabase } from "../supabase";
+import { fetchAdminStats, fetchFinanceSummary, fetchExpenses, createExpense, voidExpense, fetchLedgerEntries, fetchMerchantStatements, fetchDriverStatements, fetchMerchants, fetchAdminOrders, type AdminStats, type FinanceSummary, type FinanceRow } from "../lib/adminData";
+import type { Merchant } from "../types";
 import { useAppContext } from "../lib/AppContext";
 import AdminPanelCore from "./AdminPanel";
 import AdminMerchantIntelligence from "./AdminMerchantIntelligence";
 import AdminProspectingLinks from "./AdminProspectingLinks";
 import AdminFloatingHelper from "./admin/AdminFloatingHelper";
+import AdminNewMerchant from "./admin/AdminNewMerchant";
+import AdminNewOrder from "./admin/AdminNewOrder";
 import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
 import "../styles/dn-khalifa-final.css";
@@ -53,10 +57,15 @@ const menu = [
   { id: "abu_dhabi", ar: "طلبات أبوظبي", en: "Abu Dhabi Orders", groupAr: "التوزيع", groupEn: "Dispatch", Icon: Truck },
   { id: "external", ar: "الطلبات الخارجية", en: "External Orders", groupAr: "التوزيع", groupEn: "Dispatch", Icon: Import },
   { id: "out_scope", ar: "الطلبات خارج النطاق", en: "Out of Scope", groupAr: "التوزيع", groupEn: "Dispatch", Icon: AlertTriangle },
+  { id: "finance_dashboard", ar: "لوحة المالية", en: "Finance Dashboard", groupAr: "المالية", groupEn: "Finance", Icon: BarChart3 },
   { id: "driver_statements", ar: "كشوفات المناديب", en: "Driver Statements", groupAr: "المالية", groupEn: "Finance", Icon: FileText },
   { id: "merchant_statements", ar: "كشوفات التجار", en: "Merchant Statements", groupAr: "المالية", groupEn: "Finance", Icon: ReceiptText },
   { id: "income", ar: "الدخل", en: "Income", groupAr: "المالية", groupEn: "Finance", Icon: Wallet },
+  { id: "cod", ar: "التحصيل COD", en: "COD", groupAr: "المالية", groupEn: "Finance", Icon: Wallet },
   { id: "expenses", ar: "المصروفات", en: "Expenses", groupAr: "المالية", groupEn: "Finance", Icon: Database },
+  { id: "accounts", ar: "الحسابات", en: "Accounts", groupAr: "المالية", groupEn: "Finance", Icon: Database },
+  { id: "adjustments", ar: "التسويات", en: "Adjustments", groupAr: "المالية", groupEn: "Finance", Icon: RotateCcw },
+  { id: "audit_log", ar: "سجل التدقيق", en: "Audit Log", groupAr: "المالية", groupEn: "Finance", Icon: ShieldCheck },
   { id: "import", ar: "استيراد الشحنات", en: "Import Shipments", groupAr: "الأدوات", groupEn: "Tools", Icon: Import },
   { id: "print", ar: "طباعة فواتير", en: "Print Invoices", groupAr: "الأدوات", groupEn: "Tools", Icon: Printer },
   { id: "reports", ar: "التقارير", en: "Reports", groupAr: "الأدوات", groupEn: "Tools", Icon: BarChart3 },
@@ -81,7 +90,7 @@ type MetricMap = {
   income: number;
 };
 
-const coreFormSections: SectionId[] = ["new_order", "new_merchant"];
+const coreFormSections: SectionId[] = [];
 
 const filteredSectionIds = new Set<SectionId>([
   "all_orders",
@@ -455,6 +464,60 @@ function AdminSectionWorkspace({ id, title, ui, isArabic, metrics, orders, onOpe
   );
 }
 
+
+function AdminFinanceWorkspace({ id, title, isArabic, summary, orders, merchants, onRefresh }: { id: SectionId; title: string; isArabic: boolean; summary: FinanceSummary | null; orders: any[]; merchants: Merchant[]; onRefresh: () => Promise<void> }) {
+  const [rows, setRows] = useState<FinanceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+
+  async function loadRows() {
+    setLoading(true); setError("");
+    try {
+      if (id === "expenses") setRows(await fetchExpenses());
+      else if (id === "merchant_statements") setRows(await fetchMerchantStatements());
+      else if (id === "driver_statements") setRows(await fetchDriverStatements());
+      else if (["income", "cod", "accounts", "adjustments", "audit_log"].includes(id) && supabase) {
+        const table = id === "income" ? "income_entries" : id === "cod" ? "cod_collections" : id === "accounts" ? "finance_accounts" : id === "adjustments" ? "finance_adjustments" : "finance_audit_log";
+        const { data, error: requestError } = await supabase.from(table).select("*").order("created_at", { ascending: false }).limit(500);
+        if (requestError) throw new Error(requestError.message);
+        setRows((data || []) as FinanceRow[]);
+      } else if (id === "finance_dashboard") setRows(await fetchLedgerEntries());
+    } catch (err) { setError(String((err as Error).message || err)); } finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadRows(); }, [id]);
+
+  async function addExpense(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await createExpense({ amount: expenseAmount, notes: expenseNotes, status: "draft", payment_method: "cash" });
+      setExpenseAmount(""); setExpenseNotes("");
+      await loadRows(); await onRefresh();
+    } catch (err) { setError(String((err as Error).message || err)); }
+  }
+
+  async function voidSelectedExpense(row: FinanceRow) {
+    if (!row.id) return;
+    try { await voidExpense(row.id, "Voided from admin finance workspace"); await loadRows(); await onRefresh(); } catch (err) { setError(String((err as Error).message || err)); }
+  }
+
+  const cards = [
+    [isArabic ? "الدخل" : "Income", summary?.total_income || 0], [isArabic ? "المصروفات" : "Expenses", summary?.total_expenses || 0], ["COD", summary?.cod_collected || 0], [isArabic ? "COD معلق" : "COD pending", summary?.cod_pending || 0], [isArabic ? "مستحق التجار" : "Merchant payable", summary?.merchant_payable || 0], [isArabic ? "مستحق المناديب" : "Driver payable", summary?.driver_payable || 0],
+  ];
+
+  return <section className="dn-admin-section-workspace" dir={isArabic ? "rtl" : "ltr"}>
+    <header className="dn-admin-section-hero"><span>{isArabic ? "بيانات مالية حقيقية" : "Live finance data"}</span><h1>{title}</h1><p>{isArabic ? "كل الأرقام تقرأ من جداول Supabase أو views المالية، ولا توجد إجماليات وهمية." : "All figures read from Supabase finance tables/views; no fake totals are displayed."}</p></header>
+    <div className="dn-admin-section-kpis">{cards.map(([label, value]) => <article key={String(label)}><strong>{Number(value).toFixed(2)}</strong><span>{label as string}</span></article>)}</div>
+    <div className="dn-admin-section-panels"><div><h2>{isArabic ? "تدفق العمل" : "Workflow"}</h2><p>• {isArabic ? "لا حذف نهائي؛ المصروفات تستخدم void/reversal." : "No hard delete; expenses use void/reversal."}</p><p>• {isArabic ? "عدد التجار" : "Merchants"}: {merchants.length}</p><p>• {isArabic ? "عدد الطلبات" : "Orders"}: {orders.length}</p></div><div><h2>{isArabic ? "تحديث" : "Refresh"}</h2><button type="button" onClick={() => { void loadRows(); void onRefresh(); }}>{isArabic ? "تحديث البيانات" : "Refresh data"}</button><small>{isArabic ? "إذا لم تطبق migration ستظهر رسالة واضحة." : "If the migration is not applied, an explicit error is shown."}</small></div></div>
+    {id === "expenses" && <form onSubmit={addExpense} className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:grid-cols-[180px_1fr_auto]"><input value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} type="number" min="0" placeholder="AED" className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><input value={expenseNotes} onChange={(e) => setExpenseNotes(e.target.value)} placeholder={isArabic ? "ملاحظات المصروف" : "Expense notes"} className="rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-white" /><button className="rounded-xl bg-brand-gold px-4 py-2 font-black text-brand-deep">{isArabic ? "إضافة" : "Add"}</button></form>}
+    {error && <div className="mb-3 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200">{error}</div>}
+    <div className="dn-admin-filter-table-card"><div className="dn-admin-filter-table-head"><div><span>{loading ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "صفوف حية" : "Live rows")}</span><strong>{title}</strong></div><p>{rows.length}</p></div><div className="dn-admin-filter-table-wrap"><table className="dn-admin-filter-table"><thead><tr><th>ID</th><th>{isArabic ? "الحالة" : "Status"}</th><th>{isArabic ? "المبلغ" : "Amount"}</th><th>{isArabic ? "التاريخ" : "Date"}</th><th>{isArabic ? "إجراء" : "Action"}</th></tr></thead><tbody>{rows.length ? rows.slice(0, 40).map((row, index) => <tr key={String(row.id || index)}><td><b>{String(row.id || "—").slice(0, 12)}</b></td><td>{String(row.status || row.entry_type || "—")}</td><td>{Number(row.amount || row.debit || row.credit || row.current_balance || 0).toFixed(2)} AED</td><td>{row.created_at ? new Date(String(row.created_at)).toLocaleDateString(isArabic ? "ar-AE" : "en-AE") : "—"}</td><td>{id === "expenses" && row.status !== "void" ? <button type="button" onClick={() => void voidSelectedExpense(row)}>{isArabic ? "إلغاء" : "Void"}</button> : "—"}</td></tr>) : <tr><td colSpan={5}>{isArabic ? "لا توجد بيانات بعد أو لم تطبق الجداول." : "No data yet or finance tables are not applied."}</td></tr>}</tbody></table></div></div>
+  </section>;
+}
+
 export default function AdminPanelLuxury() {
   const { language, toggleLanguage } = useAppContext();
   const isArabic = language === "ar";
@@ -462,16 +525,29 @@ export default function AdminPanelLuxury() {
   const [active, setActive] = useState<SectionId>("dashboard");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [liveStats, setLiveStats] = useState<AdminStats | null>(null);
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+  const [adminError, setAdminError] = useState("");
+  const [mapMode, setMapMode] = useState<"standard" | "satellite" | "terrain">("standard");
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
 
+  async function refreshAdminData() {
+    setAdminLoading(true);
+    setAdminError("");
+    const [ordersResult, merchantsResult, statsResult, financeResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants(), fetchAdminStats(), fetchFinanceSummary()]);
+    if (ordersResult.status === "fulfilled") setOrders(ordersResult.value); else setAdminError(ordersResult.reason?.message || "Orders request failed");
+    if (merchantsResult.status === "fulfilled") setMerchants(merchantsResult.value);
+    if (statsResult.status === "fulfilled") setLiveStats(statsResult.value);
+    if (financeResult.status === "fulfilled") setFinanceSummary(financeResult.value);
+    setAdminLoading(false);
+  }
+
   useEffect(() => {
-    let alive = true;
-    fetchAllOrders()
-      .then((data) => { if (alive) setOrders(Array.isArray(data) ? data : []); })
-      .catch(() => { if (alive) setOrders([]); });
-    return () => { alive = false; };
+    void refreshAdminData();
   }, []);
 
   const metrics = useMemo<MetricMap>(() => {
@@ -534,9 +610,9 @@ export default function AdminPanelLuxury() {
         <section className="dn-admin-center-zone">
           <header className="dn-admin-main-title"><span>{ui.commandCenter}</span><h1>{ui.welcome}</h1><p>{ui.subtitle}</p></header>
 
-          <div className="dn-admin-map-live">
+          <div className={`dn-admin-map-live is-${mapMode}`}>
             <div className="dn-admin-map-bg" />
-            <div className="dn-admin-map-heading"><Truck className="h-5 w-5" /><strong>{ui.trackingTitle}</strong><p>{ui.trackingSubtitle}</p></div>
+            <div className="dn-admin-map-heading"><Truck className="h-5 w-5" /><strong>{ui.trackingTitle}</strong><p>{ui.trackingSubtitle}</p><div className="mt-2 flex flex-wrap gap-2">{(["standard", "satellite", "terrain"] as const).map((mode) => <button key={mode} type="button" onClick={() => setMapMode(mode)} className={`rounded-full border px-3 py-1 text-[10px] font-black ${mapMode === mode ? "border-brand-gold bg-brand-gold text-brand-deep" : "border-white/15 bg-white/10 text-white"}`}>{mode}</button>)}</div></div>
             <div className="dn-admin-route-line" />
             <div className="dn-admin-pin is-pickup"><strong>{ui.pickupPoint}</strong><span>{ui.pickupText}</span></div>
             <div className="dn-admin-pin is-current"><strong>{ui.inTransit}</strong><span>{ui.inTransitText}</span></div>
@@ -557,8 +633,10 @@ export default function AdminPanelLuxury() {
 
   function renderContent() {
     if (active === "dashboard") return renderDashboard();
-    if (coreFormSections.includes(active)) return <div className="dn-admin-core-full"><AdminPanelCore /></div>;
+    if (active === "new_merchant") return <AdminNewMerchant isArabic={isArabic} onSaved={() => void refreshAdminData()} />;
+    if (active === "new_order") return <AdminNewOrder isArabic={isArabic} merchants={merchants} onSaved={() => void refreshAdminData()} />;
     if (active === "merchants") return <div className="dn-admin-core-full"><AdminMerchantIntelligence isArabic={isArabic} onSearchOrders={() => setActive("all_orders")} onCreateOrder={() => setActive("new_order")} /></div>;
+    if (["finance_dashboard", "expenses", "income", "cod", "merchant_statements", "driver_statements", "accounts", "adjustments", "audit_log"].includes(active)) return <AdminFinanceWorkspace id={active} title={activeTitle} isArabic={isArabic} summary={financeSummary} orders={orders} merchants={merchants} onRefresh={refreshAdminData} />;
     if (active === "support") return <div className="dn-admin-core-full"><AdminProspectingLinks /></div>;
     if (filteredSectionIds.has(active)) return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
     return <AdminSectionWorkspace id={active} title={activeTitle} ui={ui} isArabic={isArabic} metrics={metrics} orders={orders} onOpenOperations={openOperations} />;
@@ -578,6 +656,7 @@ export default function AdminPanelLuxury() {
             </nav>
             <button type="button" className="dn-admin-language-button" onClick={toggleLanguage}><Languages className="h-4 w-4" />{ui.language}</button>
           </div>
+          {(adminLoading || adminError) && <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-xs font-black text-white/70"><button type="button" onClick={() => void refreshAdminData()} className="me-3 rounded-xl bg-brand-gold px-3 py-1 text-brand-deep">{isArabic ? "تحديث" : "Refresh"}</button>{adminLoading ? (isArabic ? "تحميل البيانات الحية..." : "Loading live data...") : adminError}</div>}
           {renderContent()}
         </main>
 
