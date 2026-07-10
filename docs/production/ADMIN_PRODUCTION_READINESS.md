@@ -33,3 +33,9 @@ Login, open Database Health, open Production Readiness, verify finance source, s
 ## What prevents global readiness
 
 Global readiness is blocked by missing migrations, finance derived from orders, local-only daily closing, missing `print_jobs`, missing audit events, unverified RLS, and heavy screens that still load large datasets without pagination.
+
+## Phase 8B — Supabase production foundation
+
+Apply `supabase/migrations/20260711010000_admin_production_foundation.sql` in Supabase SQL Editor before marking admin operations global-ready. Then run `docs/supabase/VERIFY_ADMIN_PRODUCTION_FOUNDATION.sql`, re-run Database Health, and re-run Production Readiness.
+
+Expected remaining warnings: operational tables can be empty on a fresh install, but missing tables/RPCs or incorrect RLS permissions remain blockers. Fallback mode is honest temporary operation only: `تشغيل مؤقت — لم يتم تأكيد قاعدة البيانات بعد.` / `Temporary operation — database has not been confirmed yet.`
