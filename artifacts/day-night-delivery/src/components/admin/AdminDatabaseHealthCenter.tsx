@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Database, RefreshCw, Settings, ShieldCheck, BarChart3, Copy } from "lucide-react";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import { fetchAdminDatabaseHealth, type AdminDbHealthCheck, type AdminDbHealthStatus } from "../../lib/adminData";
+import { addAdminNotification } from "../../lib/adminAudio";
 
 type Props = { isArabic: boolean; onNavigate?: (id: "settings" | "finance_dashboard") => void };
 
@@ -43,6 +44,14 @@ export default function AdminDatabaseHealthCenter({ isArabic, onNavigate }: Prop
     setLoading(true);
     const next = await fetchAdminDatabaseHealth();
     setChecks(next);
+    const problemObjects = next.filter((check) => check.status === "missing" || check.status === "error");
+    const permissionObjects = next.filter((check) => check.status === "permission" || check.status === "unknown");
+    if (problemObjects.length || permissionObjects.length) {
+      const names = [...problemObjects, ...permissionObjects].map((check) => check.id).join(", ");
+      addAdminNotification({ type: "database", sectionId: "database_health", priority: "high", dedupeKey: `db-health:${names}`, audioEvent: "database_health_warning", titleAr: "نقص في Supabase migrations", titleEn: "Supabase migration gaps", bodyAr: `يوجد ${problemObjects.length + permissionObjects.length} عنصر يحتاج مراجعة: ${names}.`, bodyEn: `${problemObjects.length + permissionObjects.length} database objects need review: ${names}.` });
+    } else if (next.length) {
+      addAdminNotification({ type: "success", sectionId: "database_health", priority: "normal", dedupeKey: `db-health-ok:${next.length}`, audioEvent: "database_health_ok", titleAr: "قاعدة البيانات جاهزة", titleEn: "Database is ready", bodyAr: "كل فحوصات قاعدة البيانات الأساسية جاهزة.", bodyEn: "All required database health checks are ready." });
+    }
     setLoading(false);
     try {
       window.localStorage.setItem("dn_admin_db_health", JSON.stringify(next));

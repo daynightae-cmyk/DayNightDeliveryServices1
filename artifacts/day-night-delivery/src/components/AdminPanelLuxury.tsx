@@ -46,6 +46,8 @@ import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
 import AdminDailyClosingPanel from "./admin/AdminDailyClosingPanel";
 import AdminDatabaseHealthCenter from "./admin/AdminDatabaseHealthCenter";
+import AdminNotificationCenter, { AdminNotificationBell } from "./admin/AdminNotificationCenter";
+import { addAdminNotification, playAdminAudioEvent, readAdminAudioSettings, unlockAdminAudio } from "../lib/adminAudio";
 import SpecializedAdminSectionWorkspace from "./admin/AdminSectionWorkspace";
 import type { AdminSectionId } from "./admin/AdminSectionRegistry";
 import khalifaAssets from "./admin/khalifaAssets";
@@ -54,6 +56,7 @@ import "../styles/dn-khalifa-final.css";
 import "../styles/dn-admin-task2.css";
 import "../styles/dn-admin-task3.css";
 import "../styles/dn-admin-pdf.css";
+import "../styles/dn-admin-audio.css";
 
 const menu = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: Home },
@@ -412,6 +415,7 @@ export default function AdminPanelLuxury() {
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
@@ -426,6 +430,30 @@ export default function AdminPanelLuxury() {
       return acc;
     }, {});
   }, [isArabic]);
+
+
+  useEffect(() => {
+    let lastClick = 0;
+    const handler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest("button");
+      if (!button || !button.closest(".dn-admin-fullscreen") || button.hasAttribute("disabled")) return;
+      unlockAdminAudio();
+      const now = Date.now();
+      if (now - lastClick > 150) {
+        playAdminAudioEvent("click", readAdminAudioSettings());
+        lastClick = now;
+      }
+    };
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, []);
+
+  useEffect(() => {
+    if (metrics.unassigned > 0) addAdminNotification({ type: "warning", sectionId: "dashboard", priority: "high", dedupeKey: `unassigned:${metrics.unassigned}`, audioEvent: "warning", titleAr: "طلبات بدون مندوب", titleEn: "Unassigned orders", bodyAr: `يوجد ${metrics.unassigned} طلب يحتاج تعيين مندوب.`, bodyEn: `${metrics.unassigned} orders need driver assignment.` });
+    if (financeSummary && Number(financeSummary.cod_pending || 0) > 0) addAdminNotification({ type: "cod", sectionId: "cod", priority: "high", dedupeKey: `cod:${Math.round(Number(financeSummary.cod_pending || 0))}`, audioEvent: "cod_alert", titleAr: "تحصيل معلق", titleEn: "Pending COD", bodyAr: `يوجد COD معلق بقيمة ${money(Number(financeSummary.cod_pending || 0))}.`, bodyEn: `Pending COD is ${money(Number(financeSummary.cod_pending || 0))}.` });
+    if (active === "print" && orders.length > 0) addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-ready:${orders.length}`, audioEvent: "print_ready", titleAr: "فواتير جاهزة للطباعة", titleEn: "Invoices ready to print", bodyAr: `يوجد ${orders.length} طلب يمكن إنشاء فواتير أو بوالص له.`, bodyEn: `${orders.length} orders can generate invoices or labels.` });
+  }, [metrics.unassigned, financeSummary?.cod_pending, active, orders.length]);
 
   async function refreshAdminData() {
     setAdminLoading(true);
@@ -546,6 +574,7 @@ export default function AdminPanelLuxury() {
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
+              <AdminNotificationBell isArabic={isArabic} onOpen={() => setNotificationsOpen(true)} />
               <button type="button" onClick={() => void refreshAdminData()}>
                 {ui.refresh}
               </button>
@@ -780,6 +809,8 @@ export default function AdminPanelLuxury() {
               {ui.loading}
             </div>
           )}
+
+          <AdminNotificationCenter isArabic={isArabic} open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
           {adminError && (
             <div className="dn-admin-error-banner">
