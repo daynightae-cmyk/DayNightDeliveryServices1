@@ -1,10 +1,11 @@
-import { useMemo, useState, type FormEvent, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ChangeEvent } from "react";
 import { Send, Trash2 } from "lucide-react";
 import type { Merchant, Order } from "../../types";
-import type { FinanceSummary } from "../../lib/adminData";
+import type { AdminDbHealthCheck, FinanceSummary } from "../../lib/adminData";
 import { deriveCommandMetrics } from "../../data/adminCommandExpansion";
+import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 
-type Props = { orders: Order[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null; activeSection?: string; isArabic: boolean };
+type Props = { orders: Order[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null; activeSection?: string; isArabic: boolean; dbHealthChecks?: AdminDbHealthCheck[] };
 type ChatItem = { id: string; question: string; answer: string };
 const money = (v: unknown) => `${Number(v || 0).toFixed(2)} AED`;
 const norm = (v: unknown) => String(v || "").toLowerCase();
@@ -12,9 +13,37 @@ const revenue = (o: Order) => Number(o.delivery_price || o.price || o.base_price
 const cod = (o: Order) => Number(o.cod_amount || 0);
 const merchantName = (m?: Merchant) => m?.trade_name || m?.owner_name || m?.merchant_code || (m?.id ? `#${m.id}` : "—");
 
+function loadedHealthChecks(props: Props): AdminDbHealthCheck[] {
+  if (props.dbHealthChecks?.length) return props.dbHealthChecks;
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem("dn_admin_db_health") || "[]") as AdminDbHealthCheck[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function healthAnswer(checks: AdminDbHealthCheck[], isArabic: boolean, question: string) {
+  const q = norm(question);
+  const wantsHealth = /database|supabase|finance_summary|daily closing|print queue|db-backed|قاعدة البيانات|شغال|إغلاق اليوم محفوظ|الطباعة|ماذا ينقص/.test(q);
+  if (!wantsHealth) return "";
+  if (!checks.length) return isArabic ? "افتح مركز فحص قاعدة البيانات واضغط إعادة الفحص." : "Open Database Health Center and press Re-run checks.";
+  const byId = (id: string) => checks.find((check) => check.id === id);
+  const missing = checks.filter((check) => check.status === "missing" || check.status === "error").map((check) => check.id);
+  const permission = checks.filter((check) => check.status === "permission").map((check) => check.id);
+  const summary = isArabic ? `جاهزية قاعدة البيانات: ${checks.filter((check) => check.status === "ok").length}/${checks.length} تعمل. ينقص Supabase: ${missing.join(", ") || "لا شيء أساسي"}. مشاكل الصلاحيات: ${permission.join(", ") || "لا توجد"}.` : `Database readiness: ${checks.filter((check) => check.status === "ok").length}/${checks.length} working. Missing in Supabase: ${missing.join(", ") || "nothing critical"}. Permission issues: ${permission.join(", ") || "none"}.`;
+  if (/finance_summary|ملخص/.test(q)) { const check = byId("finance_summary") || byId("get_finance_summary"); return check ? (isArabic ? `finance_summary: ${check.messageAr}. ${summary}` : `finance_summary: ${check.messageEn}. ${summary}`) : summary; }
+  if (/daily closing|إغلاق/.test(q)) { const check = byId("admin_daily_closings"); return check ? (isArabic ? `إغلاق اليوم DB-backed عبر admin_daily_closings: ${check.messageAr}.` : `Daily closing DB-backed via admin_daily_closings: ${check.messageEn}.`) : summary; }
+  if (/print queue|print|الطباعة/.test(q)) { const check = byId("print_jobs"); return check ? (isArabic ? `الطباعة مرتبطة بجدول print_jobs: ${check.messageAr}.` : `Print queue connected through print_jobs: ${check.messageEn}.`) : summary; }
+  return summary;
+}
+
 function answer(question: string, props: Props): string {
   const { orders, merchants, financeSummary, isArabic, activeSection } = props;
   const q = norm(question);
+  const healthResponse = healthAnswer(loadedHealthChecks(props), isArabic, question);
+  if (healthResponse) return healthResponse;
   const metrics = deriveCommandMetrics(orders, merchants, financeSummary);
   const delivered = orders.filter((o) => /deliver|complete/.test(norm(o.status)));
   const unassigned = orders.filter((o) => !o.driver_code && !o.driver_name && !o.driver_phone);
@@ -56,11 +85,13 @@ export default function KhalifaLiveAssistant(props: Props) {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [, setHealthNonce] = useState(0);
+  useEffect(() => { const handler = () => setHealthNonce((value) => value + 1); window.addEventListener("dn-admin-db-health-change", handler); return () => window.removeEventListener("dn-admin-db-health-change", handler); }, []);
   const latest = history[0]?.answer;
   const hint = props.isArabic ? "اسأل خليفة عن التحصيل، المناديب، المصروفات، التجار..." : "Ask Khalifa about COD, drivers, expenses, merchants...";
   const note = props.isArabic ? "الإجابة مبنية على البيانات المحملة حالياً" : "Answer is based on currently loaded data";
-  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "كم COD المتبقي؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
-  function askNow(text: string) { const trimmed = text.trim(); if (!trimmed) return; setLoading(true); window.setTimeout(() => { setHistory((items) => [{ id: `${Date.now()}`, question: trimmed, answer: answer(trimmed, props) }, ...items].slice(0, 6)); setQuestion(""); setLoading(false); }, 120); }
+  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "كم COD المتبقي؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟", "هل قاعدة البيانات جاهزة؟", "هل finance_summary شغال؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?", "Is the database ready?", "Is finance_summary working?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
+  function askNow(text: string) { const trimmed = text.trim(); if (!trimmed) return; playAdminAudioEvent("click"); setLoading(true); window.setTimeout(() => { const nextAnswer = answer(trimmed, props); setHistory((items) => [{ id: `${Date.now()}`, question: trimmed, answer: nextAnswer }, ...items].slice(0, 6)); addAdminNotification({ type: "khalifa", sectionId: props.activeSection || "khalifa", priority: /لا تغلق|نقص|بدون مندوب|ready|جاهز|missing|unassigned/i.test(nextAnswer) ? "high" : "normal", dedupeKey: `khalifa:${trimmed.slice(0, 40)}`, audioEvent: "khalifa_insight", titleAr: "توصية خليفة", titleEn: "Khalifa recommendation", bodyAr: nextAnswer, bodyEn: nextAnswer }); setQuestion(""); setLoading(false); }, 120); }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); askNow(question); }
   return <section className="dn-khalifa-live"><form onSubmit={submit}><label>{hint}</label><textarea value={question} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setQuestion(event.target.value)} placeholder={hint} rows={3} /><div className="dn-khalifa-live-actions"><button type="submit" disabled={loading}><Send className="h-4 w-4" />{loading ? (props.isArabic ? "يفكر..." : "Thinking...") : (props.isArabic ? "إرسال" : "Send")}</button><button type="button" onClick={() => setHistory([])}><Trash2 className="h-4 w-4" />{props.isArabic ? "مسح" : "Clear"}</button></div></form><small>{note}</small><div className="dn-khalifa-examples">{examples.map((item) => <button type="button" key={item} onClick={() => askNow(item)}>{item}</button>)}</div>{latest && <article className="dn-khalifa-answer"><strong>{props.isArabic ? "إجابة خليفة" : "Khalifa answer"}</strong><p>{latest}</p></article>}<ul>{history.slice(0, 4).map((item) => <li key={item.id}><b>{item.question}</b><span>{item.answer}</span></li>)}</ul></section>;
 }

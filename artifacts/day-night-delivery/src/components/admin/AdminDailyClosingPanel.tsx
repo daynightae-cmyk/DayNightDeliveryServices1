@@ -14,6 +14,7 @@ import {
   type FinanceSummarySource,
 } from "../../lib/adminData";
 import AdminPdfExportButton from "./AdminPdfExportButton";
+import { addAdminNotification } from "../../lib/adminAudio";
 import "../../styles/dn-daily-closing.css";
 
 type Props = { isArabic: boolean; orders: Order[]; financeSummary: FinanceSummary | null; financeSummarySource: FinanceSummarySource; onNavigate?: (id: string) => void };
@@ -44,6 +45,18 @@ export default function AdminDailyClosingPanel({ isArabic, orders, financeSummar
   ] as const;
   const summaryText = `إغلاق يومي ${closing.closing_date}: ${statusText(record ? closing.status : "unsaved", true)}، COD معلق ${money(closing.cod_pending)}، صافي اليوم ${money(closing.net_total)}.`;
   const pdfPayload = { language: isArabic ? ("ar" as const) : ("en" as const), sectionTitle: isArabic ? "إغلاق يومي" : "Daily closing", filters: `${sourceText(source, isArabic)} | ${closing.closing_date}`, totals: Object.fromEntries(cards), columns: [{ key: "metric", label: isArabic ? "البند" : "Metric" }, { key: "value", label: isArabic ? "القيمة" : "Value" }], rows: cards.map(([metric, value]) => ({ metric, value })) };
+
+  useEffect(() => {
+    const hasRisk = Number(closing.net_total || 0) < 0 || Number(closing.unreconciled_cod || 0) > 0;
+    const needsReview = hasRisk || Number(closing.cod_pending || 0) > 0 || Number(closing.unassigned_orders || 0) > 0 || Number(closing.pending_review_orders || 0) > 0;
+    if (hasRisk) {
+      addAdminNotification({ type: "daily_closing", sectionId: "dashboard", priority: "high", dedupeKey: `daily-risk:${closing.closing_date}`, audioEvent: "warning", titleAr: "خطر مالي قبل الإغلاق", titleEn: "Financial risk before closing", bodyAr: `صافي اليوم ${money(closing.net_total)} وCOD غير مسوى ${money(closing.unreconciled_cod)}.`, bodyEn: `Net is ${money(closing.net_total)} and unreconciled COD is ${money(closing.unreconciled_cod)}.` });
+    } else if (needsReview) {
+      addAdminNotification({ type: "daily_closing", sectionId: "dashboard", priority: "high", dedupeKey: `daily-review:${closing.closing_date}:${closing.cod_pending}:${closing.unassigned_orders}:${closing.pending_review_orders}`, audioEvent: "daily_closing_warning", titleAr: "الإغلاق يحتاج مراجعة", titleEn: "Closing needs review", bodyAr: `COD معلق ${money(closing.cod_pending)}، بدون مندوب ${closing.unassigned_orders}، وتحت المراجعة ${closing.pending_review_orders}.`, bodyEn: `Pending COD ${money(closing.cod_pending)}, unassigned ${closing.unassigned_orders}, review ${closing.pending_review_orders}.` });
+    } else {
+      addAdminNotification({ type: "daily_closing", sectionId: "dashboard", priority: "normal", dedupeKey: `daily-ready:${closing.closing_date}`, audioEvent: "daily_closing_ready", titleAr: "اليوم جاهز للإغلاق", titleEn: "Day ready to close", bodyAr: "كل المؤشرات الأساسية تسمح بإغلاق اليوم.", bodyEn: "Core indicators allow daily closing." });
+    }
+  }, [closing.closing_date, closing.net_total, closing.unreconciled_cod, closing.cod_pending, closing.unassigned_orders, closing.pending_review_orders]);
 
   return <section className={`dn-daily-closing ${closing.status}`} dir={isArabic ? "rtl" : "ltr"}>
     <header><div><span className="dn-source-badge">{sourceText(source, isArabic)}</span><h2>{isArabic ? "إغلاق يومي" : "Daily closing"}</h2><p>{isArabic ? "محفوظ في قاعدة البيانات عند توفر الجدول، مع حفظ مؤقت محلي واضح عند التعذر." : "DB-backed when the table exists, with clear local fallback."}</p></div><strong>{statusText(record ? closing.status : "unsaved", isArabic)}</strong></header>

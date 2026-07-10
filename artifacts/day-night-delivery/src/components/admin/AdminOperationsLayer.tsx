@@ -26,6 +26,7 @@ import {
   type FinanceRow,
 } from "../../lib/adminData";
 import { actionLabel, fieldLabel, financeTypeLabel } from "../../data/adminTranslations";
+import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 import type { Merchant, Order } from "../../types";
 import "../../styles/dn-admin-ops-layer.css";
 
@@ -190,6 +191,7 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
         if (!data.length && orders.length) {
           data = printableRowsFromOrders(orders, isArabic);
           setMessage(isArabic ? "لا توجد مهام طباعة محفوظة، لكن توجد طلبات جاهزة لإنشاء فواتير." : "No saved print jobs, but orders are ready for invoices.");
+          addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-ready:${orders.length}`, audioEvent: "print_ready", titleAr: "فواتير جاهزة للطباعة", titleEn: "Invoices ready to print", bodyAr: `يوجد ${orders.length} طلب يمكن إنشاء فواتير أو بوالص له.`, bodyEn: `${orders.length} orders can generate invoices or labels.` });
         }
       }
       else if (id === "cod") {
@@ -315,11 +317,14 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
         filters,
         pdf_payload: tablePdf(isArabic, title, rows),
       });
+      playAdminAudioEvent("print_ready");
+      addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-job:${Date.now()}`, audioEvent: "print_ready", titleAr: "تم إنشاء مهمة طباعة", titleEn: "Print job queued", bodyAr: "تم حفظ مهمة الطباعة عند توفر جدول print_jobs.", bodyEn: "Print job was saved when print_jobs is available." }, { dedupeMs: 1000 });
       setMessage(isArabic ? "تم إنشاء مهمة الطباعة" : "Print job queued.");
       await load();
     } catch (error) {
       console.warn("Print job save failed:", (error as Error)?.message || error);
-      setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database.");
+      addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: "print-preview-only", audioEvent: "warning", titleAr: "معاينة طباعة فقط", titleEn: "Print preview only", bodyAr: "معاينة فقط — لم يتم حفظ مهمة الطباعة في قاعدة البيانات.", bodyEn: "Preview only — the print job was not saved in the database." });
+      setMessage(isArabic ? "معاينة فقط — لم يتم حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — the print job was not saved in the database.");
     }
   }
 
@@ -421,7 +426,7 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة بوليصة" : "Print shipping label"}</button>
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة فاتورة" : "Print invoice"}</button>
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة كشف إحضار" : "Print pickup manifest"}</button>
-          <button type="button" onClick={async () => { const first = rows.find((row) => !String(row.id || "").startsWith("derived-print-")); if (first?.id) { await markPrintJobPrinted(String(first.id)); await load(); } else setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database."); }}>{isArabic ? "تحديد كمطبوع" : "Mark printed"}</button>
+          <button type="button" onClick={async () => { const first = rows.find((row) => !String(row.id || "").startsWith("derived-print-")); if (first?.id) { await markPrintJobPrinted(String(first.id)); playAdminAudioEvent("print_done"); addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-done:${first.id}`, audioEvent: "print_done", titleAr: "تم تحديث حالة الطباعة", titleEn: "Print status updated", bodyAr: "تم تعليم مهمة الطباعة كمطبوعة.", bodyEn: "Print job was marked as printed." }, { dedupeMs: 1000 }); await load(); } else setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database."); }}>{isArabic ? "تحديد كمطبوع" : "Mark printed"}</button>
           <span>{isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders"}</span>
         </div>
       )}

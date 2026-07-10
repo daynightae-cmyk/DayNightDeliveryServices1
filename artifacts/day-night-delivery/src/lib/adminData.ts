@@ -728,3 +728,75 @@ export async function reopenDailyClosing(date: string, notes?: string): Promise<
 export async function fetchFinanceSummaryResult(): Promise<FinanceSummaryResult> {
   return fetchFinanceSummary();
 }
+
+export type AdminDbHealthStatus = "ok" | "missing" | "permission" | "empty" | "error" | "unknown";
+
+export type AdminDbHealthCheck = {
+  id: string;
+  labelAr: string;
+  labelEn: string;
+  kind: "table" | "view" | "rpc";
+  status: AdminDbHealthStatus;
+  rowCount?: number;
+  messageAr: string;
+  messageEn: string;
+};
+
+type AdminDbHealthTarget = Omit<AdminDbHealthCheck, "status" | "rowCount" | "messageAr" | "messageEn">;
+
+const adminDbHealthTargets: AdminDbHealthTarget[] = [
+  { id: "finance_summary", labelAr: "ملخص المالية", labelEn: "finance_summary", kind: "view" },
+  { id: "get_finance_summary", labelAr: "دالة ملخص المالية", labelEn: "get_finance_summary", kind: "rpc" },
+  ...["admin_daily_closings", "print_jobs", "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries", "driver_statement_entries", "import_batches", "import_batch_rows", "admin_audit_events", "orders", "merchants", "profiles"].map((id) => ({ id, labelAr: id, labelEn: id, kind: "table" as const })),
+];
+
+function classifyHealthError(error: unknown): AdminDbHealthStatus {
+  const message = String((error as { message?: string; code?: string })?.message || error || "").toLowerCase();
+  const code = String((error as { code?: string })?.code || "").toLowerCase();
+  if (!message && !code) return "unknown";
+  if (message.includes("schema cache") || message.includes("could not find") || message.includes("does not exist") || code === "42p01" || code === "pgrst202" || code === "pgrst205") return "missing";
+  if (message.includes("permission denied") || message.includes("row-level security") || message.includes("not authorized") || code === "42501") return "permission";
+  return "error";
+}
+
+function healthMessage(status: AdminDbHealthStatus, kind: AdminDbHealthCheck["kind"], rowCount?: number) {
+  if (status === "ok") return { messageAr: kind === "rpc" ? "يعمل" : "موجود ويعمل", messageEn: kind === "rpc" ? "Working" : "Exists and working" };
+  if (status === "empty") return { messageAr: "موجود لكن لا توجد بيانات", messageEn: "Exists but empty" };
+  if (status === "missing") return { messageAr: "غير موجود — يحتاج تطبيق migration", messageEn: "Missing — migration required" };
+  if (status === "permission") return { messageAr: "لا توجد صلاحية — تحقق من RLS", messageEn: "Permission issue — check RLS" };
+  if (status === "unknown") return { messageAr: "تعذر التحقق حالياً", messageEn: "Unable to verify right now" };
+  return { messageAr: `يحتاج تحقق إداري${typeof rowCount === "number" ? "" : ""}`, messageEn: "Admin verification required" };
+}
+
+export async function fetchAdminDatabaseHealth(): Promise<AdminDbHealthCheck[]> {
+  if (!supabase) {
+    return adminDbHealthTargets.map((target) => ({ ...target, status: "unknown", ...healthMessage("unknown", target.kind) }));
+  }
+
+  const client = supabase;
+  const checks = await Promise.all(adminDbHealthTargets.map(async (target): Promise<AdminDbHealthCheck> => {
+    if (target.kind === "rpc") {
+      const { data, error } = await client.rpc("get_finance_summary");
+      if (error) {
+        const status = classifyHealthError(error);
+        console.warn("Database health RPC warning:", target.id, status);
+        return { ...target, status, ...healthMessage(status, target.kind) };
+      }
+      const empty = data == null || (Array.isArray(data) && data.length === 0);
+      const status: AdminDbHealthStatus = empty ? "empty" : "ok";
+      return { ...target, status, rowCount: empty ? 0 : 1, ...healthMessage(status, target.kind, empty ? 0 : 1) };
+    }
+
+    const { count, error } = await client.from(target.id).select("*", { count: "exact", head: true });
+    if (error) {
+      const status = classifyHealthError(error);
+      console.warn("Database health object warning:", target.id, status);
+      return { ...target, status, ...healthMessage(status, target.kind) };
+    }
+    const rowCount = typeof count === "number" ? count : 0;
+    const status: AdminDbHealthStatus = rowCount === 0 ? "empty" : "ok";
+    return { ...target, status, rowCount, ...healthMessage(status, target.kind, rowCount) };
+  }));
+
+  return checks;
+}
