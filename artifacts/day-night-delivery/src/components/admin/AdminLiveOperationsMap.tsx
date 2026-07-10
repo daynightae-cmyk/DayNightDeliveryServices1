@@ -17,11 +17,16 @@ import {
   Layers,
   MapPin,
   Navigation,
-  Radio,
   Route,
   Search,
   Truck,
+  ZoomIn,
+  ZoomOut,
+  LocateFixed,
+  Maximize2,
+  RefreshCw,
 } from "lucide-react";
+import { AdminIconBadge, AdminStateChip } from "./adminIconSystem";
 import { defaultLocations } from "../../data/defaultLocations";
 import { adminMapRegions, orderRegionId } from "../../data/adminCommandExpansion";
 import {
@@ -76,9 +81,9 @@ const driverIcon = L.divIcon({
 });
 
 const modeLabels = [
-  { mode: "standard" as const, ar: "عادي", en: "Standard" },
-  { mode: "satellite" as const, ar: "ساتلايت", en: "Satellite" },
-  { mode: "terrain" as const, ar: "تضاريس", en: "Terrain" },
+  { mode: "standard" as const, ar: "عرض عادي", en: "Standard view" },
+  { mode: "satellite" as const, ar: "عرض فضائي", en: "Satellite view" },
+  { mode: "terrain" as const, ar: "عرض تضاريس", en: "Terrain view" },
 ];
 
 const statusFilters = [
@@ -199,6 +204,38 @@ function MapRefresh({
   }, [map, points, driver, focusRegion, focusCommand]);
 
   return null;
+}
+
+function MapCommandControls({
+  isArabic,
+  fitPoints,
+  driver,
+  focusRegion,
+  onReset,
+}: {
+  isArabic: boolean;
+  fitPoints: LatLngTuple[];
+  driver: LatLngTuple;
+  focusRegion: (typeof adminMapRegions)[number];
+  onReset: () => void;
+}) {
+  const map = useMap();
+  const fitRoute = () => {
+    const validPoints = fitPoints.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (validPoints.length >= 2) map.fitBounds(validPoints, { padding: [64, 64], maxZoom: 13, animate: true });
+  };
+  const resetMap = () => {
+    map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: true });
+    onReset();
+  };
+  const controls = [
+    { key: "zoom-in", label: isArabic ? "تكبير الخريطة" : "Zoom in", Icon: ZoomIn, action: () => map.zoomIn() },
+    { key: "zoom-out", label: isArabic ? "تصغير الخريطة" : "Zoom out", Icon: ZoomOut, action: () => map.zoomOut() },
+    { key: "reset", label: isArabic ? "إعادة ضبط الخريطة" : "Reset map", Icon: LocateFixed, action: resetMap },
+    { key: "fit", label: isArabic ? "ملاءمة المسار" : "Fit route", Icon: Maximize2, action: fitRoute },
+    { key: "driver", label: isArabic ? "تمركز على الإمارات" : "Center UAE", Icon: Navigation, action: () => map.setView(driver, 13, { animate: true }) },
+  ];
+  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, Icon, action }) => <button key={key} type="button" className="dn-map-control-button" aria-label={label} title={label} onClick={action}><Icon className="h-4 w-4" aria-hidden="true" /></button>)}</div>;
 }
 
 export default function AdminLiveOperationsMap({
@@ -468,12 +505,10 @@ export default function AdminLiveOperationsMap({
       <div className="dn-live-map-ops-panel">
         <div className="dn-map-title-card">
           <p>
-            <Radio className="h-4 w-4 animate-pulse" />
+            <AdminIconBadge name="map" className="!h-8 !w-8 !min-w-8" />
             {isArabic ? "خريطة العمليات الحية" : "Live Operations Map"}
           </p>
-          <span>
-            {isArabic ? "الوضع الحالي" : "Current mode"}: {activeModeLabel}
-          </span>
+          <AdminStateChip name="live-data" tone="success">{isArabic ? "الوضع الحالي" : "Current mode"}: {activeModeLabel}</AdminStateChip>
           <b dir="ltr">{String(reference).slice(0, 28)}</b>
         </div>
 
@@ -532,6 +567,8 @@ export default function AdminLiveOperationsMap({
             key={item.mode}
             type="button"
             onClick={() => selectMode(item.mode)}
+            aria-pressed={mapMode === item.mode}
+            aria-label={isArabic ? item.ar : item.en}
             className={mapMode === item.mode ? "is-active" : ""}
           >
             {isArabic ? item.ar : item.en}
@@ -555,11 +592,11 @@ export default function AdminLiveOperationsMap({
       </div>
 
       <div className="dn-map-action-bar">
-        <button type="button" onClick={() => doFocus("fit")}>
-          {isArabic ? "ضبط المسار" : "Fit route"}
+        <button type="button" onClick={() => doFocus("fit")}><Maximize2 className="h-4 w-4" />
+          {isArabic ? "ملاءمة المسار" : "Fit route"}
         </button>
-        <button type="button" onClick={() => doFocus("driver")}>
-          {isArabic ? "تتبع السيارة" : "Center vehicle"}
+        <button type="button" onClick={() => doFocus("driver")}><LocateFixed className="h-4 w-4" />
+          {isArabic ? "تمركز على الإمارات" : "Center UAE"}
         </button>
         <button
           type="button"
@@ -568,7 +605,7 @@ export default function AdminLiveOperationsMap({
             doFocus("fit");
           }}
         >
-          {isArabic ? "تحديث الخريطة" : "Refresh map"}
+          <RefreshCw className="h-4 w-4" />{isArabic ? "إعادة ضبط الخريطة" : "Reset map"}
         </button>
       </div>
 
@@ -585,8 +622,9 @@ export default function AdminLiveOperationsMap({
         zoom={regionFilter === "all" ? 10 : focusRegion.zoom}
         style={{ height: "100%", width: "100%" }}
         scrollWheelZoom={false}
-        zoomControl
+        zoomControl={false}
       >
+        <MapCommandControls isArabic={isArabic} fitPoints={fitPoints} driver={driverPos} focusRegion={focusRegion} onReset={() => setRefreshNonce((value) => value + 1)} />
         {renderBaseLayers()}
 
         <MapRefresh
