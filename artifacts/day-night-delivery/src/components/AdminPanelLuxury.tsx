@@ -45,6 +45,7 @@ import AdminPdfExportButton from "./admin/AdminPdfExportButton";
 import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
 import AdminDailyClosingPanel from "./admin/AdminDailyClosingPanel";
+import AdminDatabaseHealthCenter from "./admin/AdminDatabaseHealthCenter";
 import SpecializedAdminSectionWorkspace from "./admin/AdminSectionWorkspace";
 import type { AdminSectionId } from "./admin/AdminSectionRegistry";
 import khalifaAssets from "./admin/khalifaAssets";
@@ -87,6 +88,7 @@ const menu = [
 
   { id: "settings", ar: "الإعدادات", en: "Settings", groupAr: "النظام", groupEn: "System", Icon: Settings },
   { id: "support", ar: "الدعم الفني", en: "Technical Support", groupAr: "النظام", groupEn: "System", Icon: Headphones },
+  { id: "database_health", ar: "فحص قاعدة البيانات", en: "Database Health", groupAr: "النظام", groupEn: "System", Icon: Database },
   { id: "logout", ar: "تسجيل الخروج", en: "Logout", groupAr: "النظام", groupEn: "System", Icon: LogOut },
 ] as const;
 
@@ -620,6 +622,14 @@ export default function AdminPanelLuxury() {
               onCreateOrder={() => setSection("new_order")}
             />
           </div>
+        </section>
+      );
+    }
+
+    if (active === "database_health") {
+      return (
+        <section className="dn-admin-center-zone">
+          <AdminDatabaseHealthCenter isArabic={isArabic} onNavigate={(id) => setSection(id)} />
         </section>
       );
     }
