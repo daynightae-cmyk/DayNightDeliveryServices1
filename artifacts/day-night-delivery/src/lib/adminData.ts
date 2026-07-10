@@ -39,8 +39,8 @@ async function callRpc<T>(fn: string, args: Record<string, unknown>): Promise<T 
   const { data, error } = await supabase.rpc(fn, args);
   if (!error && data) return data as T;
 
-  if (error) {
-    console.warn(`${fn} RPC failed. Falling back where possible:`, error.message);
+  if (error && !isMissingSchemaError(error)) {
+    console.warn(`${fn} RPC failed. Falling back where possible.`);
   }
   return null;
 }
@@ -565,11 +565,13 @@ async function updateTableRow(table: string, id: string, payload: Record<string,
 
 export async function createAdminAuditEvent(payload: { entity_type: string; entity_id?: string; action: string; before_data?: unknown; after_data?: unknown; metadata?: unknown }): Promise<FinanceRow | null> {
   if (!supabase) return null;
+  const rpcRow = await callRpc<FinanceRow>("admin_create_audit_event", { p_event: payload as Record<string, unknown> });
+  if (rpcRow?.id) return rpcRow;
   const user = await supabase.auth.getUser().catch(() => null);
   const actor = user?.data?.user;
   try {
-    return await insertTableRow("admin_audit_events", { ...payload, actor_id: actor?.id, actor_email: actor?.email, created_at: new Date().toISOString() });
-  } catch (error) { console.warn("Audit event skipped:", (error as Error).message); return null; }
+    return await insertTableRow("admin_audit_events", { ...payload, actor_id: actor?.id, created_at: new Date().toISOString() });
+  } catch (error) { console.warn("Audit event skipped without exposing raw Supabase errors."); return null; }
 }
 
 export async function fetchExpenses(filters?: AdminDateFilters): Promise<FinanceRow[]> {
@@ -579,7 +581,8 @@ export async function fetchExpenses(filters?: AdminDateFilters): Promise<Finance
 }
 
 export async function createExpense(input: AdminExpensePayload | ExpenseInput): Promise<FinanceRow> {
-  const row = await insertTableRow("admin_expenses", { expense_date: (input as AdminExpensePayload).expense_date || new Date().toISOString().slice(0, 10), category: (input as AdminExpensePayload).category || "other", amount: Math.max(0, numberValue(input.amount, 0)), payment_method: input.payment_method || "cash", status: input.status || "draft", notes: input.notes, reference_number: (input as AdminExpensePayload).reference_number, attachment_url: (input as AdminExpensePayload).attachment_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  const payload = { expense_date: (input as AdminExpensePayload).expense_date || new Date().toISOString().slice(0, 10), category: (input as AdminExpensePayload).category || "other", amount: Math.max(0, numberValue(input.amount, 0)), payment_method: input.payment_method || "cash", status: input.status || "draft", notes: input.notes, reference_number: (input as AdminExpensePayload).reference_number, receipt_url: (input as AdminExpensePayload).attachment_url, attachment_url: (input as AdminExpensePayload).attachment_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const row = await callRpc<FinanceRow>("admin_create_expense", { p_expense: payload }) || await insertTableRow("admin_expenses", payload);
   void createAdminAuditEvent({ entity_type: "admin_expense", entity_id: String(row.id || ""), action: "create", after_data: row });
   return row;
 }
@@ -597,7 +600,7 @@ export async function voidExpense(expenseId: string, reason: string): Promise<Fi
 }
 
 export async function fetchAdjustments(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("admin_adjustments", filters, "created_at"); }
-export async function createAdjustment(payload: AdminAdjustmentPayload): Promise<FinanceRow> { const row = await insertTableRow("admin_adjustments", { ...payload, amount: Math.max(0, numberValue(payload.amount, 0)), status: payload.status || "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
+export async function createAdjustment(payload: AdminAdjustmentPayload): Promise<FinanceRow> { const prepared = { ...payload, amount: Math.max(0, numberValue(payload.amount, 0)), status: payload.status || "draft", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; const row = await callRpc<FinanceRow>("admin_create_adjustment", { p_adjustment: prepared }) || await insertTableRow("admin_adjustments", prepared); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
 export async function approveAdjustment(id: string): Promise<FinanceRow> { const row = await updateTableRow("admin_adjustments", id, { status: "approved", approved_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: id, action: "approve", after_data: row }); return row; }
 export async function voidAdjustment(id: string, reason: string): Promise<FinanceRow> { const row = await updateTableRow("admin_adjustments", id, { status: "void", voided_at: new Date().toISOString(), notes: reason }); void createAdminAuditEvent({ entity_type: "admin_adjustment", entity_id: id, action: "void", metadata: { reason } }); return row; }
 
@@ -618,12 +621,12 @@ export async function fetchAdminAuditEvents(filters?: AdminDateFilters): Promise
 
 export async function createImportBatch(payload: { merchant_id?: string; file_name: string; import_mode: string; total_rows?: number; valid_rows?: number; invalid_rows?: number }): Promise<FinanceRow> { return insertTableRow("import_batches", { ...payload, status: "preview", created_at: new Date().toISOString() }); }
 export function validateImportRows(rows: Record<string, unknown>[], merchantId?: string): ImportRowValidation[] { const seen = new Set<string>(); return rows.map((raw, index)=>{ const normalized = { merchant_id: merchantId, receiver_name: clean(raw.receiver_name || raw.name), receiver_phone: clean(raw.receiver_phone || raw.phone), receiver_city: clean(raw.city || raw.receiver_city), receiver_address: clean(raw.address || raw.receiver_address), cod_amount: numberValue(raw.cod_amount, 0), notes: clean(raw.notes) }; const errors = [!normalized.receiver_name && "receiver_name required", !normalized.receiver_phone && "receiver_phone required", !normalized.receiver_city && "city required", !normalized.receiver_address && "address required"].filter(Boolean) as string[]; const dupKey = normalized.receiver_phone; const duplicateWarning = dupKey && seen.has(dupKey) ? "duplicate phone in file" : undefined; if (dupKey) seen.add(dupKey); return { rowIndex:index+1, raw, normalized, errors: duplicateWarning ? [...errors, duplicateWarning] : errors, status: errors.length ? "invalid" : "valid", duplicateWarning }; }); }
-export async function saveImportPreviewRows(batchId: string, rows: ImportRowValidation[]): Promise<FinanceRow[]> { if (!supabase) return []; const payload = rows.map((row)=>({ batch_id: batchId, row_index: row.rowIndex, raw_payload: row.raw, normalized_payload: row.normalized, validation_errors: row.errors, status: row.status })); const { data, error } = await supabase.from("import_batch_rows").insert(payload).select("*"); if (error) throw cleanAdminError(error); return (data || []) as FinanceRow[]; }
+export async function saveImportPreviewRows(batchId: string, rows: ImportRowValidation[]): Promise<FinanceRow[]> { if (!supabase) return []; const payload = rows.map((row)=>({ batch_id: batchId, row_index: row.rowIndex, raw: row.raw, normalized: row.normalized, errors: row.errors, status: row.status })); const { data, error } = await supabase.from("import_batch_rows").insert(payload).select("*"); if (error) throw cleanAdminError(error); return (data || []) as FinanceRow[]; }
 export async function commitValidImportRows(batchId: string): Promise<{ created: number; message: string }> { void createAdminAuditEvent({ entity_type: "import_batch", entity_id: batchId, action: "commit_preview", metadata: { mode: "requires server order creation" } }); return { created: 0, message: "Preview rows saved. Order creation must be confirmed with the admin order workflow before marking import as completed." }; }
 
-export async function createPrintJob(payload: { job_type: string; language: string; order_ids?: unknown[]; merchant_id?: string; filters?: unknown; pdf_payload?: unknown }): Promise<FinanceRow> { const row = await insertTableRow("print_jobs", { ...payload, status: "queued", order_ids: payload.order_ids || [], filters: payload.filters || {}, pdf_payload: payload.pdf_payload || {}, created_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "print_job", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
+export async function createPrintJob(payload: { job_type: string; language: string; order_ids?: unknown[]; merchant_id?: string; filters?: unknown; pdf_payload?: unknown }): Promise<FinanceRow> { const prepared = { ...payload, status: "queued", order_ids: payload.order_ids || [], filters: payload.filters || {}, pdf_payload: payload.pdf_payload || {}, created_at: new Date().toISOString() }; const row = await callRpc<FinanceRow>("admin_create_print_job", { p_job: prepared }) || await insertTableRow("print_jobs", prepared); void createAdminAuditEvent({ entity_type: "print_job", entity_id: String(row.id || ""), action: "create", after_data: row }); return row; }
 export async function fetchPrintJobs(filters?: AdminDateFilters): Promise<FinanceRow[]> { return fetchTableRows("print_jobs", filters, "created_at"); }
-export async function markPrintJobPrinted(id: string): Promise<FinanceRow> { const row = await updateTableRow("print_jobs", id, { status: "printed", printed_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "print_job", entity_id: id, action: "mark_printed", after_data: row }); return row; }
+export async function markPrintJobPrinted(id: string): Promise<FinanceRow> { const row = await callRpc<FinanceRow>("admin_mark_print_job_printed", { p_job_id: id }) || await updateTableRow("print_jobs", id, { status: "printed", printed_at: new Date().toISOString() }); void createAdminAuditEvent({ entity_type: "print_job", entity_id: id, action: "mark_printed", after_data: row }); return row; }
 
 export async function fetchLedgerEntries(): Promise<FinanceRow[]> {
   if (!supabase) return [];
@@ -747,10 +750,15 @@ export function buildDailyClosingSnapshot(date: string, orders: Order[], finance
 
 export async function saveDailyClosingSnapshot(snapshot: DailyClosingSnapshot): Promise<DailyClosingResult> {
   if (!supabase) return { snapshot, source: "local", saved: false, warning: "مراجعة محلية مؤقتة — لم يتم الحفظ في قاعدة البيانات." };
+  const rpcRow = await callRpc<FinanceRow>("admin_save_daily_closing", { p_snapshot: snapshot as Record<string, unknown> });
+  if (rpcRow?.id) {
+    void createAdminAuditEvent({ entity_type: "admin_daily_closing", entity_id: String(rpcRow.id || snapshot.closing_date), action: "save", after_data: rpcRow });
+    return { snapshot: normalizeDailyClosing(rpcRow as Record<string, unknown>), source: "view", saved: true };
+  }
   const { data, error } = await supabase.from("admin_daily_closings").upsert({ ...snapshot, updated_at: new Date().toISOString() }, { onConflict: "closing_date" }).select("*").single();
   if (error) {
-    console.warn("Daily closing save failed:", error.message);
-    return { snapshot, source: "local", saved: false, warning: "تعذر حفظ إغلاق اليوم في قاعدة البيانات، تم الاحتفاظ بالملخص مؤقتاً فقط." };
+    console.warn("Daily closing save failed without exposing raw Supabase errors.");
+    return { snapshot, source: "local", saved: false, warning: "تشغيل مؤقت — لم يتم تأكيد قاعدة البيانات بعد. Temporary operation — database has not been confirmed yet." };
   }
   void createAdminAuditEvent({ entity_type: "admin_daily_closing", entity_id: String((data as FinanceRow).id || snapshot.closing_date), action: "save", after_data: data });
   return { snapshot: normalizeDailyClosing(data as Record<string, unknown>), source: "view", saved: true };
@@ -790,6 +798,12 @@ type AdminDbHealthTarget = Omit<AdminDbHealthCheck, "status" | "rowCount" | "mes
 const adminDbHealthTargets: AdminDbHealthTarget[] = [
   { id: "finance_summary", labelAr: "ملخص المالية", labelEn: "finance_summary", kind: "view" },
   { id: "get_finance_summary", labelAr: "دالة ملخص المالية", labelEn: "get_finance_summary", kind: "rpc" },
+  { id: "admin_create_expense", labelAr: "إنشاء مصروف", labelEn: "admin_create_expense", kind: "rpc" },
+  { id: "admin_create_adjustment", labelAr: "إنشاء تعديل", labelEn: "admin_create_adjustment", kind: "rpc" },
+  { id: "admin_create_print_job", labelAr: "إنشاء طباعة", labelEn: "admin_create_print_job", kind: "rpc" },
+  { id: "admin_mark_print_job_printed", labelAr: "تأكيد الطباعة", labelEn: "admin_mark_print_job_printed", kind: "rpc" },
+  { id: "admin_save_daily_closing", labelAr: "حفظ الإغلاق", labelEn: "admin_save_daily_closing", kind: "rpc" },
+  { id: "admin_create_audit_event", labelAr: "تسجيل التدقيق", labelEn: "admin_create_audit_event", kind: "rpc" },
   ...["admin_daily_closings", "print_jobs", "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries", "driver_statement_entries", "import_batches", "import_batch_rows", "admin_audit_events", "orders", "merchants", "profiles"].map((id) => ({ id, labelAr: id, labelEn: id, kind: "table" as const })),
 ];
 
@@ -819,7 +833,14 @@ export async function fetchAdminDatabaseHealth(): Promise<AdminDbHealthCheck[]> 
   const client = supabase;
   const checks = await Promise.all(adminDbHealthTargets.map(async (target): Promise<AdminDbHealthCheck> => {
     if (target.kind === "rpc") {
-      const { data, error } = await client.rpc("get_finance_summary");
+      const rpcArgs: Record<string, unknown> = target.id === "admin_create_expense" ? { p_expense: { _health_check: true, category: "health_check", amount: 0, status: "draft" } }
+        : target.id === "admin_create_adjustment" ? { p_adjustment: { _health_check: true, adjustment_type: "health_check", amount: 0, reason: "health_check", status: "draft" } }
+        : target.id === "admin_create_print_job" ? { p_job: { _health_check: true, job_type: "health_check", language: "ar", status: "queued" } }
+        : target.id === "admin_mark_print_job_printed" ? { p_job_id: "00000000-0000-0000-0000-000000000000" }
+        : target.id === "admin_save_daily_closing" ? { p_snapshot: { _health_check: true, closing_date: new Date().toISOString().slice(0, 10), status: "draft" } }
+        : target.id === "admin_create_audit_event" ? { p_event: { _health_check: true, entity_type: "health_check", action: "verify" } }
+        : {};
+      const { data, error } = await client.rpc(target.id, rpcArgs);
       if (error) {
         const status = classifyHealthError(error);
         console.warn("Database health RPC warning:", target.id, status);
@@ -874,7 +895,7 @@ export type AdminProductionReadinessReport = {
   items: AdminProductionReadinessItem[];
 };
 
-const requiredProductionObjects = ["orders", "merchants", "profiles", "finance_summary", "get_finance_summary", "admin_daily_closings", "print_jobs", "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries", "driver_statement_entries", "import_batches", "import_batch_rows", "admin_audit_events"];
+const requiredProductionObjects = ["orders", "merchants", "profiles", "finance_summary", "get_finance_summary", "admin_create_expense", "admin_create_adjustment", "admin_create_print_job", "admin_mark_print_job_printed", "admin_save_daily_closing", "admin_create_audit_event", "admin_daily_closings", "print_jobs", "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries", "driver_statement_entries", "import_batches", "import_batch_rows", "admin_audit_events"];
 
 function readinessItem(input: AdminProductionReadinessItem): AdminProductionReadinessItem {
   return { ...input, score: Math.max(0, Math.min(100, Math.round(input.score))) };
@@ -913,12 +934,13 @@ export async function fetchAdminProductionReadiness(): Promise<AdminProductionRe
       readinessItem({ id: "orders", categoryAr: "الطلبات والتحميل", categoryEn: "Orders & loading", status: ordersPage.source === "db" ? "needs_review" : "blocked", risk: ordersPage.source === "db" ? "high" : "critical", score: ordersPage.source === "db" ? 78 : 35, titleAr: "Pagination للطلبات", titleEn: "Order pagination", messageAr: "تمت إضافة helper للتحميل بصفحات، والشاشات القديمة تحتاج الانتقال إليه تدريجياً.", messageEn: "A paginated helper exists; legacy screens should migrate to it.", evidenceAr: [`صفحة ${ordersPage.page} بحجم ${ordersPage.pageSize}.`, `إجمالي آمن: ${ordersPage.count}`], evidenceEn: [`Page ${ordersPage.page} size ${ordersPage.pageSize}.`, `Safe total: ${ordersPage.count}`], actionsAr: ["استخدم fetchAdminOrdersPage في شاشات الطلبات الجديدة."], actionsEn: ["Use fetchAdminOrdersPage in new order screens."] }),
       readinessItem({ id: "finance", categoryAr: "المالية والحسابات", categoryEn: "Finance & accounts", status: financeSource === "rpc" ? "ready" : financeSource === "view" ? "needs_review" : "blocked", risk: financeSource === "rpc" ? "low" : financeSource === "view" ? "medium" : "critical", score: financeSource === "rpc" ? 100 : financeSource === "view" ? 78 : 35, titleAr: "مصدر الملخص المالي", titleEn: "Finance source", messageAr: financeSource === "derived" ? "الملخص المالي مشتق حالياً، وهذا لا يصلح كمرجع مالي نهائي في الإنتاج." : `مصدر المالية الحالي: ${financeSource}.`, messageEn: financeSource === "derived" ? "Finance summary is currently derived; this is not acceptable as the final production financial source." : `Current finance source: ${financeSource}.`, evidenceAr: [`source=${financeSource}`], evidenceEn: [`source=${financeSource}`], actionsAr: ["حوّل الملخص المالي إلى RPC فعلي ومراجع."], actionsEn: ["Use an audited RPC as the final financial source."] }),
       readinessItem({ id: "daily_closing", categoryAr: "الإغلاق اليومي", categoryEn: "Daily closing", status: dailyReady ? "ready" : "blocked", risk: dailyReady ? "low" : "critical", score: dailyReady ? 92 : 40, titleAr: "إغلاق اليوم DB-backed", titleEn: "DB-backed daily closing", messageAr: dailyReady ? "إغلاق اليوم مرتبط بقاعدة البيانات." : "إغلاق اليوم يعتمد على local/derived عند الفشل وهذا مانع للإنتاج.", messageEn: dailyReady ? "Daily closing is connected to the database." : "Daily closing falls back to local/derived on failure, which blocks production.", evidenceAr: [`admin_daily_closings: ${byId("admin_daily_closings")?.messageAr || "غير معروف"}`, `source=${dailyClosing.source}`], evidenceEn: [`admin_daily_closings: ${byId("admin_daily_closings")?.messageEn || "unknown"}`, `source=${dailyClosing.source}`], actionsAr: ["فعّل وحصّن admin_daily_closings."], actionsEn: ["Enable and harden admin_daily_closings."] }),
-      readinessItem({ id: "print", categoryAr: "الطباعة والفواتير", categoryEn: "Print & invoices", status: printCheck?.status === "ok" ? "ready" : printCheck?.status === "empty" ? "needs_review" : "blocked", risk: printCheck?.status === "ok" ? "low" : printCheck?.status === "empty" ? "medium" : "critical", score: printCheck?.status === "ok" ? 92 : printCheck?.status === "empty" ? 72 : 30, titleAr: "اعتماد print_jobs", titleEn: "print_jobs adoption", messageAr: printCheck?.status === "ok" ? "طابور الطباعة موجود وبه بيانات." : "الطباعة الرسمية تحتاج print_jobs ولا يجب الاكتفاء بالاشتقاق من الطلبات.", messageEn: printCheck?.status === "ok" ? "Print queue exists with rows." : "Official printing needs print_jobs and should not rely only on orders.", evidenceAr: [`print_jobs: ${printCheck?.messageAr || "غير معروف"}`], evidenceEn: [`print_jobs: ${printCheck?.messageEn || "unknown"}`], actionsAr: ["اعتمد print_jobs للطباعة الرسمية."], actionsEn: ["Use print_jobs for official printing."] }),
+      readinessItem({ id: "print", categoryAr: "الطباعة والفواتير", categoryEn: "Print & invoices", status: printCheck?.status === "ok" || printCheck?.status === "empty" ? "ready" : "blocked", risk: printCheck?.status === "ok" ? "low" : printCheck?.status === "empty" ? "medium" : "critical", score: printCheck?.status === "ok" ? 92 : printCheck?.status === "empty" ? 72 : 30, titleAr: "اعتماد print_jobs", titleEn: "print_jobs adoption", messageAr: printCheck?.status === "ok" ? "طابور الطباعة موجود وبه بيانات." : "الطباعة الرسمية تحتاج print_jobs ولا يجب الاكتفاء بالاشتقاق من الطلبات.", messageEn: printCheck?.status === "ok" ? "Print queue exists with rows." : "Official printing needs print_jobs and should not rely only on orders.", evidenceAr: [`print_jobs: ${printCheck?.messageAr || "غير معروف"}`], evidenceEn: [`print_jobs: ${printCheck?.messageEn || "unknown"}`], actionsAr: ["اعتمد print_jobs للطباعة الرسمية."], actionsEn: ["Use print_jobs for official printing."] }),
       readinessItem({ id: "import", categoryAr: "الاستيراد", categoryEn: "Import", status: importMissing ? "blocked" : "needs_review", risk: importMissing ? "critical" : "medium", score: importMissing ? 35 : 75, titleAr: "استيراد مضبوط", titleEn: "Controlled import", messageAr: importMissing ? "جداول الاستيراد غير مكتملة." : "الاستيراد يعمل كمعاينة آمنة ويحتاج مسار اعتماد نهائي.", messageEn: importMissing ? "Import tables are incomplete." : "Import works as safe preview and needs final approval flow.", evidenceAr: ["import_batches / import_batch_rows"], evidenceEn: ["import_batches / import_batch_rows"], actionsAr: ["اختبر CSV/XLSX ومسار إنشاء الطلبات."], actionsEn: ["Test CSV/XLSX and order creation flow."] }),
-      readinessItem({ id: "audit", categoryAr: "التدقيق والسجل", categoryEn: "Audit log", status: auditCheck?.status === "ok" ? "ready" : auditCheck?.status === "empty" ? "needs_review" : "blocked", risk: auditCheck?.status === "ok" ? "low" : auditCheck?.status === "empty" ? "medium" : "critical", score: auditCheck?.status === "ok" ? 95 : auditCheck?.status === "empty" ? 72 : 30, titleAr: "سجل تدقيق إداري", titleEn: "Admin audit trail", messageAr: auditEvents.length ? "أحداث التدقيق متاحة." : "لا توجد أحداث تدقيق مثبتة بعد.", messageEn: auditEvents.length ? "Audit events are available." : "No verified audit events yet.", evidenceAr: [`admin_audit_events: ${auditCheck?.messageAr || "غير معروف"}`], evidenceEn: [`admin_audit_events: ${auditCheck?.messageEn || "unknown"}`], actionsAr: ["سجل كل عمليات الإنشاء والاعتماد والإلغاء."], actionsEn: ["Log every create, approve, and void action."] }),
+      readinessItem({ id: "audit", categoryAr: "التدقيق والسجل", categoryEn: "Audit log", status: auditCheck?.status === "ok" || auditCheck?.status === "empty" ? "ready" : "blocked", risk: auditCheck?.status === "ok" ? "low" : auditCheck?.status === "empty" ? "medium" : "critical", score: auditCheck?.status === "ok" ? 95 : auditCheck?.status === "empty" ? 72 : 30, titleAr: "سجل تدقيق إداري", titleEn: "Admin audit trail", messageAr: auditEvents.length ? "أحداث التدقيق متاحة." : "لا توجد أحداث تدقيق مثبتة بعد.", messageEn: auditEvents.length ? "Audit events are available." : "No verified audit events yet.", evidenceAr: [`admin_audit_events: ${auditCheck?.messageAr || "غير معروف"}`], evidenceEn: [`admin_audit_events: ${auditCheck?.messageEn || "unknown"}`], actionsAr: ["سجل كل عمليات الإنشاء والاعتماد والإلغاء."], actionsEn: ["Log every create, approve, and void action."] }),
       readinessItem({ id: "performance", categoryAr: "الأداء", categoryEn: "Performance", status: "needs_review", risk: "medium", score: 76, titleAr: "أداء التحميل", titleEn: "Loading performance", messageAr: "ينبغي منع تحميل آلاف الصفوف دفعة واحدة في واجهات التشغيل.", messageEn: "Operational screens should avoid loading thousands of rows at once.", evidenceAr: ["fetchAdminOrdersPage يستخدم range و count."], evidenceEn: ["fetchAdminOrdersPage uses range and count."], actionsAr: ["انقل الجداول الثقيلة إلى pagination."], actionsEn: ["Move heavy tables to pagination."] }),
     ];
-    const globalReady = missing.length === 0 && financeSource === "rpc" && dailyReady && printCheck?.status === "ok" && auditCheck?.status === "ok" && ordersPage.source === "db";
+    const requiredAdminRpcsExist = ["get_finance_summary", "admin_create_expense", "admin_create_adjustment", "admin_create_print_job", "admin_mark_print_job_printed", "admin_save_daily_closing", "admin_create_audit_event"].every((id) => ["ok", "empty"].includes(byId(id)?.status || ""));
+    const globalReady = missing.length === 0 && financeSource === "rpc" && requiredAdminRpcsExist && dailyReady && ["ok", "empty"].includes(printCheck?.status || "") && ["ok", "empty"].includes(auditCheck?.status || "") && ordersPage.source === "db";
     items.push(readinessItem({ id: "global", categoryAr: "جاهزية العالمية", categoryEn: "Global readiness", status: globalReady ? "ready" : "needs_review", risk: globalReady ? "low" : "high", score: globalReady ? 95 : 68, titleAr: "مستوى عالمي", titleEn: "Global standard", messageAr: globalReady ? "النظام جاهز لمراجعة إنتاج عالمية." : "النظام قوي داخلياً، لكنه لم يصل بعد لمستوى عالمي كامل.", messageEn: globalReady ? "The system is ready for global production review." : "The system is strong internally, but not yet fully global-grade.", evidenceAr: [`blockers=${missing.length}`, `finance=${financeSource}`], evidenceEn: [`blockers=${missing.length}`, `finance=${financeSource}`], actionsAr: ["أزل كل الموانع ثم نفذ اختبارات E2E."], actionsEn: ["Remove blockers, then run E2E tests."] }));
     return aggregateReadiness(items);
   } catch (error) {
