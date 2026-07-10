@@ -308,9 +308,21 @@ export type FinanceSummary = {
   total_expenses: number;
   cod_collected: number;
   cod_pending: number;
+  cod_reconciled: number;
+  cod_total: number;
   merchant_payable: number;
   driver_payable: number;
+  net_estimate: number;
+  average_order_revenue: number;
+  total_orders: number;
+  active_orders: number;
+  delivered_orders: number;
+  cancelled_orders: number;
+  returned_orders: number;
 };
+
+export type FinanceSummarySource = "rpc" | "view" | "derived";
+export type FinanceSummaryResult = { summary: FinanceSummary; source: FinanceSummarySource; warning?: string };
 
 export type FinanceRow = Record<string, unknown> & { id?: string; created_at?: string; status?: string };
 
@@ -370,15 +382,93 @@ export async function updateOrderStatus(orderId: string, status: string, note?: 
   return data as Order;
 }
 
-export async function fetchFinanceSummary(): Promise<FinanceSummary> {
-  const empty: FinanceSummary = { total_income: 0, total_expenses: 0, cod_collected: 0, cod_pending: 0, merchant_payable: 0, driver_payable: 0 };
-  if (!supabase) return empty;
-  const { data, error } = await supabase.from("finance_summary").select("*").maybeSingle();
-  if (error) {
-    console.warn("Failed to fetch finance summary:", error.message);
-    return empty;
-  }
-  return { ...empty, ...(data || {}) } as FinanceSummary;
+const emptyFinanceSummary: FinanceSummary = {
+  total_income: 0,
+  total_expenses: 0,
+  cod_collected: 0,
+  cod_pending: 0,
+  cod_reconciled: 0,
+  cod_total: 0,
+  merchant_payable: 0,
+  driver_payable: 0,
+  net_estimate: 0,
+  average_order_revenue: 0,
+  total_orders: 0,
+  active_orders: 0,
+  delivered_orders: 0,
+  cancelled_orders: 0,
+  returned_orders: 0,
+};
+
+function normalizeFinanceSummary(row: Partial<FinanceSummary> | Record<string, unknown> | null | undefined): FinanceSummary {
+  const source = row || {};
+  const summary = { ...emptyFinanceSummary };
+  (Object.keys(summary) as Array<keyof FinanceSummary>).forEach((key) => {
+    summary[key] = numberValue((source as Record<string, unknown>)[key], summary[key]);
+  });
+  summary.cod_total = summary.cod_total || summary.cod_collected + summary.cod_pending;
+  summary.net_estimate = summary.net_estimate || summary.total_income - summary.total_expenses;
+  summary.average_order_revenue = summary.average_order_revenue || (summary.total_orders ? summary.total_income / summary.total_orders : 0);
+  return summary;
+}
+
+async function deriveFinanceSummaryFromOrders(): Promise<FinanceSummary> {
+  const [ordersResult, expensesResult, adjustmentsResult, codResult] = await Promise.allSettled([
+    fetchAdminOrders(),
+    fetchExpenses(),
+    fetchAdjustments(),
+    fetchCodCollections(),
+  ]);
+  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
+  const expenses = expensesResult.status === "fulfilled" ? expensesResult.value : [];
+  const adjustments = adjustmentsResult.status === "fulfilled" ? adjustmentsResult.value : [];
+  const codRows = codResult.status === "fulfilled" ? codResult.value : [];
+  const delivered = orders.filter((order) => /deliver|complete/.test(orderStatus(order)));
+  const cancelled = orders.filter((order) => /cancel|fail/.test(orderStatus(order)));
+  const returned = orders.filter((order) => /return/.test(orderStatus(order)));
+  const active = orders.filter((order) => !/deliver|complete|cancel|fail|return/.test(orderStatus(order)));
+  const totalIncome = orders.reduce((sum, order) => sum + orderDeliveryIncome(order), 0);
+  const totalExpenses = expenses.reduce((sum, row) => sum + numberValue(row.amount ?? row.total ?? row.debit, 0), 0);
+  const adjustmentsNet = adjustments.reduce((sum, row) => {
+    const direction = clean(row.direction).toLowerCase();
+    const amount = numberValue(row.amount ?? row.credit ?? row.debit, 0);
+    return sum + (direction === "negative" ? -amount : amount);
+  }, 0);
+  const orderCodTotal = orders.reduce((sum, order) => sum + numberValue(order.cod_amount, 0), 0);
+  const codCollected = codRows.length ? codRows.reduce((sum, row) => sum + numberValue(row.collected_amount ?? row.amount, 0), 0) : delivered.reduce((sum, order) => sum + numberValue(order.cod_amount, 0), 0);
+  const codReconciled = codRows.filter((row) => /reconcile|closed/.test(clean(row.status).toLowerCase())).reduce((sum, row) => sum + numberValue(row.collected_amount ?? row.cod_amount ?? row.amount, 0), 0);
+  const codPending = Math.max(0, orderCodTotal - codCollected);
+  return normalizeFinanceSummary({
+    total_income: totalIncome,
+    total_expenses: totalExpenses,
+    cod_collected: codCollected,
+    cod_pending: codPending,
+    cod_reconciled: codReconciled,
+    cod_total: orderCodTotal,
+    merchant_payable: Math.max(0, orderCodTotal - totalIncome),
+    driver_payable: Math.max(0, delivered.length * 5),
+    net_estimate: totalIncome - totalExpenses + adjustmentsNet,
+    average_order_revenue: orders.length ? totalIncome / orders.length : 0,
+    total_orders: orders.length,
+    active_orders: active.length,
+    delivered_orders: delivered.length,
+    cancelled_orders: cancelled.length,
+    returned_orders: returned.length,
+  });
+}
+
+export async function fetchFinanceSummary(): Promise<FinanceSummaryResult> {
+  if (!supabase) return { summary: await deriveFinanceSummaryFromOrders(), source: "derived", warning: "Finance summary temporarily derived from orders" };
+
+  const rpc = await supabase.rpc("get_finance_summary");
+  if (!rpc.error && rpc.data) return { summary: normalizeFinanceSummary(Array.isArray(rpc.data) ? rpc.data[0] : rpc.data), source: "rpc" };
+  if (rpc.error && !isMissingSchemaError(rpc.error)) console.warn("finance_summary rpc unavailable:", rpc.error.message);
+
+  const view = await supabase.from("finance_summary").select("*").maybeSingle();
+  if (!view.error && view.data) return { summary: normalizeFinanceSummary(view.data), source: "view" };
+  if (view.error && !isMissingSchemaError(view.error)) console.warn("finance_summary view unavailable:", view.error.message);
+
+  return { summary: await deriveFinanceSummaryFromOrders(), source: "derived", warning: "Finance summary temporarily derived from orders" };
 }
 
 

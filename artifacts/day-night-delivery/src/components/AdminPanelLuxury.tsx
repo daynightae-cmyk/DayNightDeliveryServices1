@@ -31,6 +31,7 @@ import {
   fetchFinanceSummary,
   fetchMerchants,
   type FinanceSummary,
+  type FinanceSummarySource,
 } from "../lib/adminData";
 import type { Merchant } from "../types";
 import { useAppContext } from "../lib/AppContext";
@@ -43,6 +44,7 @@ import KhalifaGuidanceFeed from "./admin/KhalifaGuidanceFeed";
 import AdminPdfExportButton from "./admin/AdminPdfExportButton";
 import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
+import AdminDailyClosingPanel from "./admin/AdminDailyClosingPanel";
 import SpecializedAdminSectionWorkspace from "./admin/AdminSectionWorkspace";
 import type { AdminSectionId } from "./admin/AdminSectionRegistry";
 import khalifaAssets from "./admin/khalifaAssets";
@@ -403,6 +405,8 @@ export default function AdminPanelLuxury() {
   const [orders, setOrders] = useState<any[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+  const [financeSummarySource, setFinanceSummarySource] = useState<FinanceSummarySource>("derived");
+  const [financeWarning, setFinanceWarning] = useState("");
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
@@ -445,7 +449,9 @@ export default function AdminPanelLuxury() {
     }
 
     if (financeResult.status === "fulfilled") {
-      setFinanceSummary(financeResult.value);
+      setFinanceSummary(financeResult.value.summary);
+      setFinanceSummarySource(financeResult.value.source);
+      setFinanceWarning(financeResult.value.warning || "");
     } else {
       console.warn("Finance request failed:", financeResult.reason);
     }
@@ -548,6 +554,8 @@ export default function AdminPanelLuxury() {
 
         <div className="dn-admin-core-full">
           <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
+          <AdminDailyClosingPanel isArabic={isArabic} orders={orders} financeSummary={financeSummary} financeSummarySource={financeSummarySource} onNavigate={(target) => setSection(target as SectionId)} />
+          {financeWarning && <p className="dn-clean-note">{isArabic ? "ملخص مالي مشتق مؤقتاً من الطلبات" : "Finance summary temporarily derived from orders"}</p>}
         </div>
 
         <div className="dn-admin-bottom-cards">
@@ -662,6 +670,8 @@ export default function AdminPanelLuxury() {
           orders={orders}
           merchants={merchants}
           financeSummary={financeSummary}
+          financeSummarySource={financeSummarySource}
+          financeWarning={financeWarning}
           onRefresh={refreshAdminData}
           onNavigate={(id) => {
             setActive(id as SectionId);
