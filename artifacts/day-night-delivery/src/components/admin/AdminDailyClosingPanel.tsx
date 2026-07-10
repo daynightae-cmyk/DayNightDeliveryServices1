@@ -14,6 +14,7 @@ import {
   type FinanceSummarySource,
 } from "../../lib/adminData";
 import AdminPdfExportButton from "./AdminPdfExportButton";
+import { addAdminNotification } from "../../lib/adminAudio";
 import "../../styles/dn-daily-closing.css";
 
 type Props = { isArabic: boolean; orders: Order[]; financeSummary: FinanceSummary | null; financeSummarySource: FinanceSummarySource; onNavigate?: (id: string) => void };
@@ -29,6 +30,14 @@ export default function AdminDailyClosingPanel({ isArabic, orders, financeSummar
   const date = todayKey();
   const derived = useMemo(() => buildDailyClosingSnapshot(date, orders, financeSummary, []), [date, orders, financeSummary]);
   const closing = record || derived;
+
+  useEffect(() => {
+    const hasRisk = Number(closing.net_total || 0) < 0 || Number(closing.unreconciled_cod || 0) > 0;
+    const needsReview = Number(closing.cod_pending || 0) > 0 || Number(closing.unassigned_orders || 0) > 0 || Number(closing.pending_review_orders || 0) > 0;
+    if (hasRisk) addAdminNotification({ type: "warning", sectionId: "daily_closing", priority: "high", dedupeKey: `closing:${date}:risk`, audioEvent: "warning", titleAr: "خطر مالي قبل الإغلاق", titleEn: "Financial risk before closing", bodyAr: `صافي اليوم ${money(closing.net_total)} و COD غير مسوى ${money(closing.unreconciled_cod)}.`, bodyEn: `Net total is ${money(closing.net_total)} and unresolved COD is ${money(closing.unreconciled_cod)}.` });
+    else if (needsReview) addAdminNotification({ type: "daily_closing", sectionId: "daily_closing", priority: "high", dedupeKey: `closing:${date}:review:${closing.cod_pending}:${closing.unassigned_orders}:${closing.pending_review_orders}`, audioEvent: "daily_closing_warning", titleAr: "الإغلاق يحتاج مراجعة", titleEn: "Closing needs review", bodyAr: `COD معلق ${money(closing.cod_pending)}، بدون مندوب ${closing.unassigned_orders}، مراجعة ${closing.pending_review_orders}.`, bodyEn: `Pending COD ${money(closing.cod_pending)}, unassigned ${closing.unassigned_orders}, review ${closing.pending_review_orders}.` });
+    else addAdminNotification({ type: "daily_closing", sectionId: "daily_closing", priority: "normal", dedupeKey: `closing:${date}:ready`, audioEvent: "daily_closing_ready", titleAr: "اليوم جاهز للإغلاق", titleEn: "Day is ready to close", bodyAr: "كل المؤشرات الأساسية تسمح بإغلاق اليوم.", bodyEn: "All core indicators allow closing the day." });
+  }, [date, closing.status, closing.cod_pending, closing.unassigned_orders, closing.pending_review_orders, closing.unreconciled_cod, closing.net_total]);
 
   useEffect(() => { void fetchDailyClosing(date).then((result) => { setRecord(result.snapshot); setSource(result.source); if (result.warning) setMessage(result.warning); }); }, [date]);
 
