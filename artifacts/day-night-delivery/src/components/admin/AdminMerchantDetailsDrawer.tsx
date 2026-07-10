@@ -1,0 +1,21 @@
+import { X } from "lucide-react";
+import type { Merchant, Order } from "../../types";
+import { actionLabel, statusLabel } from "../../data/adminTranslations";
+
+type Props = { merchant: Merchant | null; orders: Order[]; isArabic: boolean; onClose: () => void; onNavigate: (target: "new_order" | "merchant_statements") => void; onPreview: (message: string) => void };
+const money = (v: unknown) => `${Number(v || 0).toFixed(2)} AED`;
+const val = (v: unknown) => String(v ?? "").trim() || "—";
+export default function AdminMerchantDetailsDrawer({ merchant, orders, isArabic, onClose, onNavigate, onPreview }: Props) {
+  if (!merchant) return null;
+  const merchantOrders = orders.filter((o)=>o.merchant_id === merchant.id || o.merchant_name === merchant.trade_name);
+  const delivered = merchantOrders.filter((o)=>/deliver|complete/.test(String(o.status||"").toLowerCase())).length;
+  const cancelled = merchantOrders.filter((o)=>/cancel|fail/.test(String(o.status||"").toLowerCase())).length;
+  const returned = merchantOrders.filter((o)=>/return/.test(String(o.status||"").toLowerCase())).length;
+  const cod = merchantOrders.reduce((s,o)=>s+Number(o.cod_amount||0),0);
+  const fees = merchantOrders.reduce((s,o)=>s+Number(o.delivery_price||o.price||0),0);
+  const last = merchantOrders.slice().sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))[0];
+  const routeMap = new Map<string, number>(); merchantOrders.forEach((o)=>{ const r = `${o.sender_city || "—"} → ${o.receiver_city || o.destination_country || "—"}`; routeMap.set(r,(routeMap.get(r)||0)+1); });
+  const topRoutes = [...routeMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const rows = [[isArabic?"التاجر":"Merchant", merchant.trade_name],[isArabic?"مسؤول التواصل":"Contact person", merchant.owner_name],[isArabic?"الهاتف":"Phone", merchant.phone],[isArabic?"البريد":"Email", merchant.email],[isArabic?"الإمارة/المدينة":"Emirate/city", `${merchant.emirate || "—"} / ${merchant.city || "—"}`],[isArabic?"عنوان الإحضار":"Pickup address", merchant.pickup_address || merchant.address],[isArabic?"الحالة":"Status", statusLabel(merchant.status || "active", isArabic)],[isArabic?"إجمالي الطلبات":"Total orders", merchantOrders.length],[isArabic?"المسلمة":"Delivered", delivered],[isArabic?"الملغية":"Cancelled", cancelled],[isArabic?"الراجعة":"Returned", returned],["COD", money(cod)],[isArabic?"رسوم التوصيل":"Delivery fees", money(fees)],[isArabic?"رصيد التاجر التقديري":"Merchant balance estimate", money(cod - fees)],[isArabic?"آخر طلب":"Last order", last?.tracking_number || last?.invoice_number || last?.id]];
+  return <aside className="dn-admin-drawer" dir={isArabic?"rtl":"ltr"}><header><div><span>{isArabic ? "تفاصيل التاجر" : "Merchant details"}</span><strong>{merchant.trade_name}</strong></div><button type="button" onClick={onClose}><X className="h-4 w-4" /></button></header><section className="dn-admin-drawer-grid">{rows.map(([label,value])=><article key={String(label)}><span>{label}</span><strong>{val(value)}</strong></article>)}</section><section><h3>{isArabic ? "أعلى المسارات" : "Top routes"}</h3>{topRoutes.length ? <ol>{topRoutes.map(([route,count])=><li key={route}>{route} · {count}</li>)}</ol> : <p>{isArabic ? "لا توجد مسارات كافية لهذا التاجر." : "No enough routes for this merchant."}</p>}</section><footer><button type="button" onClick={()=>onNavigate("new_order")}>{isArabic?"إنشاء طلب للتاجر":"Create order for merchant"}</button><button type="button" onClick={()=>onNavigate("merchant_statements")}>{isArabic?"فتح كشف التاجر":"Open merchant statement"}</button><button type="button" onClick={()=>onPreview(isArabic?"تصدير PDF للتاجر قيد المعاينة.":"Merchant PDF export is in preview.")}>{actionLabel("exportPdf", isArabic)}</button><button type="button" onClick={()=>onPreview(isArabic?"تفعيل/تعطيل التاجر يحتاج حقل حالة مدعوماً؛ تم فتح معاينة فقط.":"Activate/deactivate needs a supported status field; preview only.")}>{isArabic?"تفعيل/تعطيل":"Activate/deactivate"}</button><button type="button" onClick={()=>onPreview(isArabic?"إضافة الملاحظات للتاجر تحتاج جدول ملاحظات مدعوماً؛ معاينة فقط.":"Adding merchant notes needs a supported notes table; preview only.")}>{isArabic?"إضافة ملاحظة":"Add note"}</button></footer></aside>;
+}
