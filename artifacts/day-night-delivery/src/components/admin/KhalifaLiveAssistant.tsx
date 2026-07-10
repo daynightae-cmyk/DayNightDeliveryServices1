@@ -24,6 +24,30 @@ function loadedHealthChecks(props: Props): AdminDbHealthCheck[] {
   }
 }
 
+function readinessAnswer(isArabic: boolean, question: string) {
+  const q = norm(question);
+  const wants = /جاهز للإنتاج|النظام عالمي|يمنع العالمية|مالية db|finance db|الطباعة جاهزة|الإغلاق اليومي آمن|أول خطر|production ready|global|what blocks|print ready|daily closing safe|first risk/.test(q);
+  if (!wants) return "";
+  if (typeof window === "undefined") return isArabic ? "افتح مركز جاهزية الإنتاج واضغط إعادة الفحص." : "Open Production Readiness and press Re-run.";
+  try {
+    const report = JSON.parse(window.localStorage.getItem("dn_admin_production_readiness") || "null") as { overallScore?: number; status?: string; blockers?: number; items?: Array<{ id?: string; status?: string; risk?: string; messageAr?: string; messageEn?: string }> } | null;
+    if (!report?.items?.length) return isArabic ? "افتح مركز جاهزية الإنتاج واضغط إعادة الفحص." : "Open Production Readiness and press Re-run.";
+    const finance = report.items.find((item) => item.id === "finance");
+    const print = report.items.find((item) => item.id === "print");
+    const closing = report.items.find((item) => item.id === "daily_closing");
+    const global = report.items.find((item) => item.id === "global");
+    const firstRisk = report.items.find((item) => item.status === "blocked" || item.risk === "critical") || report.items.find((item) => item.risk === "high");
+    if (/مالية db|finance db/.test(q)) return isArabic ? (finance?.messageAr || "راجع مركز جاهزية الإنتاج للمالية.") : (finance?.messageEn || "Check Production Readiness for finance.");
+    if (/الطباعة جاهزة|print ready/.test(q)) return isArabic ? (print?.messageAr || "راجع جاهزية الطباعة.") : (print?.messageEn || "Check print readiness.");
+    if (/الإغلاق اليومي آمن|daily closing safe/.test(q)) return isArabic ? (closing?.messageAr || "راجع إغلاق اليوم.") : (closing?.messageEn || "Check daily closing.");
+    if (/يمنع العالمية|what blocks|أول خطر|first risk/.test(q)) return isArabic ? `أول خطر الآن: ${firstRisk?.messageAr || "لا توجد موانع حرجة ظاهرة"}.` : `First risk now: ${firstRisk?.messageEn || "No visible critical blockers"}.`;
+    if (/النظام عالمي|global/.test(q)) return isArabic ? (global?.messageAr || "النظام يحتاج مراجعة عالمية.") : (global?.messageEn || "The system needs global-readiness review.");
+    return isArabic ? `جاهزية الإنتاج ${report.overallScore || 0}%، الحالة ${report.status || "غير معروف"}، الموانع ${report.blockers || 0}.` : `Production readiness is ${report.overallScore || 0}%, status ${report.status || "unknown"}, blockers ${report.blockers || 0}.`;
+  } catch {
+    return isArabic ? "افتح مركز جاهزية الإنتاج واضغط إعادة الفحص." : "Open Production Readiness and press Re-run.";
+  }
+}
+
 function healthAnswer(checks: AdminDbHealthCheck[], isArabic: boolean, question: string) {
   const q = norm(question);
   const wantsHealth = /database|supabase|finance_summary|daily closing|print queue|db-backed|قاعدة البيانات|شغال|إغلاق اليوم محفوظ|الطباعة|ماذا ينقص/.test(q);
@@ -42,6 +66,8 @@ function healthAnswer(checks: AdminDbHealthCheck[], isArabic: boolean, question:
 function answer(question: string, props: Props): string {
   const { orders, merchants, financeSummary, isArabic, activeSection } = props;
   const q = norm(question);
+  const readinessResponse = readinessAnswer(isArabic, question);
+  if (readinessResponse) return readinessResponse;
   const healthResponse = healthAnswer(loadedHealthChecks(props), isArabic, question);
   if (healthResponse) return healthResponse;
   const metrics = deriveCommandMetrics(orders, merchants, financeSummary);
@@ -90,7 +116,7 @@ export default function KhalifaLiveAssistant(props: Props) {
   const latest = history[0]?.answer;
   const hint = props.isArabic ? "اسأل خليفة عن التحصيل، المناديب، المصروفات، التجار..." : "Ask Khalifa about COD, drivers, expenses, merchants...";
   const note = props.isArabic ? "الإجابة مبنية على البيانات المحملة حالياً" : "Answer is based on currently loaded data";
-  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "كم COD المتبقي؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟", "هل قاعدة البيانات جاهزة؟", "هل finance_summary شغال؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?", "Is the database ready?", "Is finance_summary working?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
+  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "كم COD المتبقي؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟", "هل قاعدة البيانات جاهزة؟", "هل finance_summary شغال؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?", "Is the database ready?", "Is finance_summary working?", "Is the app production ready?", "What blocks global readiness?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
   function askNow(text: string) { const trimmed = text.trim(); if (!trimmed) return; playAdminAudioEvent("click"); setLoading(true); window.setTimeout(() => { const nextAnswer = answer(trimmed, props); addAdminNotification({ type: "khalifa", sectionId: props.activeSection || "khalifa", priority: /لا تغلق|نقص|بدون مندوب|missing|unassigned|خطر/i.test(nextAnswer) ? "high" : "normal", dedupeKey: `khalifa:${trimmed.slice(0, 40)}`, audioEvent: "khalifa_insight", titleAr: "توصية خليفة", titleEn: "Khalifa recommendation", bodyAr: nextAnswer, bodyEn: nextAnswer }); setHistory((items) => [{ id: `${Date.now()}`, question: trimmed, answer: nextAnswer }, ...items].slice(0, 6)); setQuestion(""); setLoading(false); }, 120); }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); askNow(question); }
   return <section className="dn-khalifa-live"><form onSubmit={submit}><label>{hint}</label><textarea value={question} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setQuestion(event.target.value)} placeholder={hint} rows={3} /><div className="dn-khalifa-live-actions"><button type="submit" disabled={loading}><Send className="h-4 w-4" />{loading ? (props.isArabic ? "يفكر..." : "Thinking...") : (props.isArabic ? "إرسال" : "Send")}</button><button type="button" onClick={() => setHistory([])}><Trash2 className="h-4 w-4" />{props.isArabic ? "مسح" : "Clear"}</button></div></form><small>{note}</small><div className="dn-khalifa-examples">{examples.map((item) => <button type="button" key={item} onClick={() => askNow(item)}>{item}</button>)}</div>{latest && <article className="dn-khalifa-answer"><strong>{props.isArabic ? "إجابة خليفة" : "Khalifa answer"}</strong><p>{latest}</p></article>}<ul>{history.slice(0, 4).map((item) => <li key={item.id}><b>{item.question}</b><span>{item.answer}</span></li>)}</ul></section>;

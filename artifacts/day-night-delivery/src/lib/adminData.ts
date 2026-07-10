@@ -334,18 +334,61 @@ function orderDeliveryIncome(order: Order) {
   return numberValue(order.delivery_price ?? order.price ?? order.base_price, 0);
 }
 
-export async function fetchAdminOrders(): Promise<Order[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  if (error) {
-    console.warn("Failed to fetch admin orders:", error.message);
-    return [];
+export type AdminOrderPageParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  merchantId?: string;
+  driverId?: string;
+  city?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type AdminOrderPageResult = {
+  rows: Order[];
+  count: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  source: "db" | "fallback";
+  warning?: string;
+};
+
+function safeLike(value: string) {
+  return value.replace(/[%,]/g, "").trim();
+}
+
+export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): Promise<AdminOrderPageResult> {
+  const page = Math.max(1, Math.floor(numberValue(params.page, 1)));
+  const pageSize = Math.min(100, Math.max(1, Math.floor(numberValue(params.pageSize, 50))));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  if (!supabase) return { rows: [], count: 0, page, pageSize, totalPages: 0, source: "fallback", warning: "Supabase is not configured." };
+  let query = supabase.from("orders").select("*", { count: "exact" });
+  if (params.status) query = query.eq("status", params.status);
+  if (params.merchantId) query = query.eq("merchant_id", params.merchantId);
+  if (params.driverId) query = query.or(`driver_id.eq.${params.driverId},assigned_driver_id.eq.${params.driverId}`);
+  if (params.city) query = query.or(`receiver_city.ilike.%${safeLike(params.city)}%,sender_city.ilike.%${safeLike(params.city)}%`);
+  if (params.dateFrom) query = query.gte("created_at", params.dateFrom);
+  if (params.dateTo) query = query.lte("created_at", params.dateTo);
+  if (params.search) {
+    const term = safeLike(params.search);
+    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,receiver_name.ilike.%${term}%`);
   }
-  return (data || []) as Order[];
+  const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
+  if (error) {
+    console.warn("Failed to fetch paginated admin orders:", error.message);
+    return { rows: [], count: 0, page, pageSize, totalPages: 0, source: "fallback", warning: "Orders could not be loaded safely right now." };
+  }
+  const safeCount = typeof count === "number" ? count : (data || []).length;
+  return { rows: (data || []) as Order[], count: safeCount, page, pageSize, totalPages: Math.ceil(safeCount / pageSize), source: "db" };
+}
+
+export async function fetchAdminOrders(): Promise<Order[]> {
+  const result = await fetchAdminOrdersPage({ page: 1, pageSize: 100 });
+  return result.rows;
 }
 
 export async function fetchAdminStats(): Promise<AdminStats> {
@@ -799,4 +842,87 @@ export async function fetchAdminDatabaseHealth(): Promise<AdminDbHealthCheck[]> 
   }));
 
   return checks;
+}
+
+export type AdminReadinessStatus = "ready" | "needs_review" | "blocked" | "unknown";
+export type AdminReadinessRisk = "low" | "medium" | "high" | "critical";
+
+export type AdminProductionReadinessItem = {
+  id: string;
+  categoryAr: string;
+  categoryEn: string;
+  status: AdminReadinessStatus;
+  risk: AdminReadinessRisk;
+  score: number;
+  titleAr: string;
+  titleEn: string;
+  messageAr: string;
+  messageEn: string;
+  evidenceAr: string[];
+  evidenceEn: string[];
+  actionsAr: string[];
+  actionsEn: string[];
+};
+
+export type AdminProductionReadinessReport = {
+  generatedAt: string;
+  overallScore: number;
+  status: AdminReadinessStatus;
+  risk: AdminReadinessRisk;
+  blockers: number;
+  warnings: number;
+  items: AdminProductionReadinessItem[];
+};
+
+const requiredProductionObjects = ["orders", "merchants", "profiles", "finance_summary", "get_finance_summary", "admin_daily_closings", "print_jobs", "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries", "driver_statement_entries", "import_batches", "import_batch_rows", "admin_audit_events"];
+
+function readinessItem(input: AdminProductionReadinessItem): AdminProductionReadinessItem {
+  return { ...input, score: Math.max(0, Math.min(100, Math.round(input.score))) };
+}
+
+function aggregateReadiness(items: AdminProductionReadinessItem[]): AdminProductionReadinessReport {
+  const blockers = items.filter((item) => item.status === "blocked").length;
+  const warnings = items.filter((item) => item.status === "needs_review" || item.status === "unknown").length;
+  const overallScore = Math.round(items.reduce((sum, item) => sum + item.score, 0) / Math.max(1, items.length));
+  const risk: AdminReadinessRisk = items.some((item) => item.risk === "critical") ? "critical" : items.some((item) => item.risk === "high") ? "high" : items.some((item) => item.risk === "medium") ? "medium" : "low";
+  const status: AdminReadinessStatus = blockers > 0 ? "blocked" : overallScore >= 90 ? "ready" : warnings > 0 ? "needs_review" : "unknown";
+  return { generatedAt: new Date().toISOString(), overallScore, status, risk, blockers, warnings, items };
+}
+
+export async function fetchAdminProductionReadiness(): Promise<AdminProductionReadinessReport> {
+  try {
+    const [health, finance, ordersPage, dailyClosing, printJobs, auditEvents] = await Promise.all([
+      fetchAdminDatabaseHealth(),
+      fetchFinanceSummaryResult(),
+      fetchAdminOrdersPage({ page: 1, pageSize: 50 }),
+      fetchDailyClosing(new Date().toISOString().slice(0, 10)),
+      fetchPrintJobs().catch(() => [] as FinanceRow[]),
+      fetchAdminAuditEvents().catch(() => [] as FinanceRow[]),
+    ]);
+    const byId = (id: string) => health.find((check) => check.id === id);
+    const missing = requiredProductionObjects.filter((id) => ["missing", "permission", "error", "unknown"].includes(byId(id)?.status || "unknown"));
+    const empty = requiredProductionObjects.filter((id) => byId(id)?.status === "empty");
+    const financeSource = finance.source;
+    const dailyReady = byId("admin_daily_closings")?.status === "ok" && dailyClosing.source !== "local";
+    const printCheck = byId("print_jobs");
+    const auditCheck = byId("admin_audit_events");
+    const importMissing = ["import_batches", "import_batch_rows"].some((id) => byId(id)?.status !== "ok" && byId(id)?.status !== "empty");
+    const items: AdminProductionReadinessItem[] = [
+      readinessItem({ id: "database", categoryAr: "قاعدة البيانات", categoryEn: "Database", status: missing.length ? "blocked" : empty.length ? "needs_review" : "ready", risk: missing.length ? "critical" : empty.length ? "medium" : "low", score: missing.length ? 25 : empty.length ? 72 : 100, titleAr: "تطبيق migrations المطلوبة", titleEn: "Required migrations", messageAr: missing.length ? "توجد كائنات إنتاج ناقصة أو محجوبة." : empty.length ? "الكائنات موجودة لكن بعضها بلا بيانات اختبار." : "الكائنات المطلوبة موجودة وتستجيب.", messageEn: missing.length ? "Required production objects are missing or blocked." : empty.length ? "Objects exist, but some are empty." : "Required objects exist and respond.", evidenceAr: [`تم فحص ${health.length} كائن.`, `ناقص/محجوب: ${missing.join(", ") || "لا يوجد"}`], evidenceEn: [`Checked ${health.length} objects.`, `Missing/blocked: ${missing.join(", ") || "none"}`], actionsAr: missing.length ? ["طبّق migrations الناقصة في Supabase SQL Editor."] : ["اختبر ببيانات إنتاجية مشابهة."], actionsEn: missing.length ? ["Apply missing migrations in Supabase SQL Editor."] : ["Test with production-like seed data."] }),
+      readinessItem({ id: "security", categoryAr: "الصلاحيات والأمان", categoryEn: "Security & RLS", status: "needs_review", risk: "high", score: 70, titleAr: "تحقق RLS يدوياً", titleEn: "Manual RLS verification", messageAr: "المسار محمي، لكن سياسات RLS تحتاج إثباتاً من Supabase.", messageEn: "The route is protected, but RLS policies require Supabase verification.", evidenceAr: ["ProtectedAdminRoute موجود.", "الفحص الأمامي لا يثبت كل سياسات RLS."], evidenceEn: ["ProtectedAdminRoute exists.", "Frontend checks cannot prove every RLS policy."], actionsAr: ["راجع RLS Policies لكل جداول الإدارة."], actionsEn: ["Review RLS policies for every admin table."] }),
+      readinessItem({ id: "orders", categoryAr: "الطلبات والتحميل", categoryEn: "Orders & loading", status: ordersPage.source === "db" ? "needs_review" : "blocked", risk: ordersPage.source === "db" ? "high" : "critical", score: ordersPage.source === "db" ? 78 : 35, titleAr: "Pagination للطلبات", titleEn: "Order pagination", messageAr: "تمت إضافة helper للتحميل بصفحات، والشاشات القديمة تحتاج الانتقال إليه تدريجياً.", messageEn: "A paginated helper exists; legacy screens should migrate to it.", evidenceAr: [`صفحة ${ordersPage.page} بحجم ${ordersPage.pageSize}.`, `إجمالي آمن: ${ordersPage.count}`], evidenceEn: [`Page ${ordersPage.page} size ${ordersPage.pageSize}.`, `Safe total: ${ordersPage.count}`], actionsAr: ["استخدم fetchAdminOrdersPage في شاشات الطلبات الجديدة."], actionsEn: ["Use fetchAdminOrdersPage in new order screens."] }),
+      readinessItem({ id: "finance", categoryAr: "المالية والحسابات", categoryEn: "Finance & accounts", status: financeSource === "rpc" ? "ready" : financeSource === "view" ? "needs_review" : "blocked", risk: financeSource === "rpc" ? "low" : financeSource === "view" ? "medium" : "critical", score: financeSource === "rpc" ? 100 : financeSource === "view" ? 78 : 35, titleAr: "مصدر الملخص المالي", titleEn: "Finance source", messageAr: financeSource === "derived" ? "الملخص المالي مشتق حالياً، وهذا لا يصلح كمرجع مالي نهائي في الإنتاج." : `مصدر المالية الحالي: ${financeSource}.`, messageEn: financeSource === "derived" ? "Finance summary is currently derived; this is not acceptable as the final production financial source." : `Current finance source: ${financeSource}.`, evidenceAr: [`source=${financeSource}`], evidenceEn: [`source=${financeSource}`], actionsAr: ["حوّل الملخص المالي إلى RPC فعلي ومراجع."], actionsEn: ["Use an audited RPC as the final financial source."] }),
+      readinessItem({ id: "daily_closing", categoryAr: "الإغلاق اليومي", categoryEn: "Daily closing", status: dailyReady ? "ready" : "blocked", risk: dailyReady ? "low" : "critical", score: dailyReady ? 92 : 40, titleAr: "إغلاق اليوم DB-backed", titleEn: "DB-backed daily closing", messageAr: dailyReady ? "إغلاق اليوم مرتبط بقاعدة البيانات." : "إغلاق اليوم يعتمد على local/derived عند الفشل وهذا مانع للإنتاج.", messageEn: dailyReady ? "Daily closing is connected to the database." : "Daily closing falls back to local/derived on failure, which blocks production.", evidenceAr: [`admin_daily_closings: ${byId("admin_daily_closings")?.messageAr || "غير معروف"}`, `source=${dailyClosing.source}`], evidenceEn: [`admin_daily_closings: ${byId("admin_daily_closings")?.messageEn || "unknown"}`, `source=${dailyClosing.source}`], actionsAr: ["فعّل وحصّن admin_daily_closings."], actionsEn: ["Enable and harden admin_daily_closings."] }),
+      readinessItem({ id: "print", categoryAr: "الطباعة والفواتير", categoryEn: "Print & invoices", status: printCheck?.status === "ok" ? "ready" : printCheck?.status === "empty" ? "needs_review" : "blocked", risk: printCheck?.status === "ok" ? "low" : printCheck?.status === "empty" ? "medium" : "critical", score: printCheck?.status === "ok" ? 92 : printCheck?.status === "empty" ? 72 : 30, titleAr: "اعتماد print_jobs", titleEn: "print_jobs adoption", messageAr: printCheck?.status === "ok" ? "طابور الطباعة موجود وبه بيانات." : "الطباعة الرسمية تحتاج print_jobs ولا يجب الاكتفاء بالاشتقاق من الطلبات.", messageEn: printCheck?.status === "ok" ? "Print queue exists with rows." : "Official printing needs print_jobs and should not rely only on orders.", evidenceAr: [`print_jobs: ${printCheck?.messageAr || "غير معروف"}`], evidenceEn: [`print_jobs: ${printCheck?.messageEn || "unknown"}`], actionsAr: ["اعتمد print_jobs للطباعة الرسمية."], actionsEn: ["Use print_jobs for official printing."] }),
+      readinessItem({ id: "import", categoryAr: "الاستيراد", categoryEn: "Import", status: importMissing ? "blocked" : "needs_review", risk: importMissing ? "critical" : "medium", score: importMissing ? 35 : 75, titleAr: "استيراد مضبوط", titleEn: "Controlled import", messageAr: importMissing ? "جداول الاستيراد غير مكتملة." : "الاستيراد يعمل كمعاينة آمنة ويحتاج مسار اعتماد نهائي.", messageEn: importMissing ? "Import tables are incomplete." : "Import works as safe preview and needs final approval flow.", evidenceAr: ["import_batches / import_batch_rows"], evidenceEn: ["import_batches / import_batch_rows"], actionsAr: ["اختبر CSV/XLSX ومسار إنشاء الطلبات."], actionsEn: ["Test CSV/XLSX and order creation flow."] }),
+      readinessItem({ id: "audit", categoryAr: "التدقيق والسجل", categoryEn: "Audit log", status: auditCheck?.status === "ok" ? "ready" : auditCheck?.status === "empty" ? "needs_review" : "blocked", risk: auditCheck?.status === "ok" ? "low" : auditCheck?.status === "empty" ? "medium" : "critical", score: auditCheck?.status === "ok" ? 95 : auditCheck?.status === "empty" ? 72 : 30, titleAr: "سجل تدقيق إداري", titleEn: "Admin audit trail", messageAr: auditEvents.length ? "أحداث التدقيق متاحة." : "لا توجد أحداث تدقيق مثبتة بعد.", messageEn: auditEvents.length ? "Audit events are available." : "No verified audit events yet.", evidenceAr: [`admin_audit_events: ${auditCheck?.messageAr || "غير معروف"}`], evidenceEn: [`admin_audit_events: ${auditCheck?.messageEn || "unknown"}`], actionsAr: ["سجل كل عمليات الإنشاء والاعتماد والإلغاء."], actionsEn: ["Log every create, approve, and void action."] }),
+      readinessItem({ id: "performance", categoryAr: "الأداء", categoryEn: "Performance", status: "needs_review", risk: "medium", score: 76, titleAr: "أداء التحميل", titleEn: "Loading performance", messageAr: "ينبغي منع تحميل آلاف الصفوف دفعة واحدة في واجهات التشغيل.", messageEn: "Operational screens should avoid loading thousands of rows at once.", evidenceAr: ["fetchAdminOrdersPage يستخدم range و count."], evidenceEn: ["fetchAdminOrdersPage uses range and count."], actionsAr: ["انقل الجداول الثقيلة إلى pagination."], actionsEn: ["Move heavy tables to pagination."] }),
+    ];
+    const globalReady = missing.length === 0 && financeSource === "rpc" && dailyReady && printCheck?.status === "ok" && auditCheck?.status === "ok" && ordersPage.source === "db";
+    items.push(readinessItem({ id: "global", categoryAr: "جاهزية العالمية", categoryEn: "Global readiness", status: globalReady ? "ready" : "needs_review", risk: globalReady ? "low" : "high", score: globalReady ? 95 : 68, titleAr: "مستوى عالمي", titleEn: "Global standard", messageAr: globalReady ? "النظام جاهز لمراجعة إنتاج عالمية." : "النظام قوي داخلياً، لكنه لم يصل بعد لمستوى عالمي كامل.", messageEn: globalReady ? "The system is ready for global production review." : "The system is strong internally, but not yet fully global-grade.", evidenceAr: [`blockers=${missing.length}`, `finance=${financeSource}`], evidenceEn: [`blockers=${missing.length}`, `finance=${financeSource}`], actionsAr: ["أزل كل الموانع ثم نفذ اختبارات E2E."], actionsEn: ["Remove blockers, then run E2E tests."] }));
+    return aggregateReadiness(items);
+  } catch (error) {
+    console.warn("Production readiness check failed:", (error as { message?: string })?.message || error);
+    return aggregateReadiness([readinessItem({ id: "unknown", categoryAr: "جاهزية الإنتاج", categoryEn: "Production readiness", status: "unknown", risk: "critical", score: 0, titleAr: "تعذر الفحص", titleEn: "Check unavailable", messageAr: "تعذر إنشاء تقرير الجاهزية حالياً بدون عرض تفاصيل تقنية.", messageEn: "Could not generate readiness report right now without exposing technical details.", evidenceAr: ["تم إخفاء التفاصيل التقنية عن الواجهة."], evidenceEn: ["Technical details are hidden from the UI."], actionsAr: ["أعد الفحص وراجع سجلات الإدارة."], actionsEn: ["Re-run the check and review admin logs."] })]);
+  }
 }
