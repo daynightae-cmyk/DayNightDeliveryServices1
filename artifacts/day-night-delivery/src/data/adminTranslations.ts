@@ -29,6 +29,13 @@ export const statusLabel = (status: string, isArabic: boolean) => getLabel("stat
 export const financeTypeLabel = (type: string, isArabic: boolean) => getLabel("finance", type, isArabic);
 export const sectionFallbackLabel = (key: string, isArabic: boolean) => getLabel("fallback", key, isArabic);
 export const tableColumnLabel = (key: string, isArabic: boolean) => getLabel("table", key, isArabic);
+export function getAdminLabel(key: string, isArabic: boolean): string {
+  for (const group of ["field", "action", "kpi", "status", "fallback", "table", "finance"] as LabelGroup[]) {
+    const value = getLabel(group, key, isArabic);
+    if (value !== key) return value;
+  }
+  return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim();
+}
 
 export const adminSectionWorkspaceCopy = {
   ar: { filters: "الفلاتر والمدخلات", actions: "إجراءات جاهزة", currentRows: "الصفوف الحالية", empty: "لا توجد بيانات حقيقية مطابقة حالياً.", safeFallback: "إذا كان جدول متخصص غير متاح، يتم الاشتقاق بأمان من الطلبات دون عرض أخطاء Supabase الخام." },
