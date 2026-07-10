@@ -611,3 +611,120 @@ export async function fetchDriverStatements(): Promise<FinanceRow[]> {
   }
   return (data || []) as FinanceRow[];
 }
+
+export type DailyClosingStatus = "draft" | "needs_review" | "closed" | "reopened";
+export type DailyClosingSource = "rpc" | "view" | "derived" | "local";
+
+export type DailyClosingSnapshot = {
+  closing_date: string;
+  total_orders: number;
+  delivered_orders: number;
+  cancelled_orders: number;
+  returned_orders: number;
+  delivery_income: number;
+  cod_total: number;
+  cod_collected: number;
+  cod_pending: number;
+  cod_reconciled: number;
+  expenses_total: number;
+  adjustments_net: number;
+  net_total: number;
+  unassigned_orders: number;
+  pending_review_orders: number;
+  unreconciled_cod: number;
+  print_jobs_pending: number;
+  status: DailyClosingStatus;
+  source: "rpc" | "view" | "derived";
+  notes?: string;
+  snapshot?: Record<string, unknown>;
+};
+
+export type DailyClosingResult = {
+  snapshot: DailyClosingSnapshot | null;
+  source: DailyClosingSource;
+  saved: boolean;
+  warning?: string;
+};
+
+function normalizeDailyClosing(row: Record<string, unknown>): DailyClosingSnapshot {
+  return {
+    closing_date: String(row.closing_date || new Date().toISOString().slice(0, 10)),
+    total_orders: numberValue(row.total_orders),
+    delivered_orders: numberValue(row.delivered_orders),
+    cancelled_orders: numberValue(row.cancelled_orders),
+    returned_orders: numberValue(row.returned_orders),
+    delivery_income: numberValue(row.delivery_income),
+    cod_total: numberValue(row.cod_total),
+    cod_collected: numberValue(row.cod_collected),
+    cod_pending: numberValue(row.cod_pending),
+    cod_reconciled: numberValue(row.cod_reconciled),
+    expenses_total: numberValue(row.expenses_total),
+    adjustments_net: numberValue(row.adjustments_net),
+    net_total: numberValue(row.net_total),
+    unassigned_orders: numberValue(row.unassigned_orders),
+    pending_review_orders: numberValue(row.pending_review_orders),
+    unreconciled_cod: numberValue(row.unreconciled_cod),
+    print_jobs_pending: numberValue(row.print_jobs_pending),
+    status: ["draft", "needs_review", "closed", "reopened"].includes(String(row.status)) ? row.status as DailyClosingStatus : "draft",
+    source: ["rpc", "view"].includes(String(row.source)) ? row.source as "rpc" | "view" : "derived",
+    notes: clean(row.notes) || undefined,
+    snapshot: typeof row.snapshot === "object" && row.snapshot ? row.snapshot as Record<string, unknown> : {},
+  };
+}
+
+export async function fetchDailyClosing(date: string): Promise<DailyClosingResult> {
+  if (!supabase) return { snapshot: null, source: "local", saved: false, warning: "مراجعة محلية مؤقتة — لم يتم الحفظ في قاعدة البيانات." };
+  const { data, error } = await supabase.from("admin_daily_closings").select("*").eq("closing_date", date).maybeSingle();
+  if (error) {
+    console.warn("Daily closing fetch failed:", error.message);
+    return { snapshot: null, source: "local", saved: false, warning: "تعذر حفظ إغلاق اليوم في قاعدة البيانات، تم الاحتفاظ بالملخص مؤقتاً فقط." };
+  }
+  return { snapshot: data ? normalizeDailyClosing(data as Record<string, unknown>) : null, source: data ? "view" : "derived", saved: Boolean(data) };
+}
+
+export function buildDailyClosingSnapshot(date: string, orders: Order[], financeSummary: FinanceSummary | null, operationRows: FinanceRow[] = []): DailyClosingSnapshot {
+  const dayOrders = orders.filter((order) => String(order.created_at || order.updated_at || "").slice(0, 10) === date);
+  const delivered = dayOrders.filter((order) => /deliver|complete/.test(orderStatus(order)));
+  const cancelled = dayOrders.filter((order) => /cancel|fail/.test(orderStatus(order)));
+  const returned = dayOrders.filter((order) => /return/.test(orderStatus(order)));
+  const unassigned = dayOrders.filter((order) => !(order as Order & { driver_id?: string; assigned_driver_id?: string }).driver_id && !(order as Order & { driver_id?: string; assigned_driver_id?: string }).assigned_driver_id && !order.driver_name);
+  const pendingReview = dayOrders.filter((order) => /review|confirm|hold|pending/.test(orderStatus(order)));
+  const deliveryIncome = dayOrders.reduce((sum, order) => sum + orderDeliveryIncome(order), 0);
+  const codTotal = dayOrders.reduce((sum, order) => sum + numberValue(order.cod_amount), 0);
+  const codCollected = delivered.reduce((sum, order) => sum + numberValue(order.cod_amount), 0);
+  const codReconciled = numberValue(financeSummary?.cod_reconciled);
+  const expenses = numberValue(financeSummary?.total_expenses);
+  const adjustments = operationRows.reduce((sum, row) => sum + (clean(row.direction).toLowerCase() === "negative" ? -numberValue(row.amount) : numberValue(row.amount)), 0);
+  const codPending = Math.max(0, numberValue(financeSummary?.cod_pending, codTotal - codCollected));
+  const unreconciled = Math.max(0, codCollected - codReconciled);
+  const printPending = operationRows.filter((row) => /print|invoice|label/.test(clean(row.entry_type || row.adjustment_type || row.job_type || row.category || row.action || row.status)) && /draft|pending|queued/.test(clean(row.status))).length;
+  const status: DailyClosingStatus = codPending > 0 || unreconciled > 0 || pendingReview.length > 0 || unassigned.length > 0 ? "needs_review" : "draft";
+  return { closing_date: date, total_orders: dayOrders.length, delivered_orders: delivered.length, cancelled_orders: cancelled.length, returned_orders: returned.length, delivery_income: deliveryIncome, cod_total: codTotal, cod_collected: codCollected, cod_pending: codPending, cod_reconciled: codReconciled, expenses_total: expenses, adjustments_net: adjustments, net_total: deliveryIncome - expenses + adjustments, unassigned_orders: unassigned.length, pending_review_orders: pendingReview.length, unreconciled_cod: unreconciled, print_jobs_pending: printPending, status, source: "derived", snapshot: { generated_at: new Date().toISOString() } };
+}
+
+export async function saveDailyClosingSnapshot(snapshot: DailyClosingSnapshot): Promise<DailyClosingResult> {
+  if (!supabase) return { snapshot, source: "local", saved: false, warning: "مراجعة محلية مؤقتة — لم يتم الحفظ في قاعدة البيانات." };
+  const { data, error } = await supabase.from("admin_daily_closings").upsert({ ...snapshot, updated_at: new Date().toISOString() }, { onConflict: "closing_date" }).select("*").single();
+  if (error) {
+    console.warn("Daily closing save failed:", error.message);
+    return { snapshot, source: "local", saved: false, warning: "تعذر حفظ إغلاق اليوم في قاعدة البيانات، تم الاحتفاظ بالملخص مؤقتاً فقط." };
+  }
+  void createAdminAuditEvent({ entity_type: "admin_daily_closing", entity_id: String((data as FinanceRow).id || snapshot.closing_date), action: "save", after_data: data });
+  return { snapshot: normalizeDailyClosing(data as Record<string, unknown>), source: "view", saved: true };
+}
+
+export async function markDailyClosingReviewed(date: string, notes?: string): Promise<DailyClosingResult> {
+  const current = await fetchDailyClosing(date);
+  const snapshot = current.snapshot || buildDailyClosingSnapshot(date, [], null, []);
+  return saveDailyClosingSnapshot({ ...snapshot, status: "closed", notes: clean(notes || snapshot.notes || "Closing reviewed") });
+}
+
+export async function reopenDailyClosing(date: string, notes?: string): Promise<DailyClosingResult> {
+  const current = await fetchDailyClosing(date);
+  const snapshot = current.snapshot || buildDailyClosingSnapshot(date, [], null, []);
+  return saveDailyClosingSnapshot({ ...snapshot, status: "reopened", notes: clean(notes || snapshot.notes || "Reopen day") });
+}
+
+export async function fetchFinanceSummaryResult(): Promise<FinanceSummaryResult> {
+  return fetchFinanceSummary();
+}

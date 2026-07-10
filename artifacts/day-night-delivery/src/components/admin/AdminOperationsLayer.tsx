@@ -18,6 +18,7 @@ import {
   fetchExpenses,
   fetchMerchantStatementEntries,
   fetchPrintJobs,
+  markPrintJobPrinted,
   saveImportPreviewRows,
   validateImportRows,
   voidAdjustment,
@@ -98,6 +99,28 @@ function parseCsv(text: string): Record<string, string>[] {
   return lines.map((line) => Object.fromEntries(line.split(",").map((cell, index) => [headers[index] || `field_${index}`, cell.trim()])));
 }
 
+
+function printableRowsFromOrders(orders: Order[], isArabic: boolean): FinanceRow[] {
+  return orders.map((order) => ({
+    id: `derived-print-${order.id || order.tracking_number || order.invoice_number}`,
+    order_id: order.id || order.tracking_number || order.invoice_number,
+    tracking_number: order.tracking_number || order.invoice_number || order.id || "—",
+    entry_date: String(order.created_at || order.updated_at || new Date().toISOString()).slice(0, 10),
+    job_type: "invoice",
+    debit: Number(order.delivery_price || order.price || order.base_price || 0),
+    credit: Number(order.cod_amount || 0),
+    balance: Number(order.cod_amount || 0) + Number(order.delivery_price || order.price || order.base_price || 0),
+    status: "ready_from_orders",
+    merchant_name: order.merchant_name || order.sender_name || "—",
+    receiver_name: order.receiver_name || "—",
+    city: order.receiver_city || order.sender_city || "—",
+    document_type: isArabic ? "فاتورة" : "Invoice",
+    print_status: isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders",
+    notes: isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders",
+    created_at: order.created_at || new Date().toISOString(),
+  }));
+}
+
 function tablePdf(isArabic: boolean, title: string, rows: FinanceRow[]) {
   return {
     language: isArabic ? ("ar" as const) : ("en" as const),
@@ -162,7 +185,13 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
       if (id === "expenses") data = await fetchExpenses(filters);
       else if (id === "adjustments") data = await fetchAdjustments(filters);
       else if (id === "audit_log") data = await fetchAdminAuditEvents(filters);
-      else if (id === "print") data = await fetchPrintJobs(filters);
+      else if (id === "print") {
+        data = await fetchPrintJobs(filters);
+        if (!data.length && orders.length) {
+          data = printableRowsFromOrders(orders, isArabic);
+          setMessage(isArabic ? "لا توجد مهام طباعة محفوظة، لكن توجد طلبات جاهزة لإنشاء فواتير." : "No saved print jobs, but orders are ready for invoices.");
+        }
+      }
       else if (id === "cod") {
         data = await fetchCodCollections(filters);
         if (!data.length) {
@@ -277,17 +306,21 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
   async function makePrintJob() {
     const selected = orders.slice(0, 25).map((order) => order.id).filter(Boolean);
-    await createPrintJob({
-      job_type: "invoice",
-      language: isArabic ? "ar" : "en",
-      order_ids: selected,
-      merchant_id: merchantId || undefined,
-      filters,
-      pdf_payload: tablePdf(isArabic, title, rows),
-    });
-
-    setMessage(isArabic ? "تم إنشاء مهمة طباعة في الطابور." : "Print job queued.");
-    await load();
+    try {
+      await createPrintJob({
+        job_type: "invoice",
+        language: isArabic ? "ar" : "en",
+        order_ids: selected,
+        merchant_id: merchantId || undefined,
+        filters,
+        pdf_payload: tablePdf(isArabic, title, rows),
+      });
+      setMessage(isArabic ? "تم إنشاء مهمة الطباعة" : "Print job queued.");
+      await load();
+    } catch (error) {
+      console.warn("Print job save failed:", (error as Error)?.message || error);
+      setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database.");
+    }
   }
 
   async function approveFirst() {
@@ -383,8 +416,13 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
       {id === "print" && (
         <div className="dn-ops-form">
-          <button type="button" onClick={() => void makePrintJob()}>{actionLabel("createPrintJob", isArabic)}</button>
-          <span>{isArabic ? "تستخدم حمولة PDF الحالية وقائمة الطلبات المفلترة." : "Uses current PDF payload and filtered order list."}</span>
+          <button type="button" onClick={() => void makePrintJob()}>{isArabic ? "إنشاء مهمة طباعة" : "Create print job"}</button>
+          <AdminPdfExportButton label={isArabic ? "تصدير PDF" : "Export PDF"} payload={tablePdf(isArabic, title, rows)} />
+          <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة بوليصة" : "Print shipping label"}</button>
+          <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة فاتورة" : "Print invoice"}</button>
+          <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة كشف إحضار" : "Print pickup manifest"}</button>
+          <button type="button" onClick={async () => { const first = rows.find((row) => !String(row.id || "").startsWith("derived-print-")); if (first?.id) { await markPrintJobPrinted(String(first.id)); await load(); } else setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database."); }}>{isArabic ? "تحديد كمطبوع" : "Mark printed"}</button>
+          <span>{isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders"}</span>
         </div>
       )}
 
@@ -424,7 +462,7 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
         {!rows.length && (
           <div className="dn-ops-empty">
-            {isArabic ? "لا توجد بيانات محفوظة في هذا القسم حالياً. عند غياب الجداول المتخصصة يتم عرض مشتقات الطلبات حيثما أمكن." : "No saved data in this section right now. When specialized tables are missing, order-derived rows are shown where possible."}
+            {id === "print" ? (orders.length ? (isArabic ? "لا توجد مهام طباعة محفوظة، لكن توجد طلبات جاهزة لإنشاء فواتير." : "No saved print jobs, but orders are ready for invoices.") : (isArabic ? "لا توجد طلبات لإنشاء فواتير حالياً." : "No orders are available for invoices right now.")) : (isArabic ? "لا توجد بيانات محفوظة في هذا القسم حالياً. عند غياب الجداول المتخصصة يتم عرض مشتقات الطلبات حيثما أمكن." : "No saved data in this section right now. When specialized tables are missing, order-derived rows are shown where possible.")}
           </div>
         )}
       </div>
