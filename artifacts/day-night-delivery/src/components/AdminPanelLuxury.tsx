@@ -46,6 +46,7 @@ import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
 import AdminDailyClosingPanel from "./admin/AdminDailyClosingPanel";
 import AdminDatabaseHealthCenter from "./admin/AdminDatabaseHealthCenter";
+import AdminFinanceOperationsCenter from "./admin/AdminFinanceOperationsCenter";
 import AdminProductionReadinessCenter from "./admin/AdminProductionReadinessCenter";
 import AdminNotificationCenter, { AdminNotificationBell } from "./admin/AdminNotificationCenter";
 import { addAdminNotification, playAdminAudioEvent, readAdminAudioSettings, unlockAdminAudio } from "../lib/adminAudio";
@@ -661,6 +662,22 @@ export default function AdminPanelLuxury() {
       return (
         <section className="dn-admin-center-zone">
           <AdminDatabaseHealthCenter isArabic={isArabic} onNavigate={(id) => setSection(id)} />
+        </section>
+      );
+    }
+
+    if (active === "finance_dashboard") {
+      return (
+        <section className="dn-admin-center-zone">
+          <AdminFinanceOperationsCenter
+            isArabic={isArabic}
+            orders={orders}
+            merchants={merchants}
+            financeSummary={financeSummary}
+            financeSummarySource={financeSummarySource}
+            onRefresh={refreshAdminData}
+            onNavigate={(id) => setSection(id as SectionId)}
+          />
         </section>
       );
     }
