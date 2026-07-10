@@ -26,7 +26,7 @@ import {
   Maximize2,
   RefreshCw,
 } from "lucide-react";
-import { AdminIconBadge, AdminStateChip } from "./adminIconSystem";
+import { AdminIconBadge, AdminStateChip, IconizedMapControlButton } from "./adminIconSystem";
 import { defaultLocations } from "../../data/defaultLocations";
 import { adminMapRegions, orderRegionId } from "../../data/adminCommandExpansion";
 import {
@@ -233,9 +233,9 @@ function MapCommandControls({
     { key: "zoom-out", label: isArabic ? "تصغير الخريطة" : "Zoom out", Icon: ZoomOut, action: () => map.zoomOut() },
     { key: "reset", label: isArabic ? "إعادة ضبط الخريطة" : "Reset map", Icon: LocateFixed, action: resetMap },
     { key: "fit", label: isArabic ? "ملاءمة المسار" : "Fit route", Icon: Maximize2, action: fitRoute },
-    { key: "driver", label: isArabic ? "تمركز على الإمارات" : "Center UAE", Icon: Navigation, action: () => map.setView(driver, 13, { animate: true }) },
+    { key: "uae", label: isArabic ? "تمركز على الإمارات" : "Center UAE", Icon: Navigation, action: () => map.setView(defaultLocations.abuDhabi, 8, { animate: true }) },
   ];
-  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, Icon, action }) => <button key={key} type="button" className="dn-map-control-button" aria-label={label} title={label} onClick={action}><Icon className="h-4 w-4" aria-hidden="true" /></button>)}</div>;
+  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, action }) => <IconizedMapControlButton key={key} icon={key === "zoom-in" ? "zoom-in" : key === "zoom-out" ? "zoom-out" : key === "fit" ? "fit-route" : key === "reset" ? "reset-map" : "map"} title={label} ariaLabel={label} onClick={action} />)}</div>;
 }
 
 export default function AdminLiveOperationsMap({
