@@ -46,6 +46,7 @@ import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
 import AdminDailyClosingPanel from "./admin/AdminDailyClosingPanel";
 import AdminDatabaseHealthCenter from "./admin/AdminDatabaseHealthCenter";
+import AdminProductionReadinessCenter from "./admin/AdminProductionReadinessCenter";
 import AdminNotificationCenter, { AdminNotificationBell } from "./admin/AdminNotificationCenter";
 import { addAdminNotification, playAdminAudioEvent, readAdminAudioSettings, unlockAdminAudio } from "../lib/adminAudio";
 import SpecializedAdminSectionWorkspace from "./admin/AdminSectionWorkspace";
@@ -92,6 +93,7 @@ const menu = [
   { id: "settings", ar: "الإعدادات", en: "Settings", groupAr: "النظام", groupEn: "System", Icon: Settings },
   { id: "support", ar: "الدعم الفني", en: "Technical Support", groupAr: "النظام", groupEn: "System", Icon: Headphones },
   { id: "database_health", ar: "فحص قاعدة البيانات", en: "Database Health", groupAr: "النظام", groupEn: "System", Icon: Database },
+  { id: "production_readiness", ar: "جاهزية الإنتاج", en: "Production Readiness", groupAr: "النظام", groupEn: "System", Icon: ShieldCheck },
   { id: "logout", ar: "تسجيل الخروج", en: "Logout", groupAr: "النظام", groupEn: "System", Icon: LogOut },
 ] as const;
 
@@ -659,6 +661,14 @@ export default function AdminPanelLuxury() {
       return (
         <section className="dn-admin-center-zone">
           <AdminDatabaseHealthCenter isArabic={isArabic} onNavigate={(id) => setSection(id)} />
+        </section>
+      );
+    }
+
+    if (active === "production_readiness") {
+      return (
+        <section className="dn-admin-center-zone">
+          <AdminProductionReadinessCenter isArabic={isArabic} onNavigate={(id) => setSection(id as SectionId)} />
         </section>
       );
     }
