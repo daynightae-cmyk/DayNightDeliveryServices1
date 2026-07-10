@@ -49,6 +49,7 @@ import AdminDatabaseHealthCenter from "./admin/AdminDatabaseHealthCenter";
 import AdminFinanceOperationsCenter from "./admin/AdminFinanceOperationsCenter";
 import AdminProductionReadinessCenter from "./admin/AdminProductionReadinessCenter";
 import AdminNotificationCenter, { AdminNotificationBell } from "./admin/AdminNotificationCenter";
+import { AdminIconBadge, AdminStateChip, type AdminIconName } from "./admin/adminIconSystem";
 import { addAdminNotification, playAdminAudioEvent, readAdminAudioSettings, unlockAdminAudio } from "../lib/adminAudio";
 import SpecializedAdminSectionWorkspace from "./admin/AdminSectionWorkspace";
 import type { AdminSectionId } from "./admin/AdminSectionRegistry";
@@ -59,6 +60,7 @@ import "../styles/dn-admin-task2.css";
 import "../styles/dn-admin-task3.css";
 import "../styles/dn-admin-pdf.css";
 import "../styles/dn-admin-audio.css";
+import "../styles/dn-admin-iconography.css";
 
 const menu = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: Home },
@@ -170,6 +172,9 @@ const copy = {
     loading: "تحميل البيانات الحية...",
     lastSync: "آخر مزامنة",
     liveData: "متصل بالبيانات الحية",
+    sourceLive: "المصدر: قاعدة البيانات",
+    sourceDerived: "بيانات مشتقة مؤقتاً",
+    openSection: "اضغط لفتح القسم المناسب",
     quickActions: "إجراءات سريعة",
     addOrder: "إضافة طلب",
     addMerchant: "إضافة تاجر",
@@ -220,6 +225,9 @@ const copy = {
     loading: "Loading live data...",
     lastSync: "Last sync",
     liveData: "Connected to live data",
+    sourceLive: "Source: database",
+    sourceDerived: "Temporary derived data",
+    openSection: "Open the relevant section",
     quickActions: "Quick Actions",
     addOrder: "Add Order",
     addMerchant: "Add Merchant",
@@ -401,13 +409,12 @@ function KhalifaPanel({
         <p>{ui.helperRole}</p>
         <small>{ui.helperText}</small>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-white/80">
-          <span>{ui.liveData}</span>
-          <span>{activeTitle}</span>
-          <span>{ui.lastSync}</span>
-          <span>{lastSyncAt ? lastSyncAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE") : "—"}</span>
-          <span>{isArabic ? "بدون مندوب" : "Unassigned"}</span>
-          <span>{metrics.unassigned}</span>
+        <AdminStateChip name="live-data" tone="success">{ui.liveData}</AdminStateChip>
+
+        <div className="mt-3 grid gap-2 text-xs font-black text-white/80">
+          <div className="dn-khalifa-status-row"><span><AdminIconBadge name="dashboard" />{isArabic ? "القسم الحالي" : "Current section"}</span><b>{activeTitle}</b></div>
+          <div className="dn-khalifa-status-row"><span><AdminIconBadge name="live-data" />{ui.lastSync}</span><b>{lastSyncAt ? lastSyncAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE") : "—"}</b></div>
+          <div className="dn-khalifa-status-row"><span><AdminIconBadge name="unassigned-orders" />{isArabic ? "بدون مندوب" : "Unassigned"}</span><b>{metrics.unassigned}</b></div>
         </div>
 
         <button type="button">{ui.ask}</button>
@@ -540,22 +547,22 @@ export default function AdminPanelLuxury() {
 
   function renderDashboardCenter() {
     const kpis = [
-      { label: ui.totalOrders, value: metrics.total, Icon: ClipboardList },
-      { label: ui.activeOrders, value: metrics.active, Icon: Truck },
-      { label: ui.deliveredOrders, value: metrics.delivered, Icon: PackageCheck },
-      { label: ui.unassignedOrders, value: metrics.unassigned, Icon: AlertTriangle },
-      { label: ui.codTotal, value: money(metrics.codTotal), Icon: Wallet },
-      { label: ui.income, value: money(metrics.income), Icon: BarChart3 },
+      { label: ui.totalOrders, value: metrics.total, icon: "orders" as AdminIconName, hint: ui.sourceLive },
+      { label: ui.activeOrders, value: metrics.active, icon: "active-orders" as AdminIconName, hint: isArabic ? "قيد التنفيذ" : "In progress" },
+      { label: ui.deliveredOrders, value: metrics.delivered, icon: "delivered-orders" as AdminIconName, hint: isArabic ? "مكتملة" : "Completed" },
+      { label: ui.unassignedOrders, value: metrics.unassigned, icon: "unassigned-orders" as AdminIconName, hint: isArabic ? "تحتاج تعيين" : "Needs assignment" },
+      { label: ui.codTotal, value: money(metrics.codTotal), icon: "cod" as AdminIconName, hint: ui.sourceDerived },
+      { label: ui.income, value: money(metrics.income), icon: "income" as AdminIconName, hint: ui.sourceDerived },
     ];
     const quickActions = [
-      { title: ui.addOrder, hint: ui.addOrderHint, Icon: PackagePlus, onClick: () => setSection("new_order") },
-      { title: ui.addMerchant, hint: ui.addMerchantHint, Icon: UserRoundPlus, onClick: () => setSection("new_merchant") },
-      { title: ui.reviewPending, hint: ui.reviewPendingHint, Icon: ClipboardList, onClick: () => setSection("review") },
-      { title: ui.openFinance, hint: ui.openFinanceHint, Icon: BarChart3, onClick: () => setSection("finance_dashboard") },
-      { title: ui.databaseHealth, hint: ui.databaseHealthHint, Icon: Database, onClick: () => setSection("database_health") },
-      { title: ui.productionReadiness, hint: ui.productionReadinessHint, Icon: ShieldCheck, onClick: () => setSection("production_readiness") },
-      { title: ui.exportPdf, hint: ui.exportPdfHint, Icon: FileText, pdf: true },
-      { title: ui.refreshData, hint: ui.refreshDataHint, Icon: RotateCcw, onClick: () => void refreshAdminData() },
+      { title: ui.addOrder, hint: ui.addOrderHint, icon: "add-order" as AdminIconName, onClick: () => setSection("new_order") },
+      { title: ui.addMerchant, hint: ui.addMerchantHint, icon: "add-merchant" as AdminIconName, onClick: () => setSection("new_merchant") },
+      { title: ui.reviewPending, hint: ui.reviewPendingHint, icon: "review-orders" as AdminIconName, onClick: () => setSection("review") },
+      { title: ui.openFinance, hint: ui.openFinanceHint, icon: "finance" as AdminIconName, onClick: () => setSection("finance_dashboard") },
+      { title: ui.databaseHealth, hint: ui.databaseHealthHint, icon: "database-health" as AdminIconName, onClick: () => setSection("database_health") },
+      { title: ui.productionReadiness, hint: ui.productionReadinessHint, icon: "production-readiness" as AdminIconName, onClick: () => setSection("production_readiness") },
+      { title: ui.exportPdf, hint: ui.exportPdfHint, icon: "pdf-export" as AdminIconName, pdf: true },
+      { title: ui.refreshData, hint: ui.refreshDataHint, icon: "refresh" as AdminIconName, onClick: () => void refreshAdminData() },
     ];
 
     return (
@@ -567,11 +574,12 @@ export default function AdminPanelLuxury() {
         </header>
 
         <div className="dn-admin-section-kpis dn-admin-dashboard-kpis">
-          {kpis.map(({ label, value, Icon }) => (
+          {kpis.map(({ label, value, icon, hint }) => (
             <article key={label}>
-              <Icon className="h-5 w-5" />
+              <AdminIconBadge name={icon} className="dn-admin-kpi-icon" />
               <strong>{value}</strong>
               <span>{label}</span>
+              <small>{hint}</small>
             </article>
           ))}
         </div>
@@ -589,16 +597,16 @@ export default function AdminPanelLuxury() {
             </div>
 
             <div className="dn-admin-action-grid">
-              {quickActions.map(({ title, hint, Icon, onClick, pdf }) => (
+              {quickActions.map(({ title, hint, icon, onClick, pdf }) => (
                 pdf ? (
                   <div className="dn-admin-action-tile dn-admin-action-tile-pdf" key={title} role="group" aria-label={title}>
-                    <span className="dn-admin-action-icon"><Icon className="h-5 w-5" /></span>
+                    <AdminIconBadge name={icon} className="dn-admin-action-icon" />
                     <span className="dn-admin-action-copy"><strong className="dn-admin-action-title">{title}</strong><small className="dn-admin-action-hint">{hint}</small></span>
                     <AdminPdfExportButton label={title} payload={buildDashboardPdfPayload(isArabic, activeTitle, metrics)} />
                   </div>
                 ) : (
                   <button type="button" className="dn-admin-action-tile" key={title} onClick={onClick} aria-label={`${title} · ${hint}`}>
-                    <span className="dn-admin-action-icon"><Icon className="h-5 w-5" /></span>
+                    <AdminIconBadge name={icon} className="dn-admin-action-icon" />
                     <span className="dn-admin-action-copy"><strong className="dn-admin-action-title">{title}</strong><small className="dn-admin-action-hint">{hint}</small></span>
                   </button>
                 )
@@ -823,7 +831,7 @@ export default function AdminPanelLuxury() {
                       onClick={() => setSection(item.id)}
                       className={selected ? "is-active" : ""}
                     >
-                      <Icon className="h-4 w-4" />
+                      <span className="dn-admin-sidebar-icon"><Icon className="h-4 w-4" /></span>
                       <span>{getMenuLabel(item, isArabic)}</span>
                     </button>
                   );

@@ -214,11 +214,11 @@ export default function KhalifaGuidanceFeed({
           <ChevronRight className="h-4 w-4" />
         </button>
 
-        <button type="button" onClick={() => setPaused((value) => !value)}>
+        <button type="button" onClick={() => setPaused((value) => !value)} aria-label={paused ? (isArabic ? "تشغيل التدوير" : "Play rotation") : (isArabic ? "إيقاف التدوير" : "Pause rotation")}>
           {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
         </button>
 
-        <button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""}>
+        <button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""} aria-label={isArabic ? "تثبيت التوصية" : "Pin insight"}>
           <Pin className="h-4 w-4" />
         </button>
 
