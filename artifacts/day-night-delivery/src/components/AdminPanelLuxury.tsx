@@ -175,7 +175,18 @@ const copy = {
     addMerchant: "إضافة تاجر",
     reviewPending: "مراجعة الطلبات",
     openFinance: "فتح المالية",
+    databaseHealth: "فحص قاعدة البيانات",
+    productionReadiness: "جاهزية الإنتاج",
     exportPdf: "تصدير PDF",
+    refreshData: "تحديث البيانات",
+    addOrderHint: "طلب جديد",
+    addMerchantHint: "ملف تاجر",
+    reviewPendingHint: "قائمة المراجعة",
+    openFinanceHint: "COD والكشوفات",
+    databaseHealthHint: "Supabase والجداول",
+    productionReadinessHint: "فحص الإطلاق",
+    exportPdfHint: "ملخص القيادة",
+    refreshDataHint: "مزامنة حية",
     systemAlert: "تنبيه النظام",
     cleanFallback: "إذا كان جدول متخصص غير متاح، يتم الاشتقاق بأمان من الطلبات دون عرض أخطاء Supabase الخام.",
   },
@@ -214,7 +225,18 @@ const copy = {
     addMerchant: "Add Merchant",
     reviewPending: "Review Pending",
     openFinance: "Open Finance",
+    databaseHealth: "Database Health",
+    productionReadiness: "Production Readiness",
     exportPdf: "Export PDF",
+    refreshData: "Refresh Data",
+    addOrderHint: "New shipment",
+    addMerchantHint: "Merchant profile",
+    reviewPendingHint: "Review queue",
+    openFinanceHint: "COD & statements",
+    databaseHealthHint: "Supabase tables",
+    productionReadinessHint: "Launch checks",
+    exportPdfHint: "Command summary",
+    refreshDataHint: "Live sync",
     systemAlert: "System Alert",
     cleanFallback: "If a specialized table is unavailable, this workspace safely derives from orders without exposing raw Supabase schema errors.",
   },
@@ -525,16 +547,26 @@ export default function AdminPanelLuxury() {
       { label: ui.codTotal, value: money(metrics.codTotal), Icon: Wallet },
       { label: ui.income, value: money(metrics.income), Icon: BarChart3 },
     ];
+    const quickActions = [
+      { title: ui.addOrder, hint: ui.addOrderHint, Icon: PackagePlus, onClick: () => setSection("new_order") },
+      { title: ui.addMerchant, hint: ui.addMerchantHint, Icon: UserRoundPlus, onClick: () => setSection("new_merchant") },
+      { title: ui.reviewPending, hint: ui.reviewPendingHint, Icon: ClipboardList, onClick: () => setSection("review") },
+      { title: ui.openFinance, hint: ui.openFinanceHint, Icon: BarChart3, onClick: () => setSection("finance_dashboard") },
+      { title: ui.databaseHealth, hint: ui.databaseHealthHint, Icon: Database, onClick: () => setSection("database_health") },
+      { title: ui.productionReadiness, hint: ui.productionReadinessHint, Icon: ShieldCheck, onClick: () => setSection("production_readiness") },
+      { title: ui.exportPdf, hint: ui.exportPdfHint, Icon: FileText, pdf: true },
+      { title: ui.refreshData, hint: ui.refreshDataHint, Icon: RotateCcw, onClick: () => void refreshAdminData() },
+    ];
 
     return (
-      <section className="dn-admin-center-zone">
-        <header className="dn-admin-main-title">
+      <section className="dn-admin-center-zone dn-admin-dashboard-polished">
+        <header className="dn-admin-main-title dn-admin-dashboard-hero">
           <span>{ui.commandCenter}</span>
           <h1>{ui.welcome}</h1>
           <p>{ui.subtitle}</p>
         </header>
 
-        <div className="dn-admin-section-kpis">
+        <div className="dn-admin-section-kpis dn-admin-dashboard-kpis">
           {kpis.map(({ label, value, Icon }) => (
             <article key={label}>
               <Icon className="h-5 w-5" />
@@ -544,55 +576,48 @@ export default function AdminPanelLuxury() {
           ))}
         </div>
 
-        <div className="dn-admin-section-panels">
-          <div>
-            <h2>{ui.quickActions}</h2>
-            <p>• {ui.cleanFallback}</p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setSection("new_order")}>
-                {ui.addOrder}
-              </button>
-              <button type="button" onClick={() => setSection("new_merchant")}>
-                {ui.addMerchant}
-              </button>
-              <button type="button" onClick={() => setSection("review")}>
-                {ui.reviewPending}
-              </button>
-              <button type="button" onClick={() => setSection("finance_dashboard")}>
-                {ui.openFinance}
-              </button>
-            </div>
+        <section className="dn-admin-map-first-grid" aria-label={isArabic ? "الخريطة والإجراءات السريعة" : "Map and quick actions"}>
+          <div className="dn-admin-map-primary">
+            <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
           </div>
 
-          <div>
+          <aside className="dn-admin-quick-actions-compact" aria-label={ui.quickActions}>
+            <div className="dn-admin-quick-actions-head">
+              <span>{isArabic ? "لوحة تنفيذ" : "Action console"}</span>
+              <h2>{ui.quickActions}</h2>
+              <p>{ui.cleanFallback}</p>
+            </div>
+
+            <div className="dn-admin-action-grid">
+              {quickActions.map(({ title, hint, Icon, onClick, pdf }) => (
+                pdf ? (
+                  <div className="dn-admin-action-tile dn-admin-action-tile-pdf" key={title} role="group" aria-label={title}>
+                    <span className="dn-admin-action-icon"><Icon className="h-5 w-5" /></span>
+                    <span className="dn-admin-action-copy"><strong className="dn-admin-action-title">{title}</strong><small className="dn-admin-action-hint">{hint}</small></span>
+                    <AdminPdfExportButton label={title} payload={buildDashboardPdfPayload(isArabic, activeTitle, metrics)} />
+                  </div>
+                ) : (
+                  <button type="button" className="dn-admin-action-tile" key={title} onClick={onClick} aria-label={`${title} · ${hint}`}>
+                    <span className="dn-admin-action-icon"><Icon className="h-5 w-5" /></span>
+                    <span className="dn-admin-action-copy"><strong className="dn-admin-action-title">{title}</strong><small className="dn-admin-action-hint">{hint}</small></span>
+                  </button>
+                )
+              ))}
+            </div>
+          </aside>
+        </section>
+
+        <section className="dn-admin-dashboard-secondary-grid">
+          <article className="dn-admin-secondary-panel">
             <h2>{ui.liveData}</h2>
-            <p>
-              {ui.lastSync}:{" "}
-              <b>
-                {lastSyncAt
-                  ? lastSyncAt.toLocaleString(isArabic ? "ar-AE" : "en-AE")
-                  : "—"}
-              </b>
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
+            <p>{ui.lastSync}: <b>{lastSyncAt ? lastSyncAt.toLocaleString(isArabic ? "ar-AE" : "en-AE") : "—"}</b></p>
+            <div className="dn-admin-compact-action-row">
               <AdminNotificationBell isArabic={isArabic} onOpen={() => setNotificationsOpen(true)} />
-              <button type="button" onClick={() => void refreshAdminData()}>
-                {ui.refresh}
-              </button>
-              <AdminPdfExportButton payload={buildDashboardPdfPayload(isArabic, activeTitle, metrics)} />
+              <button type="button" onClick={() => void refreshAdminData()}>{ui.refresh}</button>
             </div>
-          </div>
-        </div>
+            {financeWarning && <p className="dn-clean-note">{isArabic ? "ملخص مالي مشتق مؤقتاً من الطلبات" : "Finance summary temporarily derived from orders"}</p>}
+          </article>
 
-        <div className="dn-admin-core-full">
-          <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
-          <AdminDailyClosingPanel isArabic={isArabic} orders={orders} financeSummary={financeSummary} financeSummarySource={financeSummarySource} onNavigate={(target) => setSection(target as SectionId)} />
-          {financeWarning && <p className="dn-clean-note">{isArabic ? "ملخص مالي مشتق مؤقتاً من الطلبات" : "Finance summary temporarily derived from orders"}</p>}
-        </div>
-
-        <div className="dn-admin-bottom-cards">
           {[
             [ui.latest, ui.noUpdates, FileText],
             [ui.shipmentInfo, ui.noData, PackageCheck],
@@ -600,18 +625,17 @@ export default function AdminPanelLuxury() {
             [ui.quickHelp, ui.preparing, Headphones],
           ].map(([title, text, Icon]) => {
             const CardIcon = Icon as typeof FileText;
-
             return (
-              <article key={String(title)}>
-                <div>
-                  <CardIcon className="h-6 w-6" />
-                </div>
+              <article className="dn-admin-secondary-panel" key={String(title)}>
+                <div className="dn-admin-secondary-icon"><CardIcon className="h-5 w-5" /></div>
                 <strong>{title as string}</strong>
                 <p>{text as string}</p>
               </article>
             );
           })}
-        </div>
+
+          <AdminDailyClosingPanel isArabic={isArabic} orders={orders} financeSummary={financeSummary} financeSummarySource={financeSummarySource} onNavigate={(target) => setSection(target as SectionId)} />
+        </section>
       </section>
     );
   }
