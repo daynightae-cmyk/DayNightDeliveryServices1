@@ -201,7 +201,7 @@ const copy = {
     liveData: "Connected to live data",
     quickActions: "Quick Actions",
     addOrder: "Add Order",
-    addMerchant: "New Merchant",
+    addMerchant: "Add Merchant",
     reviewPending: "Review Pending",
     openFinance: "Open Finance",
     exportPdf: "Export PDF",
@@ -220,10 +220,6 @@ function normalize(value: unknown) {
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} AED`;
-}
-
-function getOrderAmount(order: any) {
-  return Number(order?.cod_amount || order?.delivery_price || order?.price || order?.total_amount || 0);
 }
 
 function getOrderIncome(order: any) {
@@ -289,7 +285,13 @@ function buildMetrics(orders: any[]): MetricMap {
     abuDhabi: orders.filter(isAbuDhabi).length,
     external: orders.filter(isExternal).length,
     outScope: orders.filter(isOutScope).length,
-    unassigned: orders.filter((order) => isActive(order) && !order?.driver_id && !order?.assigned_driver_id && !order?.driver_name).length,
+    unassigned: orders.filter(
+      (order) =>
+        isActive(order) &&
+        !order?.driver_id &&
+        !order?.assigned_driver_id &&
+        !order?.driver_name,
+    ).length,
     codTotal: orders.reduce((sum, order) => sum + Number(order?.cod_amount || 0), 0),
     income: orders.reduce((sum, order) => sum + getOrderIncome(order), 0),
   };
@@ -343,6 +345,7 @@ function KhalifaPanel({
   useEffect(() => {
     const handler = () => setAvatarNonce((value) => value + 1);
     window.addEventListener("dn-admin-settings-change", handler);
+
     return () => window.removeEventListener("dn-admin-settings-change", handler);
   }, []);
 
@@ -406,14 +409,14 @@ export default function AdminPanelLuxury() {
 
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
-
   const metrics = useMemo(() => buildMetrics(orders), [orders]);
 
   const groupedMenu = useMemo(() => {
-    return menu.reduce<Record<string, typeof menu[number][]>>((acc, item) => {
+    return menu.reduce<Record<string, (typeof menu)[number][]>>((acc, item) => {
       const group = isArabic ? item.groupAr : item.groupEn;
       acc[group] = acc[group] || [];
       acc[group].push(item);
+
       return acc;
     }, {});
   }, [isArabic]);
@@ -474,11 +477,6 @@ export default function AdminPanelLuxury() {
     setMobileMenu(false);
   }
 
-  function openOperations() {
-    setActive("all_orders");
-    setMobileMenu(false);
-  }
-
   function renderDashboardCenter() {
     const kpis = [
       { label: ui.totalOrders, value: metrics.total, Icon: ClipboardList },
@@ -511,11 +509,20 @@ export default function AdminPanelLuxury() {
           <div>
             <h2>{ui.quickActions}</h2>
             <p>• {ui.cleanFallback}</p>
+
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setSection("new_order")}>{ui.addOrder}</button>
-              <button type="button" onClick={() => setSection("new_merchant")}>{ui.addMerchant}</button>
-              <button type="button" onClick={() => setSection("review")}>{ui.reviewPending}</button>
-              <button type="button" onClick={() => setSection("finance_dashboard")}>{ui.openFinance}</button>
+              <button type="button" onClick={() => setSection("new_order")}>
+                {ui.addOrder}
+              </button>
+              <button type="button" onClick={() => setSection("new_merchant")}>
+                {ui.addMerchant}
+              </button>
+              <button type="button" onClick={() => setSection("review")}>
+                {ui.reviewPending}
+              </button>
+              <button type="button" onClick={() => setSection("finance_dashboard")}>
+                {ui.openFinance}
+              </button>
             </div>
           </div>
 
@@ -523,10 +530,17 @@ export default function AdminPanelLuxury() {
             <h2>{ui.liveData}</h2>
             <p>
               {ui.lastSync}:{" "}
-              <b>{lastSyncAt ? lastSyncAt.toLocaleString(isArabic ? "ar-AE" : "en-AE") : "—"}</b>
+              <b>
+                {lastSyncAt
+                  ? lastSyncAt.toLocaleString(isArabic ? "ar-AE" : "en-AE")
+                  : "—"}
+              </b>
             </p>
+
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => void refreshAdminData()}>{ui.refresh}</button>
+              <button type="button" onClick={() => void refreshAdminData()}>
+                {ui.refresh}
+              </button>
               <AdminPdfExportButton payload={buildDashboardPdfPayload(isArabic, activeTitle, metrics)} />
             </div>
           </div>
@@ -544,9 +558,12 @@ export default function AdminPanelLuxury() {
             [ui.quickHelp, ui.preparing, Headphones],
           ].map(([title, text, Icon]) => {
             const CardIcon = Icon as typeof FileText;
+
             return (
               <article key={String(title)}>
-                <div><CardIcon className="h-6 w-6" /></div>
+                <div>
+                  <CardIcon className="h-6 w-6" />
+                </div>
                 <strong>{title as string}</strong>
                 <p>{text as string}</p>
               </article>
@@ -694,6 +711,7 @@ export default function AdminPanelLuxury() {
             {Object.entries(groupedMenu).map(([group, items]) => (
               <section key={group}>
                 <h3>{group}</h3>
+
                 {items.map((item) => {
                   const Icon = item.Icon;
                   const selected = active === item.id;
@@ -730,6 +748,7 @@ export default function AdminPanelLuxury() {
                 <Languages className="h-4 w-4" />
                 {ui.language}
               </button>
+
               <button type="button" onClick={() => void refreshAdminData()}>
                 {ui.refresh}
               </button>
