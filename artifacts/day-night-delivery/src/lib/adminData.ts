@@ -948,3 +948,109 @@ export async function fetchAdminProductionReadiness(): Promise<AdminProductionRe
     return aggregateReadiness([readinessItem({ id: "unknown", categoryAr: "جاهزية الإنتاج", categoryEn: "Production readiness", status: "unknown", risk: "critical", score: 0, titleAr: "تعذر الفحص", titleEn: "Check unavailable", messageAr: "تعذر إنشاء تقرير الجاهزية حالياً بدون عرض تفاصيل تقنية.", messageEn: "Could not generate readiness report right now without exposing technical details.", evidenceAr: ["تم إخفاء التفاصيل التقنية عن الواجهة."], evidenceEn: ["Technical details are hidden from the UI."], actionsAr: ["أعد الفحص وراجع سجلات الإدارة."], actionsEn: ["Re-run the check and review admin logs."] })]);
   }
 }
+
+export type CodReconciliationCandidate = {
+  orderId?: string;
+  trackingNumber: string;
+  merchantId?: string;
+  driverId?: string;
+  codAmount: number;
+  collectedAmount: number;
+  reconciledAmount: number;
+  pendingAmount: number;
+  status: "pending" | "partial" | "collected" | "reconciled";
+  createdAt?: string;
+};
+
+export type CodReconciliationSummary = {
+  totalCod: number;
+  collected: number;
+  reconciled: number;
+  pending: number;
+  candidates: CodReconciliationCandidate[];
+  source: "db" | "derived";
+  warning?: string;
+};
+
+export type StatementSummary = {
+  entityType: "merchant" | "driver";
+  entityId?: string;
+  entityName?: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  rows: FinanceRow[];
+  source: "db" | "derived";
+  warning?: string;
+};
+
+function rowAmount(row: FinanceRow, key: string) { return numberValue(row[key], 0); }
+function cleanStatus(value: unknown): CodReconciliationCandidate["status"] {
+  const status = clean(value).toLowerCase();
+  if (status.includes("reconcile")) return "reconciled";
+  if (status.includes("collect")) return "collected";
+  if (status.includes("partial")) return "partial";
+  return "pending";
+}
+function candidateFromCodRow(row: FinanceRow): CodReconciliationCandidate {
+  const codAmount = rowAmount(row, "cod_amount") || rowAmount(row, "amount");
+  const collectedAmount = rowAmount(row, "collected_amount");
+  const reconciledAmount = /reconcile|closed/.test(clean(row.status).toLowerCase()) ? (rowAmount(row, "reconciled_amount") || collectedAmount || codAmount) : rowAmount(row, "reconciled_amount");
+  return { orderId: clean(row.order_id) || undefined, trackingNumber: clean(row.tracking_number || row.invoice_number || row.order_id || row.id) || "—", merchantId: clean(row.merchant_id) || undefined, driverId: clean(row.driver_id) || undefined, codAmount, collectedAmount, reconciledAmount, pendingAmount: Math.max(0, codAmount - reconciledAmount), status: cleanStatus(row.status), createdAt: clean(row.created_at) || undefined };
+}
+function candidateFromOrder(order: Order): CodReconciliationCandidate {
+  const codAmount = numberValue(order.cod_amount, 0);
+  const delivered = /deliver|complete/.test(orderStatus(order));
+  const driverId = clean((order as Order & { driver_id?: string; assigned_driver_id?: string }).driver_id || (order as Order & { driver_id?: string; assigned_driver_id?: string }).assigned_driver_id) || undefined;
+  return { orderId: order.id, trackingNumber: clean(order.tracking_number || order.invoice_number || order.id) || "—", merchantId: clean(order.merchant_id) || undefined, driverId, codAmount, collectedAmount: delivered ? codAmount : 0, reconciledAmount: 0, pendingAmount: delivered ? codAmount : codAmount, status: delivered ? "collected" : "pending", createdAt: clean(order.created_at) || undefined };
+}
+
+export async function fetchCodReconciliationSummary(): Promise<CodReconciliationSummary> {
+  try {
+    const dbRows = await fetchCodCollections();
+    if (dbRows.length) {
+      const candidates = dbRows.map(candidateFromCodRow);
+      return { totalCod: candidates.reduce((s, c) => s + c.codAmount, 0), collected: candidates.reduce((s, c) => s + c.collectedAmount, 0), reconciled: candidates.reduce((s, c) => s + c.reconciledAmount, 0), pending: candidates.reduce((s, c) => s + c.pendingAmount, 0), candidates, source: "db" };
+    }
+  } catch { /* clean fallback below */ }
+  const orders = await fetchAdminOrders();
+  const candidates = orders.filter((order) => numberValue(order.cod_amount, 0) > 0).map(candidateFromOrder);
+  return { totalCod: candidates.reduce((s, c) => s + c.codAmount, 0), collected: candidates.reduce((s, c) => s + c.collectedAmount, 0), reconciled: 0, pending: candidates.reduce((s, c) => s + c.pendingAmount, 0), candidates, source: "derived", warning: "Finance COD reconciliation is temporarily derived from orders until cod_collections is available." };
+}
+
+export async function reconcileCodCollection(payload: { orderId?: string; trackingNumber?: string; merchantId?: string; driverId?: string; codAmount: number; collectedAmount: number; reconciledAmount?: number; paymentMethod?: string; referenceNumber?: string; notes?: string; }): Promise<FinanceRow> {
+  const prepared = { order_id: payload.orderId, tracking_number: payload.trackingNumber, merchant_id: payload.merchantId, driver_id: payload.driverId, cod_amount: Math.max(0, numberValue(payload.codAmount)), collected_amount: Math.max(0, numberValue(payload.collectedAmount)), reconciled_amount: Math.max(0, numberValue(payload.reconciledAmount, payload.collectedAmount)), payment_method: clean(payload.paymentMethod || "cash"), reference_number: clean(payload.referenceNumber), notes: clean(payload.notes), status: "reconciled", reconciled_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const row = await insertTableRow("cod_collections", prepared);
+  void createAdminAuditEvent({ entity_type: "cod_collection", entity_id: String(row.id || row.tracking_number || ""), action: "reconcile", after_data: row });
+  return row;
+}
+
+function summarizeStatement(entityType: "merchant" | "driver", rows: FinanceRow[], source: "db" | "derived", entityId?: string, warning?: string): StatementSummary {
+  const debit = rows.reduce((sum, row) => sum + rowAmount(row, "debit"), 0);
+  const credit = rows.reduce((sum, row) => sum + rowAmount(row, "credit"), 0);
+  const lastBalance = rows.length ? rowAmount(rows[rows.length - 1], "balance") : credit - debit;
+  return { entityType, entityId, debit, credit, balance: lastBalance || credit - debit, rows, source, warning };
+}
+
+export async function fetchMerchantStatementSummary(merchantId?: string): Promise<StatementSummary> {
+  try { const rows = await fetchMerchantStatementEntries({ merchantId }); if (rows.length) return summarizeStatement("merchant", rows, "db", merchantId); } catch { /* derived */ }
+  const orders = await fetchAdminOrders();
+  const rows = deriveMerchantStatementFromOrders(merchantId, orders);
+  return summarizeStatement("merchant", rows, "derived", merchantId, "Merchant statement is temporarily derived from orders until merchant_statement_entries is available.");
+}
+
+export async function fetchDriverStatementSummary(driverId?: string): Promise<StatementSummary> {
+  try { const rows = await fetchDriverStatementEntries({ driverId }); if (rows.length) return summarizeStatement("driver", rows, "db", driverId); } catch { /* derived */ }
+  const orders = await fetchAdminOrders();
+  const rows = deriveDriverStatementFromOrders(driverId, orders);
+  return summarizeStatement("driver", rows, "derived", driverId, "Driver statement is temporarily derived from orders until driver_statement_entries is available.");
+}
+
+export async function fetchFinanceAuditSummary(): Promise<{ totalEvents: number; recentEvents: FinanceRow[]; source: "db" | "empty" | "unavailable"; warning?: string }> {
+  try {
+    const rows = await fetchAdminAuditEvents();
+    return { totalEvents: rows.length, recentEvents: rows.slice(0, 8), source: rows.length ? "db" : "empty", warning: rows.length ? undefined : "Audit table is available but no finance actions are recorded yet." };
+  } catch {
+    return { totalEvents: 0, recentEvents: [], source: "unavailable", warning: "Finance audit trail is unavailable. Do not treat operations as final without audit history." };
+  }
+}

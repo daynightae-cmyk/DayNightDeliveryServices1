@@ -63,6 +63,26 @@ function healthAnswer(checks: AdminDbHealthCheck[], isArabic: boolean, question:
   return summary;
 }
 
+function financeRiskAnswer(props: Props, question: string) {
+  const { isArabic, financeSummary, activeSection } = props;
+  const q = norm(question);
+  const wants = /هل أصرف للتجار|هل أصرف للمناديب|هل cod متسوي|هل المالية جاهزة|ما خطر المالية|ما أول إجراء مالي|ما صافي اليوم|هل أقدر أقفل اليوم|pay merchants|pay drivers|cod reconciled|finance ready|finance risk|first finance action|today'?s net|close today/i.test(q);
+  if (!wants) return "";
+  const pendingCod = Number(financeSummary?.cod_pending || 0);
+  const reconciled = Number(financeSummary?.cod_reconciled || 0);
+  const collected = Number(financeSummary?.cod_collected || 0);
+  const net = Number(financeSummary?.net_estimate || 0);
+  const sourceNote = /finance|مالية/i.test(activeSection || "") ? (isArabic ? "إن كان مصدر المالية Derived fallback فلا تعتبر الأرقام نهائية." : "If finance source is Derived fallback, numbers are not final.") : (isArabic ? "افتح مركز المالية للتأكد من مصدر البيانات." : "Open Finance Center to verify the data source.");
+  const codNote = pendingCod > 0 || collected > reconciled ? (isArabic ? `COD غير مكتمل: معلق ${money(pendingCod)} وغير مسوى تقديرياً ${money(Math.max(0, collected - reconciled))}.` : `COD is not complete: pending ${money(pendingCod)} and estimated unreconciled ${money(Math.max(0, collected - reconciled))}.`) : (isArabic ? "COD لا يظهر عليه تعليق في الملخص الحالي." : "COD does not show a pending balance in the current summary.");
+  if (/أصرف للتجار|pay merchants/i.test(q)) return pendingCod > 0 ? (isArabic ? `${codNote} لا تصرف للتجار قبل فتح مركز المالية ثم تسوية COD وكشوفات التجار.` : `${codNote} Do not pay merchants before opening Finance Center and reconciling COD/merchant statements.`) : (isArabic ? `يمكن التحضير للصرف لكن راجع كشوفات التجار أولاً. ${sourceNote}` : `You can prepare payout, but review merchant statements first. ${sourceNote}`);
+  if (/أصرف للمناديب|pay drivers/i.test(q)) return pendingCod > 0 ? (isArabic ? `${codNote} صرف المناديب موقوف حتى لا يبقى COD على المندوب.` : `${codNote} Driver payout is blocked until assigned COD is cleared.`) : (isArabic ? `راجع كشوفات المناديب ثم صدّر التقرير. ${sourceNote}` : `Review driver statements then export the report. ${sourceNote}`);
+  if (/cod متسوي|cod reconciled/i.test(q)) return `${codNote} ${isArabic ? "افتح التحصيل COD من مركز المالية." : "Open COD collections from Finance Center."}`;
+  if (/خطر المالية|finance risk/i.test(q)) return pendingCod > 0 ? (isArabic ? `الخطر الأول ماليًا هو COD المعلق. ${codNote}` : `The first finance risk is pending COD. ${codNote}`) : (isArabic ? `الخطر الحالي هو الاعتماد على مصدر غير DB-backed إن كان ظاهراً كمشتق. ${sourceNote}` : `Current risk is relying on non DB-backed data if the source is derived. ${sourceNote}`);
+  if (/أول إجراء مالي|first finance action/i.test(q)) return pendingCod > 0 ? (isArabic ? "أول إجراء: افتح مركز المالية ثم تسوية COD قبل الصرف أو إغلاق اليوم." : "First action: open Finance Center and reconcile COD before payout or daily closing.") : (isArabic ? "أول إجراء: راجع مصدر البيانات ثم صدّر كشوفات التجار والمناديب." : "First action: verify data source, then export merchant and driver statements.");
+  if (/صافي اليوم|today'?s net/i.test(q)) return isArabic ? `صافي اليوم التقديري ${money(net)}. ${sourceNote}` : `Estimated net is ${money(net)}. ${sourceNote}`;
+  return pendingCod > 0 ? (isArabic ? `المالية تحتاج مراجعة قبل الإغلاق أو الصرف. ${codNote}` : `Finance needs review before closing or payout. ${codNote}`) : (isArabic ? `المالية تبدو قابلة للمراجعة، لكن لا تعتبرها نهائية إذا كان المصدر مشتقاً. ${sourceNote}` : `Finance looks reviewable, but not final if source is derived. ${sourceNote}`);
+}
+
 function answer(question: string, props: Props): string {
   const { orders, merchants, financeSummary, isArabic, activeSection } = props;
   const q = norm(question);
@@ -70,6 +90,8 @@ function answer(question: string, props: Props): string {
   if (readinessResponse) return readinessResponse;
   const healthResponse = healthAnswer(loadedHealthChecks(props), isArabic, question);
   if (healthResponse) return healthResponse;
+  const financeResponse = financeRiskAnswer(props, question);
+  if (financeResponse) return financeResponse;
   const metrics = deriveCommandMetrics(orders, merchants, financeSummary);
   const delivered = orders.filter((o) => /deliver|complete/.test(norm(o.status)));
   const unassigned = orders.filter((o) => !o.driver_code && !o.driver_name && !o.driver_phone);
@@ -116,7 +138,7 @@ export default function KhalifaLiveAssistant(props: Props) {
   const latest = history[0]?.answer;
   const hint = props.isArabic ? "اسأل خليفة عن التحصيل، المناديب، المصروفات، التجار..." : "Ask Khalifa about COD, drivers, expenses, merchants...";
   const note = props.isArabic ? "الإجابة مبنية على البيانات المحملة حالياً" : "Answer is based on currently loaded data";
-  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "كم COD المتبقي؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟", "هل قاعدة البيانات جاهزة؟", "هل finance_summary شغال؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?", "Is the database ready?", "Is finance_summary working?", "Is the app production ready?", "What blocks global readiness?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
+  const examples = useMemo(() => { const base = props.isArabic ? ["هل أقدر أقفل اليوم؟", "هل أصرف للتجار؟", "ما خطر المالية الآن؟", "ما صافي اليوم؟", "افتح التحصيل", "افتح المصروفات", "ما سبب عدم إغلاق اليوم؟", "هل قاعدة البيانات جاهزة؟", "هل finance_summary شغال؟"] : ["Can I close today?", "What is pending COD?", "What is today's net?", "Open COD reconciliation", "Open expenses", "Why should I not close today?", "Is the database ready?", "Is finance_summary working?", "Is the app production ready?", "What blocks global readiness?"]; const section = props.activeSection || ""; return /مصروف|expense/i.test(section) ? [base[5], base[4], base[1], ...base.slice(0,3)] : /تاجر|merchant/i.test(section) ? [base[2], base[0], base[4], ...base.slice(3,5)] : /مندوب|driver|pickup|إحضار/i.test(section) ? [base[3], base[0], base[1], ...base.slice(4)] : base; }, [props.isArabic, props.activeSection]);
   function askNow(text: string) { const trimmed = text.trim(); if (!trimmed) return; playAdminAudioEvent("click"); setLoading(true); window.setTimeout(() => { const nextAnswer = answer(trimmed, props); addAdminNotification({ type: "khalifa", sectionId: props.activeSection || "khalifa", priority: /لا تغلق|نقص|بدون مندوب|missing|unassigned|خطر/i.test(nextAnswer) ? "high" : "normal", dedupeKey: `khalifa:${trimmed.slice(0, 40)}`, audioEvent: "khalifa_insight", titleAr: "توصية خليفة", titleEn: "Khalifa recommendation", bodyAr: nextAnswer, bodyEn: nextAnswer }); setHistory((items) => [{ id: `${Date.now()}`, question: trimmed, answer: nextAnswer }, ...items].slice(0, 6)); setQuestion(""); setLoading(false); }, 120); }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); askNow(question); }
   return <section className="dn-khalifa-live"><form onSubmit={submit}><label>{hint}</label><textarea value={question} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setQuestion(event.target.value)} placeholder={hint} rows={3} /><div className="dn-khalifa-live-actions"><button type="submit" disabled={loading}><Send className="h-4 w-4" />{loading ? (props.isArabic ? "يفكر..." : "Thinking...") : (props.isArabic ? "إرسال" : "Send")}</button><button type="button" onClick={() => setHistory([])}><Trash2 className="h-4 w-4" />{props.isArabic ? "مسح" : "Clear"}</button></div></form><small>{note}</small><div className="dn-khalifa-examples">{examples.map((item) => <button type="button" key={item} onClick={() => askNow(item)}>{item}</button>)}</div>{latest && <article className="dn-khalifa-answer"><strong>{props.isArabic ? "إجابة خليفة" : "Khalifa answer"}</strong><p>{latest}</p></article>}<ul>{history.slice(0, 4).map((item) => <li key={item.id}><b>{item.question}</b><span>{item.answer}</span></li>)}</ul></section>;
