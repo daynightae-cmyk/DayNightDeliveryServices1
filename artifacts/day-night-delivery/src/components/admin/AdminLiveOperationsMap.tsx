@@ -81,9 +81,9 @@ const driverIcon = L.divIcon({
 });
 
 const modeLabels = [
-  { mode: "standard" as const, ar: "عرض عادي", en: "Standard view" },
-  { mode: "satellite" as const, ar: "عرض فضائي", en: "Satellite view" },
-  { mode: "terrain" as const, ar: "عرض تضاريس", en: "Terrain view" },
+  { mode: "standard" as const, ar: "عرض عادي", en: "Standard view", icon: "map" as const },
+  { mode: "satellite" as const, ar: "عرض فضائي", en: "Satellite view", icon: "layers" as const },
+  { mode: "terrain" as const, ar: "عرض تضاريس", en: "Terrain view", icon: "route" as const },
 ];
 
 const statusFilters = [
@@ -571,6 +571,7 @@ export default function AdminLiveOperationsMap({
             aria-label={isArabic ? item.ar : item.en}
             className={mapMode === item.mode ? "is-active" : ""}
           >
+            <AdminIconBadge name={item.icon} className="!h-6 !w-6 !min-w-6" />
             {isArabic ? item.ar : item.en}
           </button>
         ))}
@@ -586,6 +587,7 @@ export default function AdminLiveOperationsMap({
               onClick={() => setRegion(region.id)}
               className={regionFilter === region.id ? "is-active" : ""}
             >
+              <AdminIconBadge name={region.id === "external" ? "external-orders" : "map"} className="!h-6 !w-6 !min-w-6" />
               {isArabic ? region.ar : region.en}
             </button>
           ))}

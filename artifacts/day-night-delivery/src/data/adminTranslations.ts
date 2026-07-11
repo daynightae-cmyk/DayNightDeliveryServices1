@@ -34,7 +34,7 @@ export function getAdminLabel(key: string, isArabic: boolean): string {
     const value = getLabel(group, key, isArabic);
     if (value !== key) return value;
   }
-  return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim();
+  return isArabic ? "غير محدد" : key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim().replace(/^./, (char) => char.toUpperCase()) || "Undefined";
 }
 
 export const adminSectionWorkspaceCopy = {
