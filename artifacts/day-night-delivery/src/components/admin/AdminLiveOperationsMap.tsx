@@ -9,6 +9,7 @@ import {
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import "../../styles/dn-admin-video-map-final.css";
 import L from "leaflet";
 import {
   AlertTriangle,
@@ -533,7 +534,7 @@ export default function AdminLiveOperationsMap({
 
   return (
     <section
-      className="w-full max-w-[680px] rounded-[28px] border border-brand-gold/20 bg-[#031226]/95 p-3 shadow-2xl shadow-black/25"
+      className="dn-video-clean-live-map w-full max-w-[920px] rounded-[28px] border border-brand-gold/20 bg-[#031226]/95 p-3 shadow-2xl shadow-black/25"
       dir={isArabic ? "rtl" : "ltr"}
       aria-label={isArabic ? "خريطة العمليات الحية" : "Live operations map"}
     >
@@ -647,7 +648,7 @@ export default function AdminLiveOperationsMap({
         </div>
       )}
 
-      <div className="mt-3 w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#020812]" style={{ aspectRatio: "1 / 1" }}>
+      <div className="dn-video-map-square mt-3 w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#020812]" style={{ aspectRatio: "1 / 1" }}>
         <MapContainer
           key={`${mapMode}-${refreshNonce}`}
           center={driverPos}
@@ -731,7 +732,7 @@ export default function AdminLiveOperationsMap({
         </MapContainer>
       </div>
 
-      <footer className="mt-3 grid gap-2 rounded-3xl border border-white/10 bg-[#05182f]/70 p-3 text-[0.7rem] font-black text-white/75 sm:grid-cols-2 lg:grid-cols-3">
+      <footer className="dn-video-map-summary mt-3 grid gap-2 rounded-3xl border border-white/10 bg-[#05182f]/70 p-3 text-[0.7rem] font-black text-white/75 sm:grid-cols-2 lg:grid-cols-3">
         <span className="inline-flex items-center gap-2">
           <MapPin className="h-3.5 w-3.5 text-brand-gold" />
           {isArabic ? pickup.labelAr : pickup.labelEn}
