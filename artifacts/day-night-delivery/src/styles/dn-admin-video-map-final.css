@@ -1,0 +1,216 @@
+/* DAY NIGHT — final video-reviewed admin map cleanup.
+   This file is imported by AdminLiveOperationsMap.tsx and intentionally uses higher
+   selector specificity than older visual-rescue rules so the live map does not shrink,
+   collide with quick actions, or leave a large empty command-center gap. */
+
+html body .dn-admin-fullscreen .dn-admin-map-first-grid {
+  display: grid !important;
+  grid-template-columns: minmax(560px, 0.68fr) minmax(250px, 0.32fr) !important;
+  align-items: start !important;
+  justify-content: stretch !important;
+  gap: clamp(0.85rem, 1.4vw, 1.25rem) !important;
+  width: 100% !important;
+  max-width: 1180px !important;
+  margin-inline: auto !important;
+}
+
+html body .dn-admin-fullscreen .dn-admin-map-primary {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  justify-self: stretch !important;
+  margin: 0 !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-clean-live-map {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  border-radius: 1.45rem !important;
+  padding: clamp(0.7rem, 1vw, 0.95rem) !important;
+  background: linear-gradient(145deg, rgba(3, 18, 38, 0.96), rgba(2, 8, 18, 0.94)) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-clean-live-map header {
+  gap: 0.75rem !important;
+  border-radius: 1.2rem !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-clean-live-map label,
+html body .dn-admin-fullscreen .dn-video-clean-live-map select,
+html body .dn-admin-fullscreen .dn-video-clean-live-map input,
+html body .dn-admin-fullscreen .dn-video-clean-live-map button {
+  min-width: 0 !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-clean-live-map svg {
+  width: 0.95rem !important;
+  height: 0.95rem !important;
+  min-width: 0.95rem !important;
+  min-height: 0.95rem !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-clean-live-map [aria-pressed="true"] {
+  border-color: rgba(250, 204, 21, 0.72) !important;
+  background: rgba(250, 204, 21, 0.15) !important;
+  color: #facc15 !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square {
+  position: relative !important;
+  aspect-ratio: 1 / 1 !important;
+  width: 100% !important;
+  min-height: 560px !important;
+  max-height: min(72vh, 760px) !important;
+  border-radius: 1.35rem !important;
+  isolation: isolate !important;
+  background: #020812 !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square .leaflet-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  border-radius: inherit !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square .leaflet-control-container {
+  pointer-events: none !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square .leaflet-control-container *,
+html body .dn-admin-fullscreen .dn-video-map-square [role="toolbar"],
+html body .dn-admin-fullscreen .dn-video-map-square [role="toolbar"] * {
+  pointer-events: auto !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square [role="toolbar"] {
+  display: grid !important;
+  gap: 0.38rem !important;
+  padding: 0.35rem !important;
+  border-radius: 0.9rem !important;
+  background: rgba(2, 8, 18, 0.68) !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square [role="toolbar"] button {
+  width: 2.05rem !important;
+  height: 2.05rem !important;
+  min-width: 2.05rem !important;
+  min-height: 2.05rem !important;
+  border-radius: 0.72rem !important;
+  padding: 0 !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-square [role="toolbar"] button svg {
+  width: 0.9rem !important;
+  height: 0.9rem !important;
+  min-width: 0.9rem !important;
+  min-height: 0.9rem !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-summary {
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+html body .dn-admin-fullscreen .dn-video-map-summary span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html body .dn-admin-fullscreen .dn-admin-quick-actions-compact {
+  max-width: none !important;
+  width: 100% !important;
+  align-self: start !important;
+  justify-self: stretch !important;
+}
+
+html body .dn-admin-fullscreen .dn-admin-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+}
+
+html body .dn-admin-fullscreen .dn-admin-action-tile,
+html body .dn-admin-fullscreen .dn-iconized-action-tile {
+  min-height: 4rem !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 1500px) {
+  html body .dn-admin-fullscreen .dn-admin-map-first-grid {
+    grid-template-columns: minmax(640px, 0.7fr) minmax(280px, 0.3fr) !important;
+    max-width: 1280px !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-map-square {
+    min-height: 620px !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  html body .dn-admin-fullscreen .dn-admin-map-first-grid {
+    grid-template-columns: minmax(520px, 1fr) minmax(240px, 300px) !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-map-square {
+    min-height: 500px !important;
+  }
+}
+
+@media (max-width: 1080px) {
+  html body .dn-admin-fullscreen .dn-admin-map-first-grid {
+    grid-template-columns: 1fr !important;
+    max-width: 820px !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-admin-quick-actions-compact {
+    order: -1 !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-admin-action-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  html body .dn-admin-fullscreen .dn-video-clean-live-map header > div:nth-child(2),
+  html body .dn-admin-fullscreen .dn-video-clean-live-map header > div:nth-child(3) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-map-square {
+    min-height: 420px !important;
+    max-height: none !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-admin-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  html body .dn-admin-fullscreen .dn-video-clean-live-map {
+    padding: 0.6rem !important;
+    border-radius: 1rem !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-clean-live-map header > div:nth-child(2),
+  html body .dn-admin-fullscreen .dn-video-clean-live-map header > div:nth-child(3) {
+    grid-template-columns: 1fr !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-map-square {
+    min-height: 340px !important;
+    border-radius: 0.95rem !important;
+  }
+
+  html body .dn-admin-fullscreen .dn-video-map-summary {
+    grid-template-columns: 1fr !important;
+  }
+}
