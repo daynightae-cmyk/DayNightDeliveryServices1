@@ -1,299 +1,576 @@
-/* Post-merge admin visual rescue: icon visibility, spacing, and blank-area prevention. */
+/*
+  DAY NIGHT admin final visual rescue.
+  This file is intentionally imported last by AdminPanelLuxury.tsx.
+  It fixes the real production issue where legacy global rules hide aria-hidden SVGs,
+  leaving gold circles without icons.
+*/
+
+/* ------------------------------------------------------------
+   Critical fix: old CSS hides every [aria-hidden="true"] inside admin.
+   Lucide icons are intentionally aria-hidden, so force admin SVGs visible again.
+------------------------------------------------------------ */
+body:has(.dn-admin-fullscreen) .dn-admin-icon-badge[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-iconized-icon[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-sidebar-icon[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-secondary-icon[aria-hidden="true"] {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+body:has(.dn-admin-fullscreen) .dn-admin-icon-badge svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-state-chip svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-iconized svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-iconized-action-tile svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-map-control-button svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-khalifa-question-chip svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-side-nav svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-section-card svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-empty-state svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-secondary-icon svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-section-workspace svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-live-map-shell svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-map-route-summary svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-top-actions svg[aria-hidden="true"],
+body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ------------------------------------------------------------
+   Icon primitives
+------------------------------------------------------------ */
 .dn-admin-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  min-width: 2rem;
-  border: 1px solid rgba(250, 204, 21, 0.35);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(14, 165, 233, 0.12));
-  color: #facc15;
-  box-shadow: 0 0 18px rgba(250, 204, 21, 0.12);
-  flex: 0 0 auto;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.2rem !important;
+  height: 2.2rem !important;
+  min-width: 2.2rem !important;
+  min-height: 2.2rem !important;
+  border: 1px solid rgba(250, 204, 21, 0.44) !important;
+  border-radius: 0.95rem !important;
+  background: radial-gradient(circle at 30% 18%, rgba(255, 240, 170, 0.24), rgba(250, 204, 21, 0.16) 36%, rgba(14, 165, 233, 0.14) 100%) !important;
+  color: #facc15 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 18px rgba(250, 204, 21, 0.12) !important;
+  flex: 0 0 auto !important;
+  line-height: 0 !important;
 }
 
 .dn-admin-icon-badge svg,
+.dn-admin-svg-icon,
+.dn-admin-state-icon,
 .dn-iconized svg,
 .dn-iconized-action-tile svg,
 .dn-map-control-button svg,
 .dn-khalifa-question-chip svg,
 .dn-admin-side-nav svg,
 .dn-admin-section-card svg,
-.dn-admin-empty-state svg {
-  display: block;
-  width: 1rem;
-  height: 1rem;
-  min-width: 1rem;
-  min-height: 1rem;
-  stroke: currentColor;
-  color: currentColor;
-  opacity: 1;
-  overflow: visible;
-  flex-shrink: 0;
+.dn-admin-empty-state svg,
+.dn-admin-secondary-icon svg,
+.dn-section-workspace svg,
+.dn-live-map-shell svg,
+.dn-map-route-summary svg {
+  display: block !important;
+  width: 1.08rem !important;
+  height: 1.08rem !important;
+  min-width: 1.08rem !important;
+  min-height: 1.08rem !important;
+  stroke: currentColor !important;
+  color: currentColor !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
 }
 
-.dn-iconized,
-.dn-iconized-action-tile,
-.dn-iconized-panel-header,
-.dn-admin-empty-state {
-  border: 1px solid rgba(250, 204, 21, 0.18);
-  border-radius: 1.35rem;
-  background: linear-gradient(145deg, rgba(7, 26, 51, 0.9), rgba(2, 8, 18, 0.86));
+.dn-admin-kpi-icon {
+  width: 2.45rem !important;
+  height: 2.45rem !important;
+  min-width: 2.45rem !important;
+  border-radius: 1.05rem !important;
 }
 
+/* Remove old decorative pseudo dots/corners that were mistaken for icons. */
+.dn-admin-action-tile::before,
+.dn-admin-action-tile::after,
+.dn-admin-secondary-panel::before,
+.dn-admin-secondary-panel::after,
+.dn-admin-dashboard-kpis > article::before,
+.dn-admin-dashboard-kpis > article::after,
+.dn-section-panels > article::before,
+.dn-section-panels > article::after,
+.dn-section-table-card::before,
+.dn-section-table-card::after,
+.dn-khalifa-current::before,
+.dn-khalifa-current::after {
+  content: none !important;
+  display: none !important;
+}
+
+.dn-admin-card-corner,
+.dn-khalifa-dot,
+.dn-status-dot,
+.dn-live-dot,
+.dn-map-dot,
+.icon-dot,
+.empty-circle,
+.corner-badge {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------
+   State chips and badges
+------------------------------------------------------------ */
+.dn-admin-state-chip,
+.dn-map-state-chip,
+.dn-source-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.42rem !important;
+  min-height: 1.8rem !important;
+  border-radius: 999px !important;
+  padding: 0.34rem 0.72rem !important;
+  border: 1px solid rgba(116, 177, 255, 0.24) !important;
+  background: rgba(6, 20, 46, 0.74) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-size: 0.72rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.dn-admin-state-chip.is-success,
+.dn-admin-state-chip.is-gold {
+  border-color: rgba(52, 211, 153, 0.38) !important;
+  color: #bbf7d0 !important;
+}
+
+.dn-admin-state-chip.is-warning {
+  border-color: rgba(245, 183, 0, 0.48) !important;
+  color: #fde68a !important;
+}
+
+.dn-admin-state-chip.is-danger,
+.dn-admin-state-chip.is-error {
+  border-color: rgba(248, 113, 113, 0.48) !important;
+  color: #fecaca !important;
+}
+
+/* ------------------------------------------------------------
+   Dashboard KPI cards
+------------------------------------------------------------ */
+.dn-admin-dashboard-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+  gap: 0.85rem !important;
+}
+
+.dn-admin-dashboard-kpis > article {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  grid-template-areas:
+    "icon value"
+    "icon label"
+    "icon hint" !important;
+  align-items: center !important;
+  gap: 0.22rem 0.78rem !important;
+  min-height: 6.4rem !important;
+  padding: 1rem !important;
+  border: 1px solid rgba(24, 168, 232, 0.18) !important;
+  border-radius: 1.35rem !important;
+  background: linear-gradient(145deg, rgba(7, 26, 51, 0.86), rgba(2, 8, 18, 0.78)) !important;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.dn-admin-dashboard-kpis .dn-admin-icon-badge { grid-area: icon !important; }
+.dn-admin-dashboard-kpis > article > strong { grid-area: value !important; color: #facc15 !important; font-size: 1.25rem !important; font-weight: 1000 !important; }
+.dn-admin-dashboard-kpis > article > span { grid-area: label !important; color: #fff !important; font-weight: 950 !important; }
+.dn-admin-dashboard-kpis > article > small { grid-area: hint !important; color: rgba(255, 255, 255, 0.58) !important; font-size: 0.72rem !important; font-weight: 800 !important; }
+
+/* ------------------------------------------------------------
+   Quick actions
+------------------------------------------------------------ */
+.dn-admin-action-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.75rem !important;
+}
+
+.dn-admin-action-tile,
 .dn-iconized-action-tile {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 4.25rem;
-  padding: 0.85rem 1rem;
-  text-align: start;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+  min-height: 4.35rem !important;
+  padding: 0.8rem !important;
+  text-align: start !important;
+  border: 1px solid rgba(245, 183, 0, 0.24) !important;
+  border-radius: 1.1rem !important;
+  background: linear-gradient(145deg, rgba(8, 26, 49, 0.74), rgba(3, 18, 38, 0.58)) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
-.dn-iconized-icon,
-.dn-khalifa-feed-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.3rem;
-  height: 2.3rem;
-  min-width: 2.3rem;
-  border-radius: 0.95rem;
-  background: rgba(250, 204, 21, 0.14);
-  color: #facc15;
+.dn-admin-action-copy,
+.dn-iconized-action-tile > span:last-child,
+.dn-iconized-content {
+  display: grid !important;
+  gap: 0.2rem !important;
+  min-width: 0 !important;
 }
 
-.dn-section-workspace,
-.dn-admin-section-card,
-.dn-section-panels,
-.dn-admin-main-panel {
-  min-height: 0 !important;
+.dn-admin-action-title,
+.dn-iconized strong,
+.dn-iconized-action-tile strong {
+  color: #ffffff !important;
+  font-weight: 1000 !important;
+  line-height: 1.25 !important;
+}
+
+.dn-admin-action-hint,
+.dn-iconized em,
+.dn-iconized p,
+.dn-iconized small,
+.dn-iconized-action-tile em {
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 0.72rem !important;
+  font-style: normal !important;
+  font-weight: 800 !important;
+  line-height: 1.45 !important;
+}
+
+.dn-admin-action-tile-pdf .dn-admin-pdf-export-button,
+.dn-admin-action-tile-pdf button:last-child {
+  margin-inline-start: auto !important;
+  min-height: 2.2rem !important;
+  padding: 0.38rem 0.62rem !important;
+  border-radius: 0.75rem !important;
+}
+
+/* ------------------------------------------------------------
+   Secondary cards and empty states
+------------------------------------------------------------ */
+.dn-admin-dashboard-secondary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 0.85rem !important;
+  align-items: stretch !important;
+}
+
+.dn-admin-secondary-panel {
+  display: grid !important;
+  align-content: start !important;
+  gap: 0.65rem !important;
+  min-height: 9rem !important;
+  padding: 1rem !important;
+  border: 1px solid rgba(24, 168, 232, 0.16) !important;
+  border-radius: 1.35rem !important;
+  background: linear-gradient(145deg, rgba(7, 26, 51, 0.82), rgba(2, 8, 18, 0.74)) !important;
+}
+
+.dn-admin-secondary-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.4rem !important;
+  height: 2.4rem !important;
+  min-width: 2.4rem !important;
+  border-radius: 0.95rem !important;
+  border: 1px solid rgba(250, 204, 21, 0.36) !important;
+  background: rgba(250, 204, 21, 0.12) !important;
+  color: #facc15 !important;
 }
 
 .dn-admin-empty-state,
 .dn-iconized-empty {
-  display: grid;
-  place-items: center;
-  gap: 0.65rem;
+  display: grid !important;
+  place-items: center !important;
+  gap: 0.65rem !important;
   min-height: 170px !important;
-  padding: 1.5rem;
-  text-align: center;
+  padding: 1.5rem !important;
+  text-align: center !important;
+  border: 1px dashed rgba(116, 177, 255, 0.26) !important;
+  border-radius: 1.25rem !important;
+  background: linear-gradient(135deg, rgba(6, 20, 46, 0.72), rgba(2, 8, 18, 0.52)) !important;
+  color: #fff !important;
 }
 
-.dn-section-table-wrap .dn-iconized-empty { margin: 1rem; }
+/* ------------------------------------------------------------
+   Khalifa panel
+------------------------------------------------------------ */
+.dn-khalifa-status-row,
+.dn-khalifa-current-top span,
+.dn-khalifa-live-actions button,
+.dn-khalifa-examples button,
+.dn-khalifa-question-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+}
 
+.dn-khalifa-status-row {
+  justify-content: space-between !important;
+  width: 100% !important;
+  border: 1px solid rgba(116, 177, 255, 0.2) !important;
+  border-radius: 1rem !important;
+  background: rgba(5, 18, 43, 0.58) !important;
+  padding: 0.55rem 0.65rem !important;
+}
+
+.dn-admin-khalifa-card button,
+.dn-khalifa-live-actions button,
+.dn-khalifa-examples button,
+.dn-khalifa-question-chip {
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  border-radius: 999px !important;
+  background: rgba(5, 18, 43, 0.78) !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+}
+
+.dn-khalifa-current-metric,
+.dn-khalifa-rotator-controls span {
+  border: 1px solid rgba(250, 204, 21, 0.28) !important;
+  border-radius: 999px !important;
+  padding: 0.35rem 0.6rem !important;
+  background: rgba(250, 204, 21, 0.1) !important;
+  color: #facc15 !important;
+  font-weight: 1000 !important;
+}
+
+/* ------------------------------------------------------------
+   Map shell and controls
+------------------------------------------------------------ */
+.dn-live-map-shell {
+  min-height: 420px !important;
+  max-height: 520px !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  border-radius: 1.55rem !important;
+  border: 1px solid rgba(24, 168, 232, 0.24) !important;
+  box-shadow: 0 22px 72px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(250, 204, 21, 0.08) inset !important;
+}
+
+.dn-map-control-dock {
+  position: absolute !important;
+  z-index: 680 !important;
+  inset-inline-end: 1rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: grid !important;
+  gap: 0.45rem !important;
+}
+
+.dn-map-control-button {
+  width: 42px !important;
+  height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(250, 204, 21, 0.36) !important;
+  border-radius: 0.95rem !important;
+  background: rgba(2, 8, 18, 0.88) !important;
+  color: #facc15 !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.dn-map-mode-bar button,
+.dn-map-region-chips button,
+.dn-map-action-bar button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.42rem !important;
+  min-height: 2.35rem !important;
+}
+
+.dn-map-mode-bar button.is-active,
+.dn-map-region-chips button.is-active,
+.dn-map-control-button.is-active,
+.dn-admin-side-nav button.is-active,
+.dn-admin-side-nav button[aria-current="page"] {
+  border-color: rgba(250, 204, 21, 0.65) !important;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.25), rgba(14, 165, 233, 0.12)) !important;
+  color: #facc15 !important;
+}
+
+/* ------------------------------------------------------------
+   Interaction states
+------------------------------------------------------------ */
 .dn-section-workspace button,
 .dn-iconized-action-tile,
+.dn-admin-action-tile,
 .dn-map-control-button,
 .dn-map-mode-bar button,
 .dn-map-region-chips button,
 .dn-map-action-bar button,
 .dn-khalifa-rotator-controls button,
 .dn-khalifa-question-chip,
-.dn-admin-side-nav button {
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+.dn-admin-side-nav button,
+.dn-admin-compact-action-row button,
+.dn-admin-top-actions button {
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease !important;
 }
 
 .dn-section-workspace button:hover:not(:disabled),
 .dn-iconized-action-tile:hover:not(:disabled),
+.dn-admin-action-tile:hover:not(:disabled),
 .dn-map-control-button:hover:not(:disabled),
 .dn-map-mode-bar button:hover:not(:disabled),
 .dn-map-region-chips button:hover:not(:disabled),
 .dn-map-action-bar button:hover:not(:disabled),
 .dn-khalifa-rotator-controls button:hover:not(:disabled),
 .dn-khalifa-question-chip:hover:not(:disabled),
-.dn-admin-side-nav button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(250, 204, 21, 0.55);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(250, 204, 21, 0.12);
+.dn-admin-side-nav button:hover:not(:disabled),
+.dn-admin-compact-action-row button:hover:not(:disabled),
+.dn-admin-top-actions button:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  border-color: rgba(250, 204, 21, 0.58) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(250, 204, 21, 0.12) inset !important;
 }
 
 .dn-section-workspace button:focus-visible,
 .dn-iconized-action-tile:focus-visible,
+.dn-admin-action-tile:focus-visible,
 .dn-map-control-button:focus-visible,
 .dn-map-mode-bar button:focus-visible,
 .dn-map-region-chips button:focus-visible,
 .dn-map-action-bar button:focus-visible,
 .dn-khalifa-question-chip:focus-visible,
-.dn-admin-side-nav button:focus-visible {
-  outline: 3px solid rgba(250, 204, 21, 0.72);
-  outline-offset: 3px;
+.dn-admin-side-nav button:focus-visible,
+.dn-admin-compact-action-row button:focus-visible,
+.dn-admin-top-actions button:focus-visible {
+  outline: 3px solid rgba(250, 204, 21, 0.72) !important;
+  outline-offset: 3px !important;
 }
 
 .dn-section-workspace button:active:not(:disabled),
 .dn-iconized-action-tile:active:not(:disabled),
-.dn-map-control-button:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.dn-admin-action-tile:active:not(:disabled),
+.dn-map-control-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985) !important;
+}
+
 .dn-section-workspace button:disabled,
 .dn-iconized-action-tile:disabled,
-.dn-map-control-button:disabled { opacity: 0.48; cursor: not-allowed; filter: saturate(0.65); }
-
-.dn-live-map-shell {
-  min-height: 420px;
-  max-height: 520px;
-  isolation: isolate;
-}
-
-.dn-map-control-dock {
-  position: absolute;
-  z-index: 680;
-  inset-inline-end: 1rem;
-  top: 7.5rem;
-  display: grid;
-  gap: 0.45rem;
-}
-
-.dn-map-control-button {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(250, 204, 21, 0.32);
-  border-radius: 16px;
-  background: rgba(2, 8, 18, 0.86);
-  color: #facc15;
-  backdrop-filter: blur(14px);
-}
-
-.dn-map-mode-bar button,
-.dn-map-region-chips button,
-.dn-map-action-bar button,
-.dn-khalifa-question-chip,
-.dn-khalifa-live-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.dn-map-mode-bar button.is-active,
-.dn-map-region-chips button.is-active,
-.dn-admin-side-nav button[aria-current="page"] {
-  border-color: rgba(250, 204, 21, 0.65);
-  background: rgba(250, 204, 21, 0.16);
-  color: #facc15;
-}
-
-.dn-khalifa-status-row,
-.dn-khalifa-current-top span,
-.dn-admin-state-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.dn-khalifa-current-metric,
-.dn-khalifa-rotator-controls span {
-  border: 1px solid rgba(250, 204, 21, 0.28);
-  border-radius: 999px;
-  padding: 0.35rem 0.6rem;
-  background: rgba(250, 204, 21, 0.1);
-  color: #facc15;
-  font-weight: 1000;
-}
-
-[dir="rtl"] .dn-iconized-action-tile,
-[dir="rtl"] .dn-admin-state-chip { flex-direction: row; }
-[dir="ltr"] .dn-iconized-action-tile,
-[dir="ltr"] .dn-admin-state-chip { flex-direction: row; }
-
-@media (max-width: 900px) {
-  .dn-live-map-shell { height: 400px !important; min-height: 380px; max-height: 440px; }
-  .dn-section-panels { grid-template-columns: 1fr !important; }
-  .dn-map-control-dock { top: 6.5rem; }
-}
-
-@media (max-width: 520px) {
-  .dn-live-map-shell { height: 340px !important; min-height: 320px; max-height: 380px; border-radius: 20px; }
-  .dn-map-control-dock { top: auto; bottom: 4.75rem; inset-inline-end: 0.75rem; gap: 0.35rem; }
-  .dn-map-control-button { width: 38px; height: 38px; }
-  .dn-section-workspace { overflow-x: hidden; }
-  .dn-iconized-action-tile { align-items: center; width: 100%; }
-  .dn-admin-icon-badge { min-width: 2rem; width: 2rem; height: 2rem; }
-}
-
-/* Final rendered-icon polish: keep badges meaningful instead of decorative empty circles. */
-.dn-admin-dashboard-kpis > article,
-.dn-admin-secondary-panel,
-.dn-admin-action-tile,
-.dn-khalifa-current,
-.dn-section-table-card,
-.dn-section-panels > article {
-  position: relative;
-  overflow: hidden;
-}
-
-.dn-admin-action-tile,
-.dn-admin-secondary-panel,
-.dn-section-kpis .dn-iconized-metric {
-  min-width: 0;
-}
-
-.dn-admin-action-tile:focus-visible,
-.dn-admin-compact-action-row button:focus-visible,
-.dn-admin-top-actions button:focus-visible {
-  outline: 3px solid rgba(250, 204, 21, 0.7);
-  outline-offset: 3px;
-}
-
-.dn-admin-action-tile:hover .dn-admin-icon-badge,
-.dn-admin-dashboard-kpis article:hover .dn-admin-icon-badge,
-.dn-map-action-bar button:hover .dn-admin-icon-badge,
-.dn-map-mode-bar button:hover .dn-admin-icon-badge,
-.dn-map-region-chips button:hover .dn-admin-icon-badge {
-  background: linear-gradient(135deg, rgba(250, 204, 21, 0.28), rgba(14, 165, 233, 0.2));
-  color: #fff7b0;
-  transform: scale(1.04);
-}
-
-.dn-admin-action-tile:active,
-.dn-map-action-bar button:active,
-.dn-map-mode-bar button:active,
-.dn-map-region-chips button:active {
-  transform: translateY(0) scale(0.985);
-}
-
 .dn-admin-action-tile:disabled,
-.dn-map-action-bar button:disabled,
-.dn-map-mode-bar button:disabled,
-.dn-map-region-chips button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.dn-map-control-button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  filter: saturate(0.65) !important;
 }
 
+/* ------------------------------------------------------------
+   Blank panel prevention
+------------------------------------------------------------ */
 .dn-admin-fullscreen,
 .dn-admin-content-full,
 .dn-admin-workspace-host,
 .dn-section-workspace,
+.dn-admin-center-zone,
 .dn-live-map-shell {
-  max-width: 100%;
-  overflow-x: hidden;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
 }
 
+.dn-section-workspace,
+.dn-admin-section-card,
+.dn-section-panels,
+.dn-admin-main-panel,
+.dn-admin-center-zone,
+.dn-admin-workspace-host {
+  min-height: 0 !important;
+}
+
+.dn-section-panels {
+  align-items: start !important;
+}
+
+/* ------------------------------------------------------------
+   RTL / LTR alignment
+------------------------------------------------------------ */
 [dir="rtl"] .dn-admin-action-copy,
 [dir="rtl"] .dn-iconized-content,
-[dir="rtl"] .dn-khalifa-current-body {
-  text-align: right;
+[dir="rtl"] .dn-khalifa-current-body,
+[dir="rtl"] .dn-admin-secondary-panel {
+  text-align: right !important;
 }
 
 [dir="ltr"] .dn-admin-action-copy,
 [dir="ltr"] .dn-iconized-content,
-[dir="ltr"] .dn-khalifa-current-body {
-  text-align: left;
+[dir="ltr"] .dn-khalifa-current-body,
+[dir="ltr"] .dn-admin-secondary-panel {
+  text-align: left !important;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+------------------------------------------------------------ */
+@media (max-width: 1280px) {
+  .dn-admin-action-grid { grid-template-columns: 1fr !important; }
+  .dn-live-map-shell { min-height: 400px !important; max-height: 480px !important; }
+}
+
+@media (max-width: 900px) {
+  .dn-live-map-shell {
+    height: 400px !important;
+    min-height: 380px !important;
+    max-height: 440px !important;
+  }
+
+  .dn-section-panels {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-map-control-dock {
+    top: auto !important;
+    bottom: 4.75rem !important;
+    transform: none !important;
+  }
 }
 
 @media (max-width: 768px) {
   .dn-admin-action-grid,
   .dn-section-kpis,
-  .dn-admin-dashboard-secondary-grid {
+  .dn-admin-dashboard-secondary-grid,
+  .dn-admin-dashboard-kpis {
     grid-template-columns: 1fr !important;
   }
 
   .dn-map-mode-bar,
   .dn-map-region-chips,
   .dn-map-action-bar {
-    max-width: calc(100% - 1rem);
-    flex-wrap: wrap;
+    max-width: calc(100% - 1rem) !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .dn-live-map-shell {
+    height: 340px !important;
+    min-height: 320px !important;
+    max-height: 380px !important;
+    border-radius: 1.25rem !important;
+  }
+
+  .dn-map-control-dock {
+    inset-inline-end: 0.75rem !important;
+    gap: 0.35rem !important;
+  }
+
+  .dn-map-control-button {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .dn-admin-icon-badge {
+    min-width: 2rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
   }
 }
