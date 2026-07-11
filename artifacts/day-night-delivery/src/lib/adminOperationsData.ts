@@ -165,6 +165,27 @@ export async function updateOpsMerchantStatus(merchantId: string, status: string
   return { row: data as Merchant, source: "db" };
 }
 
+export async function deleteOpsMerchant(merchantId: string): Promise<OpsCreateResult<Merchant>> {
+  if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
+
+  const { count, error: countError } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("merchant_id", merchantId);
+
+  if (countError) throw operationsError(countError, "Could not verify linked orders before deleting this merchant.");
+  if ((count || 0) > 0) {
+    throw new Error("Cannot delete this merchant because orders are directly linked by merchant_id. Pause or review the merchant instead.");
+  }
+
+  const rpcDeleted = await rpcOne<Merchant>("admin_delete_merchant", { p_merchant_id: merchantId });
+  if (rpcDeleted?.id) return { row: rpcDeleted, source: "rpc" };
+
+  const { data, error } = await supabase.from("merchants").delete().eq("id", merchantId).select("*").single();
+  if (error) throw operationsError(error, "Could not delete merchant. Confirm admin/support RLS access and that no linked orders exist.");
+  return { row: data as Merchant, source: "db" };
+}
+
 export function calculateOpsOrderPrice(input: OpsOrderInput) {
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
   if (input.shipping_scope === "international") {
