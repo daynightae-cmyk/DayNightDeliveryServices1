@@ -138,46 +138,199 @@ export function getAdminIcon(name?: AdminIconName): LucideIcon {
   return (name && iconMap[name]) || Sparkles;
 }
 
-export function AdminIconBadge({ name, label, className = "" }: { name?: AdminIconName; label?: string; className?: string }) {
+export function AdminIconBadge({
+  name = "info",
+  label,
+  className = "",
+}: {
+  name?: AdminIconName;
+  label?: string;
+  className?: string;
+}) {
   const Icon = getAdminIcon(name);
-  return <span className={`dn-admin-icon-badge ${className}`} aria-label={label} aria-hidden={label ? undefined : true}><Icon className="h-4 w-4" aria-hidden="true" /></span>;
+
+  return (
+    <span className={`dn-admin-icon-badge ${className}`} role={label ? "img" : "presentation"} aria-label={label}>
+      <Icon className="dn-admin-svg-icon" aria-hidden="true" focusable="false" />
+    </span>
+  );
 }
 
-export function AdminStateChip({ name = "info", children, tone = "info" }: { name?: AdminIconName; children: ReactNode; tone?: AdminIconTone }) {
+export function AdminStateChip({
+  name = "info",
+  children,
+  tone = "info",
+}: {
+  name?: AdminIconName;
+  children: ReactNode;
+  tone?: AdminIconTone;
+}) {
   const Icon = getAdminIcon(name);
-  return <span className={`dn-admin-state-chip is-${tone}`}><Icon className="h-3.5 w-3.5" aria-hidden="true" />{children}</span>;
+
+  return (
+    <span className={`dn-admin-state-chip is-${tone}`}>
+      <Icon className="dn-admin-state-icon" aria-hidden="true" focusable="false" />
+      <span>{children}</span>
+    </span>
+  );
 }
 
-export function AdminEmptyState({ title, message, action, icon = "empty-state" }: { title: string; message: string; action?: ReactNode; icon?: AdminIconName }) {
-  return <div className="dn-admin-empty-state"><AdminIconBadge name={icon} /><strong>{title}</strong><p>{message}</p>{action}</div>;
+export function AdminEmptyState({
+  title,
+  message,
+  action,
+  icon = "empty-state",
+}: {
+  title: string;
+  message: string;
+  action?: ReactNode;
+  icon?: AdminIconName;
+}) {
+  return (
+    <div className="dn-admin-empty-state">
+      <AdminIconBadge name={icon} label={title} />
+      <strong>{title}</strong>
+      <p>{message}</p>
+      {action}
+    </div>
+  );
 }
 
-function IconizedShell({ as: Tag = "article", icon, title, tone = "gold", dir, className = "", children, disabled, loading }: IconizedBaseProps & { as?: "article" | "div" }) {
+function IconizedShell({
+  as: Tag = "article",
+  icon,
+  title,
+  tone = "gold",
+  dir,
+  className = "",
+  children,
+  disabled,
+  loading,
+}: IconizedBaseProps & { as?: "article" | "div" }) {
   const Icon = getAdminIcon(icon);
-  return <Tag dir={dir} className={`dn-iconized dn-iconized-${tone} ${disabled ? "is-disabled" : ""} ${className}`} aria-disabled={disabled || undefined}>
-    <span className="dn-iconized-icon">{loading ? <Loader2 className="dn-spin" aria-hidden="true" /> : <Icon aria-hidden="true" />}</span>
-    <span className="dn-iconized-content"><strong>{title}</strong>{children}</span>
-  </Tag>;
+
+  return (
+    <Tag dir={dir} className={`dn-iconized dn-iconized-${tone} ${disabled ? "is-disabled" : ""} ${className}`} aria-disabled={disabled || undefined}>
+      <span className="dn-iconized-icon" aria-hidden="true">
+        {loading ? <Loader2 className="dn-spin" aria-hidden="true" focusable="false" /> : <Icon aria-hidden="true" focusable="false" />}
+      </span>
+      <span className="dn-iconized-content">
+        <strong>{title}</strong>
+        {children}
+      </span>
+    </Tag>
+  );
 }
 
 export function IconizedPanelHeader(props: IconizedBaseProps & { eyebrow?: ReactNode; action?: ReactNode }) {
-  return <header className={`dn-iconized-panel-header ${props.className || ""}`} dir={props.dir}><IconizedShell as="div" {...props} className="">{props.eyebrow && <small>{props.eyebrow}</small>}{props.children}</IconizedShell>{props.action}</header>;
+  return (
+    <header className={`dn-iconized-panel-header ${props.className || ""}`} dir={props.dir}>
+      <IconizedShell as="div" {...props} className="">
+        {props.eyebrow && <small>{props.eyebrow}</small>}
+        {props.children}
+      </IconizedShell>
+      {props.action}
+    </header>
+  );
 }
 
 export function IconizedMetricCard(props: IconizedBaseProps & { value: ReactNode; hint?: ReactNode }) {
-  return <IconizedShell {...props} className={`dn-iconized-metric ${props.className || ""}`}><b>{props.value}</b>{props.hint && <em>{props.hint}</em>}</IconizedShell>;
+  return (
+    <IconizedShell {...props} className={`dn-iconized-metric ${props.className || ""}`}>
+      <b>{props.value}</b>
+      {props.hint && <em>{props.hint}</em>}
+    </IconizedShell>
+  );
 }
 
-export function IconizedActionTile({ icon, title, hint, onClick, ariaLabel, tone = "gold", dir, disabled, loading, className = "" }: IconizedBaseProps & { hint?: ReactNode; onClick?: () => void; ariaLabel: string }) {
+export function IconizedActionTile({
+  icon,
+  title,
+  hint,
+  onClick,
+  ariaLabel,
+  tone = "gold",
+  dir,
+  disabled,
+  loading,
+  className = "",
+}: IconizedBaseProps & { hint?: ReactNode; onClick?: () => void; ariaLabel: string }) {
   const Icon = getAdminIcon(icon);
-  return <button type="button" className={`dn-iconized-action-tile dn-iconized-${tone} ${className}`} dir={dir} disabled={disabled || loading} aria-label={ariaLabel} onClick={onClick}><span className="dn-iconized-icon">{loading ? <Loader2 className="dn-spin" aria-hidden="true" /> : <Icon aria-hidden="true" />}</span><span><strong>{title}</strong>{hint && <em>{hint}</em>}</span></button>;
+
+  return (
+    <button
+      type="button"
+      className={`dn-iconized-action-tile dn-iconized-${tone} ${className}`}
+      dir={dir}
+      disabled={disabled || loading}
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      <span className="dn-iconized-icon" aria-hidden="true">
+        {loading ? <Loader2 className="dn-spin" aria-hidden="true" focusable="false" /> : <Icon aria-hidden="true" focusable="false" />}
+      </span>
+      <span>
+        <strong>{title}</strong>
+        {hint && <em>{hint}</em>}
+      </span>
+    </button>
+  );
 }
 
-export function IconizedMapControlButton({ icon, title, ariaLabel, onClick, active, disabled, loading, tone = "gold" }: { icon: AdminIconName; title: ReactNode; ariaLabel: string; onClick: () => void; active?: boolean; disabled?: boolean; loading?: boolean; tone?: AdminIconTone }) {
+export function IconizedMapControlButton({
+  icon,
+  title,
+  ariaLabel,
+  onClick,
+  active,
+  disabled,
+  loading,
+  tone = "gold",
+}: {
+  icon: AdminIconName;
+  title: ReactNode;
+  ariaLabel: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  tone?: AdminIconTone;
+}) {
   const Icon = getAdminIcon(icon);
-  return <button type="button" className={`dn-map-control-button dn-iconized-${tone} ${active ? "is-active" : ""}`} aria-label={ariaLabel} title={String(title)} aria-pressed={active} disabled={disabled || loading} onClick={onClick}>{loading ? <Loader2 className="dn-spin" aria-hidden="true" /> : <Icon aria-hidden="true" />}</button>;
+
+  return (
+    <button
+      type="button"
+      className={`dn-map-control-button dn-iconized-${tone} ${active ? "is-active" : ""}`}
+      aria-label={ariaLabel}
+      title={String(title)}
+      aria-pressed={active}
+      disabled={disabled || loading}
+      onClick={onClick}
+    >
+      {loading ? <Loader2 className="dn-spin" aria-hidden="true" focusable="false" /> : <Icon aria-hidden="true" focusable="false" />}
+    </button>
+  );
 }
 
-export function IconizedSectionButton(props: Parameters<typeof IconizedActionTile>[0]) { return <IconizedActionTile {...props} className={`dn-iconized-section-button ${props.className || ""}`} />; }
-export function IconizedEmptyState(props: IconizedBaseProps & { message: ReactNode; action?: ReactNode }) { return <IconizedShell {...props} className={`dn-iconized-empty ${props.className || ""}`}><p>{props.message}</p>{props.action}</IconizedShell>; }
-export function IconizedStatusRow(props: IconizedBaseProps & { value?: ReactNode }) { return <IconizedShell as="div" {...props} className={`dn-iconized-status-row ${props.className || ""}`}>{props.value && <b>{props.value}</b>}{props.children}</IconizedShell>; }
+export function IconizedSectionButton(props: Parameters<typeof IconizedActionTile>[0]) {
+  return <IconizedActionTile {...props} className={`dn-iconized-section-button ${props.className || ""}`} />;
+}
+
+export function IconizedEmptyState(props: IconizedBaseProps & { message: ReactNode; action?: ReactNode }) {
+  return (
+    <IconizedShell {...props} className={`dn-iconized-empty ${props.className || ""}`}>
+      <p>{props.message}</p>
+      {props.action}
+    </IconizedShell>
+  );
+}
+
+export function IconizedStatusRow(props: IconizedBaseProps & { value?: ReactNode }) {
+  return (
+    <IconizedShell as="div" {...props} className={`dn-iconized-status-row ${props.className || ""}`}>
+      {props.value && <b>{props.value}</b>}
+      {props.children}
+    </IconizedShell>
+  );
+}
