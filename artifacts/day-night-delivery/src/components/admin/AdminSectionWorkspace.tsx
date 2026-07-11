@@ -12,9 +12,11 @@ import AdminMerchantDetailsDrawer from "./AdminMerchantDetailsDrawer";
 import AdminStatusUpdateModal from "./AdminStatusUpdateModal";
 import AdminDriverAssignmentModal from "./AdminDriverAssignmentModal";
 import AdminDailyClosingPanel from "./AdminDailyClosingPanel";
+import AdminProfessionalOrdersWorkspace, { ORDER_SECTION_IDS } from "./AdminProfessionalOrdersWorkspace";
 import "../../styles/dn-admin-sections.css";
 
 type Props = { id: AdminSectionId; isArabic: boolean; orders: Order[]; merchants: Merchant[]; financeSummary: FinanceSummary | null; financeSummarySource?: FinanceSummarySource; financeWarning?: string; onNavigate?: (id: AdminSectionId) => void; onRefresh?: () => Promise<void> };
+const professionalOrderSections = new Set<AdminSectionId>(ORDER_SECTION_IDS as AdminSectionId[]);
 const n = (v: unknown) => String(v ?? "").toLowerCase();
 const money = (v: number) => `${Number(v || 0).toFixed(2)} AED`;
 const orderExtra = (o: Order) => o as Order & { total?: number; total_amount?: number; service_fee?: number; pickup_city?: string; delivery_city?: string };
@@ -82,6 +84,9 @@ function iconForAction(action: string) {
 }
 
 export default function AdminSectionWorkspace({ id, isArabic, orders, merchants, financeSummary, financeSummarySource = "derived", financeWarning, onNavigate, onRefresh }: Props) {
+  if (professionalOrderSections.has(id)) {
+    return <AdminProfessionalOrdersWorkspace id={id as (typeof ORDER_SECTION_IDS)[number]} isArabic={isArabic} orders={orders} merchants={merchants} onRefresh={onRefresh} onNavigate={onNavigate} />;
+  }
   const config = adminSectionById[id]; const [query,setQuery] = useState(""); const [filters,setFilters] = useState<Record<string,string>>({}); const [selectedOrder,setSelectedOrder] = useState<Order | null>(null); const [selectedMerchant,setSelectedMerchant] = useState<Merchant | null>(null); const [statusOrder,setStatusOrder] = useState<Order | null>(null); const [assignOrder,setAssignOrder] = useState<Order | null>(null); const [notice,setNotice] = useState("");
   const base = useMemo(()=>derivedRows(id, orders),[id,orders]);
   const rows = useMemo(()=>base.filter((o)=>{ const haystack = [tracking(o), o.receiver_phone, o.sender_phone, o.receiver_name, o.customer_name, o.merchant_name, o.sender_name, o.status, o.service_type, o.payment_method, o.sender_city, o.receiver_city].join(" ").toLowerCase(); if (query && !haystack.includes(query.toLowerCase())) return false; if (filters.status && !n(o.status).includes(n(filters.status))) return false; if (filters.merchant && !n(`${o.merchant_id || ""} ${o.merchant_name || ""} ${o.sender_name || ""}`).includes(n(filters.merchant))) return false; if (filters.driver && !n(`${o.driver_code || ""} ${o.driver_name || ""} ${o.driver_phone || ""}`).includes(n(filters.driver))) return false; if ((filters.emirate || filters.city) && !n(`${o.sender_city} ${o.receiver_city}`).includes(n(filters.emirate || filters.city))) return false; if (filters.serviceType && !n(o.service_type).includes(n(filters.serviceType))) return false; if (filters.paymentType && !n(o.payment_method).includes(n(filters.paymentType))) return false; if (filters.codOnly && Number(o.cod_amount || 0) <= 0) return false; if (filters.dateRange && !String(o.created_at || "").includes(filters.dateRange)) return false; return true; }).slice(0,80),[base,query,filters]);
