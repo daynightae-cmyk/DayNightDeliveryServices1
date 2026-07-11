@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Building2, Save } from "lucide-react";
-import { createMerchant, type MerchantInput } from "../../lib/adminData";
+import { AlertTriangle, Building2, CheckCircle2, Database, Save } from "lucide-react";
+import { createOpsMerchant, type OpsDataSource, type OpsMerchantInput } from "../../lib/adminOperationsData";
 import type { Merchant } from "../../types";
 
-const emptyMerchant: MerchantInput = {
+const emptyMerchant: OpsMerchantInput = {
   trade_name: "",
   owner_name: "",
   phone: "",
@@ -56,25 +56,33 @@ const statusOptions = [
 ];
 
 function inputClass() {
-  return "w-full rounded-2xl border border-white/10 bg-brand-deep/70 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-brand-gold/60";
+  return "w-full rounded-2xl border border-brand-sky/20 bg-brand-deep/75 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-brand-gold/70 focus:ring-2 focus:ring-brand-gold/15";
 }
 
-function cleanError(error: unknown, isArabic: boolean) {
-  const message = String((error as Error)?.message || error || "");
-  console.warn("Merchant save failed:", message);
-  return isArabic
-    ? "تعذر حفظ التاجر حالياً. راجع الصلاحيات أو الجداول بدون عرض تفاصيل تقنية للمستخدم."
-    : "Could not save merchant right now. Check permissions or tables; technical details are hidden from the user.";
+function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boolean) {
+  if (source === "rpc") return isArabic ? "تم عبر RPC الإنتاجي" : "Saved through production RPC";
+  if (source === "db") return isArabic ? "تم عبر جدول merchants مباشرة" : "Saved directly to merchants table";
+  if (source === "pending") return isArabic ? "جاهز للحفظ الحقيقي" : "Ready for live save";
+  return isArabic ? "بانتظار الحفظ" : "Not saved yet";
 }
 
 export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: boolean; onSaved?: (merchant: Merchant) => void }) {
-  const [form, setForm] = useState<MerchantInput>(emptyMerchant);
+  const [form, setForm] = useState<OpsMerchantInput>(emptyMerchant);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [source, setSource] = useState<OpsDataSource | "pending" | "none">("none");
 
-  function setField<K extends keyof MerchantInput>(key: K, value: MerchantInput[K]) {
+  function setField<K extends keyof OpsMerchantInput>(key: K, value: OpsMerchantInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setSource("pending");
+  }
+
+  function validate() {
+    if (!form.trade_name.trim()) return isArabic ? "اسم المتجر مطلوب." : "Trade name is required.";
+    if (!form.phone.trim()) return isArabic ? "رقم الهاتف مطلوب." : "Phone is required.";
+    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) return isArabic ? "صيغة البريد الإلكتروني غير صحيحة." : "Email format is invalid.";
+    return "";
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -82,30 +90,34 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
     setMessage("");
     setError("");
 
-    if (!form.trade_name.trim() || !form.phone.trim()) {
-      setError(isArabic ? "اسم التاجر ورقم الهاتف مطلوبان." : "Trade name and phone are required.");
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setSaving(true);
     try {
-      const saved = await createMerchant(form);
-      setMessage(isArabic ? `تم حفظ التاجر ${saved.merchant_code || ""}` : `Merchant saved ${saved.merchant_code || ""}`);
+      const result = await createOpsMerchant(form);
+      const saved = result.row;
+      setSource(result.source);
+      setMessage(isArabic ? `تم حفظ التاجر الحقيقي: ${saved.trade_name} · ${saved.merchant_code || "بدون كود"}` : `Live merchant saved: ${saved.trade_name} · ${saved.merchant_code || "no code"}`);
       setForm(emptyMerchant);
       onSaved?.(saved);
     } catch (err) {
-      setError(cleanError(err, isArabic));
+      setSource("none");
+      setError(String((err as Error).message || err));
     } finally {
       setSaving(false);
     }
   }
 
   const labels = {
-    title: isArabic ? "إضافة تاجر حقيقي" : "Create live merchant",
+    title: isArabic ? "إضافة تاجر إنتاجي متصل بقاعدة البيانات" : "Create production DB-backed merchant",
     hint: isArabic
-      ? "يحفظ مباشرة في جدول التجار مع حماية البيانات الحساسة داخل الإدارة."
-      : "Saves directly to the merchants table with sensitive data kept in admin-only views.",
-    save: saving ? (isArabic ? "جاري الحفظ..." : "Saving...") : (isArabic ? "حفظ التاجر" : "Save merchant"),
+      ? "لا يتم حفظ أي تاجر محلي أو وهمي. الحفظ يتم عبر RPC إنتاجي أو إدخال مباشر في جدول merchants بعد تطبيق migration."
+      : "No local or fake merchant is saved. Saves through the production RPC or direct merchants insert after the migration is applied.",
+    save: saving ? (isArabic ? "جاري الحفظ الحقيقي..." : "Saving live...") : (isArabic ? "حفظ التاجر في قاعدة البيانات" : "Save merchant to database"),
     tradeName: isArabic ? "اسم المتجر *" : "Trade name *",
     owner: isArabic ? "اسم المالك" : "Owner",
     phone: isArabic ? "الهاتف *" : "Phone *",
@@ -115,76 +127,84 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
     city: isArabic ? "المدينة" : "City",
     address: isArabic ? "العنوان" : "Address",
     pickupAddress: isArabic ? "عنوان الاستلام" : "Pickup address",
-    license: isArabic ? "الرخصة التجارية (محمي)" : "License (protected)",
+    license: isArabic ? "الرخصة التجارية" : "Trade license",
     bank: isArabic ? "البنك" : "Bank",
-    settlement: isArabic ? "دورة التسوية" : "Settlement",
-    defaultPayment: isArabic ? "الدفع الافتراضي" : "Default payment",
+    settlement: isArabic ? "دورة التسوية" : "Settlement cycle",
+    defaultPayment: isArabic ? "طريقة الدفع الافتراضية" : "Default payment",
     status: isArabic ? "الحالة" : "Status",
-    notes: isArabic ? "ملاحظات" : "Notes",
-    logo: isArabic ? "الشعار (اختياري)" : "Logo URL (optional)",
+    notes: isArabic ? "ملاحظات تشغيلية" : "Operations notes",
+    logo: isArabic ? "رابط الشعار" : "Logo URL",
   };
 
   return (
-    <form onSubmit={submit} className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
-      <div className="mb-5 flex items-center gap-3">
-        <Building2 className="h-7 w-7 text-brand-gold" />
-        <div>
-          <h2 className="text-xl font-black text-white">{labels.title}</h2>
-          <p className="text-xs font-bold text-white/50">{labels.hint}</p>
+    <form onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold">
+            <Building2 className="h-6 w-6" />
+          </span>
+          <div>
+            <h2 className="text-xl font-black text-white">{labels.title}</h2>
+            <p className="mt-1 max-w-3xl text-xs font-bold leading-6 text-white/55">{labels.hint}</p>
+          </div>
         </div>
+        <span className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200">
+          <Database className="h-4 w-4" />
+          {sourceLabel(source, isArabic)}
+        </span>
       </div>
 
-      {message && <div className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-200">{message}</div>}
-      {error && <div className="mb-4 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200">{error}</div>}
+      {message && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+      {error && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200"><AlertTriangle className="h-4 w-4" />{error}</div>}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.tradeName}</span><input className={inputClass()} value={form.trade_name} onChange={(e) => setField("trade_name", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.owner}</span><input className={inputClass()} value={form.owner_name || ""} onChange={(e) => setField("owner_name", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.phone}</span><input dir="ltr" className={inputClass()} value={form.phone} onChange={(e) => setField("phone", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.altPhone}</span><input dir="ltr" className={inputClass()} value={form.alt_phone || ""} onChange={(e) => setField("alt_phone", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.email}</span><input dir="ltr" className={inputClass()} value={form.email || ""} onChange={(e) => setField("email", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.logo}</span><input dir="ltr" className={inputClass()} value={form.logo_url || ""} onChange={(e) => setField("logo_url", e.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.tradeName}</span><input className={inputClass()} value={form.trade_name} onChange={(event) => setField("trade_name", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.owner}</span><input className={inputClass()} value={form.owner_name || ""} onChange={(event) => setField("owner_name", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.phone}</span><input dir="ltr" className={inputClass()} value={form.phone} onChange={(event) => setField("phone", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.altPhone}</span><input dir="ltr" className={inputClass()} value={form.alt_phone || ""} onChange={(event) => setField("alt_phone", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.email}</span><input dir="ltr" className={inputClass()} value={form.email || ""} onChange={(event) => setField("email", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.logo}</span><input dir="ltr" className={inputClass()} value={form.logo_url || ""} onChange={(event) => setField("logo_url", event.target.value)} /></label>
 
         <label className="space-y-1">
           <span className="text-xs font-black text-white/60">{labels.emirate}</span>
-          <select className={inputClass()} value={form.emirate || ""} onChange={(e) => setField("emirate", e.target.value)}>
+          <select className={inputClass()} value={form.emirate || ""} onChange={(event) => { setField("emirate", event.target.value); setField("city", event.target.value); }}>
             {emirates.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
           </select>
         </label>
 
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.city}</span><input className={inputClass()} value={form.city || ""} onChange={(e) => setField("city", e.target.value)} /></label>
-        <label className="space-y-1 md:col-span-2"><span className="text-xs font-black text-white/60">{labels.address}</span><input className={inputClass()} value={form.address || ""} onChange={(e) => setField("address", e.target.value)} /></label>
-        <label className="space-y-1 md:col-span-2"><span className="text-xs font-black text-white/60">{labels.pickupAddress}</span><input className={inputClass()} value={form.pickup_address || ""} onChange={(e) => setField("pickup_address", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">{labels.license}</span><input className={inputClass()} value={form.license_number || ""} onChange={(e) => setField("license_number", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">TRN</span><input className={inputClass()} value={form.trn || ""} onChange={(e) => { setField("trn", e.target.value); setField("tax_number", e.target.value); }} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">IBAN</span><input dir="ltr" className={inputClass()} value={form.iban || ""} onChange={(e) => setField("iban", e.target.value)} /></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.bank}</span><input className={inputClass()} value={form.bank_name || ""} onChange={(e) => setField("bank_name", e.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.city}</span><input className={inputClass()} value={form.city || ""} onChange={(event) => setField("city", event.target.value)} /></label>
+        <label className="space-y-1 md:col-span-2"><span className="text-xs font-black text-white/60">{labels.address}</span><input className={inputClass()} value={form.address || ""} onChange={(event) => setField("address", event.target.value)} /></label>
+        <label className="space-y-1 md:col-span-2"><span className="text-xs font-black text-white/60">{labels.pickupAddress}</span><input className={inputClass()} value={form.pickup_address || ""} onChange={(event) => setField("pickup_address", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">{labels.license}</span><input className={inputClass()} value={form.license_number || ""} onChange={(event) => setField("license_number", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">TRN</span><input className={inputClass()} value={form.trn || ""} onChange={(event) => { setField("trn", event.target.value); setField("tax_number", event.target.value); }} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-brand-gold">IBAN</span><input dir="ltr" className={inputClass()} value={form.iban || ""} onChange={(event) => setField("iban", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.bank}</span><input className={inputClass()} value={form.bank_name || ""} onChange={(event) => setField("bank_name", event.target.value)} /></label>
 
         <label className="space-y-1">
           <span className="text-xs font-black text-white/60">{labels.settlement}</span>
-          <select className={inputClass()} value={form.settlement_cycle || "weekly"} onChange={(e) => setField("settlement_cycle", e.target.value)}>
+          <select className={inputClass()} value={form.settlement_cycle || "weekly"} onChange={(event) => setField("settlement_cycle", event.target.value)}>
             {settlementOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
           </select>
         </label>
 
         <label className="space-y-1">
           <span className="text-xs font-black text-white/60">{labels.defaultPayment}</span>
-          <select className={inputClass()} value={form.default_payment_method || "sender_pays"} onChange={(e) => setField("default_payment_method", e.target.value)}>
+          <select className={inputClass()} value={form.default_payment_method || "sender_pays"} onChange={(event) => setField("default_payment_method", event.target.value)}>
             {paymentOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
           </select>
         </label>
 
         <label className="space-y-1">
           <span className="text-xs font-black text-white/60">{labels.status}</span>
-          <select className={inputClass()} value={form.status || "active"} onChange={(e) => setField("status", e.target.value)}>
+          <select className={inputClass()} value={form.status || "active"} onChange={(event) => setField("status", event.target.value)}>
             {statusOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
           </select>
         </label>
 
-        <label className="space-y-1 md:col-span-2 xl:col-span-3"><span className="text-xs font-black text-white/60">{labels.notes}</span><textarea className={`${inputClass()} min-h-24`} value={form.notes || ""} onChange={(e) => setField("notes", e.target.value)} /></label>
+        <label className="space-y-1 md:col-span-2 xl:col-span-3"><span className="text-xs font-black text-white/60">{labels.notes}</span><textarea className={`${inputClass()} min-h-24`} value={form.notes || ""} onChange={(event) => setField("notes", event.target.value)} /></label>
       </div>
 
-      <button type="submit" disabled={saving} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-sm font-black text-brand-deep disabled:opacity-60">
+      <button type="submit" disabled={saving} className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-sm font-black text-brand-deep transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
         <Save className="h-4 w-4" />
         {labels.save}
       </button>
