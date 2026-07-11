@@ -9,6 +9,17 @@ import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import { actionLabel, fieldLabel as translatedFieldLabel, kpiLabel, sectionFallbackLabel, statusLabel, tableColumnLabel } from "../../data/adminTranslations";
 import "../../styles/dn-admin-sections.css";
 
+type FinanceArea =
+  | "finance_dashboard"
+  | "driver_statements"
+  | "merchant_statements"
+  | "income"
+  | "cod"
+  | "expenses"
+  | "accounts"
+  | "adjustments"
+  | "audit_log";
+
 type Props = {
   id: AdminSectionId;
   isArabic: boolean;
@@ -82,21 +93,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
   const [notice, setNotice] = useState("");
   const navigate = (target: AdminSectionId) => onNavigate?.(target);
   const refresh = onRefresh || (async () => undefined);
-
-  if (financeSections.has(id)) {
-    return (
-      <AdminFinanceOperationsCenter
-        isArabic={isArabic}
-        activeSection={id as Extract<AdminSectionId, "finance_dashboard" | "driver_statements" | "merchant_statements" | "income" | "cod" | "expenses" | "accounts" | "adjustments" | "audit_log">}
-        orders={orders}
-        merchants={merchants}
-        financeSummary={financeSummary}
-        financeSummarySource={financeSummarySource}
-        onRefresh={refresh}
-        onNavigate={(target) => navigate(target as AdminSectionId)}
-      />
-    );
-  }
+  const isFinance = financeSections.has(id);
 
   const baseRows = useMemo(() => orders.filter((order) => statusMatch(order, id)), [id, orders]);
   const rows = useMemo(() => baseRows.filter((order) => {
@@ -130,6 +127,21 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
     else if (action === "openStatements") navigate("merchant_statements");
     else setNotice(isArabic ? `تم فتح إجراء: ${actionLabel(action, true)}` : `Opened action: ${actionLabel(action, false)}`);
   };
+
+  if (isFinance) {
+    return (
+      <AdminFinanceOperationsCenter
+        isArabic={isArabic}
+        activeSection={id as FinanceArea}
+        orders={orders}
+        merchants={merchants}
+        financeSummary={financeSummary}
+        financeSummarySource={financeSummarySource}
+        onRefresh={refresh}
+        onNavigate={(target) => navigate(target as AdminSectionId)}
+      />
+    );
+  }
 
   return (
     <section className="dn-section-workspace" dir={isArabic ? "rtl" : "ltr"}>
