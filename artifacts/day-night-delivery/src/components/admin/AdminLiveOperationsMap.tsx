@@ -20,11 +20,6 @@ import {
   Route,
   Search,
   Truck,
-  ZoomIn,
-  ZoomOut,
-  LocateFixed,
-  Maximize2,
-  RefreshCw,
 } from "lucide-react";
 import { AdminIconBadge, AdminStateChip, IconizedMapControlButton } from "./adminIconSystem";
 import { defaultLocations } from "../../data/defaultLocations";
@@ -229,13 +224,14 @@ function MapCommandControls({
     onReset();
   };
   const controls = [
-    { key: "zoom-in", label: isArabic ? "تكبير الخريطة" : "Zoom in", Icon: ZoomIn, action: () => map.zoomIn() },
-    { key: "zoom-out", label: isArabic ? "تصغير الخريطة" : "Zoom out", Icon: ZoomOut, action: () => map.zoomOut() },
-    { key: "reset", label: isArabic ? "إعادة ضبط الخريطة" : "Reset map", Icon: LocateFixed, action: resetMap },
-    { key: "fit", label: isArabic ? "ملاءمة المسار" : "Fit route", Icon: Maximize2, action: fitRoute },
-    { key: "uae", label: isArabic ? "تمركز على الإمارات" : "Center UAE", Icon: Navigation, action: () => map.setView(defaultLocations.abuDhabi, 8, { animate: true }) },
+    { key: "zoom-in", label: isArabic ? "تكبير الخريطة" : "Zoom in", icon: "zoom-in" as const, action: () => map.zoomIn() },
+    { key: "zoom-out", label: isArabic ? "تصغير الخريطة" : "Zoom out", icon: "zoom-out" as const, action: () => map.zoomOut() },
+    { key: "reset-map", label: isArabic ? "إعادة ضبط الخريطة" : "Reset map", icon: "reset-map" as const, action: resetMap },
+    { key: "fit-route", label: isArabic ? "ملاءمة المسار" : "Fit route", icon: "fit-route" as const, action: fitRoute },
+    { key: "focus-driver", label: isArabic ? "تركيز على المندوب" : "Focus driver", icon: "focus-driver" as const, action: () => map.setView(driver, 13, { animate: true }) },
+    { key: "refresh", label: isArabic ? "تحديث الخريطة" : "Refresh map", icon: "refresh" as const, action: () => { map.invalidateSize({ animate: true }); onReset(); } },
   ];
-  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, action }) => <IconizedMapControlButton key={key} icon={key === "zoom-in" ? "zoom-in" : key === "zoom-out" ? "zoom-out" : key === "fit" ? "fit-route" : key === "reset" ? "reset-map" : "map"} title={label} ariaLabel={label} onClick={action} />)}</div>;
+  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, icon, action }) => <IconizedMapControlButton key={key} icon={icon} title={label} ariaLabel={label} onClick={action} />)}</div>;
 }
 
 export default function AdminLiveOperationsMap({
@@ -594,11 +590,11 @@ export default function AdminLiveOperationsMap({
       </div>
 
       <div className="dn-map-action-bar">
-        <button type="button" onClick={() => doFocus("fit")}><Maximize2 className="h-4 w-4" />
+        <button type="button" onClick={() => doFocus("fit")}><AdminIconBadge name="fit-route" className="!h-6 !w-6 !min-w-6" />
           {isArabic ? "ملاءمة المسار" : "Fit route"}
         </button>
-        <button type="button" onClick={() => doFocus("driver")}><LocateFixed className="h-4 w-4" />
-          {isArabic ? "تمركز على الإمارات" : "Center UAE"}
+        <button type="button" onClick={() => doFocus("driver")}><AdminIconBadge name="focus-driver" className="!h-6 !w-6 !min-w-6" />
+          {isArabic ? "تركيز على المندوب" : "Focus driver"}
         </button>
         <button
           type="button"
@@ -607,7 +603,7 @@ export default function AdminLiveOperationsMap({
             doFocus("fit");
           }}
         >
-          <RefreshCw className="h-4 w-4" />{isArabic ? "إعادة ضبط الخريطة" : "Reset map"}
+          <AdminIconBadge name="refresh" className="!h-6 !w-6 !min-w-6" />{isArabic ? "تحديث الخريطة" : "Refresh map"}
         </button>
       </div>
 

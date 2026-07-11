@@ -212,3 +212,88 @@
   .dn-iconized-action-tile { align-items: center; width: 100%; }
   .dn-admin-icon-badge { min-width: 2rem; width: 2rem; height: 2rem; }
 }
+
+/* Final rendered-icon polish: keep badges meaningful instead of decorative empty circles. */
+.dn-admin-dashboard-kpis > article,
+.dn-admin-secondary-panel,
+.dn-admin-action-tile,
+.dn-khalifa-current,
+.dn-section-table-card,
+.dn-section-panels > article {
+  position: relative;
+  overflow: hidden;
+}
+
+.dn-admin-action-tile,
+.dn-admin-secondary-panel,
+.dn-section-kpis .dn-iconized-metric {
+  min-width: 0;
+}
+
+.dn-admin-action-tile:focus-visible,
+.dn-admin-compact-action-row button:focus-visible,
+.dn-admin-top-actions button:focus-visible {
+  outline: 3px solid rgba(250, 204, 21, 0.7);
+  outline-offset: 3px;
+}
+
+.dn-admin-action-tile:hover .dn-admin-icon-badge,
+.dn-admin-dashboard-kpis article:hover .dn-admin-icon-badge,
+.dn-map-action-bar button:hover .dn-admin-icon-badge,
+.dn-map-mode-bar button:hover .dn-admin-icon-badge,
+.dn-map-region-chips button:hover .dn-admin-icon-badge {
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.28), rgba(14, 165, 233, 0.2));
+  color: #fff7b0;
+  transform: scale(1.04);
+}
+
+.dn-admin-action-tile:active,
+.dn-map-action-bar button:active,
+.dn-map-mode-bar button:active,
+.dn-map-region-chips button:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.dn-admin-action-tile:disabled,
+.dn-map-action-bar button:disabled,
+.dn-map-mode-bar button:disabled,
+.dn-map-region-chips button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dn-admin-fullscreen,
+.dn-admin-content-full,
+.dn-admin-workspace-host,
+.dn-section-workspace,
+.dn-live-map-shell {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+[dir="rtl"] .dn-admin-action-copy,
+[dir="rtl"] .dn-iconized-content,
+[dir="rtl"] .dn-khalifa-current-body {
+  text-align: right;
+}
+
+[dir="ltr"] .dn-admin-action-copy,
+[dir="ltr"] .dn-iconized-content,
+[dir="ltr"] .dn-khalifa-current-body {
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .dn-admin-action-grid,
+  .dn-section-kpis,
+  .dn-admin-dashboard-secondary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-map-mode-bar,
+  .dn-map-region-chips,
+  .dn-map-action-bar {
+    max-width: calc(100% - 1rem);
+    flex-wrap: wrap;
+  }
+}
