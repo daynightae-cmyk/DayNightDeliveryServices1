@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Printer, ShieldCheck, WalletCards } from "lucide-react";
+import { Database, Printer, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import {
   approveAdjustment,
@@ -9,15 +9,6 @@ import {
   createExpense,
   createImportBatch,
   createPrintJob,
-  deriveDriverStatementFromOrders,
-  deriveMerchantStatementFromOrders,
-  fetchAdjustments,
-  fetchAdminAuditEvents,
-  fetchCodCollections,
-  fetchDriverStatementEntries,
-  fetchExpenses,
-  fetchMerchantStatementEntries,
-  fetchPrintJobs,
   markPrintJobPrinted,
   saveImportPreviewRows,
   validateImportRows,
@@ -25,6 +16,21 @@ import {
   voidExpense,
   type FinanceRow,
 } from "../../lib/adminData";
+import {
+  fetchProductionRows,
+  productionTableForSection,
+  rowBalance,
+  rowCredit,
+  rowDate,
+  rowDebit,
+  rowNotes,
+  rowReference,
+  rowType,
+  summarizeRows,
+  syncAdminProductionRows,
+  type AdminProductionFilters,
+  type AdminProductionSource,
+} from "../../lib/adminProductionData";
 import { actionLabel, fieldLabel, financeTypeLabel } from "../../data/adminTranslations";
 import { addAdminNotification } from "../../lib/adminAudio";
 import type { Merchant, Order } from "../../types";
@@ -39,58 +45,10 @@ type Props = {
   onRefresh: () => Promise<void>;
 };
 
-type AdminFilters = {
-  merchantId?: string;
-  driverId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-};
-
 const inputClass = "rounded-xl border border-white/10 bg-brand-deep/70 px-3 py-2 text-sm font-bold text-white outline-none";
 
 function money(value: unknown) {
   return `${Number(value || 0).toFixed(2)} AED`;
-}
-
-function cleanDate(value: unknown) {
-  return String(value || new Date().toISOString()).slice(0, 10);
-}
-
-function rowNumber(row: FinanceRow, keys: string[]) {
-  for (const key of keys) {
-    const value = Number(row[key] || 0);
-    if (Number.isFinite(value) && value > 0) return value;
-  }
-
-  return 0;
-}
-
-function rowDebit(row: FinanceRow) {
-  return rowNumber(row, ["debit", "expense_amount"]);
-}
-
-function rowCredit(row: FinanceRow) {
-  return rowNumber(row, ["credit", "amount", "cod_amount", "collected_amount", "delivery_fee", "payout_amount"]);
-}
-
-function rowBalance(row: FinanceRow) {
-  return rowNumber(row, ["balance", "net_amount", "cod_amount", "collected_amount", "amount", "credit"]);
-}
-
-function rowDate(row: FinanceRow) {
-  return String(row.entry_date || row.expense_date || row.collection_date || row.printed_at || cleanDate(row.created_at));
-}
-
-function rowReference(row: FinanceRow) {
-  return String(row.tracking_number || row.reference_number || row.entity_id || row.order_id || row.id || "—");
-}
-
-function rowType(row: FinanceRow) {
-  return String(row.entry_type || row.adjustment_type || row.job_type || row.category || row.action || row.status || "—");
-}
-
-function rowNotes(row: FinanceRow) {
-  return String(row.notes || row.reason || row.entity_type || row.file_name || "—");
 }
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -100,33 +58,16 @@ function parseCsv(text: string): Record<string, string>[] {
   return lines.map((line) => Object.fromEntries(line.split(",").map((cell, index) => [headers[index] || `field_${index}`, cell.trim()])));
 }
 
-
-function printableRowsFromOrders(orders: Order[], isArabic: boolean): FinanceRow[] {
-  return orders.map((order) => ({
-    id: `derived-print-${order.id || order.tracking_number || order.invoice_number}`,
-    order_id: order.id || order.tracking_number || order.invoice_number,
-    tracking_number: order.tracking_number || order.invoice_number || order.id || "—",
-    entry_date: String(order.created_at || order.updated_at || new Date().toISOString()).slice(0, 10),
-    job_type: "invoice",
-    debit: Number(order.delivery_price || order.price || order.base_price || 0),
-    credit: Number(order.cod_amount || 0),
-    balance: Number(order.cod_amount || 0) + Number(order.delivery_price || order.price || order.base_price || 0),
-    status: "ready_from_orders",
-    merchant_name: order.merchant_name || order.sender_name || "—",
-    receiver_name: order.receiver_name || "—",
-    city: order.receiver_city || order.sender_city || "—",
-    document_type: isArabic ? "فاتورة" : "Invoice",
-    print_status: isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders",
-    notes: isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders",
-    created_at: order.created_at || new Date().toISOString(),
-  }));
+function sourceText(source: AdminProductionSource, isArabic: boolean, table: string) {
+  if (source === "db") return isArabic ? `مصدر فعلي: ${table}` : `Real source: ${table}`;
+  return isArabic ? `غير متصل بقاعدة البيانات: ${table}` : `Database unavailable: ${table}`;
 }
 
-function tablePdf(isArabic: boolean, title: string, rows: FinanceRow[]) {
+function tablePdf(isArabic: boolean, title: string, source: string, rows: FinanceRow[]) {
   return {
     language: isArabic ? ("ar" as const) : ("en" as const),
     sectionTitle: title,
-    filters: isArabic ? "الفلاتر الحالية" : "Current filters",
+    filters: `${isArabic ? "مصدر البيانات" : "Data source"}: ${source}`,
     totals: {
       rows: rows.length,
       debit: money(rows.reduce((sum, row) => sum + rowDebit(row), 0)),
@@ -150,10 +91,13 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
   const [rows, setRows] = useState<FinanceRow[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [source, setSource] = useState<AdminProductionSource>("unavailable");
+  const [tableName, setTableName] = useState(productionTableForSection(id).table);
   const [merchantId, setMerchantId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [status, setStatus] = useState("");
   const [codOnly, setCodOnly] = useState(false);
   const [expense, setExpense] = useState({
     amount: "",
@@ -174,73 +118,48 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
   const [csvPreview, setCsvPreview] = useState<ReturnType<typeof validateImportRows>>([]);
   const [lastBatchId, setLastBatchId] = useState("");
 
-  const filters: AdminFilters = { merchantId, driverId, dateFrom, dateTo };
+  const filters: AdminProductionFilters = { merchantId, driverId, dateFrom, dateTo, status };
 
   async function load() {
     setBusy(true);
     setMessage("");
 
     try {
-      let data: FinanceRow[] = [];
-
-      if (id === "expenses") data = await fetchExpenses(filters);
-      else if (id === "adjustments") data = await fetchAdjustments(filters);
-      else if (id === "audit_log") data = await fetchAdminAuditEvents(filters);
-      else if (id === "print") {
-        data = await fetchPrintJobs(filters);
-        if (!data.length && orders.length) {
-          data = printableRowsFromOrders(orders, isArabic);
-          setMessage(isArabic ? "لا توجد مهام طباعة محفوظة، لكن توجد طلبات جاهزة لإنشاء فواتير." : "No saved print jobs, but orders are ready for invoices.");
-        }
-      }
-      else if (id === "cod") {
-        data = await fetchCodCollections(filters);
-        if (!data.length) {
-          data = orders
-            .filter((order) => Number(order.cod_amount || 0) > 0)
-            .map((order) => ({
-              id: `derived-cod-${order.id || order.tracking_number || order.invoice_number}`,
-              order_id: order.id,
-              merchant_id: order.merchant_id,
-              tracking_number: order.tracking_number || order.invoice_number,
-              entry_date: String(order.created_at || new Date().toISOString()).slice(0, 10),
-              entry_type: "pending",
-              debit: 0,
-              credit: Number(order.cod_amount || 0),
-              balance: Number(order.cod_amount || 0),
-              cod_amount: Number(order.cod_amount || 0),
-              status: "pending",
-              notes: isArabic ? "مشتق من الطلبات" : "Derived from orders",
-              created_at: order.created_at,
-            }));
-        }
-      } else if (id === "driver_statements") {
-        data = await fetchDriverStatementEntries(filters);
-        if (!data.length) data = deriveDriverStatementFromOrders(driverId || undefined, orders, filters);
-      } else if (id === "merchant_statements") {
-        data = await fetchMerchantStatementEntries(filters);
-        if (!data.length) data = deriveMerchantStatementFromOrders(merchantId || undefined, orders, filters);
-      } else if (id === "reports") {
-        data = [
-          ...(await fetchExpenses(filters)),
-          ...(await fetchAdjustments(filters)),
-          ...(await fetchPrintJobs(filters)),
-        ];
-      }
-
-      const normalized = data.map((row) => ({
+      const result = await fetchProductionRows(id, filters);
+      const normalized = result.rows.map((row) => ({
         ...row,
         debit: rowDebit(row),
         credit: rowCredit(row),
         balance: rowBalance(row),
       }));
-
       const visibleRows = codOnly ? normalized.filter((row) => rowDebit(row) + rowCredit(row) + rowBalance(row) > 0) : normalized;
       setRows(visibleRows);
-      if (id === "print" && visibleRows.length > 0) addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `ops-print-ready:${visibleRows.length}`, audioEvent: "print_ready", titleAr: "فواتير جاهزة للطباعة", titleEn: "Invoices ready to print", bodyAr: `يوجد ${visibleRows.length} طلب يمكن إنشاء فواتير أو بوالص له.`, bodyEn: `${visibleRows.length} orders can generate invoices or labels.` });
+      setSource(result.source);
+      setTableName(result.table);
+
+      if (result.message) setMessage(result.message);
+      if (result.source === "db" && result.synced) {
+        setMessage(isArabic ? "تمت مزامنة الفروع التشغيلية من قاعدة البيانات الحقيقية." : "Operational branches synced from the real database.");
+      }
+
+      if (id === "print" && visibleRows.length > 0) {
+        addAdminNotification({
+          type: "print",
+          sectionId: "print",
+          priority: "normal",
+          dedupeKey: `ops-print-db:${visibleRows.length}`,
+          audioEvent: "print_ready",
+          titleAr: "طابور طباعة حقيقي",
+          titleEn: "Real print queue",
+          bodyAr: `يوجد ${visibleRows.length} مهمة طباعة محفوظة في قاعدة البيانات.`,
+          bodyEn: `${visibleRows.length} print jobs are saved in the database.`,
+        });
+      }
     } catch (error) {
-      console.warn("Admin operations layer load failed:", (error as Error)?.message || error);
-      setMessage(isArabic ? "تعذر تحميل الجدول المتخصص؛ تم الحفاظ على الواجهة بدون عرض خطأ تقني." : "Specialized table could not be loaded; technical details were hidden.");
+      console.warn("Admin DB operation load failed:", (error as Error)?.message || error);
+      setRows([]);
+      setSource("unavailable");
+      setMessage(isArabic ? "فشل الاتصال بجدول الإنتاج الحقيقي. لا يتم عرض صفوف وهمية." : "Real production table failed to load. No fake rows are displayed.");
     } finally {
       setBusy(false);
     }
@@ -248,17 +167,10 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
   useEffect(() => {
     void load();
-  }, [id, orders.length]);
+  }, [id]);
 
-  const totals = useMemo(
-    () => ({
-      count: rows.length,
-      debit: rows.reduce((sum, row) => sum + rowDebit(row), 0),
-      credit: rows.reduce((sum, row) => sum + rowCredit(row), 0),
-      pending: rows.filter((row) => /draft|pending|queued/.test(String(row.status || ""))).length,
-    }),
-    [rows],
-  );
+  const totals = useMemo(() => summarizeRows(rows), [rows]);
+  const dataSourceText = sourceText(source, isArabic, tableName);
 
   async function submitExpense() {
     if (!expense.amount || Number(expense.amount) <= 0 || !expense.category || !expense.expense_date) {
@@ -267,7 +179,7 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
     }
 
     await createExpense(expense);
-    setMessage(isArabic ? "تم حفظ المصروف كعملية حقيقية." : "Expense saved as a real operation.");
+    setMessage(isArabic ? "تم حفظ المصروف في قاعدة البيانات." : "Expense saved to the database.");
     await load();
     await onRefresh();
   }
@@ -279,13 +191,14 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
     }
 
     await createAdjustment({ ...adjustment, merchant_id: merchantId || undefined, driver_id: driverId || undefined });
-    setMessage(isArabic ? "تم إنشاء التسوية." : "Adjustment created.");
+    setMessage(isArabic ? "تم إنشاء التسوية في قاعدة البيانات." : "Adjustment saved to the database.");
     await load();
+    await onRefresh();
   }
 
   async function handleCsv(file: File) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      setMessage(isArabic ? "CSV مدعوم الآن؛ XLSX قيد الانتظار بوضوح." : "CSV is supported now; XLSX remains pending.");
+      setMessage(isArabic ? "CSV مدعوم الآن. لا يتم إنشاء صفوف وهمية من XLSX." : "CSV is supported now. No fake XLSX rows are created.");
       return;
     }
 
@@ -296,7 +209,7 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
     const batch = await createImportBatch({
       merchant_id: merchantId || undefined,
       file_name: file.name,
-      import_mode: "preview",
+      import_mode: "database_preview",
       total_rows: validation.length,
       valid_rows: validation.filter((row) => row.status === "valid").length,
       invalid_rows: validation.filter((row) => row.status === "invalid").length,
@@ -304,49 +217,69 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
     setLastBatchId(String(batch.id || ""));
     await saveImportPreviewRows(String(batch.id), validation);
-    setMessage(isArabic ? "تم حفظ معاينة الاستيراد فقط؛ لم يتم إنشاء طلبات بعد." : "Import preview saved only; no orders were created yet.");
+    setMessage(isArabic ? "تم حفظ معاينة الاستيراد كصفوف حقيقية في قاعدة البيانات." : "Import preview rows were saved as real database rows.");
   }
 
   async function makePrintJob() {
     const selected = orders.slice(0, 25).map((order) => order.id).filter(Boolean);
-    try {
-      await createPrintJob({
-        job_type: "invoice",
-        language: isArabic ? "ar" : "en",
-        order_ids: selected,
-        merchant_id: merchantId || undefined,
-        filters,
-        pdf_payload: tablePdf(isArabic, title, rows),
-      });
-      setMessage(isArabic ? "تم إنشاء مهمة الطباعة" : "Print job queued.");
-      addAdminNotification({ type: "success", sectionId: "print", priority: "normal", dedupeKey: `print-job:${Date.now()}`, audioEvent: "success", titleAr: "تم إنشاء مهمة الطباعة", titleEn: "Print job created", bodyAr: "تم حفظ مهمة الطباعة في قاعدة البيانات.", bodyEn: "The print job was saved in the database.", dedupeMs: 1000 });
-      await load();
-    } catch (error) {
-      console.warn("Print job save failed:", (error as Error)?.message || error);
-      setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database.");
-      addAdminNotification({ type: "warning", sectionId: "print", priority: "high", dedupeKey: "print-preview-only", audioEvent: "warning", titleAr: "معاينة فقط", titleEn: "Preview only", bodyAr: "لم يتم حفظ مهمة الطباعة في قاعدة البيانات.", bodyEn: "The print job was not saved in the database." });
+    if (!selected.length) {
+      setMessage(isArabic ? "لا توجد طلبات حقيقية لإنشاء مهمة طباعة." : "No real orders are available for a print job.");
+      return;
     }
+
+    await createPrintJob({
+      job_type: "invoice",
+      language: isArabic ? "ar" : "en",
+      order_ids: selected,
+      merchant_id: merchantId || undefined,
+      filters,
+      pdf_payload: tablePdf(isArabic, title, dataSourceText, rows),
+    });
+    setMessage(isArabic ? "تم إنشاء مهمة الطباعة في قاعدة البيانات." : "Print job saved to the database.");
+    addAdminNotification({
+      type: "success",
+      sectionId: "print",
+      priority: "normal",
+      dedupeKey: `print-job-db:${Date.now()}`,
+      audioEvent: "success",
+      titleAr: "تم إنشاء مهمة الطباعة",
+      titleEn: "Print job created",
+      bodyAr: "تم حفظ مهمة الطباعة في قاعدة البيانات.",
+      bodyEn: "The print job was saved in the database.",
+      dedupeMs: 1000,
+    });
+    await load();
   }
 
   async function approveFirst() {
     const firstId = rows[0]?.id;
     if (!firstId || (id !== "expenses" && id !== "adjustments")) {
-      setMessage(isArabic ? "الاعتماد الحقيقي متاح للمصروفات والتسويات فقط حالياً." : "Real approval is currently available for expenses and adjustments only.");
+      setMessage(isArabic ? "الاعتماد الإنتاجي متاح للمصروفات والتسويات ذات الصفوف المحفوظة فقط." : "Production approval is available only for saved expenses and adjustments.");
       return;
     }
 
     await (id === "expenses" ? approveExpense(String(firstId)) : approveAdjustment(String(firstId)));
+    setMessage(isArabic ? "تم الاعتماد في قاعدة البيانات." : "Approved in the database.");
     await load();
   }
 
   async function voidFirst() {
     const firstId = rows[0]?.id;
     if (!firstId || (id !== "expenses" && id !== "adjustments")) {
-      setMessage(isArabic ? "الإلغاء الحقيقي متاح للمصروفات والتسويات فقط حالياً." : "Real voiding is currently available for expenses and adjustments only.");
+      setMessage(isArabic ? "الإلغاء الإنتاجي متاح للمصروفات والتسويات ذات الصفوف المحفوظة فقط." : "Production voiding is available only for saved expenses and adjustments.");
       return;
     }
 
     await (id === "expenses" ? voidExpense(String(firstId), "Voided from admin") : voidAdjustment(String(firstId), "Voided from admin"));
+    setMessage(isArabic ? "تم الإلغاء في قاعدة البيانات." : "Voided in the database.");
+    await load();
+  }
+
+  async function runSync() {
+    const sync = await syncAdminProductionRows();
+    setMessage(sync.ok
+      ? (isArabic ? "تمت مزامنة صفوف COD والكشوفات من الطلبات الحقيقية." : "COD and statement rows synced from real orders.")
+      : sync.message || (isArabic ? "فشلت المزامنة." : "Sync failed."));
     await load();
   }
 
@@ -354,14 +287,17 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
     <section className="dn-ops-layer" dir={isArabic ? "rtl" : "ltr"}>
       <header>
         <div>
-          <span>{isArabic ? "طبقة عمليات حقيقية" : "Real operations layer"}</span>
+          <span>{isArabic ? "طبقة إنتاج مرتبطة بقاعدة البيانات" : "Production DB-backed layer"}</span>
           <h1>{title}</h1>
-          <p>{isArabic ? "كل إجراء يكتب إلى جداول Supabase الجديدة أو يوضح أنه معاينة فقط." : "Actions write to new Supabase tables or are clearly marked preview-only."}</p>
+          <p>{isArabic ? "كل الصفوف هنا من جداول Supabase أو عمليات محفوظة فقط. لا توجد صفوف وهمية أو derived UI rows." : "All rows here come from Supabase tables or saved operations only. No fake or UI-derived rows are displayed."}</p>
         </div>
-        <AdminPdfExportButton payload={tablePdf(isArabic, title, rows)} />
+        <AdminPdfExportButton payload={tablePdf(isArabic, title, dataSourceText, rows)} />
       </header>
 
-      {message && <div className="dn-ops-message">{message}</div>}
+      <div className={`dn-ops-message ${source === "db" ? "is-db" : "is-warning"}`}>
+        <Database className="inline h-4 w-4" /> {dataSourceText}
+        {message ? ` · ${message}` : ""}
+      </div>
 
       <div className="dn-ops-filters">
         <select className={inputClass} value={merchantId} onChange={(event) => setMerchantId(event.target.value)}>
@@ -369,10 +305,12 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
           {merchants.map((merchant) => <option key={merchant.id} value={merchant.id}>{merchant.trade_name || merchant.owner_name || merchant.merchant_code || merchant.id}</option>)}
         </select>
         <input className={inputClass} value={driverId} onChange={(event) => setDriverId(event.target.value)} placeholder={isArabic ? "معرف المندوب" : "Driver id"} />
+        <input className={inputClass} value={status} onChange={(event) => setStatus(event.target.value)} placeholder={isArabic ? "الحالة" : "Status"} />
         <input className={inputClass} type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
         <input className={inputClass} type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
         <label className="dn-ops-toggle"><input type="checkbox" checked={codOnly} onChange={(event) => setCodOnly(event.target.checked)} /> {fieldLabel("codOnly", isArabic)}</label>
-        <button type="button" onClick={() => void load()}>{busy ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "تحديث" : "Refresh")}</button>
+        <button type="button" onClick={() => void load()}><RefreshCw className="inline h-4 w-4" /> {busy ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "تحديث" : "Refresh")}</button>
+        <button type="button" onClick={() => void runSync()}>{isArabic ? "مزامنة الإنتاج" : "Sync production"}</button>
       </div>
 
       <div className="dn-ops-kpis">
@@ -413,21 +351,20 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
       {id === "import" && (
         <div className="dn-ops-form">
-          <input className={inputClass} type="file" accept=".csv,.xlsx" onChange={(event) => event.target.files?.[0] && void handleCsv(event.target.files[0])} />
+          <input className={inputClass} type="file" accept=".csv" onChange={(event) => event.target.files?.[0] && void handleCsv(event.target.files[0])} />
           <button type="button" disabled={!lastBatchId} onClick={async () => { const result = await commitValidImportRows(lastBatchId); setMessage(result.message); }}>{actionLabel("commitRows", isArabic)}</button>
-          <span>{isArabic ? `معاينة الاستيراد: ${csvPreview.length} صف. لم يتم إنشاء طلبات قبل التأكيد.` : `Import preview: ${csvPreview.length} rows. No orders are created before confirmation.`}</span>
+          <span>{isArabic ? `صفوف معاينة محفوظة في DB: ${csvPreview.length}` : `Preview rows saved in DB: ${csvPreview.length}`}</span>
         </div>
       )}
 
       {id === "print" && (
         <div className="dn-ops-form">
-          <button type="button" onClick={() => void makePrintJob()}>{isArabic ? "إنشاء مهمة طباعة" : "Create print job"}</button>
-          <AdminPdfExportButton label={isArabic ? "تصدير PDF" : "Export PDF"} payload={tablePdf(isArabic, title, rows)} />
+          <button type="button" onClick={() => void makePrintJob()}>{isArabic ? "إنشاء مهمة طباعة من الطلبات" : "Create print job from orders"}</button>
+          <AdminPdfExportButton label={isArabic ? "تصدير PDF" : "Export PDF"} payload={tablePdf(isArabic, title, dataSourceText, rows)} />
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة بوليصة" : "Print shipping label"}</button>
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة فاتورة" : "Print invoice"}</button>
           <button type="button" onClick={() => window.print()}>{isArabic ? "طباعة كشف إحضار" : "Print pickup manifest"}</button>
-          <button type="button" onClick={async () => { const first = rows.find((row) => !String(row.id || "").startsWith("derived-print-")); if (first?.id) { await markPrintJobPrinted(String(first.id)); addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-done:${first.id}`, audioEvent: "print_done", titleAr: "تم تحديث حالة الطباعة", titleEn: "Print status updated", bodyAr: "تم تحديد مهمة الطباعة كمطبوعة.", bodyEn: "The print job was marked as printed." }); await load(); } else setMessage(isArabic ? "معاينة فقط — تعذر حفظ مهمة الطباعة في قاعدة البيانات." : "Preview only — could not save print job in the database."); }}>{isArabic ? "تحديد كمطبوع" : "Mark printed"}</button>
-          <span>{isArabic ? "جاهز للطباعة من الطلبات" : "Ready to print from orders"}</span>
+          <button type="button" onClick={async () => { const first = rows[0]; if (first?.id) { await markPrintJobPrinted(String(first.id)); addAdminNotification({ type: "print", sectionId: "print", priority: "normal", dedupeKey: `print-done:${first.id}`, audioEvent: "print_done", titleAr: "تم تحديث حالة الطباعة", titleEn: "Print status updated", bodyAr: "تم تحديد مهمة الطباعة كمطبوعة.", bodyEn: "The print job was marked as printed." }); await load(); } else setMessage(isArabic ? "لا توجد مهمة طباعة محفوظة في قاعدة البيانات." : "No saved print job exists in the database."); }}>{isArabic ? "تحديد كمطبوع" : "Mark printed"}</button>
         </div>
       )}
 
@@ -467,7 +404,9 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
 
         {!rows.length && (
           <div className="dn-ops-empty">
-            {id === "print" ? (orders.length ? (isArabic ? "لا توجد مهام طباعة محفوظة، لكن توجد طلبات جاهزة لإنشاء فواتير." : "No saved print jobs, but orders are ready for invoices.") : (isArabic ? "لا توجد طلبات لإنشاء فواتير حالياً." : "No orders are available for invoices right now.")) : (isArabic ? "لا توجد بيانات محفوظة في هذا القسم حالياً. عند غياب الجداول المتخصصة يتم عرض مشتقات الطلبات حيثما أمكن." : "No saved data in this section right now. When specialized tables are missing, order-derived rows are shown where possible.")}
+            {source === "db"
+              ? (isArabic ? "لا توجد صفوف محفوظة في جدول قاعدة البيانات لهذا القسم بعد." : "No saved database rows exist for this section yet.")
+              : (isArabic ? "قاعدة البيانات غير متاحة لهذا القسم. لا يتم عرض صفوف وهمية." : "Database is unavailable for this section. No fake rows are displayed.")}
           </div>
         )}
       </div>
