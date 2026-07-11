@@ -1,0 +1,433 @@
+.dn-pro-orders {
+  display: grid;
+  gap: 1rem;
+  color: #fff;
+}
+
+.dn-pro-orders-hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(24, 168, 232, 0.18);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(245, 183, 0, 0.16), transparent 18rem),
+    radial-gradient(circle at 88% 8%, rgba(24, 168, 232, 0.15), transparent 22rem),
+    rgba(3, 18, 38, 0.78);
+  padding: 1.25rem;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.25);
+}
+
+.dn-pro-orders-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 183, 0, 0.75), transparent);
+}
+
+.dn-pro-orders-hero-icon {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  border: 1px solid rgba(245, 183, 0, 0.28);
+  border-radius: 1.25rem;
+  background: rgba(245, 183, 0, 0.12);
+  color: #f5b700;
+}
+
+.dn-pro-orders-hero span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgba(245, 183, 0, 0.92);
+  font-size: 0.72rem;
+  font-weight: 1000;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dn-pro-orders-hero h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3vw, 2.5rem);
+  font-weight: 1000;
+  line-height: 1.1;
+}
+
+.dn-pro-orders-hero p {
+  max-width: 56rem;
+  margin: 0.45rem 0 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1.8;
+}
+
+.dn-pro-orders-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.dn-pro-orders-hero-actions button,
+.dn-pro-orders-hero-actions .dn-admin-pdf-export-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 1000;
+  transition: 180ms ease;
+}
+
+.dn-pro-orders-hero-actions button:hover,
+.dn-pro-orders-hero-actions .dn-admin-pdf-export-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 183, 0, 0.38);
+  background: rgba(245, 183, 0, 0.11);
+  color: #f5b700;
+}
+
+.dn-pro-orders-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.dn-pro-orders-tabs button {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.042);
+  color: rgba(255, 255, 255, 0.68);
+  padding: 0.85rem;
+  text-align: start;
+  transition: 180ms ease;
+}
+
+.dn-pro-orders-tabs button span {
+  color: #18a8e8;
+}
+
+.dn-pro-orders-tabs button strong {
+  font-size: 0.76rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-tabs button b {
+  color: #f5b700;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.dn-pro-orders-tabs button:hover,
+.dn-pro-orders-tabs button.is-active {
+  transform: translateY(-1px);
+  border-color: rgba(245, 183, 0, 0.38);
+  background: linear-gradient(135deg, rgba(245, 183, 0, 0.12), rgba(24, 168, 232, 0.07));
+  color: #fff;
+}
+
+.dn-pro-orders-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.dn-pro-orders-metric {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 1rem;
+}
+
+.dn-pro-orders-metric span {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  margin-bottom: 0.45rem;
+  border-radius: 0.9rem;
+  background: rgba(24, 168, 232, 0.1);
+  color: #18a8e8;
+}
+
+.dn-pro-orders-metric strong {
+  display: block;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 1000;
+  word-break: break-word;
+}
+
+.dn-pro-orders-metric small {
+  display: block;
+  margin-top: 0.25rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.dn-pro-orders-metric-warn span { background: rgba(245, 183, 0, 0.12); color: #f5b700; }
+.dn-pro-orders-metric-danger span { background: rgba(244, 63, 94, 0.12); color: #fecdd3; }
+
+.dn-pro-orders-filters {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr)) auto;
+  gap: 0.65rem;
+  align-items: end;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.5rem;
+  background: rgba(3, 18, 38, 0.68);
+  padding: 0.85rem;
+}
+
+.dn-pro-orders-search,
+.dn-pro-orders-filters label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dn-pro-orders-search {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3.25rem;
+  border: 1px solid rgba(24, 168, 232, 0.18);
+  border-radius: 1.15rem;
+  background: rgba(0, 0, 0, 0.22);
+  color: #f5b700;
+  padding: 0 0.9rem;
+}
+
+.dn-pro-orders-filters label span {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.68rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-search input,
+.dn-pro-orders-filters input {
+  width: 100%;
+  min-height: 3.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.05rem;
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  padding: 0 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  outline: none;
+}
+
+.dn-pro-orders-search input {
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.dn-pro-orders-filters button {
+  display: inline-flex;
+  min-height: 3.1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(245, 183, 0, 0.25);
+  border-radius: 1.05rem;
+  background: rgba(245, 183, 0, 0.08);
+  color: #f5b700;
+  padding: 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-filters button.is-active {
+  background: #f5b700;
+  color: #031226;
+}
+
+.dn-pro-orders-notice {
+  margin: 0;
+  border: 1px solid rgba(24, 168, 232, 0.18);
+  border-radius: 1.15rem;
+  background: rgba(24, 168, 232, 0.08);
+  color: #aeeaff;
+  padding: 0.85rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.dn-pro-orders-table-card {
+  overflow: hidden;
+  border: 1px solid rgba(24, 168, 232, 0.16);
+  border-radius: 1.6rem;
+  background: rgba(3, 18, 38, 0.7);
+  box-shadow: 0 20px 58px rgba(0, 0, 0, 0.18);
+}
+
+.dn-pro-orders-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem;
+}
+
+.dn-pro-orders-table-head span,
+.dn-pro-orders-table-head small {
+  color: rgba(245, 183, 0, 0.85);
+  font-size: 0.7rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-table-head h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-table-wrap {
+  overflow-x: auto;
+}
+
+.dn-pro-orders-table-wrap table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.dn-pro-orders-table-wrap th,
+.dn-pro-orders-table-wrap td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  padding: 0.82rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-align: start;
+  vertical-align: top;
+}
+
+.dn-pro-orders-table-wrap th {
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 0.68rem;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dn-pro-orders-table-wrap td > button {
+  border: 0;
+  background: transparent;
+  color: #f5b700;
+  padding: 0;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-status {
+  display: inline-grid;
+  gap: 0.25rem;
+}
+
+.dn-pro-orders-status small {
+  width: max-content;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.dn-pro-orders-row-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.045);
+  color: #fff;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-row-actions button:hover {
+  border-color: rgba(245, 183, 0, 0.38);
+  color: #f5b700;
+}
+
+.dn-pro-orders-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  padding: 3rem 1rem;
+  color: rgba(255, 255, 255, 0.58);
+  text-align: center;
+}
+
+.dn-pro-orders-empty svg {
+  color: #18a8e8;
+}
+
+.dn-pro-orders-empty strong {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 1000;
+}
+
+.dn-pro-orders-empty p {
+  max-width: 34rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.dn-pro-orders-empty button {
+  margin-top: 0.4rem;
+  border: 0;
+  border-radius: 1rem;
+  background: #f5b700;
+  color: #031226;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+@media (max-width: 1180px) {
+  .dn-pro-orders-hero { grid-template-columns: auto 1fr; }
+  .dn-pro-orders-hero-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .dn-pro-orders-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dn-pro-orders-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dn-pro-orders-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dn-pro-orders-search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .dn-pro-orders-hero { grid-template-columns: 1fr; }
+  .dn-pro-orders-tabs,
+  .dn-pro-orders-kpis,
+  .dn-pro-orders-filters { grid-template-columns: 1fr; }
+}
