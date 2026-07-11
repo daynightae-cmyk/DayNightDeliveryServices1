@@ -15,13 +15,19 @@ import {
   CalendarDays,
   Filter,
   Layers,
+  LocateFixed,
   MapPin,
+  Minus,
   Navigation,
+  Plus,
+  RefreshCw,
+  RotateCcw,
   Route,
   Search,
   Truck,
+  type LucideIcon,
 } from "lucide-react";
-import { AdminIconBadge, AdminStateChip, IconizedMapControlButton } from "./adminIconSystem";
+import { AdminStateChip } from "./adminIconSystem";
 import { defaultLocations } from "../../data/defaultLocations";
 import { adminMapRegions, orderRegionId } from "../../data/adminCommandExpansion";
 import {
@@ -76,9 +82,9 @@ const driverIcon = L.divIcon({
 });
 
 const modeLabels = [
-  { mode: "standard" as const, ar: "عرض عادي", en: "Standard view", icon: "map" as const },
-  { mode: "satellite" as const, ar: "عرض فضائي", en: "Satellite view", icon: "layers" as const },
-  { mode: "terrain" as const, ar: "عرض تضاريس", en: "Terrain view", icon: "route" as const },
+  { mode: "standard" as const, ar: "عادي", en: "Standard", Icon: MapPin },
+  { mode: "satellite" as const, ar: "فضائي", en: "Satellite", Icon: Layers },
+  { mode: "terrain" as const, ar: "تضاريس", en: "Terrain", Icon: Route },
 ];
 
 const statusFilters = [
@@ -96,6 +102,15 @@ function readLocal(key: string, fallback: string) {
     return localStorage.getItem(key) || fallback;
   } catch {
     return fallback;
+  }
+}
+
+function writeLocal(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore private browsing/storage restrictions.
   }
 }
 
@@ -128,18 +143,18 @@ function label(value: unknown, fallback = "—") {
 
 function includesCity(order: any, query: string) {
   return `
-    ${order.sender_city || ""}
-    ${order.receiver_city || ""}
-    ${order.pickup_city || ""}
-    ${order.delivery_city || ""}
-    ${order.destination_country || ""}
+    ${order?.sender_city || ""}
+    ${order?.receiver_city || ""}
+    ${order?.pickup_city || ""}
+    ${order?.delivery_city || ""}
+    ${order?.destination_country || ""}
   `
     .toLowerCase()
     .includes(query.toLowerCase());
 }
 
 function isStatusMatch(order: any, filter: string) {
-  const status = norm(order.status);
+  const status = norm(order?.status);
 
   if (filter === "all") return true;
   if (filter === "active") return isActiveOrder(order);
@@ -171,7 +186,7 @@ function MapRefresh({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       map.invalidateSize({ animate: true });
-    }, 120);
+    }, 140);
 
     return () => window.clearTimeout(timer);
   }, [map, mapMode, refreshNonce]);
@@ -191,7 +206,7 @@ function MapRefresh({
 
     if (validPoints.length >= 2) {
       map.fitBounds(validPoints, {
-        padding: [52, 52],
+        padding: [54, 54],
         maxZoom: 12,
         animate: true,
       });
@@ -199,6 +214,28 @@ function MapRefresh({
   }, [map, points, driver, focusRegion, focusCommand]);
 
   return null;
+}
+
+function MapButton({
+  Icon,
+  labelText,
+  onClick,
+}: {
+  Icon: LucideIcon;
+  labelText: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={labelText}
+      title={labelText}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-brand-gold/30 bg-[#020812]/85 text-brand-gold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-brand-gold/70 hover:bg-brand-gold/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
 }
 
 function MapCommandControls({
@@ -215,23 +252,42 @@ function MapCommandControls({
   onReset: () => void;
 }) {
   const map = useMap();
+
   const fitRoute = () => {
     const validPoints = fitPoints.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
     if (validPoints.length >= 2) map.fitBounds(validPoints, { padding: [64, 64], maxZoom: 13, animate: true });
   };
+
   const resetMap = () => {
-    map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: true });
+    map.setView(
+      focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center,
+      focusRegion.id === "all" ? 9 : focusRegion.zoom,
+      { animate: true },
+    );
     onReset();
   };
-  const controls = [
-    { key: "zoom-in", label: isArabic ? "تكبير الخريطة" : "Zoom in", icon: "zoom-in" as const, action: () => map.zoomIn() },
-    { key: "zoom-out", label: isArabic ? "تصغير الخريطة" : "Zoom out", icon: "zoom-out" as const, action: () => map.zoomOut() },
-    { key: "reset-map", label: isArabic ? "إعادة ضبط الخريطة" : "Reset map", icon: "reset-map" as const, action: resetMap },
-    { key: "fit-route", label: isArabic ? "ملاءمة المسار" : "Fit route", icon: "fit-route" as const, action: fitRoute },
-    { key: "focus-driver", label: isArabic ? "تركيز على المندوب" : "Focus driver", icon: "focus-driver" as const, action: () => map.setView(driver, 13, { animate: true }) },
-    { key: "refresh", label: isArabic ? "تحديث الخريطة" : "Refresh map", icon: "refresh" as const, action: () => { map.invalidateSize({ animate: true }); onReset(); } },
-  ];
-  return <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>{controls.map(({ key, label, icon, action }) => <IconizedMapControlButton key={key} icon={icon} title={label} ariaLabel={label} onClick={action} />)}</div>;
+
+  return (
+    <div
+      className="absolute left-3 top-3 z-[900] grid gap-1.5 rounded-2xl border border-white/10 bg-[#020812]/70 p-1.5 backdrop-blur-md rtl:left-auto rtl:right-3"
+      role="toolbar"
+      aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}
+    >
+      <MapButton Icon={Plus} labelText={isArabic ? "تكبير الخريطة" : "Zoom in"} onClick={() => map.zoomIn()} />
+      <MapButton Icon={Minus} labelText={isArabic ? "تصغير الخريطة" : "Zoom out"} onClick={() => map.zoomOut()} />
+      <MapButton Icon={RotateCcw} labelText={isArabic ? "إعادة ضبط الخريطة" : "Reset map"} onClick={resetMap} />
+      <MapButton Icon={Route} labelText={isArabic ? "ملاءمة المسار" : "Fit route"} onClick={fitRoute} />
+      <MapButton Icon={LocateFixed} labelText={isArabic ? "تركيز على المندوب" : "Focus driver"} onClick={() => map.setView(driver, 13, { animate: true })} />
+      <MapButton
+        Icon={RefreshCw}
+        labelText={isArabic ? "تحديث الخريطة" : "Refresh map"}
+        onClick={() => {
+          map.invalidateSize({ animate: true });
+          onReset();
+        }}
+      />
+    </div>
+  );
 }
 
 export default function AdminLiveOperationsMap({
@@ -287,20 +343,17 @@ export default function AdminLiveOperationsMap({
       sortedOrders.filter((order) => {
         const regionOk = regionFilter === "all" || orderRegionId(order) === regionFilter;
         const statusOk = isStatusMatch(order, statusFilter);
-        const searchOk =
-          !searchQuery.trim() ||
-          [
-            getOrderReference(order),
-            order.sender_name,
-            order.receiver_name,
-            order.merchant_name,
-            order.receiver_phone,
-            order.sender_phone,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          includesCity(order, searchQuery);
+        const searchText = [
+          getOrderReference(order),
+          order.sender_name,
+          order.receiver_name,
+          order.merchant_name,
+          order.receiver_phone,
+          order.sender_phone,
+        ]
+          .join(" ")
+          .toLowerCase();
+        const searchOk = !searchQuery.trim() || searchText.includes(searchQuery.toLowerCase()) || includesCity(order, searchQuery);
 
         return regionOk && statusOk && searchOk;
       }),
@@ -407,17 +460,17 @@ export default function AdminLiveOperationsMap({
   }, [routeWaypoints, hasLiveDriver]);
 
   if (!isMounted) {
-    return <div className="dn-live-map-shell dn-admin-live-ops-map min-h-[380px] animate-pulse" />;
+    return <div className="min-h-[420px] w-full animate-pulse rounded-[28px] border border-brand-gold/20 bg-[#020812]" />;
   }
 
   const reference = getOrderReference(activeOrder);
   const activeMode = modeLabels.find((item) => item.mode === mapMode) || modeLabels[0];
-  const activeModeLabel = isArabic ? activeMode.ar : activeMode.en;
   const activeLayerFailed = tileFailedByMode[mapMode];
   const selectedStatus = label(activeOrder?.status, isArabic ? "غير محدد" : "Unknown");
   const amount = orderAmount(activeOrder);
   const distanceKm = routeDistance ? (routeDistance / 1000).toFixed(1) : "—";
   const durationMin = routeDuration ? Math.max(1, Math.round(routeDuration / 60)) : null;
+  const compactRegions = adminMapRegions.filter((region) => ["all", "abu_dhabi", "dubai", "sharjah", "al_ain", "external"].includes(region.id));
 
   const tileHandlers = {
     tileerror: () => setTileFailedByMode((current) => ({ ...current, [mapMode]: true })),
@@ -428,28 +481,13 @@ export default function AdminLiveOperationsMap({
     setMapMode(mode);
     setRefreshNonce((value) => value + 1);
     setTileFailedByMode((current) => ({ ...current, [mode]: false }));
-
-    try {
-      localStorage.setItem("dn_admin_map_mode", mode);
-    } catch {
-      // Ignore storage restrictions.
-    }
+    writeLocal("dn_admin_map_mode", mode);
   };
 
   const setRegion = (region: string) => {
     setRegionFilter(region);
-
-    try {
-      localStorage.setItem("dn_admin_map_region", region);
-    } catch {
-      // Ignore storage restrictions.
-    }
-
+    writeLocal("dn_admin_map_region", region);
     setFocusCommand({ type: "region", nonce: Date.now() });
-  };
-
-  const doFocus = (type: "fit" | "driver" | "region") => {
-    setFocusCommand({ type, nonce: Date.now() });
   };
 
   const renderBaseLayers = () => {
@@ -494,46 +532,44 @@ export default function AdminLiveOperationsMap({
   };
 
   return (
-    <div
-      className="dn-live-map-shell dn-admin-live-ops-map relative h-[460px] w-full overflow-hidden rounded-[28px] border border-brand-gold/25 bg-[#020812]"
+    <section
+      className="w-full max-w-[680px] rounded-[28px] border border-brand-gold/20 bg-[#031226]/95 p-3 shadow-2xl shadow-black/25"
       dir={isArabic ? "rtl" : "ltr"}
+      aria-label={isArabic ? "خريطة العمليات الحية" : "Live operations map"}
     >
-      <div className="dn-live-map-ops-panel">
-        <div className="dn-map-title-card">
-          <p>
-            <AdminIconBadge name="map" className="!h-8 !w-8 !min-w-8" />
-            {isArabic ? "خريطة العمليات الحية" : "Live Operations Map"}
-          </p>
-          <AdminStateChip name="live-data" tone="success">{isArabic ? "الوضع الحالي" : "Current mode"}: {activeModeLabel}</AdminStateChip>
-          <b dir="ltr">{String(reference).slice(0, 28)}</b>
+      <header className="grid gap-3 rounded-3xl border border-white/10 bg-[#05182f]/70 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-base font-black text-brand-gold">
+              <MapPin className="h-4 w-4" aria-hidden="true" />
+              {isArabic ? "خريطة العمليات الحية" : "Live Operations Map"}
+            </p>
+            <p className="mt-1 truncate text-[0.7rem] font-bold text-white/60" dir="ltr">
+              {String(reference).slice(0, 34)}
+            </p>
+          </div>
+          <AdminStateChip name="live-data" tone="success">
+            {isArabic ? "وضع" : "Mode"}: {isArabic ? activeMode.ar : activeMode.en}
+          </AdminStateChip>
         </div>
 
-        <div className="dn-map-control-grid">
-          <label>
-            <span>{isArabic ? "الشحنة" : "Shipment"}</span>
-            <select value={selectedOrderId} onChange={(event) => setSelectedOrderId(event.target.value)}>
-              {filteredOrders.slice(0, 80).map((order) => (
-                <option key={String(order.id || getOrderReference(order))} value={String(order.id || getOrderReference(order))}>
-                  {getOrderReference(order)} — {label(order.receiver_city || order.delivery_city || order.receiver_name)}
-                </option>
-              ))}
-            </select>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="grid gap-1 text-[0.65rem] font-black text-brand-gold">
+            {isArabic ? "بحث" : "Search"}
+            <span className="flex min-h-10 items-center gap-2 rounded-2xl border border-brand-sky/20 bg-[#020812]/70 px-3 text-white">
+              <Search className="h-3.5 w-3.5 text-white/55" aria-hidden="true" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={isArabic ? "مدينة / تاجر / هاتف" : "City / merchant / phone"}
+                className="min-h-0 w-full border-0 bg-transparent p-0 text-[0.72rem] font-bold outline-none placeholder:text-white/35"
+              />
+            </span>
           </label>
 
-          <label>
-            <span>{isArabic ? "الحالة" : "Status"}</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              {statusFilters.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {isArabic ? item.ar : item.en}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>{isArabic ? "الإمارة" : "Emirate"}</span>
-            <select value={regionFilter} onChange={(event) => setRegion(event.target.value)}>
+          <label className="grid gap-1 text-[0.65rem] font-black text-brand-gold">
+            {isArabic ? "الإمارة" : "Emirate"}
+            <select className="min-h-10 rounded-2xl border border-brand-sky/20 bg-[#020812]/70 px-3 text-[0.72rem] font-black text-white" value={regionFilter} onChange={(event) => setRegion(event.target.value)}>
               {adminMapRegions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {isArabic ? region.ar : region.en}
@@ -542,185 +578,185 @@ export default function AdminLiveOperationsMap({
             </select>
           </label>
 
-          <label>
-            <span>{isArabic ? "بحث" : "Search"}</span>
-            <div className="dn-map-search-inline">
-              <Search className="h-3.5 w-3.5" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={isArabic ? "مدينة / تاجر / هاتف" : "City / merchant / phone"}
-              />
-            </div>
+          <label className="grid gap-1 text-[0.65rem] font-black text-brand-gold">
+            {isArabic ? "الحالة" : "Status"}
+            <select className="min-h-10 rounded-2xl border border-brand-sky/20 bg-[#020812]/70 px-3 text-[0.72rem] font-black text-white" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              {statusFilters.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {isArabic ? item.ar : item.en}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-[0.65rem] font-black text-brand-gold">
+            {isArabic ? "الشحنة" : "Shipment"}
+            <select className="min-h-10 rounded-2xl border border-brand-sky/20 bg-[#020812]/70 px-3 text-[0.72rem] font-black text-white" value={selectedOrderId} onChange={(event) => setSelectedOrderId(event.target.value)}>
+              {filteredOrders.slice(0, 80).map((order) => (
+                <option key={String(order.id || getOrderReference(order))} value={String(order.id || getOrderReference(order))}>
+                  {getOrderReference(order)} — {label(order.receiver_city || order.delivery_city || order.receiver_name)}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
-      </div>
 
-      <div className="dn-map-mode-bar">
-        <Layers className="h-4 w-4 text-brand-gold" />
-        {modeLabels.map((item) => (
-          <button
-            key={item.mode}
-            type="button"
-            onClick={() => selectMode(item.mode)}
-            aria-pressed={mapMode === item.mode}
-            aria-label={isArabic ? item.ar : item.en}
-            className={mapMode === item.mode ? "is-active" : ""}
-          >
-            <AdminIconBadge name={item.icon} className="!h-6 !w-6 !min-w-6" />
-            {isArabic ? item.ar : item.en}
-          </button>
-        ))}
-      </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.66rem] font-black text-white/55">{isArabic ? "الطبقة" : "Layer"}</span>
+          {modeLabels.map(({ mode, ar, en, Icon }) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => selectMode(mode)}
+              aria-pressed={mapMode === mode}
+              className={`inline-flex min-h-9 items-center gap-2 rounded-2xl border px-3 text-[0.72rem] font-black transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold ${
+                mapMode === mode
+                  ? "border-brand-gold/70 bg-brand-gold/15 text-brand-gold"
+                  : "border-white/10 bg-[#020812]/62 text-white/75"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {isArabic ? ar : en}
+            </button>
+          ))}
+        </div>
 
-      <div className="dn-map-region-chips">
-        {adminMapRegions
-          .filter((region) => ["all", "abu_dhabi", "dubai", "sharjah", "al_ain", "external"].includes(region.id))
-          .map((region) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.66rem] font-black text-white/55">{isArabic ? "المناطق" : "Regions"}</span>
+          {compactRegions.map((region) => (
             <button
               key={region.id}
               type="button"
               onClick={() => setRegion(region.id)}
-              className={regionFilter === region.id ? "is-active" : ""}
+              className={`min-h-8 rounded-2xl border px-3 text-[0.68rem] font-black transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold ${
+                regionFilter === region.id
+                  ? "border-brand-gold/70 bg-brand-gold/15 text-brand-gold"
+                  : "border-white/10 bg-[#020812]/62 text-white/72"
+              }`}
             >
-              <AdminIconBadge name={region.id === "external" ? "external-orders" : "map"} className="!h-6 !w-6 !min-w-6" />
               {isArabic ? region.ar : region.en}
             </button>
           ))}
-      </div>
-
-      <div className="dn-map-action-bar">
-        <button type="button" onClick={() => doFocus("fit")}><AdminIconBadge name="fit-route" className="!h-6 !w-6 !min-w-6" />
-          {isArabic ? "ملاءمة المسار" : "Fit route"}
-        </button>
-        <button type="button" onClick={() => doFocus("driver")}><AdminIconBadge name="focus-driver" className="!h-6 !w-6 !min-w-6" />
-          {isArabic ? "تركيز على المندوب" : "Focus driver"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setRefreshNonce((value) => value + 1);
-            doFocus("fit");
-          }}
-        >
-          <AdminIconBadge name="refresh" className="!h-6 !w-6 !min-w-6" />{isArabic ? "تحديث الخريطة" : "Refresh map"}
-        </button>
-      </div>
+        </div>
+      </header>
 
       {activeLayerFailed && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[660] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-amber-300/30 bg-[#071A33]/90 px-4 py-3 text-center text-xs font-black text-amber-100 shadow-2xl backdrop-blur-xl">
+        <div className="mt-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-center text-xs font-black text-amber-100">
           <AlertTriangle className="mx-auto mb-1 h-4 w-4 text-brand-gold" />
           {isArabic ? "تعذر تحميل هذه الطبقة مؤقتاً، جرّب وضعاً آخر." : "This layer could not be loaded temporarily; try another mode."}
         </div>
       )}
 
-      <MapContainer
-        key={`${mapMode}-${refreshNonce}`}
-        center={driverPos}
-        zoom={regionFilter === "all" ? 10 : focusRegion.zoom}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom={false}
-        zoomControl={false}
-      >
-        <MapCommandControls isArabic={isArabic} fitPoints={fitPoints} driver={driverPos} focusRegion={focusRegion} onReset={() => setRefreshNonce((value) => value + 1)} />
-        {renderBaseLayers()}
+      <div className="mt-3 w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#020812]" style={{ aspectRatio: "1 / 1" }}>
+        <MapContainer
+          key={`${mapMode}-${refreshNonce}`}
+          center={driverPos}
+          zoom={regionFilter === "all" ? 10 : focusRegion.zoom}
+          className="h-full w-full"
+          style={{ height: "100%", width: "100%" }}
+          scrollWheelZoom={false}
+          zoomControl={false}
+        >
+          <MapCommandControls isArabic={isArabic} fitPoints={fitPoints} driver={driverPos} focusRegion={focusRegion} onReset={() => setRefreshNonce((value) => value + 1)} />
+          {renderBaseLayers()}
 
-        <MapRefresh
-          points={fitPoints}
-          driver={driverPos}
-          focusRegion={focusRegion}
-          focusCommand={focusCommand}
-          mapMode={mapMode}
-          refreshNonce={refreshNonce}
-        />
+          <MapRefresh
+            points={fitPoints}
+            driver={driverPos}
+            focusRegion={focusRegion}
+            focusCommand={focusCommand}
+            mapMode={mapMode}
+            refreshNonce={refreshNonce}
+          />
 
-        <Polyline
-          positions={routePoints.length ? routePoints : [pickupPos, destPos]}
-          pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }}
-        />
+          <Polyline
+            positions={routePoints.length ? routePoints : [pickupPos, destPos]}
+            pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }}
+          />
 
-        <Polyline
-          positions={[pickupPos, driverPos, destPos]}
-          pathOptions={{ color: "#18A8E8", weight: 2.5, opacity: 0.76, dashArray: "10 12" }}
-        />
+          <Polyline
+            positions={[pickupPos, driverPos, destPos]}
+            pathOptions={{ color: "#18A8E8", weight: 2.5, opacity: 0.76, dashArray: "10 12" }}
+          />
 
-        {(routePoints.length ? routePoints : [pickupPos, driverPos, destPos])
-          .filter((_, index) => index % Math.max(1, Math.floor((routePoints.length || 3) / 12)) === 0)
-          .map((point, index) => (
-            <CircleMarker
-              key={`${point[0]}-${point[1]}-${index}`}
-              center={point}
-              radius={2.8}
-              pathOptions={{
-                color: "#F5B700",
-                fillColor: "#F5B700",
-                fillOpacity: 0.75,
-                opacity: 0.55,
-              }}
-            />
-          ))}
+          {(routePoints.length ? routePoints : [pickupPos, driverPos, destPos])
+            .filter((_, index) => index % Math.max(1, Math.floor((routePoints.length || 3) / 12)) === 0)
+            .map((point, index) => (
+              <CircleMarker
+                key={`${point[0]}-${point[1]}-${index}`}
+                center={point}
+                radius={2.8}
+                pathOptions={{
+                  color: "#F5B700",
+                  fillColor: "#F5B700",
+                  fillOpacity: 0.75,
+                  opacity: 0.55,
+                }}
+              />
+            ))}
 
-        <Marker position={pickupPos} icon={pickupIcon}>
-          <Popup>
-            <b>{isArabic ? "نقطة الاستلام" : "Pickup Point"}</b>
-            <br />
-            {getOrderString(activeOrder, ["sender_address", "pickup_address", "origin_address"]) ||
-              (isArabic ? pickup.labelAr : pickup.labelEn)}
-          </Popup>
-        </Marker>
+          <Marker position={pickupPos} icon={pickupIcon}>
+            <Popup>
+              <b>{isArabic ? "نقطة الاستلام" : "Pickup Point"}</b>
+              <br />
+              {getOrderString(activeOrder, ["sender_address", "pickup_address", "origin_address"]) ||
+                (isArabic ? pickup.labelAr : pickup.labelEn)}
+            </Popup>
+          </Marker>
 
-        <Marker position={driverPos} icon={driverIcon}>
-          <Popup>
-            <b>{isArabic ? "سيارة DAY NIGHT" : "DAY NIGHT Vehicle"}</b>
-            <br />
-            {hasLiveDriver
-              ? isArabic
-                ? "موقع السيارة المباشر"
-                : "Live vehicle location"
-              : isArabic
-                ? "موقع الشحنة التقديري"
-                : "Estimated shipment position"}
-            <br />
-            {isArabic ? "المندوب" : "Driver"}: {label(activeOrder?.driver_name || activeOrder?.assigned_driver_name)}
-          </Popup>
-        </Marker>
+          <Marker position={driverPos} icon={driverIcon}>
+            <Popup>
+              <b>{isArabic ? "سيارة DAY NIGHT" : "DAY NIGHT Vehicle"}</b>
+              <br />
+              {hasLiveDriver
+                ? isArabic
+                  ? "موقع السيارة المباشر"
+                  : "Live vehicle location"
+                : isArabic
+                  ? "موقع الشحنة التقديري"
+                  : "Estimated shipment position"}
+              <br />
+              {isArabic ? "المندوب" : "Driver"}: {label(activeOrder?.driver_name || activeOrder?.assigned_driver_name)}
+            </Popup>
+          </Marker>
 
-        <Marker position={destPos} icon={destinationIcon}>
-          <Popup>
-            <b>{isArabic ? "نقطة التسليم" : "Delivery Point"}</b>
-            <br />
-            {getOrderString(activeOrder, ["receiver_address", "delivery_address", "destination_address"]) ||
-              (isArabic ? destination.labelAr : destination.labelEn)}
-          </Popup>
-        </Marker>
-      </MapContainer>
+          <Marker position={destPos} icon={destinationIcon}>
+            <Popup>
+              <b>{isArabic ? "نقطة التسليم" : "Delivery Point"}</b>
+              <br />
+              {getOrderString(activeOrder, ["receiver_address", "delivery_address", "destination_address"]) ||
+                (isArabic ? destination.labelAr : destination.labelEn)}
+            </Popup>
+          </Marker>
+        </MapContainer>
+      </div>
 
-      <div className="dn-map-route-summary">
-        <span>
+      <footer className="mt-3 grid gap-2 rounded-3xl border border-white/10 bg-[#05182f]/70 p-3 text-[0.7rem] font-black text-white/75 sm:grid-cols-2 lg:grid-cols-3">
+        <span className="inline-flex items-center gap-2">
           <MapPin className="h-3.5 w-3.5 text-brand-gold" />
           {isArabic ? pickup.labelAr : pickup.labelEn}
         </span>
-        <span>
-          <Route className="h-3.5 w-3.5" />
+        <span className="inline-flex items-center gap-2">
+          <Route className="h-3.5 w-3.5 text-brand-gold" />
           {distanceKm} km {durationMin ? `• ${durationMin}m` : ""}
         </span>
-        <span>
+        <span className="inline-flex items-center gap-2">
           <Truck className="h-3.5 w-3.5 text-brand-sky" />
           {label(activeOrder?.driver_name || activeOrder?.assigned_driver_name, isArabic ? "بدون مندوب" : "Unassigned")}
         </span>
-        <span>
+        <span className="inline-flex items-center gap-2">
           <Navigation className="h-3.5 w-3.5 text-brand-sky" />
           {isArabic ? destination.labelAr : destination.labelEn}
         </span>
-        <span>
+        <span className="inline-flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-brand-gold" />
           {selectedStatus}
         </span>
-        <span>
+        <span className="inline-flex items-center gap-2">
           <CalendarDays className="h-3.5 w-3.5 text-brand-sky" />
           {amount ? `${amount.toFixed(2)} AED` : "—"}
         </span>
-      </div>
-    </div>
+      </footer>
+    </section>
   );
 }
