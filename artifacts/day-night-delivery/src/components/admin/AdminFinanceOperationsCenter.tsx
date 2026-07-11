@@ -1,51 +1,272 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  Banknote,
+  CheckCircle2,
+  ClipboardCheck,
+  Database,
+  FileText,
+  Landmark,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Scale,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Truck,
+  Wallet,
+} from "lucide-react";
 import type { Merchant, Order } from "../../types";
 import { addAdminNotification } from "../../lib/adminAudio";
-import { markCodReconciled, type FinanceRow, type FinanceSummary, type FinanceSummarySource } from "../../lib/adminData";
 import {
-  fetchProductionCodRows,
-  fetchProductionFinanceSummary,
-  fetchProductionRows,
-  fetchProductionStatementSummary,
-  rowBalance,
-  rowCredit,
-  rowDate,
-  rowDebit,
-  rowNotes,
-  rowReference,
-  rowType,
-  type AdminProductionRowsResult,
-  type AdminProductionSource,
-} from "../../lib/adminProductionData";
+  approveAdjustment,
+  approveExpense,
+  createAdjustment,
+  createExpense,
+  createOrSyncCodCollectionFromOrder,
+  deriveDriverStatementFromOrders,
+  deriveMerchantStatementFromOrders,
+  fetchAdjustments,
+  fetchAdminAuditEvents,
+  fetchCodCollections,
+  fetchDriverStatementEntries,
+  fetchExpenses,
+  fetchMerchantStatementEntries,
+  markCodCollected,
+  markCodReconciled,
+  voidAdjustment,
+  voidExpense,
+  type FinanceRow,
+  type FinanceSummary,
+  type FinanceSummarySource,
+} from "../../lib/adminData";
 import AdminPdfExportButton from "./AdminPdfExportButton";
+import "../../styles/dn-admin-finance-suite.css";
+
+type FinanceArea =
+  | "finance_dashboard"
+  | "driver_statements"
+  | "merchant_statements"
+  | "income"
+  | "cod"
+  | "expenses"
+  | "accounts"
+  | "adjustments"
+  | "audit_log";
+
+type SourceKind = "production_table" | "live_orders" | "empty_table";
+
+type SectionPack = {
+  id: FinanceArea;
+  titleAr: string;
+  titleEn: string;
+  subtitleAr: string;
+  subtitleEn: string;
+  icon: JSX.Element;
+  rows: FinanceRow[];
+  source: SourceKind;
+  totalDebit: number;
+  totalCredit: number;
+  totalBalance: number;
+  count: number;
+  action?: () => void;
+};
+
+type Props = {
+  isArabic: boolean;
+  activeSection?: FinanceArea;
+  orders: Order[];
+  merchants: Merchant[];
+  financeSummary: FinanceSummary | null;
+  financeSummarySource: FinanceSummarySource;
+  onRefresh: () => Promise<void>;
+  onNavigate: (id: string) => void;
+};
+
+type ExpenseDraft = { category: string; amount: string; reference: string; notes: string };
+type AdjustmentDraft = { adjustment_type: string; direction: "positive" | "negative"; amount: string; reason: string; notes: string };
+
+const financeOrder: FinanceArea[] = [
+  "finance_dashboard",
+  "driver_statements",
+  "merchant_statements",
+  "income",
+  "cod",
+  "expenses",
+  "accounts",
+  "adjustments",
+  "audit_log",
+];
 
 const money = (value: unknown) => `${Number(value || 0).toFixed(2)} AED`;
-const text = (ar: boolean, a: string, e: string) => ar ? a : e;
+const t = (ar: boolean, arText: string, enText: string) => (ar ? arText : enText);
+const today = () => new Date().toISOString().slice(0, 10);
 
-function sourceLabel(source?: AdminProductionSource | FinanceSummarySource | string) {
-  if (source === "db" || source === "rpc" || source === "view") return "DB-backed";
-  return "DB unavailable";
+function clean(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-function simplePdf(isArabic: boolean, title: string, source: string, totals: Record<string, string>, rows: FinanceRow[], warnings: string[] = []) {
+function num(value: unknown) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function status(order: Order) {
+  return clean(order.status).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function isDelivered(order: Order) {
+  return /deliver|complete|تم_التسليم/.test(status(order));
+}
+
+function orderIncome(order: Order) {
+  return num(order.delivery_price || order.price || order.base_price);
+}
+
+function orderRef(order: Order) {
+  return clean(order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—");
+}
+
+function rowValue(row: FinanceRow, keys: string[]) {
+  for (const key of keys) {
+    const value = num(row[key]);
+    if (value !== 0) return value;
+  }
+  return 0;
+}
+
+function rowDebit(row: FinanceRow) {
+  return rowValue(row, ["debit", "expense_amount", "amount_debit"]);
+}
+
+function rowCredit(row: FinanceRow) {
+  return rowValue(row, ["credit", "amount_credit", "delivery_income", "delivery_fee", "cod_amount", "collected_amount", "amount"]);
+}
+
+function rowBalance(row: FinanceRow) {
+  return rowValue(row, ["balance", "net_amount", "running_balance", "cod_amount", "amount", "credit"]);
+}
+
+function rowDate(row: FinanceRow) {
+  return clean(row.entry_date || row.expense_date || row.collection_date || row.created_at || row.updated_at || today()).slice(0, 10);
+}
+
+function rowRef(row: FinanceRow) {
+  return clean(row.tracking_number || row.reference_number || row.invoice_number || row.order_id || row.entity_id || row.id || "—");
+}
+
+function rowType(row: FinanceRow) {
+  return clean(row.entry_type || row.adjustment_type || row.category || row.action || row.status || row.payment_method || "—");
+}
+
+function rowEntity(row: FinanceRow, merchants: Merchant[]) {
+  const merchantId = clean(row.merchant_id);
+  const merchant = merchants.find((item) => item.id === merchantId);
+  return clean(merchant?.trade_name || row.merchant_name || row.driver_name || row.entity_type || row.entity_id || merchantId || "—");
+}
+
+function rowNotes(row: FinanceRow) {
+  return clean(row.notes || row.reason || row.file_name || row.source || "—");
+}
+
+function sourceLabel(source: SourceKind, isArabic: boolean) {
+  if (source === "production_table") return t(isArabic, "جدول إنتاج حقيقي", "Production table");
+  if (source === "live_orders") return t(isArabic, "مبني من الطلبات الحية", "Built from live orders");
+  return t(isArabic, "جاهز بدون صفوف", "Ready with no rows");
+}
+
+function sourceTone(source: SourceKind) {
+  if (source === "production_table") return "is-db";
+  if (source === "live_orders") return "is-live";
+  return "is-empty";
+}
+
+function buildIncomeRows(orders: Order[]) {
+  return orders.map((order) => ({
+    id: `income-${order.id}`,
+    order_id: order.id,
+    tracking_number: orderRef(order),
+    entry_date: clean(order.created_at).slice(0, 10),
+    entry_type: "delivery_income",
+    debit: 0,
+    credit: orderIncome(order),
+    balance: orderIncome(order),
+    merchant_id: order.merchant_id,
+    merchant_name: order.merchant_name || order.sender_name,
+    status: order.status,
+    notes: `${order.sender_city || "—"} → ${order.receiver_city || order.destination_country || "—"}`,
+    created_at: order.created_at,
+  } satisfies FinanceRow));
+}
+
+function buildCodRowsFromOrders(orders: Order[]) {
+  return orders.filter((order) => num(order.cod_amount) > 0).map((order) => ({
+    id: `cod-order-${order.id}`,
+    order_id: order.id,
+    tracking_number: orderRef(order),
+    merchant_id: order.merchant_id,
+    driver_id: (order as Order & { driver_id?: string; assigned_driver_id?: string }).driver_id || (order as Order & { assigned_driver_id?: string }).assigned_driver_id,
+    entry_date: clean(order.created_at).slice(0, 10),
+    collection_date: clean(order.created_at).slice(0, 10),
+    entry_type: "order_cod",
+    cod_amount: num(order.cod_amount),
+    collected_amount: isDelivered(order) ? num(order.cod_amount) : 0,
+    reconciled_amount: 0,
+    credit: num(order.cod_amount),
+    balance: Math.max(0, num(order.cod_amount) - (isDelivered(order) ? num(order.cod_amount) : 0)),
+    status: isDelivered(order) ? "collected_from_order" : "pending_from_order",
+    notes: "Live COD row from orders until cod_collections is synced.",
+    created_at: order.created_at,
+  } satisfies FinanceRow));
+}
+
+function buildAuditRowsFromOrders(orders: Order[]) {
+  return orders.slice(0, 120).map((order) => ({
+    id: `audit-order-${order.id}`,
+    entity_type: "order",
+    entity_id: order.id,
+    action: `order_${status(order) || "loaded"}`,
+    reference_number: orderRef(order),
+    created_at: order.updated_at || order.created_at,
+    notes: `Order ${orderRef(order)} loaded from production orders.`,
+  } satisfies FinanceRow));
+}
+
+function sumRows(rows: FinanceRow[]) {
+  const totalDebit = rows.reduce((sum, row) => sum + rowDebit(row), 0);
+  const totalCredit = rows.reduce((sum, row) => sum + rowCredit(row), 0);
+  const totalBalance = rows.reduce((sum, row) => sum + rowBalance(row), 0);
+  return { totalDebit, totalCredit, totalBalance, count: rows.length };
+}
+
+function pdfPayload(isArabic: boolean, title: string, source: string, rows: FinanceRow[], merchants: Merchant[]) {
+  const totals = sumRows(rows);
   return {
-    language: isArabic ? "ar" as const : "en" as const,
+    language: isArabic ? ("ar" as const) : ("en" as const),
     sectionTitle: `DAY NIGHT · ${title}`,
-    filters: `${text(isArabic, "تاريخ الإنشاء", "Generated")}: ${new Date().toLocaleString(isArabic ? "ar-AE" : "en-AE")} | ${text(isArabic, "مصدر البيانات", "Source")}: ${source}${warnings.length ? ` | ${warnings.join(" | ")}` : ""}`,
-    totals,
+    filters: `${t(isArabic, "مصدر البيانات", "Data source")}: ${source} | ${t(isArabic, "تاريخ الإنشاء", "Generated")}: ${new Date().toLocaleString(isArabic ? "ar-AE" : "en-AE")}`,
+    totals: {
+      rows: String(totals.count),
+      debit: money(totals.totalDebit),
+      credit: money(totals.totalCredit),
+      balance: money(totals.totalBalance),
+    },
     columns: [
-      { key: "date", label: text(isArabic, "التاريخ", "Date") },
-      { key: "tracking", label: text(isArabic, "التتبع", "Tracking") },
-      { key: "type", label: text(isArabic, "النوع", "Type") },
-      { key: "debit", label: text(isArabic, "مدين", "Debit") },
-      { key: "credit", label: text(isArabic, "دائن", "Credit") },
-      { key: "balance", label: text(isArabic, "الرصيد", "Balance") },
-      { key: "notes", label: text(isArabic, "ملاحظات", "Notes") },
+      { key: "date", label: t(isArabic, "التاريخ", "Date") },
+      { key: "ref", label: t(isArabic, "المرجع", "Reference") },
+      { key: "entity", label: t(isArabic, "الكيان", "Entity") },
+      { key: "type", label: t(isArabic, "النوع", "Type") },
+      { key: "debit", label: t(isArabic, "مدين", "Debit") },
+      { key: "credit", label: t(isArabic, "دائن", "Credit") },
+      { key: "balance", label: t(isArabic, "الرصيد", "Balance") },
+      { key: "notes", label: t(isArabic, "ملاحظات", "Notes") },
     ],
-    rows: rows.slice(0, 60).map((row) => ({
+    rows: rows.slice(0, 100).map((row) => ({
       date: rowDate(row),
-      tracking: rowReference(row),
+      ref: rowRef(row),
+      entity: rowEntity(row, merchants),
       type: rowType(row),
       debit: money(rowDebit(row)),
       credit: money(rowCredit(row)),
@@ -55,203 +276,394 @@ function simplePdf(isArabic: boolean, title: string, source: string, totals: Rec
   };
 }
 
-type Props = {
-  isArabic: boolean;
-  orders: Order[];
-  merchants: Merchant[];
-  financeSummary: FinanceSummary | null;
-  financeSummarySource: FinanceSummarySource;
-  onRefresh: () => Promise<void>;
-  onNavigate: (id: string) => void;
-};
-
-type CodRowsResult = Awaited<ReturnType<typeof fetchProductionCodRows>>;
-type StatementRowsResult = Awaited<ReturnType<typeof fetchProductionStatementSummary>>;
-
-function emptyRowsResult(table: string): AdminProductionRowsResult {
-  return { rows: [], source: "unavailable", table, synced: false, message: "Not loaded yet." };
-}
-
-export default function AdminFinanceOperationsCenter({ isArabic, orders, merchants, financeSummary, financeSummarySource, onRefresh, onNavigate }: Props) {
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [summarySource, setSummarySource] = useState<AdminProductionSource>("unavailable");
-  const [cod, setCod] = useState<CodRowsResult | null>(null);
-  const [merchant, setMerchant] = useState<StatementRowsResult | null>(null);
-  const [driver, setDriver] = useState<StatementRowsResult | null>(null);
-  const [expenses, setExpenses] = useState<AdminProductionRowsResult>(() => emptyRowsResult("admin_expenses"));
-  const [adjustments, setAdjustments] = useState<AdminProductionRowsResult>(() => emptyRowsResult("admin_adjustments"));
-  const [audit, setAudit] = useState<AdminProductionRowsResult>(() => emptyRowsResult("admin_audit_events"));
-  const [notice, setNotice] = useState("");
+export default function AdminFinanceOperationsCenter({
+  isArabic,
+  activeSection = "finance_dashboard",
+  orders,
+  merchants,
+  financeSummary,
+  financeSummarySource,
+  onRefresh,
+  onNavigate,
+}: Props) {
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [query, setQuery] = useState("");
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>({ category: "fuel", amount: "", reference: "", notes: "" });
+  const [adjustmentDraft, setAdjustmentDraft] = useState<AdjustmentDraft>({ adjustment_type: "manual", direction: "positive", amount: "", reason: "", notes: "" });
+  const [expensesRows, setExpensesRows] = useState<FinanceRow[]>([]);
+  const [adjustmentRows, setAdjustmentRows] = useState<FinanceRow[]>([]);
+  const [codTableRows, setCodTableRows] = useState<FinanceRow[]>([]);
+  const [merchantTableRows, setMerchantTableRows] = useState<FinanceRow[]>([]);
+  const [driverTableRows, setDriverTableRows] = useState<FinanceRow[]>([]);
+  const [auditTableRows, setAuditTableRows] = useState<FinanceRow[]>([]);
+  const [expenseTableReady, setExpenseTableReady] = useState(false);
+  const [adjustmentTableReady, setAdjustmentTableReady] = useState(false);
+  const [codTableReady, setCodTableReady] = useState(false);
+  const [merchantTableReady, setMerchantTableReady] = useState(false);
+  const [driverTableReady, setDriverTableReady] = useState(false);
+  const [auditTableReady, setAuditTableReady] = useState(false);
 
   async function reload() {
     setLoading(true);
-    setNotice("");
-    const [financeResult, codResult, merchantResult, driverResult, expensesResult, adjustmentsResult, auditResult] = await Promise.all([
-      fetchProductionFinanceSummary(),
-      fetchProductionCodRows(),
-      fetchProductionStatementSummary("merchant"),
-      fetchProductionStatementSummary("driver"),
-      fetchProductionRows("expenses"),
-      fetchProductionRows("adjustments"),
-      fetchProductionRows("audit_log"),
+    setMessage("");
+    const [expensesResult, adjustmentsResult, codResult, merchantResult, driverResult, auditResult] = await Promise.allSettled([
+      fetchExpenses(),
+      fetchAdjustments(),
+      fetchCodCollections(),
+      fetchMerchantStatementEntries(),
+      fetchDriverStatementEntries(),
+      fetchAdminAuditEvents(),
     ]);
 
-    const parentIsDbBacked = financeSummarySource === "rpc" || financeSummarySource === "view";
-    setSummary(financeResult.summary || (parentIsDbBacked ? financeSummary : null));
-    setSummarySource(financeResult.source === "db" || parentIsDbBacked ? "db" : "unavailable");
-    setCod(codResult);
-    setMerchant(merchantResult);
-    setDriver(driverResult);
-    setExpenses(expensesResult);
-    setAdjustments(adjustmentsResult);
-    setAudit(auditResult);
+    const nextExpenses = expensesResult.status === "fulfilled" ? expensesResult.value : [];
+    const nextAdjustments = adjustmentsResult.status === "fulfilled" ? adjustmentsResult.value : [];
+    const nextCod = codResult.status === "fulfilled" ? codResult.value : [];
+    const nextMerchant = merchantResult.status === "fulfilled" ? merchantResult.value : [];
+    const nextDriver = driverResult.status === "fulfilled" ? driverResult.value : [];
+    const nextAudit = auditResult.status === "fulfilled" ? auditResult.value : [];
+
+    setExpensesRows(nextExpenses);
+    setAdjustmentRows(nextAdjustments);
+    setCodTableRows(nextCod);
+    setMerchantTableRows(nextMerchant);
+    setDriverTableRows(nextDriver);
+    setAuditTableRows(nextAudit);
+    setExpenseTableReady(expensesResult.status === "fulfilled");
+    setAdjustmentTableReady(adjustmentsResult.status === "fulfilled");
+    setCodTableReady(codResult.status === "fulfilled");
+    setMerchantTableReady(merchantResult.status === "fulfilled");
+    setDriverTableReady(driverResult.status === "fulfilled");
+    setAuditTableReady(auditResult.status === "fulfilled");
     setLoading(false);
   }
 
   useEffect(() => { void reload(); }, []);
 
-  const activeSummary = summary;
-  const dbBlocked = summarySource !== "db";
-  const topCod = (cod?.rows || []).filter((row) => Math.max(0, Number(row.cod_amount || row.amount || row.credit || 0) - Number(row.reconciled_amount || row.collected_amount || 0)) > 0).slice(0, 6);
-  const pendingCod = cod?.pending || activeSummary?.cod_pending || 0;
-  const draftExpenses = expenses.rows.filter((row) => !/approved|void/.test(String(row.status || "draft"))).length;
-  const approvedExpenseTotal = expenses.rows.filter((row) => /approved/.test(String(row.status))).reduce((sum, row) => sum + Number(row.amount || row.total || rowDebit(row)), 0);
-  const pendingAdjustments = adjustments.rows.filter((row) => !/approved|void/.test(String(row.status || "draft"))).length;
-  const approvedAdjustmentNet = adjustments.rows.filter((row) => /approved/.test(String(row.status))).reduce((sum, row) => sum + (String(row.direction) === "negative" ? -Number(row.amount || 0) : Number(row.amount || 0)), 0);
-  const payout = useMemo(() => {
-    const codBlocked = Number(pendingCod || 0) > 0;
-    const merchantReady = !dbBlocked && !codBlocked && (merchant?.source === "db");
-    const driverReady = !dbBlocked && !codBlocked && (driver?.source === "db");
-    return { merchant: merchantReady ? "ready" : codBlocked ? "cod" : dbBlocked ? "db" : "review", driver: driverReady ? "ready" : codBlocked ? "cod" : dbBlocked ? "db" : "review", blocked: !merchantReady || !driverReady };
-  }, [dbBlocked, driver?.source, merchant?.source, pendingCod]);
+  const incomeRows = useMemo(() => buildIncomeRows(orders), [orders]);
+  const codRows = codTableRows.length ? codTableRows : buildCodRowsFromOrders(orders);
+  const merchantRows = merchantTableRows.length ? merchantTableRows : deriveMerchantStatementFromOrders(undefined, orders);
+  const driverRows = driverTableRows.length ? driverTableRows : deriveDriverStatementFromOrders(undefined, orders);
+  const auditRows = auditTableRows.length ? auditTableRows : buildAuditRowsFromOrders(orders);
+  const accountsRows = useMemo(() => {
+    const base = financeSummary;
+    return [
+      { id: "account-income", entry_type: "income", credit: base?.total_income || incomeRows.reduce((sum, row) => sum + rowCredit(row), 0), debit: 0, balance: base?.total_income || 0, notes: "Delivery income from orders", created_at: new Date().toISOString() },
+      { id: "account-expenses", entry_type: "expenses", credit: 0, debit: base?.total_expenses || expensesRows.reduce((sum, row) => sum + rowCredit(row), 0), balance: -(base?.total_expenses || 0), notes: "Approved and draft expenses", created_at: new Date().toISOString() },
+      { id: "account-cod", entry_type: "cod_pending", credit: base?.cod_pending || 0, debit: 0, balance: base?.cod_pending || 0, notes: "Pending COD exposure", created_at: new Date().toISOString() },
+      { id: "account-merchant-payable", entry_type: "merchant_payable", credit: 0, debit: base?.merchant_payable || 0, balance: -(base?.merchant_payable || 0), notes: "Merchant payable exposure", created_at: new Date().toISOString() },
+      { id: "account-driver-payable", entry_type: "driver_payable", credit: 0, debit: base?.driver_payable || 0, balance: -(base?.driver_payable || 0), notes: "Driver payable exposure", created_at: new Date().toISOString() },
+      { id: "account-net", entry_type: "net_estimate", credit: Math.max(0, base?.net_estimate || 0), debit: Math.max(0, -(base?.net_estimate || 0)), balance: base?.net_estimate || 0, notes: "Net estimate", created_at: new Date().toISOString() },
+    ] satisfies FinanceRow[];
+  }, [expensesRows, financeSummary, incomeRows]);
+
+  const packs: SectionPack[] = useMemo(() => {
+    const data: Array<Omit<SectionPack, "totalDebit" | "totalCredit" | "totalBalance" | "count">> = [
+      { id: "finance_dashboard", titleAr: "لوحة المالية", titleEn: "Finance Dashboard", subtitleAr: "مؤشرات مالية حقيقية من الطلبات والجداول المالية بدون أرقام وهمية.", subtitleEn: "Real finance indicators from orders and finance tables with no fake numbers.", icon: <TrendingUp />, rows: [...incomeRows, ...codRows, ...expensesRows, ...adjustmentRows], source: financeSummarySource === "rpc" || financeSummarySource === "view" ? "production_table" : "live_orders" },
+      { id: "driver_statements", titleAr: "كشوفات المناديب", titleEn: "Driver Statements", subtitleAr: "أرصدة المناديب من جدول الكشوفات أو من الطلبات المسندة عند عدم وجود صفوف كشف بعد.", subtitleEn: "Driver balances from statement rows, or from assigned live orders when entries are not posted yet.", icon: <Truck />, rows: driverRows, source: driverTableRows.length ? "production_table" : "live_orders" },
+      { id: "merchant_statements", titleAr: "كشوفات التجار", titleEn: "Merchant Statements", subtitleAr: "كشف كل تاجر من السجلات المالية أو من طلباته المرتبطة مباشرة فقط.", subtitleEn: "Each merchant statement from finance entries or directly linked live orders only.", icon: <ReceiptText />, rows: merchantRows, source: merchantTableRows.length ? "production_table" : "live_orders" },
+      { id: "income", titleAr: "الدخل", titleEn: "Income", subtitleAr: "دخل التوصيل من أسعار الطلبات الحية، مع تتبع كل مرجع وتاجر ومسار.", subtitleEn: "Delivery income from live order prices, with reference, merchant, and route tracking.", icon: <Banknote />, rows: incomeRows, source: incomeRows.length ? "live_orders" : "empty_table" },
+      { id: "cod", titleAr: "التحصيل COD", titleEn: "COD Collection", subtitleAr: "COD من جدول التحصيل أو من الطلبات الحية، مع أزرار تحصيل وتسوية حقيقية.", subtitleEn: "COD from collection rows or live orders, with real collect and reconcile actions.", icon: <Wallet />, rows: codRows, source: codTableRows.length ? "production_table" : "live_orders" },
+      { id: "expenses", titleAr: "المصروفات", titleEn: "Expenses", subtitleAr: "إضافة واعتماد وإلغاء المصروفات من جدول admin_expenses الحقيقي.", subtitleEn: "Create, approve, and void expenses from the real admin_expenses table.", icon: <FileText />, rows: expensesRows, source: expensesRows.length ? "production_table" : (expenseTableReady ? "empty_table" : "live_orders") },
+      { id: "accounts", titleAr: "الحسابات", titleEn: "Accounts", subtitleAr: "دفتر حسابات مختصر يوضح الدخل، المصروفات، COD، المستحقات وصافي التقدير.", subtitleEn: "Account ledger summary for income, expenses, COD, payables, and net estimate.", icon: <Landmark />, rows: accountsRows, source: financeSummarySource === "rpc" || financeSummarySource === "view" ? "production_table" : "live_orders" },
+      { id: "adjustments", titleAr: "التسويات", titleEn: "Adjustments", subtitleAr: "إضافة واعتماد التسويات الموجبة والسالبة بسجل تدقيق.", subtitleEn: "Create and approve positive/negative adjustments with audit trail.", icon: <Scale />, rows: adjustmentRows, source: adjustmentRows.length ? "production_table" : (adjustmentTableReady ? "empty_table" : "live_orders") },
+      { id: "audit_log", titleAr: "سجل التدقيق", titleEn: "Audit Log", subtitleAr: "أحداث التدقيق المالية من الجدول الحقيقي، أو أثر حي من الطلبات إذا لم تسجل أحداث بعد.", subtitleEn: "Finance audit events from the real table, or live order trail when no events have been posted yet.", icon: <ShieldCheck />, rows: auditRows, source: auditTableRows.length ? "production_table" : "live_orders" },
+    ];
+    return data.map((item) => ({ ...item, ...sumRows(item.rows) }));
+  }, [accountsRows, adjustmentRows, auditRows, auditTableRows.length, codRows, codTableRows.length, driverRows, driverTableRows.length, expenseTableReady, expensesRows, financeSummarySource, incomeRows, merchantRows, merchantTableRows.length, adjustmentTableReady]);
+
+  const activePack = packs.find((pack) => pack.id === activeSection) || packs[0];
+  const filteredRows = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return activePack.rows.slice(0, 120);
+    return activePack.rows.filter((row) => [rowRef(row), rowType(row), rowEntity(row, merchants), rowNotes(row), row.status].join(" ").toLowerCase().includes(q)).slice(0, 120);
+  }, [activePack.rows, merchants, query]);
+
+  const summaryCards = [
+    { label: t(isArabic, "إجمالي الدخل", "Total income"), value: money(financeSummary?.total_income || incomeRows.reduce((sum, row) => sum + rowCredit(row), 0)), icon: <TrendingUp /> },
+    { label: t(isArabic, "المصروفات", "Expenses"), value: money(financeSummary?.total_expenses || expensesRows.reduce((sum, row) => sum + rowCredit(row), 0)), icon: <FileText /> },
+    { label: "COD", value: money(financeSummary?.cod_total || codRows.reduce((sum, row) => sum + rowCredit(row), 0)), icon: <Wallet /> },
+    { label: t(isArabic, "معلق COD", "Pending COD"), value: money(financeSummary?.cod_pending || codRows.reduce((sum, row) => sum + Math.max(0, rowBalance(row) - num(row.collected_amount)), 0)), icon: <AlertTriangle /> },
+    { label: t(isArabic, "التجار", "Merchants"), value: money(financeSummary?.merchant_payable || sumRows(merchantRows).totalBalance), icon: <ReceiptText /> },
+    { label: t(isArabic, "المناديب", "Drivers"), value: money(financeSummary?.driver_payable || sumRows(driverRows).totalBalance), icon: <Truck /> },
+    { label: t(isArabic, "صافي تقديري", "Net estimate"), value: money(financeSummary?.net_estimate || (sumRows(incomeRows).totalCredit - sumRows(expensesRows).totalCredit)), icon: <Landmark /> },
+    { label: t(isArabic, "صفوف مالية", "Finance rows"), value: String(packs.reduce((sum, pack) => sum + pack.count, 0)), icon: <Database /> },
+  ];
 
   useEffect(() => {
-    if (!cod) return;
-    if (cod.pending > 0) addAdminNotification({ type: "cod", sectionId: "finance_dashboard", priority: "high", dedupeKey: `finance-cod-db-${Math.round(cod.pending)}`, audioEvent: "cod_alert", titleAr: "COD يحتاج تسوية", titleEn: "COD needs reconciliation", bodyAr: `COD معلق ${money(cod.pending)}.`, bodyEn: `Pending COD is ${money(cod.pending)}.` });
-    if (dbBlocked) addAdminNotification({ type: "warning", sectionId: "finance_dashboard", priority: "high", dedupeKey: "finance-source-db-unavailable", audioEvent: "warning", titleAr: "المالية غير متصلة بالكامل", titleEn: "Finance DB unavailable", bodyAr: "لن يتم عرض أرقام وهمية. طبّق migration وتحقق من RLS.", bodyEn: "No fake figures are displayed. Apply migration and verify RLS." });
-    if (payout.blocked) addAdminNotification({ type: "warning", sectionId: "finance_dashboard", priority: "high", dedupeKey: `finance-payout-${payout.merchant}-${payout.driver}`, audioEvent: "warning", titleAr: "الصرف موقوف للمراجعة", titleEn: "Payout blocked for review", bodyAr: "راجع COD والدفتر قبل الصرف.", bodyEn: "Review COD and ledger before payout." });
-    if (!payout.blocked && !dbBlocked) addAdminNotification({ type: "success", sectionId: "finance_dashboard", dedupeKey: "finance-ready-db", audioEvent: "success", titleAr: "المالية متصلة بالإنتاج", titleEn: "Finance is DB-backed", bodyAr: "الفحوصات المالية الأساسية مرتبطة بقاعدة البيانات.", bodyEn: "Core finance checks are database-backed." });
-  }, [cod, dbBlocked, payout]);
+    const pendingCod = Number(financeSummary?.cod_pending || 0);
+    if (pendingCod > 0) {
+      addAdminNotification({ type: "cod", sectionId: "cod", priority: "high", dedupeKey: `finance-suite-cod-${Math.round(pendingCod)}`, audioEvent: "cod_alert", titleAr: "COD يحتاج متابعة", titleEn: "COD needs follow-up", bodyAr: `COD معلق ${money(pendingCod)}.`, bodyEn: `Pending COD is ${money(pendingCod)}.` });
+    }
+  }, [financeSummary?.cod_pending]);
 
-  const statusText = (value: string) => value === "ready"
-    ? text(isArabic, "جاهز للصرف", "Ready for payout")
-    : value === "cod"
-      ? text(isArabic, "موقوف بسبب COD", "Blocked by COD")
-      : value === "db"
-        ? text(isArabic, "موقوف بسبب قاعدة البيانات", "Blocked by database")
-        : text(isArabic, "يحتاج مراجعة", "Needs review");
-
-  const cards = [
-    [text(isArabic, "إجمالي الدخل", "Total income"), money(activeSummary?.total_income)],
-    [text(isArabic, "إجمالي المصروفات", "Total expenses"), money(activeSummary?.total_expenses)],
-    [text(isArabic, "COD محصل", "COD collected"), money(cod?.collected ?? activeSummary?.cod_collected)],
-    [text(isArabic, "COD معلق", "Pending COD"), money(pendingCod)],
-    [text(isArabic, "مستحقات التجار", "Merchant payable"), money(merchant?.balance ?? activeSummary?.merchant_payable)],
-    [text(isArabic, "مستحقات المناديب", "Driver payable"), money(driver?.balance ?? activeSummary?.driver_payable)],
-    [text(isArabic, "صافي فعلي", "Actual net"), money(activeSummary?.net_estimate)],
-    [text(isArabic, "مصدر البيانات", "Data source"), sourceLabel(summarySource)],
-  ];
-
-  const warnings = [
-    dbBlocked && text(isArabic, "قاعدة البيانات غير مكتملة لهذا المركز. لن يتم عرض بدائل وهمية أو أرقام مشتقة كأنها إنتاج.", "Database is incomplete for this center. No fake or derived alternatives are shown as production."),
-    cod?.message,
-    merchant?.message,
-    driver?.message,
-    expenses.message,
-    adjustments.message,
-    audit.message,
-  ].filter(Boolean) as string[];
-
-  const allRows = [
-    ...(cod?.rows || []),
-    ...(merchant?.rows || []),
-    ...(driver?.rows || []),
-    ...expenses.rows,
-    ...adjustments.rows,
-    ...audit.rows,
-  ];
-
-  async function doReconcile() {
-    const first = topCod[0];
-    if (!first?.id || cod?.source !== "db") return;
-    await markCodReconciled(String(first.id), "Reconciled from Finance Operations Center");
-    setNotice(text(isArabic, "تمت تسوية COD وتسجيلها في قاعدة البيانات.", "COD reconciliation saved to the database."));
+  async function fullRefresh() {
     await reload();
     await onRefresh();
   }
 
+  async function saveExpense() {
+    if (!expenseDraft.amount) {
+      setMessage(t(isArabic, "أدخل مبلغ المصروف أولاً.", "Enter an expense amount first."));
+      return;
+    }
+    setLoading(true);
+    try {
+      await createExpense({ category: expenseDraft.category, amount: expenseDraft.amount, reference_number: expenseDraft.reference, notes: expenseDraft.notes, status: "draft" });
+      setMessage(t(isArabic, "تم حفظ المصروف في قاعدة البيانات.", "Expense saved to the database."));
+      setExpenseDraft({ category: "fuel", amount: "", reference: "", notes: "" });
+      await fullRefresh();
+    } catch (error) {
+      console.warn("Expense save failed:", error);
+      setMessage(t(isArabic, "لم يتم الحفظ. طبّق migration المالية ثم أعد المحاولة.", "Save failed. Apply the finance migration, then retry."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveAdjustment() {
+    if (!adjustmentDraft.amount || !adjustmentDraft.reason) {
+      setMessage(t(isArabic, "أدخل مبلغ وسبب التسوية أولاً.", "Enter amount and reason first."));
+      return;
+    }
+    setLoading(true);
+    try {
+      await createAdjustment({ ...adjustmentDraft, status: "draft" });
+      setMessage(t(isArabic, "تم حفظ التسوية في قاعدة البيانات.", "Adjustment saved to the database."));
+      setAdjustmentDraft({ adjustment_type: "manual", direction: "positive", amount: "", reason: "", notes: "" });
+      await fullRefresh();
+    } catch (error) {
+      console.warn("Adjustment save failed:", error);
+      setMessage(t(isArabic, "لم يتم حفظ التسوية. طبّق migration المالية ثم أعد المحاولة.", "Adjustment save failed. Apply the finance migration, then retry."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function approveFirstExpense() {
+    const first = expensesRows.find((row) => !/approved|void/.test(clean(row.status).toLowerCase()));
+    if (!first?.id) {
+      setMessage(t(isArabic, "لا يوجد مصروف بانتظار الاعتماد.", "No expense is waiting for approval."));
+      return;
+    }
+    await approveExpense(first.id);
+    setMessage(t(isArabic, "تم اعتماد أول مصروف.", "First expense approved."));
+    await fullRefresh();
+  }
+
+  async function voidFirstExpense() {
+    const first = expensesRows.find((row) => !/void/.test(clean(row.status).toLowerCase()));
+    if (!first?.id) {
+      setMessage(t(isArabic, "لا يوجد مصروف قابل للإلغاء.", "No expense can be voided."));
+      return;
+    }
+    await voidExpense(first.id, "Voided from finance suite");
+    setMessage(t(isArabic, "تم إلغاء أول مصروف.", "First expense voided."));
+    await fullRefresh();
+  }
+
+  async function approveFirstAdjustment() {
+    const first = adjustmentRows.find((row) => !/approved|void/.test(clean(row.status).toLowerCase()));
+    if (!first?.id) {
+      setMessage(t(isArabic, "لا توجد تسوية بانتظار الاعتماد.", "No adjustment is waiting for approval."));
+      return;
+    }
+    await approveAdjustment(first.id);
+    setMessage(t(isArabic, "تم اعتماد أول تسوية.", "First adjustment approved."));
+    await fullRefresh();
+  }
+
+  async function voidFirstAdjustment() {
+    const first = adjustmentRows.find((row) => !/void/.test(clean(row.status).toLowerCase()));
+    if (!first?.id) {
+      setMessage(t(isArabic, "لا توجد تسوية قابلة للإلغاء.", "No adjustment can be voided."));
+      return;
+    }
+    await voidAdjustment(first.id, "Voided from finance suite");
+    setMessage(t(isArabic, "تم إلغاء أول تسوية.", "First adjustment voided."));
+    await fullRefresh();
+  }
+
+  async function collectFirstCod() {
+    const first = codRows.find((row) => Math.max(0, rowCredit(row) - num(row.collected_amount)) > 0);
+    if (!first) {
+      setMessage(t(isArabic, "لا يوجد COD معلق للتحصيل.", "No pending COD to collect."));
+      return;
+    }
+    setLoading(true);
+    try {
+      let target = first;
+      if (clean(first.id).startsWith("cod-order-")) {
+        const order = orders.find((item) => String(item.id) === clean(first.order_id));
+        if (!order) throw new Error("Order not found");
+        const synced = await createOrSyncCodCollectionFromOrder(order);
+        if (synced) target = synced;
+      }
+      if (!target.id) throw new Error("COD row not ready");
+      await markCodCollected(String(target.id), rowCredit(first), "Collected from finance suite");
+      setMessage(t(isArabic, "تم تسجيل تحصيل COD في قاعدة البيانات.", "COD collection saved to the database."));
+      await fullRefresh();
+    } catch (error) {
+      console.warn("COD collect failed:", error);
+      setMessage(t(isArabic, "تعذر التحصيل. طبّق migration المالية وتأكد من صلاحية الأدمن.", "Collection failed. Apply finance migration and confirm admin permissions."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function reconcileFirstCod() {
+    const first = codRows.find((row) => Math.max(0, rowCredit(row) - num(row.reconciled_amount)) > 0);
+    if (!first) {
+      setMessage(t(isArabic, "لا يوجد COD بانتظار التسوية.", "No COD is waiting for reconciliation."));
+      return;
+    }
+    setLoading(true);
+    try {
+      let target = first;
+      if (clean(first.id).startsWith("cod-order-")) {
+        const order = orders.find((item) => String(item.id) === clean(first.order_id));
+        if (!order) throw new Error("Order not found");
+        const synced = await createOrSyncCodCollectionFromOrder(order);
+        if (synced) target = synced;
+      }
+      if (!target.id) throw new Error("COD row not ready");
+      await markCodReconciled(String(target.id), "Reconciled from finance suite");
+      setMessage(t(isArabic, "تمت تسوية COD في قاعدة البيانات.", "COD reconciled in the database."));
+      await fullRefresh();
+    } catch (error) {
+      console.warn("COD reconcile failed:", error);
+      setMessage(t(isArabic, "تعذرت التسوية. طبّق migration المالية وتأكد من صلاحية الأدمن.", "Reconciliation failed. Apply finance migration and confirm admin permissions."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <section className="dn-section-workspace dn-finance-ops-grid">
-      <header className="dn-section-hero">
+    <section className="dn-finance-suite" dir={isArabic ? "rtl" : "ltr"}>
+      <header className="dn-finance-hero">
         <div>
-          <span>DAY NIGHT · {text(isArabic, "إنتاج متصل بقاعدة البيانات", "Production DB-backed")}</span>
-          <h1>{text(isArabic, "مركز المالية والتسويات", "Finance & Reconciliation Center")}</h1>
-          <p>{text(isArabic, "لا يتم عرض أرقام وهمية. عند غياب الجداول أو الصلاحيات تظهر حالة عدم اتصال واضحة.", "No fake figures are displayed. Missing tables or permissions show a clear unavailable state.")}</p>
+          <span><Sparkles className="h-4 w-4" /> DAY NIGHT · {t(isArabic, "مالية إنتاجية", "Production finance")}</span>
+          <h1>{activePack.titleAr && t(isArabic, activePack.titleAr, activePack.titleEn)}</h1>
+          <p>{t(isArabic, activePack.subtitleAr, activePack.subtitleEn)}</p>
         </div>
-        <div className="dn-section-hero-actions">
-          <button onClick={() => void reload()}><RefreshCw className="h-4 w-4" />{loading ? text(isArabic, "تحميل", "Loading") : text(isArabic, "تحديث", "Refresh")}</button>
-          <AdminPdfExportButton label={text(isArabic, "تصدير المالية PDF", "Finance PDF")} payload={simplePdf(isArabic, text(isArabic, "نظرة مالية", "Finance overview"), sourceLabel(summarySource), Object.fromEntries(cards), allRows, warnings)} />
+        <div className="dn-finance-hero-actions">
+          <button type="button" onClick={() => void fullRefresh()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} />{loading ? t(isArabic, "تحميل", "Loading") : t(isArabic, "تحديث", "Refresh")}</button>
+          <AdminPdfExportButton label={t(isArabic, "تصدير PDF", "Export PDF")} payload={pdfPayload(isArabic, t(isArabic, activePack.titleAr, activePack.titleEn), sourceLabel(activePack.source, isArabic), filteredRows, merchants)} />
         </div>
       </header>
 
-      {warnings.map((warning) => <article className="dn-admin-support-card dn-finance-warning" key={warning}><ShieldAlert className="inline h-4 w-4" /> {warning}</article>)}
-      {notice && <article className="dn-admin-support-card dn-finance-warning"><CheckCircle2 className="inline h-4 w-4" /> {notice}</article>}
+      <nav className="dn-finance-tabs" aria-label={t(isArabic, "أقسام المالية", "Finance sections")}>
+        {packs.map((pack) => (
+          <button key={pack.id} type="button" className={pack.id === activePack.id ? "is-active" : ""} onClick={() => onNavigate(pack.id)}>
+            <span className="dn-finance-tab-icon">{pack.icon}</span>
+            <strong>{t(isArabic, pack.titleAr, pack.titleEn)}</strong>
+            <small>{pack.count}</small>
+          </button>
+        ))}
+      </nav>
 
-      <div className="dn-section-kpis">
-        {cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>{sourceLabel(summarySource)}</small></article>)}
+      <div className="dn-finance-source-line">
+        <span className={sourceTone(activePack.source)}><Database className="h-4 w-4" />{sourceLabel(activePack.source, isArabic)}</span>
+        <b>{t(isArabic, "مصدر الملخص", "Summary source")}: {financeSummarySource === "rpc" ? "RPC" : financeSummarySource === "view" ? "View" : t(isArabic, "الطلبات الحية", "Live orders")}</b>
+        <em>{t(isArabic, "لا يتم إنشاء أرقام وهمية؛ كل قيمة من orders أو الجداول المالية.", "No fake numbers; every value comes from orders or finance tables.")}</em>
       </div>
 
-      <section className="dn-admin-section-panels dn-finance-panels">
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "تسوية COD", "COD reconciliation")}</h2>
-          <p>{text(isArabic, "COD معلق", "Pending COD")}: <b>{money(pendingCod)}</b> · {sourceLabel(cod?.source)}</p>
-          <div className="dn-section-hero-actions dn-finance-action-row">
-            <button onClick={() => onNavigate("cod")}>{text(isArabic, "فتح التحصيل COD", "Open COD collections")}</button>
-            <AdminPdfExportButton label={text(isArabic, "تصدير COD PDF", "Export COD PDF")} payload={simplePdf(isArabic, "COD", sourceLabel(cod?.source), { pending: money(pendingCod), collected: money(cod?.collected), reconciled: money(cod?.reconciled) }, cod?.rows || [], warnings)} />
-            <button disabled={cod?.source !== "db" || !topCod.length} onClick={() => void doReconcile()}>{text(isArabic, "تسوية أول عملية معلقة", "Reconcile first pending")}</button>
+      {message && <article className="dn-finance-message"><CheckCircle2 className="h-4 w-4" />{message}</article>}
+
+      <section className="dn-finance-kpis">
+        {summaryCards.map((card) => (
+          <article key={card.label}>
+            <i>{card.icon}</i>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className="dn-finance-command-grid">
+        <article className="dn-finance-command-card dn-finance-command-main">
+          <h2><Search className="h-5 w-5" />{t(isArabic, "البحث والصفوف", "Search and rows")}</h2>
+          <div className="dn-finance-toolbar">
+            <label>
+              <span>{t(isArabic, "بحث", "Search")}</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(isArabic, "مرجع، تاجر، مندوب، نوع، ملاحظة...", "Reference, merchant, driver, type, note...")} />
+            </label>
+            <div className="dn-finance-mini-stats">
+              <b>{filteredRows.length}</b><span>{t(isArabic, "صف ظاهر", "visible rows")}</span>
+              <b>{money(activePack.totalCredit)}</b><span>{t(isArabic, "دائن", "credit")}</span>
+              <b>{money(activePack.totalDebit)}</b><span>{t(isArabic, "مدين", "debit")}</span>
+            </div>
           </div>
-          {cod?.source !== "db" && <p><AlertTriangle className="inline h-4 w-4" /> {text(isArabic, "لا يمكن تنفيذ التسوية قبل اتصال cod_collections.", "Real reconciliation is disabled until cod_collections is connected.")}</p>}
-          <ul>{topCod.map((row) => <li key={String(row.id || rowReference(row))}>{rowReference(row)} — {money(rowBalance(row) || rowCredit(row))} — {String(row.status || "pending")}</li>)}</ul>
+          <div className="dn-finance-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t(isArabic, "التاريخ", "Date")}</th>
+                  <th>{t(isArabic, "المرجع", "Reference")}</th>
+                  <th>{t(isArabic, "الكيان", "Entity")}</th>
+                  <th>{t(isArabic, "النوع", "Type")}</th>
+                  <th>{t(isArabic, "مدين", "Debit")}</th>
+                  <th>{t(isArabic, "دائن", "Credit")}</th>
+                  <th>{t(isArabic, "الرصيد", "Balance")}</th>
+                  <th>{t(isArabic, "ملاحظات", "Notes")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={String(row.id || rowRef(row))}>
+                    <td>{rowDate(row)}</td>
+                    <td>{rowRef(row)}</td>
+                    <td>{rowEntity(row, merchants)}</td>
+                    <td>{rowType(row)}</td>
+                    <td>{money(rowDebit(row))}</td>
+                    <td>{money(rowCredit(row))}</td>
+                    <td>{money(rowBalance(row))}</td>
+                    <td>{rowNotes(row)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filteredRows.length && <div className="dn-finance-empty"><ClipboardCheck className="h-5 w-5" />{t(isArabic, "لا توجد صفوف لهذا القسم حالياً، والنظام لا يعرض صفوفاً وهمية.", "No rows for this section right now; the system does not show fake rows.")}</div>}
+          </div>
         </article>
 
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "كشوفات التجار", "Merchant statements")}</h2>
-          <p>{text(isArabic, "مستحقات التجار", "Merchant payable")}: <b>{money(merchant?.balance)}</b> · {sourceLabel(merchant?.source)}</p>
-          <p>{text(isArabic, "المصدر: merchant_statement_entries فقط.", "Source: merchant_statement_entries only.")}</p>
-          <button onClick={() => onNavigate("merchant_statements")}>{text(isArabic, "فتح كشوفات التجار", "Open merchant statements")}</button>
-          <AdminPdfExportButton label="PDF" payload={simplePdf(isArabic, text(isArabic, "كشوفات التجار", "Merchant statements"), sourceLabel(merchant?.source), { balance: money(merchant?.balance), credit: money(merchant?.credit), debit: money(merchant?.debit) }, merchant?.rows || [], warnings)} />
-        </article>
+        <aside className="dn-finance-command-side">
+          <article>
+            <h2><Wallet className="h-5 w-5" />COD</h2>
+            <p>{t(isArabic, "تحصيل وتسوية أول صف COD معلق من الجدول أو الطلبات الحية.", "Collect and reconcile the first pending COD row from the table or live orders.")}</p>
+            <button type="button" onClick={() => void collectFirstCod()} disabled={loading}>{t(isArabic, "تحصيل أول COD", "Collect first COD")}</button>
+            <button type="button" onClick={() => void reconcileFirstCod()} disabled={loading}>{t(isArabic, "تسوية أول COD", "Reconcile first COD")}</button>
+          </article>
 
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "كشوفات المناديب", "Driver statements")}</h2>
-          <p>{text(isArabic, "مستحقات المناديب", "Driver payable")}: <b>{money(driver?.balance)}</b> · {sourceLabel(driver?.source)}</p>
-          <p>{text(isArabic, "المصدر: driver_statement_entries فقط.", "Source: driver_statement_entries only.")}</p>
-          <button onClick={() => onNavigate("driver_statements")}>{text(isArabic, "فتح كشوفات المناديب", "Open driver statements")}</button>
-          <AdminPdfExportButton label="PDF" payload={simplePdf(isArabic, text(isArabic, "كشوفات المناديب", "Driver statements"), sourceLabel(driver?.source), { balance: money(driver?.balance), credit: money(driver?.credit), debit: money(driver?.debit) }, driver?.rows || [], warnings)} />
-        </article>
+          <article>
+            <h2><FileText className="h-5 w-5" />{t(isArabic, "إضافة مصروف", "Add expense")}</h2>
+            <div className="dn-finance-form-mini">
+              <input value={expenseDraft.amount} onChange={(event) => setExpenseDraft((draft) => ({ ...draft, amount: event.target.value }))} placeholder={t(isArabic, "المبلغ", "Amount")} />
+              <input value={expenseDraft.category} onChange={(event) => setExpenseDraft((draft) => ({ ...draft, category: event.target.value }))} placeholder={t(isArabic, "التصنيف", "Category")} />
+              <input value={expenseDraft.reference} onChange={(event) => setExpenseDraft((draft) => ({ ...draft, reference: event.target.value }))} placeholder={t(isArabic, "المرجع", "Reference")} />
+              <input value={expenseDraft.notes} onChange={(event) => setExpenseDraft((draft) => ({ ...draft, notes: event.target.value }))} placeholder={t(isArabic, "ملاحظات", "Notes")} />
+            </div>
+            <button type="button" onClick={() => void saveExpense()} disabled={loading}><Plus className="h-4 w-4" />{t(isArabic, "حفظ مصروف", "Save expense")}</button>
+            <button type="button" onClick={() => void approveFirstExpense()} disabled={loading || !expensesRows.length}>{t(isArabic, "اعتماد أول مصروف", "Approve first expense")}</button>
+            <button type="button" onClick={() => void voidFirstExpense()} disabled={loading || !expensesRows.length}>{t(isArabic, "إلغاء أول مصروف", "Void first expense")}</button>
+          </article>
 
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "اعتماد المصروفات والتسويات", "Expenses & adjustments approval")}</h2>
-          <p>{text(isArabic, "مصروفات قيد الاعتماد", "Pending expenses")}: {draftExpenses} · {money(approvedExpenseTotal)}</p>
-          <p>{text(isArabic, "تسويات قيد الاعتماد", "Pending adjustments")}: {pendingAdjustments} · {money(approvedAdjustmentNet)}</p>
-          <button onClick={() => onNavigate("expenses")}>{text(isArabic, "فتح المصروفات", "Open expenses")}</button>
-          <button onClick={() => onNavigate("adjustments")}>{text(isArabic, "فتح التسويات", "Open adjustments")}</button>
-        </article>
-
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "جاهزية الصرف", "Payout readiness")}</h2>
-          <p>{text(isArabic, "التجار", "Merchants")}: <b>{statusText(payout.merchant)}</b></p>
-          <p>{text(isArabic, "المناديب", "Drivers")}: <b>{statusText(payout.driver)}</b></p>
-          <p>{payout.blocked ? text(isArabic, "الصرف موقوف حتى اكتمال COD والدفتر.", "Payout remains blocked until COD and ledger are complete.") : text(isArabic, "جاهز للمراجعة النهائية.", "Ready for final review.")}</p>
-        </article>
-
-        <article className="dn-finance-panel">
-          <h2>{text(isArabic, "سجل التدقيق المالي", "Finance audit trail")}</h2>
-          <p>{text(isArabic, "آخر العمليات", "Recent events")}: {audit.rows.length} · {sourceLabel(audit.source)}</p>
-          <button onClick={() => onNavigate("audit_log")}>{text(isArabic, "فتح سجل التدقيق", "Open audit log")}</button>
-          <ul>{audit.rows.slice(0, 5).map((row) => <li key={String(row.id || row.created_at)}><Database className="inline h-3.5 w-3.5" /> {rowType(row)} — {rowReference(row)}</li>)}</ul>
-        </article>
+          <article>
+            <h2><Scale className="h-5 w-5" />{t(isArabic, "إضافة تسوية", "Add adjustment")}</h2>
+            <div className="dn-finance-form-mini">
+              <input value={adjustmentDraft.amount} onChange={(event) => setAdjustmentDraft((draft) => ({ ...draft, amount: event.target.value }))} placeholder={t(isArabic, "المبلغ", "Amount")} />
+              <select value={adjustmentDraft.direction} onChange={(event) => setAdjustmentDraft((draft) => ({ ...draft, direction: event.target.value === "negative" ? "negative" : "positive" }))}>
+                <option value="positive">{t(isArabic, "موجب", "Positive")}</option>
+                <option value="negative">{t(isArabic, "سالب", "Negative")}</option>
+              </select>
+              <input value={adjustmentDraft.reason} onChange={(event) => setAdjustmentDraft((draft) => ({ ...draft, reason: event.target.value }))} placeholder={t(isArabic, "السبب", "Reason")} />
+              <input value={adjustmentDraft.notes} onChange={(event) => setAdjustmentDraft((draft) => ({ ...draft, notes: event.target.value }))} placeholder={t(isArabic, "ملاحظات", "Notes")} />
+            </div>
+            <button type="button" onClick={() => void saveAdjustment()} disabled={loading}><Plus className="h-4 w-4" />{t(isArabic, "حفظ تسوية", "Save adjustment")}</button>
+            <button type="button" onClick={() => void approveFirstAdjustment()} disabled={loading || !adjustmentRows.length}>{t(isArabic, "اعتماد أول تسوية", "Approve first adjustment")}</button>
+            <button type="button" onClick={() => void voidFirstAdjustment()} disabled={loading || !adjustmentRows.length}>{t(isArabic, "إلغاء أول تسوية", "Void first adjustment")}</button>
+          </article>
+        </aside>
       </section>
     </section>
   );
