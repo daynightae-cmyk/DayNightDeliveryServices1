@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Banknote,
@@ -462,7 +462,7 @@ export default function AdminMerchantIntelligence({
   );
 }
 
-function SummaryCard({ icon, label, value, tone = "gold" }: { icon: React.ReactNode; label: string; value: string | number; tone?: "gold" | "green" | "red" | "blue" }) {
+function SummaryCard({ icon, label, value, tone = "gold" }: { icon: ReactNode; label: string; value: string | number; tone?: "gold" | "green" | "red" | "blue" }) {
   const toneClass = tone === "green" ? "text-emerald-300" : tone === "red" ? "text-rose-300" : tone === "blue" ? "text-brand-sky" : "text-brand-gold";
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
@@ -482,7 +482,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoTile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
       <div className="mb-2 inline-flex items-center gap-2 text-brand-gold">
