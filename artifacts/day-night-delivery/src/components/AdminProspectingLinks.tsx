@@ -24,5 +24,5 @@ export default function AdminProspectingLinks() {
 
   useEffect(() => { void refresh(); }, []);
 
-  return <AdminSystemSupportCenter isArabic={isArabic} orders={orders} merchants={merchants} financeSummary={financeSummary} onNavigate={(id) => window.dispatchEvent(new CustomEvent("dn-admin-open-section", { detail: id }))} />;
+  return <AdminSystemSupportCenter isArabic={isArabic} orders={orders} merchants={merchants} financeSummary={financeSummary} />;
 }
