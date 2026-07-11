@@ -1,0 +1,202 @@
+/* DAY NIGHT admin day mode rescue: professional light theme, readable contrast, and finance clarity. */
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen,
+html[data-dn-admin-theme="day"] body:has(.dn-admin-fullscreen) {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(24,168,232,.16), transparent 34rem),
+    radial-gradient(circle at 94% 12%, rgba(245,183,0,.18), transparent 30rem),
+    linear-gradient(135deg, #f5f8ff 0%, #eaf2ff 48%, #fff7dd 100%) !important;
+  color: #071a33 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-layout-full,
+html[data-dn-admin-theme="day"] .dn-admin-content-full,
+html[data-dn-admin-theme="day"] .dn-admin-home-full,
+html[data-dn-admin-theme="day"] .dn-admin-workspace-host,
+html[data-dn-admin-theme="day"] .dn-admin-center-zone {
+  background: transparent !important;
+  color: #071a33 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-top-strip,
+html[data-dn-admin-theme="day"] .dn-admin-current-section,
+html[data-dn-admin-theme="day"] .dn-admin-loading-banner,
+html[data-dn-admin-theme="day"] .dn-admin-error-banner,
+html[data-dn-admin-theme="day"] .dn-admin-sidebar-full,
+html[data-dn-admin-theme="day"] .dn-admin-left-ai,
+html[data-dn-admin-theme="day"] .dn-admin-brand-block,
+html[data-dn-admin-theme="day"] .dn-admin-user-mini,
+html[data-dn-admin-theme="day"] .dn-admin-khalifa-card,
+html[data-dn-admin-theme="day"] .dn-admin-section-workspace,
+html[data-dn-admin-theme="day"] .dn-admin-core-full,
+html[data-dn-admin-theme="day"] .dn-admin-settings-workspace {
+  background: rgba(255,255,255,.84) !important;
+  border-color: rgba(7,26,51,.13) !important;
+  color: #071a33 !important;
+  box-shadow: 0 22px 70px rgba(7,26,51,.10) !important;
+  backdrop-filter: blur(18px) saturate(1.15) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-khalifa-card,
+html[data-dn-admin-theme="day"] .dn-admin-user-head,
+html[data-dn-admin-theme="day"] .dn-admin-side-nav section,
+html[data-dn-admin-theme="day"] .dn-admin-side-nav button,
+html[data-dn-admin-theme="day"] .dn-admin-side-nav a,
+html[data-dn-admin-theme="day"] .dn-admin-secondary-panel,
+html[data-dn-admin-theme="day"] .dn-admin-action-tile,
+html[data-dn-admin-theme="day"] .dn-admin-kpi-card,
+html[data-dn-admin-theme="day"] .dn-section-hero,
+html[data-dn-admin-theme="day"] .dn-admin-section-hero,
+html[data-dn-admin-theme="day"] .dn-admin-filter-table-card,
+html[data-dn-admin-theme="day"] .dn-admin-support-card,
+html[data-dn-admin-theme="day"] .dn-admin-preference-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(236,246,255,.84)) !important;
+  border-color: rgba(7,26,51,.14) !important;
+  color: #071a33 !important;
+  box-shadow: 0 18px 46px rgba(7,26,51,.08) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-side-nav h3,
+html[data-dn-admin-theme="day"] .dn-admin-side-nav span,
+html[data-dn-admin-theme="day"] .dn-admin-current-section span,
+html[data-dn-admin-theme="day"] .dn-admin-current-section strong,
+html[data-dn-admin-theme="day"] .dn-admin-brand-block strong,
+html[data-dn-admin-theme="day"] .dn-admin-user-mini strong,
+html[data-dn-admin-theme="day"] .dn-admin-khalifa-card h2,
+html[data-dn-admin-theme="day"] .dn-admin-khalifa-card p,
+html[data-dn-admin-theme="day"] .dn-admin-khalifa-card small,
+html[data-dn-admin-theme="day"] .dn-admin-action-title,
+html[data-dn-admin-theme="day"] .dn-admin-action-hint,
+html[data-dn-admin-theme="day"] .dn-admin-secondary-panel strong,
+html[data-dn-admin-theme="day"] .dn-admin-secondary-panel p,
+html[data-dn-admin-theme="day"] .dn-section-hero h1,
+html[data-dn-admin-theme="day"] .dn-section-hero p,
+html[data-dn-admin-theme="day"] .dn-admin-section-hero h1,
+html[data-dn-admin-theme="day"] .dn-admin-section-hero p {
+  color: #071a33 !important;
+  text-shadow: none !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-side-nav button:hover,
+html[data-dn-admin-theme="day"] .dn-admin-side-nav button.is-active,
+html[data-dn-admin-theme="day"] .dn-admin-action-tile:hover,
+html[data-dn-admin-theme="day"] .dn-admin-site-links a:hover {
+  background: linear-gradient(135deg, #fff2b8, #f6c52a) !important;
+  border-color: rgba(179,126,0,.55) !important;
+  color: #071a33 !important;
+  box-shadow: 0 16px 34px rgba(179,126,0,.18) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-sidebar-icon,
+html[data-dn-admin-theme="day"] .dn-admin-action-icon,
+html[data-dn-admin-theme="day"] .dn-admin-secondary-icon,
+html[data-dn-admin-theme="day"] .dn-finance-tab-icon,
+html[data-dn-admin-theme="day"] .dn-finance-kpis i {
+  background: rgba(245,183,0,.16) !important;
+  border-color: rgba(179,126,0,.38) !important;
+  color: #9a6f00 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-suite,
+html[data-dn-admin-theme="day"] .dn-finance-suite * {
+  color: #071a33;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-hero,
+html[data-dn-admin-theme="day"] .dn-finance-command-card,
+html[data-dn-admin-theme="day"] .dn-finance-command-side article,
+html[data-dn-admin-theme="day"] .dn-finance-kpis article,
+html[data-dn-admin-theme="day"] .dn-finance-tabs button,
+html[data-dn-admin-theme="day"] .dn-finance-source-line,
+html[data-dn-admin-theme="day"] .dn-finance-table-wrap,
+html[data-dn-admin-theme="day"] .dn-finance-mini-stats,
+html[data-dn-admin-theme="day"] .dn-finance-message {
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(234,244,255,.9)) !important;
+  border-color: rgba(7,26,51,.14) !important;
+  color: #071a33 !important;
+  box-shadow: 0 18px 50px rgba(7,26,51,.08) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-hero h1,
+html[data-dn-admin-theme="day"] .dn-finance-hero p,
+html[data-dn-admin-theme="day"] .dn-finance-tabs strong,
+html[data-dn-admin-theme="day"] .dn-finance-kpis strong,
+html[data-dn-admin-theme="day"] .dn-finance-kpis span,
+html[data-dn-admin-theme="day"] .dn-finance-command-card h2,
+html[data-dn-admin-theme="day"] .dn-finance-command-side h2,
+html[data-dn-admin-theme="day"] .dn-finance-command-side p,
+html[data-dn-admin-theme="day"] .dn-finance-toolbar label span,
+html[data-dn-admin-theme="day"] .dn-finance-source-line em,
+html[data-dn-admin-theme="day"] .dn-finance-empty {
+  color: #071a33 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-tabs button.is-active,
+html[data-dn-admin-theme="day"] .dn-finance-suite button:hover:not(:disabled),
+html[data-dn-admin-theme="day"] .dn-finance-suite .dn-admin-pdf-button:hover {
+  background: linear-gradient(135deg, #fff0ad, #f7c11f) !important;
+  border-color: rgba(179,126,0,.58) !important;
+  color: #071a33 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-suite input,
+html[data-dn-admin-theme="day"] .dn-finance-suite select,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen input,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen select,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen textarea {
+  background: rgba(255,255,255,.96) !important;
+  border-color: rgba(7,26,51,.18) !important;
+  color: #071a33 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-suite input::placeholder,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen input::placeholder,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen textarea::placeholder {
+  color: rgba(7,26,51,.48) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-suite option,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen option {
+  color: #071a33 !important;
+  background: #ffffff !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-table-wrap table,
+html[data-dn-admin-theme="day"] .dn-admin-filter-table {
+  background: #ffffff !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-table-wrap th,
+html[data-dn-admin-theme="day"] .dn-admin-filter-table th {
+  background: linear-gradient(135deg, #071a33, #0f315b) !important;
+  color: #f5b700 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-table-wrap td,
+html[data-dn-admin-theme="day"] .dn-admin-filter-table td {
+  background: rgba(255,255,255,.96) !important;
+  color: #071a33 !important;
+  border-bottom-color: rgba(7,26,51,.1) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-finance-table-wrap tr:hover td,
+html[data-dn-admin-theme="day"] .dn-admin-filter-table tr:hover td {
+  background: #fff8db !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen button,
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen .dn-admin-pdf-button {
+  color: #071a33 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-fullscreen button:disabled {
+  opacity: .55 !important;
+}
+
+@media (max-width: 900px) {
+  html[data-dn-admin-theme="day"] .dn-finance-command-grid,
+  html[data-dn-admin-theme="day"] .dn-admin-dashboard-primary-grid,
+  html[data-dn-admin-theme="day"] .dn-admin-dashboard-secondary-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
