@@ -263,7 +263,7 @@ export default function AdminFinanceOperationsCenter({ isArabic, activeSection =
       { id: "accounts", titleAr: "الحسابات", titleEn: "Accounts", subtitleAr: "دفتر حسابات مختصر للدخل والمصروفات وCOD والمستحقات.", subtitleEn: "Account ledger summary for income, expenses, COD, and payables.", icon: <Landmark />, rows: accountsRows, source: financeSource },
       { id: "adjustments", titleAr: "التسويات", titleEn: "Adjustments", subtitleAr: "إضافة واعتماد التسويات بسجل تدقيق.", subtitleEn: "Create and approve adjustments with audit trail.", icon: <Scale />, rows: tables.adjustments, source: tableSource(tables.adjustments, "adjustments") },
       { id: "audit_log", titleAr: "سجل التدقيق", titleEn: "Audit Log", subtitleAr: "أحداث التدقيق المالية أو أثر حي من الطلبات.", subtitleEn: "Finance audit events or live order trail.", icon: <ShieldCheck />, rows: auditRows, source: tableSource(tables.audit, "audit") },
-    ] as Array<{ id: FinanceArea; titleAr: string; titleEn: string; subtitleAr: string; subtitleEn: string; icon: JSX.Element; rows: Row[]; source: SourceKind }>;
+    ] as Array<{ id: FinanceArea; titleAr: string; titleEn: string; subtitleAr: string; subtitleEn: string; icon: any; rows: Row[]; source: SourceKind }>;
     return items.map((item) => ({ ...item, ...sumRows(item.rows) }));
   }, [accountsRows, auditRows, codRows, driverRows, financeSummarySource, incomeRows, merchantRows, ready, tables]);
 
