@@ -1,66 +1,23 @@
 /*
-  DAY NIGHT admin final visual rescue.
-  This file is intentionally imported last by AdminPanelLuxury.tsx.
-  It fixes the real production issue where legacy global rules hide aria-hidden SVGs,
-  leaving gold circles without icons.
+  DAY NIGHT admin visual rescue — clean layout pass.
+  Imported last by AdminPanelLuxury.tsx.
+
+  Goals:
+  - real Lucide icons remain visible inside admin
+  - no empty circular placeholders
+  - simple icon treatment, not heavy decorative bubbles
+  - map controls are separated from the map tiles so they do not overlap
+  - dashboard layout is smooth, readable, and responsive
 */
 
-/* ------------------------------------------------------------
-   Critical fix: old CSS hides every [aria-hidden="true"] inside admin.
-   Lucide icons are intentionally aria-hidden, so force admin SVGs visible again.
------------------------------------------------------------- */
-body:has(.dn-admin-fullscreen) .dn-admin-icon-badge[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-iconized-icon[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-sidebar-icon[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-secondary-icon[aria-hidden="true"] {
-  display: inline-flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-body:has(.dn-admin-fullscreen) .dn-admin-icon-badge svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-state-chip svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-iconized svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-iconized-action-tile svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-map-control-button svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-khalifa-question-chip svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-side-nav svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-section-card svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-empty-state svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-secondary-icon svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-section-workspace svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-live-map-shell svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-map-route-summary svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-top-actions svg[aria-hidden="true"],
-body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-/* ------------------------------------------------------------
-   Icon primitives
------------------------------------------------------------- */
-.dn-admin-icon-badge {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 2.2rem !important;
-  height: 2.2rem !important;
-  min-width: 2.2rem !important;
-  min-height: 2.2rem !important;
-  border: 1px solid rgba(250, 204, 21, 0.44) !important;
-  border-radius: 0.95rem !important;
-  background: radial-gradient(circle at 30% 18%, rgba(255, 240, 170, 0.24), rgba(250, 204, 21, 0.16) 36%, rgba(14, 165, 233, 0.14) 100%) !important;
-  color: #facc15 !important;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 18px rgba(250, 204, 21, 0.12) !important;
-  flex: 0 0 auto !important;
-  line-height: 0 !important;
-}
-
+/* ============================================================
+   Critical scoped SVG visibility
+============================================================ */
+.dn-admin-fullscreen svg,
+.dn-admin-fullscreen svg[aria-hidden="true"],
+.dn-admin-fullscreen [aria-hidden="true"] svg,
 .dn-admin-icon-badge svg,
-.dn-admin-svg-icon,
-.dn-admin-state-icon,
+.dn-admin-state-chip svg,
 .dn-iconized svg,
 .dn-iconized-action-tile svg,
 .dn-map-control-button svg,
@@ -71,28 +28,34 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-admin-secondary-icon svg,
 .dn-section-workspace svg,
 .dn-live-map-shell svg,
-.dn-map-route-summary svg {
+.dn-map-route-summary svg,
+.dn-admin-top-actions svg,
+.dn-admin-mobile-open svg {
   display: block !important;
-  width: 1.08rem !important;
-  height: 1.08rem !important;
-  min-width: 1.08rem !important;
-  min-height: 1.08rem !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  min-width: 1rem !important;
+  min-height: 1rem !important;
   stroke: currentColor !important;
   color: currentColor !important;
-  opacity: 1 !important;
-  visibility: visible !important;
   overflow: visible !important;
   flex-shrink: 0 !important;
 }
 
-.dn-admin-kpi-icon {
-  width: 2.45rem !important;
-  height: 2.45rem !important;
-  min-width: 2.45rem !important;
-  border-radius: 1.05rem !important;
+/* Old placeholder/dot classes must not appear as empty visuals. */
+.dn-admin-card-corner,
+.dn-khalifa-dot,
+.dn-status-dot,
+.dn-live-dot,
+.dn-map-dot,
+.icon-dot,
+.empty-circle,
+.corner-badge {
+  display: none !important;
 }
 
-/* Remove old decorative pseudo dots/corners that were mistaken for icons. */
 .dn-admin-action-tile::before,
 .dn-admin-action-tile::after,
 .dn-admin-secondary-panel::before,
@@ -109,63 +72,91 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
   display: none !important;
 }
 
-.dn-admin-card-corner,
-.dn-khalifa-dot,
-.dn-status-dot,
-.dn-live-dot,
-.dn-map-dot,
-.icon-dot,
-.empty-circle,
-.corner-badge {
-  display: none !important;
-}
-
-/* ------------------------------------------------------------
-   State chips and badges
------------------------------------------------------------- */
-.dn-admin-state-chip,
-.dn-map-state-chip,
-.dn-source-badge {
+/* ============================================================
+   Simple icon primitives
+============================================================ */
+.dn-admin-icon-badge,
+.dn-admin-secondary-icon,
+.dn-iconized-icon,
+.dn-admin-sidebar-icon {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.42rem !important;
-  min-height: 1.8rem !important;
-  border-radius: 999px !important;
-  padding: 0.34rem 0.72rem !important;
-  border: 1px solid rgba(116, 177, 255, 0.24) !important;
-  background: rgba(6, 20, 46, 0.74) !important;
-  color: rgba(255, 255, 255, 0.88) !important;
-  font-size: 0.72rem !important;
-  font-weight: 950 !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 1.85rem !important;
+  min-height: 1.85rem !important;
+  border: 1px solid rgba(250, 204, 21, 0.34) !important;
+  border-radius: 0.7rem !important;
+  background: rgba(250, 204, 21, 0.08) !important;
+  color: #facc15 !important;
+  box-shadow: none !important;
+  line-height: 0 !important;
+  flex: 0 0 auto !important;
 }
 
-.dn-admin-state-chip.is-success,
-.dn-admin-state-chip.is-gold {
-  border-color: rgba(52, 211, 153, 0.38) !important;
-  color: #bbf7d0 !important;
+.dn-admin-kpi-icon {
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
 }
 
-.dn-admin-state-chip.is-warning {
-  border-color: rgba(245, 183, 0, 0.48) !important;
-  color: #fde68a !important;
+.dn-admin-action-icon,
+.dn-map-mode-bar .dn-admin-icon-badge,
+.dn-map-region-chips .dn-admin-icon-badge,
+.dn-map-action-bar .dn-admin-icon-badge {
+  width: 1.45rem !important;
+  height: 1.45rem !important;
+  min-width: 1.45rem !important;
+  min-height: 1.45rem !important;
+  border-radius: 0.5rem !important;
+  background: rgba(250, 204, 21, 0.08) !important;
 }
 
-.dn-admin-state-chip.is-danger,
-.dn-admin-state-chip.is-error {
-  border-color: rgba(248, 113, 113, 0.48) !important;
-  color: #fecaca !important;
+/* ============================================================
+   Global admin layout smoothing
+============================================================ */
+.dn-admin-fullscreen,
+.dn-admin-content-full,
+.dn-admin-home-full,
+.dn-admin-workspace-host,
+.dn-admin-center-zone,
+.dn-section-workspace {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
 }
 
-/* ------------------------------------------------------------
-   Dashboard KPI cards
------------------------------------------------------------- */
+.dn-admin-home-full {
+  align-items: start !important;
+}
+
+.dn-admin-workspace-host {
+  width: 100% !important;
+}
+
+.dn-admin-center-zone,
+.dn-admin-workspace-host,
+.dn-admin-main-panel,
+.dn-admin-section-card,
+.dn-section-panels,
+.dn-section-workspace {
+  min-height: 0 !important;
+}
+
+.dn-admin-dashboard-polished {
+  display: grid !important;
+  gap: 1rem !important;
+}
+
+/* ============================================================
+   KPI cards — compact and readable
+============================================================ */
 .dn-admin-dashboard-kpis {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
-  gap: 0.85rem !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 0.75rem !important;
 }
 
 .dn-admin-dashboard-kpis > article {
@@ -176,27 +167,97 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
     "icon label"
     "icon hint" !important;
   align-items: center !important;
-  gap: 0.22rem 0.78rem !important;
-  min-height: 6.4rem !important;
-  padding: 1rem !important;
-  border: 1px solid rgba(24, 168, 232, 0.18) !important;
-  border-radius: 1.35rem !important;
-  background: linear-gradient(145deg, rgba(7, 26, 51, 0.86), rgba(2, 8, 18, 0.78)) !important;
-  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  gap: 0.16rem 0.7rem !important;
+  min-height: 5.6rem !important;
+  padding: 0.9rem 1rem !important;
+  border: 1px solid rgba(24, 168, 232, 0.16) !important;
+  border-radius: 1.15rem !important;
+  background: linear-gradient(145deg, rgba(7, 26, 51, 0.82), rgba(2, 8, 18, 0.72)) !important;
+  box-shadow: none !important;
 }
 
 .dn-admin-dashboard-kpis .dn-admin-icon-badge { grid-area: icon !important; }
-.dn-admin-dashboard-kpis > article > strong { grid-area: value !important; color: #facc15 !important; font-size: 1.25rem !important; font-weight: 1000 !important; }
-.dn-admin-dashboard-kpis > article > span { grid-area: label !important; color: #fff !important; font-weight: 950 !important; }
-.dn-admin-dashboard-kpis > article > small { grid-area: hint !important; color: rgba(255, 255, 255, 0.58) !important; font-size: 0.72rem !important; font-weight: 800 !important; }
+.dn-admin-dashboard-kpis > article > strong {
+  grid-area: value !important;
+  color: #facc15 !important;
+  font-size: 1.12rem !important;
+  font-weight: 1000 !important;
+  line-height: 1.25 !important;
+}
+.dn-admin-dashboard-kpis > article > span {
+  grid-area: label !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  line-height: 1.25 !important;
+}
+.dn-admin-dashboard-kpis > article > small {
+  grid-area: hint !important;
+  color: rgba(255, 255, 255, 0.58) !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+}
 
-/* ------------------------------------------------------------
-   Quick actions
------------------------------------------------------------- */
+/* ============================================================
+   Dashboard map-first layout
+============================================================ */
+.dn-admin-map-first-grid {
+  display: grid !important;
+  grid-template-columns: minmax(390px, 620px) minmax(250px, 330px) !important;
+  gap: 1rem !important;
+  align-items: start !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin-inline: auto !important;
+}
+
+.dn-admin-map-primary {
+  width: 100% !important;
+  max-width: 640px !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+}
+
+.dn-admin-quick-actions-compact {
+  width: 100% !important;
+  max-width: 330px !important;
+  min-width: 0 !important;
+  align-self: start !important;
+  padding: 0.9rem !important;
+  border-radius: 1.35rem !important;
+  border: 1px solid rgba(245, 183, 0, 0.22) !important;
+  background: linear-gradient(145deg, rgba(7, 26, 51, 0.82), rgba(2, 8, 18, 0.72)) !important;
+  box-shadow: none !important;
+}
+
+.dn-admin-quick-actions-head {
+  display: grid !important;
+  gap: 0.25rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.dn-admin-quick-actions-head span {
+  color: #facc15 !important;
+  font-size: 0.68rem !important;
+  font-weight: 1000 !important;
+}
+
+.dn-admin-quick-actions-head h2 {
+  color: #fff !important;
+  font-size: 1.05rem !important;
+  font-weight: 1000 !important;
+  line-height: 1.25 !important;
+}
+
+.dn-admin-quick-actions-head p {
+  color: rgba(255, 255, 255, 0.58) !important;
+  font-size: 0.72rem !important;
+  line-height: 1.6 !important;
+}
+
 .dn-admin-action-grid {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 0.75rem !important;
+  gap: 0.62rem !important;
 }
 
 .dn-admin-action-tile,
@@ -204,14 +265,15 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
   position: relative !important;
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;
+  gap: 0.6rem !important;
   width: 100% !important;
-  min-height: 4.35rem !important;
-  padding: 0.8rem !important;
+  min-width: 0 !important;
+  min-height: 3.65rem !important;
+  padding: 0.68rem !important;
   text-align: start !important;
-  border: 1px solid rgba(245, 183, 0, 0.24) !important;
-  border-radius: 1.1rem !important;
-  background: linear-gradient(145deg, rgba(8, 26, 49, 0.74), rgba(3, 18, 38, 0.58)) !important;
+  border: 1px solid rgba(245, 183, 0, 0.22) !important;
+  border-radius: 0.95rem !important;
+  background: rgba(5, 18, 43, 0.72) !important;
   color: #ffffff !important;
   box-shadow: none !important;
 }
@@ -220,7 +282,7 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-iconized-action-tile > span:last-child,
 .dn-iconized-content {
   display: grid !important;
-  gap: 0.2rem !important;
+  gap: 0.14rem !important;
   min-width: 0 !important;
 }
 
@@ -228,6 +290,7 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-iconized strong,
 .dn-iconized-action-tile strong {
   color: #ffffff !important;
+  font-size: 0.78rem !important;
   font-weight: 1000 !important;
   line-height: 1.25 !important;
 }
@@ -237,146 +300,183 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-iconized p,
 .dn-iconized small,
 .dn-iconized-action-tile em {
-  color: rgba(255, 255, 255, 0.62) !important;
-  font-size: 0.72rem !important;
+  color: rgba(255, 255, 255, 0.58) !important;
+  font-size: 0.66rem !important;
   font-style: normal !important;
   font-weight: 800 !important;
-  line-height: 1.45 !important;
+  line-height: 1.35 !important;
+}
+
+.dn-admin-action-tile-pdf {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
 }
 
 .dn-admin-action-tile-pdf .dn-admin-pdf-export-button,
 .dn-admin-action-tile-pdf button:last-child {
-  margin-inline-start: auto !important;
-  min-height: 2.2rem !important;
-  padding: 0.38rem 0.62rem !important;
-  border-radius: 0.75rem !important;
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-height: 1.95rem !important;
+  margin: 0.25rem 0 0 !important;
+  padding: 0.32rem 0.5rem !important;
+  border-radius: 0.7rem !important;
+  font-size: 0.66rem !important;
 }
 
-/* ------------------------------------------------------------
-   Secondary cards and empty states
------------------------------------------------------------- */
-.dn-admin-dashboard-secondary-grid {
+/* ============================================================
+   Map shell — controls outside tile area, square map, no overlap
+============================================================ */
+.dn-live-map-shell {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
-  gap: 0.85rem !important;
-  align-items: stretch !important;
-}
-
-.dn-admin-secondary-panel {
-  display: grid !important;
-  align-content: start !important;
-  gap: 0.65rem !important;
-  min-height: 9rem !important;
-  padding: 1rem !important;
-  border: 1px solid rgba(24, 168, 232, 0.16) !important;
+  grid-template-areas:
+    "ops"
+    "modes"
+    "regions"
+    "actions"
+    "map"
+    "summary" !important;
+  gap: 0.6rem !important;
+  width: 100% !important;
+  max-width: 640px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0.75rem !important;
+  overflow: hidden !important;
   border-radius: 1.35rem !important;
-  background: linear-gradient(145deg, rgba(7, 26, 51, 0.82), rgba(2, 8, 18, 0.74)) !important;
+  border: 1px solid rgba(24, 168, 232, 0.22) !important;
+  background: linear-gradient(145deg, rgba(6, 27, 54, 0.92), rgba(2, 8, 18, 0.9)) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26) !important;
 }
 
-.dn-admin-secondary-icon {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 2.4rem !important;
-  height: 2.4rem !important;
-  min-width: 2.4rem !important;
-  border-radius: 0.95rem !important;
-  border: 1px solid rgba(250, 204, 21, 0.36) !important;
-  background: rgba(250, 204, 21, 0.12) !important;
-  color: #facc15 !important;
+.dn-live-map-ops-panel,
+.dn-map-mode-bar,
+.dn-map-region-chips,
+.dn-map-action-bar,
+.dn-map-route-summary {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 30 !important;
+  max-width: 100% !important;
 }
 
-.dn-admin-empty-state,
-.dn-iconized-empty {
+.dn-live-map-ops-panel { grid-area: ops !important; }
+.dn-map-mode-bar { grid-area: modes !important; }
+.dn-map-region-chips { grid-area: regions !important; }
+.dn-map-action-bar { grid-area: actions !important; }
+.dn-map-route-summary { grid-area: summary !important; }
+
+.dn-live-map-shell > .leaflet-container {
+  grid-area: map !important;
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 420px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.dn-map-title-card {
   display: grid !important;
-  place-items: center !important;
-  gap: 0.65rem !important;
-  min-height: 170px !important;
-  padding: 1.5rem !important;
-  text-align: center !important;
-  border: 1px dashed rgba(116, 177, 255, 0.26) !important;
-  border-radius: 1.25rem !important;
-  background: linear-gradient(135deg, rgba(6, 20, 46, 0.72), rgba(2, 8, 18, 0.52)) !important;
-  color: #fff !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 0.55rem !important;
+  padding: 0.72rem !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(116, 177, 255, 0.18) !important;
+  background: rgba(5, 18, 43, 0.74) !important;
 }
 
-/* ------------------------------------------------------------
-   Khalifa panel
------------------------------------------------------------- */
-.dn-khalifa-status-row,
-.dn-khalifa-current-top span,
-.dn-khalifa-live-actions button,
-.dn-khalifa-examples button,
-.dn-khalifa-question-chip {
+.dn-map-title-card p,
+.dn-map-title-card b {
   display: inline-flex !important;
   align-items: center !important;
   gap: 0.45rem !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  color: #fff !important;
+  font-weight: 1000 !important;
+  line-height: 1.25 !important;
 }
 
-.dn-khalifa-status-row {
-  justify-content: space-between !important;
-  width: 100% !important;
-  border: 1px solid rgba(116, 177, 255, 0.2) !important;
-  border-radius: 1rem !important;
-  background: rgba(5, 18, 43, 0.58) !important;
-  padding: 0.55rem 0.65rem !important;
+.dn-map-title-card b {
+  grid-column: 1 / -1 !important;
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 0.7rem !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-.dn-admin-khalifa-card button,
-.dn-khalifa-live-actions button,
-.dn-khalifa-examples button,
-.dn-khalifa-question-chip {
-  border: 1px solid rgba(212, 175, 55, 0.3) !important;
-  border-radius: 999px !important;
-  background: rgba(5, 18, 43, 0.78) !important;
-  color: #ffffff !important;
-  font-weight: 950 !important;
+.dn-map-control-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0.5rem !important;
+  margin-top: 0.55rem !important;
 }
 
-.dn-khalifa-current-metric,
-.dn-khalifa-rotator-controls span {
-  border: 1px solid rgba(250, 204, 21, 0.28) !important;
-  border-radius: 999px !important;
-  padding: 0.35rem 0.6rem !important;
-  background: rgba(250, 204, 21, 0.1) !important;
+.dn-map-control-grid label {
+  display: grid !important;
+  gap: 0.24rem !important;
+  min-width: 0 !important;
+}
+
+.dn-map-control-grid label > span,
+.dn-map-control-grid label span {
   color: #facc15 !important;
+  font-size: 0.62rem !important;
   font-weight: 1000 !important;
 }
 
-/* ------------------------------------------------------------
-   Map shell and controls
------------------------------------------------------------- */
-.dn-live-map-shell {
-  min-height: 420px !important;
-  max-height: 520px !important;
-  isolation: isolate !important;
-  overflow: hidden !important;
-  border-radius: 1.55rem !important;
-  border: 1px solid rgba(24, 168, 232, 0.24) !important;
-  box-shadow: 0 22px 72px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(250, 204, 21, 0.08) inset !important;
+.dn-map-control-grid select,
+.dn-map-control-grid input,
+.dn-map-search-inline {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 2.35rem !important;
+  border-radius: 0.78rem !important;
+  border: 1px solid rgba(116, 177, 255, 0.2) !important;
+  background: rgba(3, 18, 38, 0.82) !important;
+  color: #fff !important;
+  font-size: 0.74rem !important;
+  font-weight: 850 !important;
 }
 
-.dn-map-control-dock {
-  position: absolute !important;
-  z-index: 680 !important;
-  inset-inline-end: 1rem !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  display: grid !important;
-  gap: 0.45rem !important;
-}
-
-.dn-map-control-button {
-  width: 42px !important;
-  height: 42px !important;
-  display: inline-flex !important;
+.dn-map-search-inline {
+  display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  border: 1px solid rgba(250, 204, 21, 0.36) !important;
+  gap: 0.4rem !important;
+  padding-inline: 0.65rem !important;
+}
+
+.dn-map-search-inline input {
+  border: 0 !important;
+  background: transparent !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+.dn-map-mode-bar,
+.dn-map-region-chips,
+.dn-map-action-bar,
+.dn-map-route-summary {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.45rem !important;
+  padding: 0.5rem !important;
+  border: 1px solid rgba(116, 177, 255, 0.16) !important;
   border-radius: 0.95rem !important;
-  background: rgba(2, 8, 18, 0.88) !important;
-  color: #facc15 !important;
-  backdrop-filter: blur(14px) !important;
+  background: rgba(5, 18, 43, 0.68) !important;
+  backdrop-filter: none !important;
 }
 
 .dn-map-mode-bar button,
@@ -385,8 +485,18 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.42rem !important;
-  min-height: 2.35rem !important;
+  gap: 0.34rem !important;
+  min-height: 2rem !important;
+  max-width: 100% !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.7rem !important;
+  background: rgba(2, 8, 18, 0.62) !important;
+  color: rgba(255, 255, 255, 0.84) !important;
+  padding: 0.35rem 0.55rem !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
 }
 
 .dn-map-mode-bar button.is-active,
@@ -394,14 +504,213 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-map-control-button.is-active,
 .dn-admin-side-nav button.is-active,
 .dn-admin-side-nav button[aria-current="page"] {
-  border-color: rgba(250, 204, 21, 0.65) !important;
-  background: linear-gradient(135deg, rgba(250, 204, 21, 0.25), rgba(14, 165, 233, 0.12)) !important;
+  border-color: rgba(250, 204, 21, 0.58) !important;
+  background: rgba(250, 204, 21, 0.14) !important;
   color: #facc15 !important;
 }
 
-/* ------------------------------------------------------------
+.dn-map-action-bar {
+  justify-content: flex-start !important;
+}
+
+.dn-map-route-summary {
+  justify-content: space-between !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-size: 0.68rem !important;
+  font-weight: 900 !important;
+}
+
+.dn-map-route-summary span {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.32rem !important;
+  min-width: 0 !important;
+}
+
+/* Leaflet tool dock: simple vertical controls inside the square map. */
+.dn-live-map-shell .leaflet-container .dn-map-control-dock,
+.dn-map-control-dock {
+  position: absolute !important;
+  z-index: 900 !important;
+  inset-inline-start: 0.75rem !important;
+  inset-inline-end: auto !important;
+  top: 0.75rem !important;
+  bottom: auto !important;
+  transform: none !important;
+  display: grid !important;
+  gap: 0.36rem !important;
+}
+
+.dn-map-control-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
+  border: 1px solid rgba(250, 204, 21, 0.32) !important;
+  border-radius: 0.68rem !important;
+  background: rgba(2, 8, 18, 0.82) !important;
+  color: #facc15 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Remove Leaflet default control collisions. */
+.dn-live-map-shell .leaflet-control-container {
+  pointer-events: none !important;
+}
+
+.dn-live-map-shell .leaflet-control-container button,
+.dn-live-map-shell .dn-map-control-dock,
+.dn-live-map-shell .dn-map-control-dock button {
+  pointer-events: auto !important;
+}
+
+/* ============================================================
+   Secondary panels
+============================================================ */
+.dn-admin-dashboard-secondary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 0.75rem !important;
+  align-items: stretch !important;
+}
+
+.dn-admin-secondary-panel {
+  display: grid !important;
+  align-content: start !important;
+  gap: 0.55rem !important;
+  min-height: 7.8rem !important;
+  padding: 0.95rem !important;
+  border: 1px solid rgba(24, 168, 232, 0.14) !important;
+  border-radius: 1.15rem !important;
+  background: linear-gradient(145deg, rgba(7, 26, 51, 0.78), rgba(2, 8, 18, 0.68)) !important;
+  box-shadow: none !important;
+}
+
+.dn-admin-secondary-panel strong,
+.dn-admin-secondary-panel h2 {
+  color: #fff !important;
+  font-weight: 1000 !important;
+  line-height: 1.35 !important;
+}
+
+.dn-admin-secondary-panel p,
+.dn-admin-secondary-panel small {
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-weight: 800 !important;
+  line-height: 1.6 !important;
+}
+
+/* ============================================================
+   Khalifa panel smoothing
+============================================================ */
+.dn-khalifa-status-row,
+.dn-khalifa-current-top span,
+.dn-khalifa-live-actions button,
+.dn-khalifa-examples button,
+.dn-khalifa-question-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.42rem !important;
+}
+
+.dn-khalifa-status-row {
+  justify-content: space-between !important;
+  width: 100% !important;
+  border: 1px solid rgba(116, 177, 255, 0.16) !important;
+  border-radius: 0.88rem !important;
+  background: rgba(5, 18, 43, 0.52) !important;
+  padding: 0.48rem 0.58rem !important;
+}
+
+.dn-admin-khalifa-card button,
+.dn-khalifa-live-actions button,
+.dn-khalifa-examples button,
+.dn-khalifa-question-chip {
+  border: 1px solid rgba(212, 175, 55, 0.26) !important;
+  border-radius: 0.9rem !important;
+  background: rgba(5, 18, 43, 0.74) !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  box-shadow: none !important;
+}
+
+.dn-khalifa-current-metric,
+.dn-khalifa-rotator-controls span {
+  border: 1px solid rgba(250, 204, 21, 0.24) !important;
+  border-radius: 999px !important;
+  padding: 0.32rem 0.55rem !important;
+  background: rgba(250, 204, 21, 0.08) !important;
+  color: #facc15 !important;
+  font-weight: 1000 !important;
+}
+
+/* ============================================================
+   State chips and source labels
+============================================================ */
+.dn-admin-state-chip,
+.dn-map-state-chip,
+.dn-source-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  min-height: 1.65rem !important;
+  border-radius: 999px !important;
+  padding: 0.28rem 0.58rem !important;
+  border: 1px solid rgba(116, 177, 255, 0.2) !important;
+  background: rgba(6, 20, 46, 0.68) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+  font-size: 0.66rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.dn-admin-state-chip.is-success,
+.dn-admin-state-chip.is-gold {
+  border-color: rgba(52, 211, 153, 0.34) !important;
+  color: #bbf7d0 !important;
+}
+
+.dn-admin-state-chip.is-warning {
+  border-color: rgba(245, 183, 0, 0.42) !important;
+  color: #fde68a !important;
+}
+
+.dn-admin-state-chip.is-danger,
+.dn-admin-state-chip.is-error {
+  border-color: rgba(248, 113, 113, 0.42) !important;
+  color: #fecaca !important;
+}
+
+/* ============================================================
+   Empty states and blank-panel prevention
+============================================================ */
+.dn-admin-empty-state,
+.dn-iconized-empty {
+  display: grid !important;
+  place-items: center !important;
+  gap: 0.6rem !important;
+  min-height: 150px !important;
+  padding: 1.25rem !important;
+  text-align: center !important;
+  border: 1px dashed rgba(116, 177, 255, 0.24) !important;
+  border-radius: 1.1rem !important;
+  background: linear-gradient(135deg, rgba(6, 20, 46, 0.62), rgba(2, 8, 18, 0.48)) !important;
+  color: #fff !important;
+}
+
+.dn-section-panels {
+  align-items: start !important;
+}
+
+/* ============================================================
    Interaction states
------------------------------------------------------------- */
+============================================================ */
 .dn-section-workspace button,
 .dn-iconized-action-tile,
 .dn-admin-action-tile,
@@ -414,7 +723,7 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-admin-side-nav button,
 .dn-admin-compact-action-row button,
 .dn-admin-top-actions button {
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease !important;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease !important;
 }
 
 .dn-section-workspace button:hover:not(:disabled),
@@ -430,8 +739,8 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-admin-compact-action-row button:hover:not(:disabled),
 .dn-admin-top-actions button:hover:not(:disabled) {
   transform: translateY(-1px) !important;
-  border-color: rgba(250, 204, 21, 0.58) !important;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(250, 204, 21, 0.12) inset !important;
+  border-color: rgba(250, 204, 21, 0.5) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18) !important;
 }
 
 .dn-section-workspace button:focus-visible,
@@ -445,8 +754,8 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-admin-side-nav button:focus-visible,
 .dn-admin-compact-action-row button:focus-visible,
 .dn-admin-top-actions button:focus-visible {
-  outline: 3px solid rgba(250, 204, 21, 0.72) !important;
-  outline-offset: 3px !important;
+  outline: 2px solid rgba(250, 204, 21, 0.74) !important;
+  outline-offset: 2px !important;
 }
 
 .dn-section-workspace button:active:not(:disabled),
@@ -461,76 +770,71 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 .dn-admin-action-tile:disabled,
 .dn-map-control-button:disabled {
   cursor: not-allowed !important;
-  opacity: 0.5 !important;
+  opacity: 0.55 !important;
   filter: saturate(0.65) !important;
 }
 
-/* ------------------------------------------------------------
-   Blank panel prevention
------------------------------------------------------------- */
-.dn-admin-fullscreen,
-.dn-admin-content-full,
-.dn-admin-workspace-host,
-.dn-section-workspace,
-.dn-admin-center-zone,
-.dn-live-map-shell {
-  max-width: 100% !important;
-  overflow-x: hidden !important;
-}
-
-.dn-section-workspace,
-.dn-admin-section-card,
-.dn-section-panels,
-.dn-admin-main-panel,
-.dn-admin-center-zone,
-.dn-admin-workspace-host {
-  min-height: 0 !important;
-}
-
-.dn-section-panels {
-  align-items: start !important;
-}
-
-/* ------------------------------------------------------------
+/* ============================================================
    RTL / LTR alignment
------------------------------------------------------------- */
+============================================================ */
 [dir="rtl"] .dn-admin-action-copy,
 [dir="rtl"] .dn-iconized-content,
 [dir="rtl"] .dn-khalifa-current-body,
-[dir="rtl"] .dn-admin-secondary-panel {
+[dir="rtl"] .dn-admin-secondary-panel,
+[dir="rtl"] .dn-map-title-card,
+[dir="rtl"] .dn-map-control-grid {
   text-align: right !important;
 }
 
 [dir="ltr"] .dn-admin-action-copy,
 [dir="ltr"] .dn-iconized-content,
 [dir="ltr"] .dn-khalifa-current-body,
-[dir="ltr"] .dn-admin-secondary-panel {
+[dir="ltr"] .dn-admin-secondary-panel,
+[dir="ltr"] .dn-map-title-card,
+[dir="ltr"] .dn-map-control-grid {
   text-align: left !important;
 }
 
-/* ------------------------------------------------------------
+/* ============================================================
    Responsive
------------------------------------------------------------- */
-@media (max-width: 1280px) {
-  .dn-admin-action-grid { grid-template-columns: 1fr !important; }
-  .dn-live-map-shell { min-height: 400px !important; max-height: 480px !important; }
+============================================================ */
+@media (max-width: 1380px) {
+  .dn-admin-map-first-grid {
+    grid-template-columns: minmax(360px, 1fr) minmax(240px, 310px) !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .dn-admin-map-first-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-admin-map-primary,
+  .dn-admin-quick-actions-compact,
+  .dn-live-map-shell {
+    max-width: 100% !important;
+  }
+
+  .dn-admin-action-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
 
 @media (max-width: 900px) {
-  .dn-live-map-shell {
-    height: 400px !important;
+  .dn-admin-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dn-map-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dn-live-map-shell > .leaflet-container {
     min-height: 380px !important;
-    max-height: 440px !important;
   }
 
   .dn-section-panels {
     grid-template-columns: 1fr !important;
-  }
-
-  .dn-map-control-dock {
-    top: auto !important;
-    bottom: 4.75rem !important;
-    transform: none !important;
   }
 }
 
@@ -544,33 +848,42 @@ body:has(.dn-admin-fullscreen) .dn-admin-mobile-open svg[aria-hidden="true"] {
 
   .dn-map-mode-bar,
   .dn-map-region-chips,
-  .dn-map-action-bar {
-    max-width: calc(100% - 1rem) !important;
+  .dn-map-action-bar,
+  .dn-map-route-summary {
+    max-width: 100% !important;
     flex-wrap: wrap !important;
   }
 }
 
 @media (max-width: 520px) {
   .dn-live-map-shell {
-    height: 340px !important;
-    min-height: 320px !important;
-    max-height: 380px !important;
-    border-radius: 1.25rem !important;
+    padding: 0.55rem !important;
+    border-radius: 1rem !important;
   }
 
-  .dn-map-control-dock {
-    inset-inline-end: 0.75rem !important;
-    gap: 0.35rem !important;
+  .dn-live-map-shell > .leaflet-container {
+    min-height: 320px !important;
+    border-radius: 0.85rem !important;
+  }
+
+  .dn-map-control-grid {
+    grid-template-columns: 1fr !important;
   }
 
   .dn-map-control-button {
-    width: 38px !important;
-    height: 38px !important;
+    width: 1.85rem !important;
+    height: 1.85rem !important;
+    min-width: 1.85rem !important;
+    min-height: 1.85rem !important;
   }
 
-  .dn-admin-icon-badge {
-    min-width: 2rem !important;
-    width: 2rem !important;
-    height: 2rem !important;
+  .dn-admin-icon-badge,
+  .dn-admin-secondary-icon,
+  .dn-iconized-icon,
+  .dn-admin-sidebar-icon {
+    width: 1.7rem !important;
+    height: 1.7rem !important;
+    min-width: 1.7rem !important;
+    min-height: 1.7rem !important;
   }
 }
