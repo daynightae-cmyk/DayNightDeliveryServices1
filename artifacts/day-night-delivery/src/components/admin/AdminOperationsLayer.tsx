@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Database, FileText, Printer, RefreshCw } from "lucide-react";
 import type { Merchant, Order } from "../../types";
-import type { FinanceRow } from "../../lib/adminData";
+import {
+  commitValidImportRows,
+  createImportBatch,
+  saveImportPreviewRows,
+  validateImportRows,
+  type FinanceRow,
+} from "../../lib/adminData";
 import {
   fetchProductionRows,
   productionTableForSection,
@@ -60,6 +66,13 @@ function money(value: unknown) {
   return `${Number(value || 0).toFixed(2)} AED`;
 }
 
+function parseCsv(text: string): Record<string, string>[] {
+  const [head = "", ...lines] = text.split(/\r?\n/).filter(Boolean);
+  const headers = head.split(",").map((header) => header.trim());
+  if (!headers.length) return [];
+  return lines.map((line) => Object.fromEntries(line.split(",").map((cell, index) => [headers[index] || `field_${index}`, cell.trim()])));
+}
+
 function sourceText(source: AdminProductionSource, isArabic: boolean, table: string) {
   if (source === "db") return isArabic ? `مصدر فعلي: ${table}` : `Real source: ${table}`;
   return isArabic ? `جاهز للتفعيل: ${table}` : `Ready to activate: ${table}`;
@@ -96,13 +109,16 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<AdminProductionSource>("unavailable");
   const [tableName, setTableName] = useState(productionTableForSection(id).table);
+  const [merchantId, setMerchantId] = useState("");
+  const [importPreview, setImportPreview] = useState<ReturnType<typeof validateImportRows>>([]);
+  const [lastBatchId, setLastBatchId] = useState("");
 
   async function load() {
     if (isFinanceSection(id)) return;
     setBusy(true);
     setMessage("");
     try {
-      const result = await fetchProductionRows(id);
+      const result = await fetchProductionRows(id, merchantId ? { merchantId } : {});
       const normalized = result.rows.map((row) => ({
         ...row,
         debit: rowDebit(row),
@@ -128,10 +144,45 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
   useEffect(() => {
     if (isFinanceSection(id)) setFinanceSection(id);
     void load();
-  }, [id]);
+  }, [id, merchantId]);
 
   const totals = useMemo(() => summarizeRows(rows), [rows]);
   const dataSourceText = sourceText(source, isArabic, tableName);
+
+  async function handleCsv(file: File) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setMessage(isArabic ? "CSV مدعوم الآن. لا يتم إنشاء صفوف وهمية من XLSX." : "CSV is supported now. No fake XLSX rows are created.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const validation = validateImportRows(parseCsv(await file.text()), merchantId || undefined);
+      setImportPreview(validation);
+      const batch = await createImportBatch({
+        merchant_id: merchantId || undefined,
+        file_name: file.name,
+        import_mode: "database_preview",
+        total_rows: validation.length,
+        valid_rows: validation.filter((row) => row.status === "valid").length,
+        invalid_rows: validation.filter((row) => row.status === "invalid").length,
+      });
+      setLastBatchId(String(batch.id || ""));
+      await saveImportPreviewRows(String(batch.id), validation);
+      setMessage(isArabic ? "تم حفظ معاينة الاستيراد كصفوف حقيقية في قاعدة البيانات." : "Import preview rows were saved as real database rows.");
+      await load();
+    } catch (error) {
+      console.warn("Import preview failed:", error);
+      setMessage(isArabic ? "تعذر حفظ معاينة الاستيراد. تأكد من migration وصلاحيات الأدمن." : "Could not save import preview. Confirm migration and admin permissions.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commitImport() {
+    if (!lastBatchId) return;
+    const result = await commitValidImportRows(lastBatchId);
+    setMessage(result.message);
+  }
 
   if (isFinanceSection(id)) {
     return (
@@ -166,9 +217,21 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
       </div>
 
       <div className="dn-ops-filters">
+        <select value={merchantId} onChange={(event) => setMerchantId(event.target.value)}>
+          <option value="">{isArabic ? "كل التجار" : "All merchants"}</option>
+          {merchants.map((merchant) => <option key={merchant.id} value={merchant.id}>{merchant.trade_name || merchant.owner_name || merchant.merchant_code || merchant.id}</option>)}
+        </select>
         <button type="button" onClick={() => void load()}><RefreshCw className="inline h-4 w-4" /> {busy ? (isArabic ? "تحميل" : "Loading") : (isArabic ? "تحديث" : "Refresh")}</button>
         <button type="button" onClick={() => window.print()}><Printer className="inline h-4 w-4" /> {isArabic ? "طباعة" : "Print"}</button>
       </div>
+
+      {id === "import" && (
+        <div className="dn-ops-filters">
+          <input type="file" accept=".csv" onChange={(event) => event.target.files?.[0] && void handleCsv(event.target.files[0])} />
+          <button type="button" disabled={!lastBatchId || busy} onClick={() => void commitImport()}>{isArabic ? "اعتماد صفوف CSV الصالحة" : "Commit valid CSV rows"}</button>
+          <span>{isArabic ? `صفوف معاينة محفوظة: ${importPreview.length}` : `Preview rows saved: ${importPreview.length}`}</span>
+        </div>
+      )}
 
       <div className="dn-ops-kpis">
         <article><span>{isArabic ? "الصفوف" : "Rows"}</span><strong>{totals.count}</strong></article>
