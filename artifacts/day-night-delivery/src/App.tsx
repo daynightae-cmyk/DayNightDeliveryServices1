@@ -30,7 +30,9 @@ import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
 import Footer from "./components/Footer";
+import "./lib/adminUiPolish";
 import "./styles/dn-admin-real-map-hotfix.css";
+import "./styles/dn-admin-day-polish.css";
 
 const Home = lazy(() => import("./components/Home"));
 const AboutUs = lazy(() => import("./components/AboutUs"));
