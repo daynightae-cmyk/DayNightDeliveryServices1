@@ -36,21 +36,26 @@ exception when others then
 end;
 $$;
 
-create unique index if not exists cod_collections_order_id_unique
-  on public.cod_collections(order_id)
-  where order_id is not null;
+create or replace function public.dn_safe_date(value text, fallback date default current_date)
+returns date
+language plpgsql
+immutable
+as $$
+begin
+  if value is null or btrim(value) = '' then
+    return fallback;
+  end if;
 
-create unique index if not exists cod_collections_tracking_unique_when_no_order
-  on public.cod_collections(tracking_number)
-  where tracking_number is not null and order_id is null;
+  return value::date;
+exception when others then
+  return fallback;
+end;
+$$;
 
-create unique index if not exists merchant_statement_entries_order_type_unique
-  on public.merchant_statement_entries(order_id, entry_type)
-  where order_id is not null;
-
-create unique index if not exists driver_statement_entries_order_type_unique
-  on public.driver_statement_entries(order_id, entry_type)
-  where order_id is not null;
+create index if not exists cod_collections_order_id_real_sync_idx on public.cod_collections(order_id) where order_id is not null;
+create index if not exists cod_collections_tracking_real_sync_idx on public.cod_collections(tracking_number) where tracking_number is not null;
+create index if not exists merchant_statement_entries_order_type_real_sync_idx on public.merchant_statement_entries(order_id, entry_type) where order_id is not null;
+create index if not exists driver_statement_entries_order_type_real_sync_idx on public.driver_statement_entries(order_id, entry_type) where order_id is not null;
 
 create or replace function public.admin_sync_order_operation_rows()
 returns jsonb
@@ -69,7 +74,6 @@ begin
     raise exception 'not_authorized';
   end if;
 
-  -- Real COD collection rows from real orders.
   insert into public.cod_collections (
     order_id,
     tracking_number,
@@ -114,7 +118,6 @@ begin
     );
   get diagnostics v_cod_inserted = row_count;
 
-  -- Merchant COD credit entries from real COD orders.
   insert into public.merchant_statement_entries (
     merchant_id,
     order_id,
@@ -134,7 +137,7 @@ begin
     public.dn_safe_uuid(o.row_data->>'merchant_id'),
     public.dn_safe_uuid(o.row_data->>'id'),
     nullif(coalesce(o.row_data->>'tracking_number', o.row_data->>'invoice_number', o.row_data->>'coupon_number'), ''),
-    coalesce(nullif(o.row_data->>'created_at', '')::date, current_date),
+    public.dn_safe_date(o.row_data->>'created_at', current_date),
     'order_cod_credit',
     0,
     public.dn_safe_numeric(o.row_data->>'cod_amount', 0),
@@ -158,7 +161,6 @@ begin
     );
   get diagnostics v_merchant_cod_inserted = row_count;
 
-  -- Merchant delivery fee debit entries from real orders.
   insert into public.merchant_statement_entries (
     merchant_id,
     order_id,
@@ -178,7 +180,7 @@ begin
     public.dn_safe_uuid(o.row_data->>'merchant_id'),
     public.dn_safe_uuid(o.row_data->>'id'),
     nullif(coalesce(o.row_data->>'tracking_number', o.row_data->>'invoice_number', o.row_data->>'coupon_number'), ''),
-    coalesce(nullif(o.row_data->>'created_at', '')::date, current_date),
+    public.dn_safe_date(o.row_data->>'created_at', current_date),
     'delivery_fee_debit',
     greatest(
       public.dn_safe_numeric(o.row_data->>'delivery_price', 0),
@@ -217,7 +219,6 @@ begin
     );
   get diagnostics v_merchant_fee_inserted = row_count;
 
-  -- Driver delivery earning entries from real assigned orders.
   insert into public.driver_statement_entries (
     driver_id,
     order_id,
@@ -237,7 +238,7 @@ begin
     coalesce(public.dn_safe_uuid(o.row_data->>'driver_id'), public.dn_safe_uuid(o.row_data->>'assigned_driver_id')),
     public.dn_safe_uuid(o.row_data->>'id'),
     nullif(coalesce(o.row_data->>'tracking_number', o.row_data->>'invoice_number', o.row_data->>'coupon_number'), ''),
-    coalesce(nullif(o.row_data->>'created_at', '')::date, current_date),
+    public.dn_safe_date(o.row_data->>'created_at', current_date),
     'delivery_earning_credit',
     0,
     greatest(
