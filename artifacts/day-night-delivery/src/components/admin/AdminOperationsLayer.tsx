@@ -52,6 +52,10 @@ const financeSections: FinanceArea[] = [
   "audit_log",
 ];
 
+function isFinanceSection(id: string): id is FinanceArea {
+  return financeSections.includes(id as FinanceArea);
+}
+
 function money(value: unknown) {
   return `${Number(value || 0).toFixed(2)} AED`;
 }
@@ -86,33 +90,15 @@ function tablePdf(isArabic: boolean, title: string, source: string, rows: Financ
 }
 
 export default function AdminOperationsLayer({ id, title, isArabic, orders, merchants, onRefresh }: Props) {
-  const [financeSection, setFinanceSection] = useState<FinanceArea>(financeSections.includes(id as FinanceArea) ? id as FinanceArea : "finance_dashboard");
+  const [financeSection, setFinanceSection] = useState<FinanceArea>(isFinanceSection(id) ? id : "finance_dashboard");
   const [rows, setRows] = useState<FinanceRow[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<AdminProductionSource>("unavailable");
   const [tableName, setTableName] = useState(productionTableForSection(id).table);
 
-  useEffect(() => {
-    if (financeSections.includes(id as FinanceArea)) setFinanceSection(id as FinanceArea);
-  }, [id]);
-
-  if (financeSections.includes(id as FinanceArea)) {
-    return (
-      <AdminFinanceOperationsCenter
-        isArabic={isArabic}
-        activeSection={financeSection}
-        orders={orders}
-        merchants={merchants}
-        financeSummary={null}
-        financeSummarySource="derived"
-        onRefresh={onRefresh}
-        onNavigate={(target) => setFinanceSection(target as FinanceArea)}
-      />
-    );
-  }
-
   async function load() {
+    if (isFinanceSection(id)) return;
     setBusy(true);
     setMessage("");
     try {
@@ -140,11 +126,29 @@ export default function AdminOperationsLayer({ id, title, isArabic, orders, merc
   }
 
   useEffect(() => {
+    if (isFinanceSection(id)) setFinanceSection(id);
     void load();
   }, [id]);
 
   const totals = useMemo(() => summarizeRows(rows), [rows]);
   const dataSourceText = sourceText(source, isArabic, tableName);
+
+  if (isFinanceSection(id)) {
+    return (
+      <AdminFinanceOperationsCenter
+        isArabic={isArabic}
+        activeSection={financeSection}
+        orders={orders}
+        merchants={merchants}
+        financeSummary={null}
+        financeSummarySource="derived"
+        onRefresh={onRefresh}
+        onNavigate={(target) => {
+          if (isFinanceSection(target)) setFinanceSection(target);
+        }}
+      />
+    );
+  }
 
   return (
     <section className="dn-ops-layer" dir={isArabic ? "rtl" : "ltr"}>
