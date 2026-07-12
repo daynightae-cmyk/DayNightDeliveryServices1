@@ -1,4 +1,6 @@
 import {
+  handleAdminNotification,
+  handleOperationCompleted,
   playDayNightSound,
   preloadDayNightSounds,
   readDayNightAudioSettings,
@@ -18,6 +20,8 @@ export type AdminAudioEvent =
   | "notification"
   | "new_order"
   | "cod_alert"
+  | "urgent_alert"
+  | "critical_alert"
   | "khalifa_insight"
   | "daily_closing_ready"
   | "daily_closing_warning"
@@ -51,7 +55,7 @@ export type AdminNotificationType =
   | "daily_closing"
   | "khalifa";
 
-export type AdminNotificationPriority = "low" | "normal" | "high";
+export type AdminNotificationPriority = "low" | "normal" | "high" | "critical";
 export type AdminNotification = {
   id: string;
   type: AdminNotificationType;
@@ -79,6 +83,7 @@ type RoutedAudio = {
   volume: number;
   channel: string;
   minIntervalMs: number;
+  priority: number;
 };
 
 export const ADMIN_AUDIO_SETTINGS_KEY = "dn_admin_audio_settings_v1";
@@ -97,6 +102,8 @@ const fallback: AdminAudioSettings = {
   browserNotifications: false,
 };
 
+const moduleLoadedAt = Date.now();
+const initialNotificationAudioMuteUntil = moduleLoadedAt + 8500;
 let unlocked = false;
 let lastVoiceAt = 0;
 let pendingAudio: AdminAudioEvent[] = [];
@@ -156,29 +163,37 @@ export function unlockAdminAudio() {
 function allowed(event: AdminAudioEvent, s: AdminAudioSettings) {
   if (!s.enabled || s.muted) return false;
   if ((event === "click" || event === "hover") && !s.clickSounds) return false;
-  if (["notification", "new_order", "cod_alert", "print_ready", "print_done", "daily_closing_ready"].includes(event) && !s.notificationSounds) return false;
+  if (["notification", "new_order", "cod_alert", "print_ready", "print_done", "daily_closing_ready", "urgent_alert"].includes(event) && !s.notificationSounds) return false;
   if (event === "khalifa_insight" && !s.khalifaSounds) return false;
-  if (["error", "warning", "daily_closing_warning", "database_health_warning"].includes(event) && !s.warningSounds) return false;
+  if (["error", "warning", "daily_closing_warning", "database_health_warning", "critical_alert"].includes(event) && !s.warningSounds) return false;
   return true;
 }
 
 function routeAdminAudioEvent(event: AdminAudioEvent): RoutedAudio | null {
   if (event === "click" || event === "hover") return null;
 
+  if (event === "critical_alert") {
+    return { key: "glassBreak", volume: 0.5, channel: "admin-critical-alert", minIntervalMs: 6200, priority: 100 };
+  }
+
+  if (event === "urgent_alert") {
+    return { key: "carHorn", volume: 0.68, channel: "admin-urgent-horn", minIntervalMs: 2600, priority: 80 };
+  }
+
   if (event === "success" || event === "print_ready" || event === "print_done" || event === "database_health_ok" || event === "daily_closing_ready") {
-    return { key: "doorClose", volume: 0.28, channel: "admin-soft-confirm", minIntervalMs: 850 };
+    return { key: "doorClose", volume: 0.28, channel: "admin-soft-confirm", minIntervalMs: 850, priority: 35 };
   }
 
   if (event === "khalifa_insight") {
-    return { key: "sectionDoor", volume: 0.26, channel: "admin-khalifa", minIntervalMs: 1200 };
+    return { key: "sectionDoor", volume: 0.26, channel: "admin-khalifa", minIntervalMs: 1200, priority: 18 };
   }
 
   if (event === "notification" || event === "new_order" || event === "cod_alert") {
-    return { key: "sectionDoor", volume: 0.3, channel: "admin-important-notification", minIntervalMs: 1200 };
+    return { key: "sectionDoor", volume: 0.3, channel: "admin-important-notification", minIntervalMs: 1200, priority: 18 };
   }
 
   if (event === "warning" || event === "error" || event === "daily_closing_warning" || event === "database_health_warning") {
-    return { key: "sectionDoor", volume: 0.34, channel: "admin-warning", minIntervalMs: 1200 };
+    return { key: "sectionDoor", volume: 0.34, channel: "admin-warning", minIntervalMs: 1200, priority: 20 };
   }
 
   return null;
@@ -187,7 +202,9 @@ function routeAdminAudioEvent(event: AdminAudioEvent): RoutedAudio | null {
 export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdminAudioSettings()) {
   if (!allowed(event, settings)) return;
   if (!unlocked) {
-    pendingAudio = [...pendingAudio, event].slice(-4);
+    if (!["notification", "new_order", "cod_alert", "urgent_alert", "critical_alert", "warning", "error"].includes(event)) {
+      pendingAudio = [...pendingAudio, event].slice(-4);
+    }
     return;
   }
 
@@ -198,16 +215,19 @@ export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdmin
     channel: routed.channel,
     volume: routed.volume,
     minIntervalMs: routed.minIntervalMs,
+    priority: routed.priority,
   });
 }
 
 function notificationAudio(type: AdminNotificationType, priority?: AdminNotificationPriority): AdminAudioEvent {
+  if (priority === "critical") return "critical_alert";
+  if (priority === "high") return "urgent_alert";
   if (type === "khalifa") return "khalifa_insight";
   if (type === "new_order") return "new_order";
   if (type === "cod") return "cod_alert";
   if (type === "print") return "print_ready";
-  if (type === "database") return priority === "high" ? "database_health_warning" : "database_health_ok";
-  if (type === "daily_closing") return priority === "high" ? "daily_closing_warning" : "daily_closing_ready";
+  if (type === "database") return "database_health_ok";
+  if (type === "daily_closing") return "daily_closing_ready";
   if (type === "error") return "error";
   if (type === "warning") return "warning";
   if (type === "success") return "success";
@@ -284,6 +304,15 @@ export function requestAdminBrowserNotifications() {
   return Notification.requestPermission();
 }
 
+function isOldOrInitialNotification(input: AddNotificationInput, now: number): boolean {
+  if (input.createdAt) {
+    const createdTime = new Date(input.createdAt).getTime();
+    if (Number.isFinite(createdTime) && createdTime < moduleLoadedAt) return true;
+  }
+
+  return now < initialNotificationAudioMuteUntil && Boolean(input.dedupeKey);
+}
+
 export function addAdminNotification(input: AddNotificationInput): AdminNotification | null {
   const now = Date.now();
   if (input.dedupeKey) {
@@ -310,8 +339,15 @@ export function addAdminNotification(input: AddNotificationInput): AdminNotifica
   writeAdminNotifications([item, ...readAdminNotifications()]);
   const settings = readAdminAudioSettings();
   showBrowserNotification(item, settings);
-  playAdminAudioEvent(input.audioEvent || notificationAudio(item.type, item.priority), settings);
-  if (item.type === "khalifa") speakKhalifa(item.bodyAr || item.titleAr, "ar", settings);
+
+  if (!isOldOrInitialNotification(input, now)) {
+    const event = input.audioEvent && item.priority === "normal" ? input.audioEvent : notificationAudio(item.type, item.priority);
+    playAdminAudioEvent(event, settings);
+    if (event === "success" || event === "daily_closing_ready" || event === "print_done") handleOperationCompleted(event);
+    if (item.type === "khalifa") speakKhalifa(item.bodyAr || item.titleAr, "ar", settings);
+    handleAdminNotification({ id: item.id, type: item.type, priority: item.priority, createdAt: item.createdAt });
+  }
+
   return item;
 }
 
