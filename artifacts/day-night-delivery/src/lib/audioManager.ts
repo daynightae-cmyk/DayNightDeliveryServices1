@@ -15,12 +15,22 @@ type PlayOptions = {
   fadeInMs?: number;
   fadeOutMs?: number;
   respectSettings?: boolean;
+  priority?: number;
+};
+
+type NotificationLike = {
+  id?: string;
+  type?: string;
+  priority?: "low" | "normal" | "high" | "critical" | string;
+  createdAt?: string;
 };
 
 const ENABLED_KEY = "daynight_audio_enabled";
 const VOLUME_KEY = "daynight_audio_volume";
 const MUTED_KEY = "daynight_audio_muted";
 const LEGACY_SETTINGS_KEY = "dn_admin_audio_settings_v1";
+const PLAYED_NOTIFICATION_KEY = "daynight_audio_played_notification_ids_v1";
+const NAVIGATION_COOLDOWN_MS = 620;
 
 export const DAY_NIGHT_SOUND_URLS: Record<DayNightSoundKey, string> = {
   glassBreak: "https://files.catbox.moe/kuvupd.mp3",
@@ -43,6 +53,10 @@ let browserUnlocked = false;
 let unlockListenersInstalled = false;
 let navAudioBindingInstalled = false;
 let pendingAfterUnlock: Array<{ key: DayNightSoundKey; options: PlayOptions }> = [];
+let lastKnownSectionTitle = "";
+let lastNavigationAudioAt = 0;
+let lastLogoutAudioAt = 0;
+let playedNotificationIds = new Set<string>();
 
 function hasBrowserAudio(): boolean {
   return typeof window !== "undefined" && typeof document !== "undefined" && typeof Audio !== "undefined";
@@ -124,6 +138,7 @@ function ensureAudio(key: DayNightSoundKey): HTMLAudioElement | null {
   try {
     const audio = new Audio(DAY_NIGHT_SOUND_URLS[key]);
     audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
     audioByKey.set(key, audio);
     return audio;
   } catch {
@@ -141,24 +156,47 @@ function installUnlockListeners(): void {
   window.addEventListener("touchstart", unlock, { passive: true });
 }
 
+function getCurrentAdminSectionTitle(): string {
+  if (!hasBrowserAudio()) return "";
+  const element = document.querySelector(".dn-admin-current-section strong");
+  return (element?.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function isLogoutButton(target: HTMLElement | null): boolean {
+  const text = (target?.closest("button")?.textContent || "").replace(/\s+/g, " ").toLowerCase();
+  return text.includes("تسجيل الخروج") || text.includes("logout");
+}
+
 export function installAdminNavigationAudioBinding(): void {
   if (!hasBrowserAudio() || navAudioBindingInstalled) return;
   navAudioBindingInstalled = true;
+  lastKnownSectionTitle = getCurrentAdminSectionTitle();
 
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
-    const button = target?.closest(".dn-admin-side-nav button") as HTMLButtonElement | null;
-    if (!button || button.disabled || button.classList.contains("is-active")) return;
+    const button = target?.closest("button") as HTMLButtonElement | null;
+    if (!button || button.disabled || !button.closest(".dn-admin-fullscreen")) return;
 
-    const label = (button.textContent || "").trim().toLowerCase();
     unlockDayNightAudio();
 
-    if (label.includes("تسجيل الخروج") || label.includes("logout")) {
-      playDayNightSound("doorClose", { channel: "admin-logout", volume: 0.55, minIntervalMs: 1200, fadeOutMs: 180 });
+    if (isLogoutButton(target)) {
+      handleAdminLogout();
       return;
     }
 
-    playDayNightSound("sectionDoor", { channel: "admin-section-navigation", volume: 0.44, minIntervalMs: 650, fadeOutMs: 160 });
+    const before = getCurrentAdminSectionTitle() || lastKnownSectionTitle;
+    window.setTimeout(() => {
+      const after = getCurrentAdminSectionTitle();
+      if (!after) return;
+      if (!before) {
+        lastKnownSectionTitle = after;
+        return;
+      }
+      if (after !== before) {
+        handleSectionNavigation(after, before);
+        lastKnownSectionTitle = after;
+      }
+    }, 80);
   }, true);
 }
 
@@ -174,11 +212,8 @@ function fadeVolume(audio: HTMLAudioElement, target: number, durationMs: number,
   const step = () => {
     const ratio = Math.min(1, (performance.now() - startedAt) / durationMs);
     audio.volume = start + (target - start) * ratio;
-    if (ratio < 1) {
-      window.requestAnimationFrame(step);
-    } else {
-      done?.();
-    }
+    if (ratio < 1) window.requestAnimationFrame(step);
+    else done?.();
   };
   window.requestAnimationFrame(step);
 }
@@ -207,6 +242,22 @@ export function unlockDayNightAudio(): void {
   });
 }
 
+function stopLowerPriorityAudio(nextPriority: number): void {
+  if (nextPriority >= 90) {
+    audioByKey.forEach((audio, key) => {
+      if (key !== "glassBreak") stopAudioElement(audio, 120);
+    });
+    activeByChannel.clear();
+    return;
+  }
+
+  if (nextPriority >= 70) {
+    stopDayNightChannel("admin-section-navigation", 80);
+    stopDayNightChannel("admin-important-notification", 80);
+    stopDayNightChannel("admin-khalifa", 80);
+  }
+}
+
 export function playDayNightSound(key: DayNightSoundKey, options: PlayOptions = {}): boolean {
   if (!hasBrowserAudio()) return false;
   installUnlockListeners();
@@ -217,24 +268,26 @@ export function playDayNightSound(key: DayNightSoundKey, options: PlayOptions = 
 
   const intervalKey = options.channel || key;
   const now = Date.now();
-  const minInterval = options.minIntervalMs ?? (key === "carHorn" ? 1400 : key === "engineStart" ? 2800 : 420);
+  const minInterval = options.minIntervalMs ?? (key === "glassBreak" ? 5200 : key === "carHorn" ? 2200 : key === "engineStart" ? 2800 : 420);
   if (now - (lastPlayedAt.get(intervalKey) || 0) < minInterval) return false;
   lastPlayedAt.set(intervalKey, now);
 
   const audio = ensureAudio(key);
   if (!audio) return false;
 
+  stopLowerPriorityAudio(options.priority ?? 10);
+
   const channel = options.channel;
   if (channel) {
     const current = activeByChannel.get(channel);
-    if (current && current !== audio) stopAudioElement(current, options.fadeOutMs ?? 120);
+    if (current) stopAudioElement(current, options.fadeOutMs ?? 80);
     activeByChannel.set(channel, audio);
   }
 
   try {
     if (options.restart !== false || audio.ended || audio.paused) audio.currentTime = 0;
   } catch {
-    // Some remote streams may not allow currentTime before metadata is ready.
+    // Some remote files may not allow currentTime before metadata is ready.
   }
 
   const targetVolume = clamp01(settings.volume * (options.volume ?? 1));
@@ -248,7 +301,7 @@ export function playDayNightSound(key: DayNightSoundKey, options: PlayOptions = 
         if (options.fadeInMs) fadeVolume(audio, targetVolume, options.fadeInMs);
       })
       .catch(() => {
-        if (!browserUnlocked) {
+        if (!browserUnlocked && options.respectSettings !== false) {
           pendingAfterUnlock = [...pendingAfterUnlock, { key, options }].slice(-3);
         }
       });
@@ -291,16 +344,156 @@ export function stopAllDayNightSounds(fadeOutMs = 0): void {
   activeByChannel.clear();
 }
 
+export function stopCurrentAudio(fadeOutMs = 120): void {
+  stopAllDayNightSounds(fadeOutMs);
+}
+
+export function stopAllAudio(fadeOutMs = 120): void {
+  stopAllDayNightSounds(fadeOutMs);
+}
+
 export function fadeOutDayNightSound(key: DayNightSoundKey, fadeOutMs = 450): void {
   stopDayNightSound(key, fadeOutMs);
+}
+
+export function playEngineStart(): boolean {
+  unlockDayNightAudio();
+  return playDayNightSound("engineStart", {
+    channel: "admin-loading-engine",
+    volume: 1,
+    restart: true,
+    minIntervalMs: 2800,
+    fadeInMs: 120,
+    fadeOutMs: 500,
+    priority: 75,
+  });
+}
+
+export function playSectionDoor(): boolean {
+  return playDayNightSound("sectionDoor", {
+    channel: "admin-section-navigation",
+    volume: 0.44,
+    restart: true,
+    minIntervalMs: NAVIGATION_COOLDOWN_MS,
+    fadeOutMs: 120,
+    priority: 20,
+  });
+}
+
+export function playDoorClose(): boolean {
+  return playDayNightSound("doorClose", {
+    channel: "admin-door-close",
+    volume: 0.55,
+    restart: true,
+    minIntervalMs: 1000,
+    fadeOutMs: 140,
+    priority: 35,
+  });
+}
+
+export function playHornAlert(): boolean {
+  return playDayNightSound("carHorn", {
+    channel: "admin-urgent-horn",
+    volume: 0.68,
+    restart: true,
+    minIntervalMs: 2600,
+    fadeOutMs: 120,
+    priority: 80,
+  });
+}
+
+export function playCriticalAlert(): boolean {
+  return playDayNightSound("glassBreak", {
+    channel: "admin-critical-alert",
+    volume: 0.5,
+    restart: true,
+    minIntervalMs: 6200,
+    fadeOutMs: 160,
+    priority: 100,
+  });
+}
+
+export function handleSectionNavigation(nextSection: string, currentSection?: string): boolean {
+  if (!hasBrowserAudio()) return false;
+  const next = String(nextSection || "").trim();
+  const current = String(currentSection || "").trim();
+  if (!next || (current && next === current)) return false;
+
+  const now = Date.now();
+  if (now - lastNavigationAudioAt < NAVIGATION_COOLDOWN_MS) return false;
+  lastNavigationAudioAt = now;
+  return playSectionDoor();
+}
+
+export function handleAdminLogout(): boolean {
+  const now = Date.now();
+  if (now - lastLogoutAudioAt < 1500) return false;
+  lastLogoutAudioAt = now;
+  stopAllDayNightSounds(90);
+  return playDoorClose();
+}
+
+function readPlayedNotificationIds(): Set<string> {
+  if (!hasBrowserAudio()) return playedNotificationIds;
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(PLAYED_NOTIFICATION_KEY) || "[]");
+    if (Array.isArray(stored)) playedNotificationIds = new Set(stored.map(String).slice(-160));
+  } catch {
+    // Keep in-memory set.
+  }
+  return playedNotificationIds;
+}
+
+function writePlayedNotificationIds(ids: Set<string>): void {
+  if (!hasBrowserAudio()) return;
+  try {
+    window.sessionStorage.setItem(PLAYED_NOTIFICATION_KEY, JSON.stringify([...ids].slice(-160)));
+  } catch {
+    // Session storage can be unavailable; in-memory protection remains.
+  }
+}
+
+export function handleAdminNotification(notification: NotificationLike): boolean {
+  if (!notification) return false;
+  const id = String(notification.id || `${notification.type || "notice"}:${notification.createdAt || ""}`);
+  const ids = readPlayedNotificationIds();
+  if (id && ids.has(id)) return false;
+  if (id) {
+    ids.add(id);
+    writePlayedNotificationIds(ids);
+  }
+
+  const priority = String(notification.priority || "normal").toLowerCase();
+  if (priority === "critical") return playCriticalAlert();
+  if (priority === "high" || priority === "urgent") return playHornAlert();
+
+  return playDayNightSound("sectionDoor", {
+    channel: "admin-important-notification",
+    volume: 0.3,
+    restart: true,
+    minIntervalMs: 1200,
+    fadeOutMs: 120,
+    priority: 18,
+  });
+}
+
+export function handleOperationCompleted(operationType?: string): boolean {
+  const type = String(operationType || "").toLowerCase();
+  if (/critical|security|danger/.test(type)) return playCriticalAlert();
+  if (/settlement|closing|out.?scope|delivery|approved|printed|completed/.test(type)) return playDoorClose();
+  return false;
+}
+
+export function handleCriticalSystemEvent(event?: { id?: string; type?: string; priority?: string }): boolean {
+  return handleAdminNotification({ ...event, priority: "critical" });
 }
 
 export const dayNightAudioDistribution: Array<{ key: DayNightSoundKey; ar: string; en: string; auto: boolean }> = [
   { key: "engineStart", ar: "صفحة التحميل بعد تسجيل دخول صحيح", en: "Loading page after successful admin login", auto: true },
   { key: "sectionDoor", ar: "الانتقال الحقيقي بين أقسام لوحة التحكم والتنبيهات المهمة الهادئة", en: "Real admin section changes and quiet important alerts", auto: true },
-  { key: "doorClose", ar: "تسجيل الخروج ونهاية المشاهد الكبيرة", en: "Logout and major scene closure", auto: true },
-  { key: "carHorn", ar: "زر الكلاكس أو تجربة يضغطها المستخدم فقط", en: "Horn button or explicit user test only", auto: false },
-  { key: "glassBreak", ar: "مشهد كسر زجاج مخصص أو تجربة يضغطها المستخدم فقط", en: "Dedicated glass-break scene or explicit user test only", auto: false },
+  { key: "doorClose", ar: "تسجيل الخروج ونهاية العمليات الرئيسية", en: "Logout and major operation completion", auto: true },
+  { key: "carHorn", ar: "تنبيه عاجل جديد فقط أو تجربة يضغطها المستخدم", en: "New urgent alert or explicit user test only", auto: false },
+  { key: "glassBreak", ar: "حادث حرج حقيقي فقط أو تجربة يضغطها المستخدم", en: "Real critical incident or explicit user test only", auto: false },
 ];
 
 if (hasBrowserAudio()) {
