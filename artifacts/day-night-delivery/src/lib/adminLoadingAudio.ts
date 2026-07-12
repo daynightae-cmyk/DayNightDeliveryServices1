@@ -1,5 +1,8 @@
-type BrowserWindowWithAudio = Window & {
-  webkitAudioContext?: typeof AudioContext;
+type AudioContextConstructor = new () => AudioContext;
+
+type BrowserWindowWithAudio = Window & typeof globalThis & {
+  AudioContext?: AudioContextConstructor;
+  webkitAudioContext?: AudioContextConstructor;
 };
 
 type EngineNode = OscillatorNode | AudioBufferSourceNode;
@@ -26,7 +29,7 @@ function getAudioContext(): AudioContext | null {
   if (sharedContext) return sharedContext;
 
   const audioWindow = window as BrowserWindowWithAudio;
-  const AudioContextCtor = window.AudioContext ?? audioWindow.webkitAudioContext;
+  const AudioContextCtor: AudioContextConstructor | undefined = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
   if (!AudioContextCtor) return null;
 
   try {
@@ -87,7 +90,11 @@ function makeNoiseBuffer(context: AudioContext): AudioBuffer {
   return buffer;
 }
 
-function connectOscillator(context: AudioContext, master: GainNode, options: { type: OscillatorType; startFrequency: number; idleFrequency: number; gain: number; delay?: number }): OscillatorNode {
+function connectOscillator(
+  context: AudioContext,
+  master: GainNode,
+  options: { type: OscillatorType; startFrequency: number; idleFrequency: number; gain: number; delay?: number },
+): OscillatorNode {
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   const now = context.currentTime + (options.delay ?? 0);
@@ -132,7 +139,7 @@ function connectEngineNoise(context: AudioContext, master: GainNode): AudioBuffe
 }
 
 export async function startAdminLoadingEngineAudio(): Promise<boolean> {
-  if (safeReadMuted()) return false;
+  if (!canUseBrowserAudio() || safeReadMuted()) return false;
 
   const context = getAudioContext();
   if (!context) return false;
@@ -172,7 +179,7 @@ export async function startAdminLoadingEngineAudio(): Promise<boolean> {
 }
 
 export function stopAdminLoadingEngineAudio(): void {
-  if (!activeEngine) return;
+  if (!canUseBrowserAudio() || !activeEngine) return;
 
   const { context, master, nodes, stopTimers } = activeEngine;
   const now = context.currentTime;
@@ -195,7 +202,7 @@ export function stopAdminLoadingEngineAudio(): void {
     }
   });
 
-  const disconnectTimer = window.setTimeout(() => {
+  window.setTimeout(() => {
     try {
       master.disconnect();
     } catch {
@@ -203,6 +210,5 @@ export function stopAdminLoadingEngineAudio(): void {
     }
   }, 520);
 
-  window.setTimeout(() => window.clearTimeout(disconnectTimer), 800);
   activeEngine = null;
 }
