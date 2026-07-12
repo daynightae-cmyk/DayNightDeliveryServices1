@@ -7,6 +7,39 @@
   "outputDirectory": "artifacts/day-night-delivery/dist/public",
   "redirects": [
     {
+      "source": "/hello-world",
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
+      "source": "/hello-world/",
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
+      "source": "/sample-page",
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
+      "source": "/sample-page/",
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
+      "source": "/index.php",
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [
+        { "type": "query", "key": "p" }
+      ],
+      "destination": "https://daynightae.com/",
+      "permanent": true
+    },
+    {
       "source": "/(.*)",
       "has": [
         { "type": "host", "value": "www.daynightae.com" }
