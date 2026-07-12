@@ -1,3 +1,5 @@
+import { jsPDF } from "jspdf";
+
 export type AdminPdfLanguage = "ar" | "en";
 export type AdminPdfColumn = { key: string; label: string };
 export type AdminPdfPayload = {
@@ -13,12 +15,12 @@ export type AdminPdfPayload = {
 };
 
 const secretPattern = /(key|token|secret|password|authorization|supabase|anon|service_role)/i;
-const ltrPattern = /(id|tracking|phone|email|url|amount|cod|aed|number|code|date)/i;
+const ltrPattern = /(id|tracking|phone|email|url|amount|cod|aed|number|code|date|invoice|reference)/i;
 
 function clean(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   const text = String(value);
-  return secretPattern.test(text) ? "[redacted]" : text.slice(0, 160);
+  return secretPattern.test(text) ? "[redacted]" : text.slice(0, 180);
 }
 
 function html(value: unknown) {
@@ -26,7 +28,7 @@ function html(value: unknown) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -34,18 +36,51 @@ function cellDir(key: string) {
   return ltrPattern.test(key) ? "ltr" : "auto";
 }
 
-function buildReportHtml(payload: AdminPdfPayload) {
+function visibleColumns(payload: AdminPdfPayload) {
+  return payload.columns.filter((column) => !secretPattern.test(column.key));
+}
+
+function safeRows(payload: AdminPdfPayload) {
+  return payload.rows.slice(0, 500);
+}
+
+function reportOrientation(payload: AdminPdfPayload) {
+  return payload.orientation || (visibleColumns(payload).length > 5 ? "landscape" : "portrait");
+}
+
+function safeFileStem(payload: AdminPdfPayload) {
+  const title = clean(payload.sectionTitle)
+    .replace(/[\\/:*?\"<>|]+/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 70) || "admin_report";
+  return `DAY_NIGHT_${title}_${new Date().toISOString().slice(0, 10)}_${Date.now()}`;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  if (typeof document === "undefined" || typeof URL === "undefined") return;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2500);
+}
+
+function buildReportHtml(payload: AdminPdfPayload, rowsOverride?: Record<string, unknown>[], pageMeta?: { page: number; totalPages: number }) {
   const isArabic = payload.language === "ar";
   const dir = isArabic ? "rtl" : "ltr";
   const lang = isArabic ? "ar" : "en";
   const title = html(payload.sectionTitle);
-  const columns = payload.columns.filter((column) => !secretPattern.test(column.key));
-  const rows = payload.rows.slice(0, 500);
+  const columns = visibleColumns(payload);
+  const rows = rowsOverride || safeRows(payload);
   const totals = Object.entries(payload.totals || {});
-  const orientation = payload.orientation || (columns.length > 5 ? "landscape" : "portrait");
+  const orientation = reportOrientation(payload);
   const generatedAt = new Date().toLocaleString(isArabic ? "ar-AE" : "en-AE");
-  const showSummary = payload.includeSummary !== false;
-  const showFilters = payload.includeFilters !== false;
+  const showSummary = payload.includeSummary !== false && (!pageMeta || pageMeta.page === 1);
+  const showFilters = payload.includeFilters !== false && (!pageMeta || pageMeta.page === 1);
+  const pageLabel = pageMeta ? `${isArabic ? "صفحة" : "Page"} ${pageMeta.page} / ${pageMeta.totalPages}` : "";
 
   return `<!doctype html>
 <html lang="${lang}" dir="${dir}">
@@ -115,6 +150,7 @@ function buildReportHtml(payload: AdminPdfPayload) {
       <div class="meta">
         <div>${isArabic ? "تاريخ التصدير" : "Export date"}: <span class="ltr">${html(generatedAt)}</span></div>
         <div>${isArabic ? "اللغة" : "Language"}: ${isArabic ? "العربية" : "English"}</div>
+        ${pageLabel ? `<div>${html(pageLabel)}</div>` : ""}
       </div>
     </section>
 
@@ -132,29 +168,107 @@ function buildReportHtml(payload: AdminPdfPayload) {
       <span class="ltr">DAY NIGHT</span>
     </footer>
   </main>
-  <script>
-    window.addEventListener('load', function () {
-      setTimeout(function () { window.focus(); window.print(); }, 250);
-    });
-  </script>
 </body>
 </html>`;
 }
 
-export function buildAdminPdf(payload: AdminPdfPayload) {
-  const reportHtml = buildReportHtml(payload);
-  const reportWindow = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
-  if (!reportWindow) {
-    const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8" });
+function csvValue(value: unknown) {
+  const text = clean(value).replace(/\r?\n/g, " ");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function buildAdminCsv(payload: AdminPdfPayload) {
+  const columns = visibleColumns(payload);
+  const header = columns.map((column) => csvValue(column.label)).join(",");
+  const rows = safeRows(payload).map((row) => columns.map((column) => csvValue(row[column.key])).join(","));
+  const csv = `\uFEFF${[header, ...rows].join("\r\n")}`;
+  downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeFileStem(payload)}.csv`);
+}
+
+export function buildAdminDoc(payload: AdminPdfPayload) {
+  const docHtml = buildReportHtml(payload)
+    .replace("<!doctype html>", "")
+    .replace("<html", "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'");
+  downloadBlob(new Blob(["\uFEFF", docHtml], { type: "application/msword;charset=utf-8" }), `${safeFileStem(payload)}.doc`);
+}
+
+function rowsPerPdfPage(payload: AdminPdfPayload) {
+  const columns = visibleColumns(payload).length;
+  const orientation = reportOrientation(payload);
+  if (orientation === "landscape") return columns > 7 ? 10 : 13;
+  return columns > 5 ? 11 : 18;
+}
+
+function chunkRows(rows: Record<string, unknown>[], size: number) {
+  if (!rows.length) return [[]] as Record<string, unknown>[][];
+  const chunks: Record<string, unknown>[][] = [];
+  for (let index = 0; index < rows.length; index += size) chunks.push(rows.slice(index, index + size));
+  return chunks;
+}
+
+function pageXhtml(payload: AdminPdfPayload, rows: Record<string, unknown>[], page: number, totalPages: number, width: number, height: number) {
+  const report = buildReportHtml(payload, rows, { page, totalPages });
+  const body = report.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || report;
+  const isArabic = payload.language === "ar";
+  return `<div xmlns="http://www.w3.org/1999/xhtml" dir="${isArabic ? "rtl" : "ltr"}" style="width:${width}px;height:${height}px;padding:28px;background:#ffffff;overflow:hidden;font-family:Tahoma,Arial,'Noto Sans Arabic','Segoe UI',sans-serif;color:#0b172a;box-sizing:border-box;">${body}</div>`;
+}
+
+function renderSvgPageToImage(xhtml: string, width: number, height: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === "undefined" || typeof URL === "undefined") {
+      reject(new Error("Browser export is not available."));
+      return;
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `DAY_NIGHT_${payload.sectionTitle.replace(/\s+/g, "_")}_${Date.now()}.html`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
-    return;
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const scale = 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas is not available.");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.scale(scale, scale);
+        context.drawImage(image, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("PDF page render failed."));
+    };
+    image.src = url;
+  });
+}
+
+export async function buildAdminPdf(payload: AdminPdfPayload) {
+  if (typeof window === "undefined") return;
+  const orientation = reportOrientation(payload);
+  const doc = new jsPDF({ orientation, unit: "pt", format: "a4", compress: true });
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const rows = safeRows(payload);
+  const pages = chunkRows(rows, rowsPerPdfPage(payload));
+
+  try {
+    for (let index = 0; index < pages.length; index += 1) {
+      if (index > 0) doc.addPage("a4", orientation);
+      const xhtml = pageXhtml(payload, pages[index], index + 1, pages.length, width, height);
+      const image = await renderSvgPageToImage(xhtml, width, height);
+      doc.addImage(image, "PNG", 0, 0, width, height, undefined, "FAST");
+    }
+    doc.save(`${safeFileStem(payload)}.pdf`);
+  } catch (error) {
+    console.warn("Direct PDF export failed; downloading Word-compatible report instead.", error);
+    buildAdminDoc(payload);
   }
-  reportWindow.document.open();
-  reportWindow.document.write(reportHtml);
-  reportWindow.document.close();
 }
