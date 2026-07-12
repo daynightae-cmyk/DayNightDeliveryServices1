@@ -1,17 +1,17 @@
-type AudioContextConstructor = new () => AudioContext;
-
-type BrowserWindowWithAudio = Window & typeof globalThis & {
-  AudioContext?: AudioContextConstructor;
-  webkitAudioContext?: AudioContextConstructor;
+type AudioWindow = Window & {
+  AudioContext?: new () => AudioContext;
+  webkitAudioContext?: new () => AudioContext;
 };
 
-type EngineNode = OscillatorNode | AudioBufferSourceNode;
+type StoppableAudioNode = {
+  stop: (when?: number) => void;
+};
 
 type EngineAudioState = {
   context: AudioContext;
   master: GainNode;
-  nodes: EngineNode[];
-  stopTimers: number[];
+  nodes: StoppableAudioNode[];
+  timers: number[];
 };
 
 const STORAGE_KEY = "dn_admin_loading_audio_muted_v1";
@@ -28,8 +28,8 @@ function getAudioContext(): AudioContext | null {
   if (!canUseBrowserAudio()) return null;
   if (sharedContext) return sharedContext;
 
-  const audioWindow = window as BrowserWindowWithAudio;
-  const AudioContextCtor: AudioContextConstructor | undefined = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+  const audioWindow = window as AudioWindow;
+  const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
   if (!AudioContextCtor) return null;
 
   try {
@@ -158,33 +158,33 @@ export async function startAdminLoadingEngineAudio(): Promise<boolean> {
   master.gain.exponentialRampToValueAtTime(DEFAULT_VOLUME, now + 0.28);
   master.connect(context.destination);
 
-  const nodes: EngineNode[] = [
+  const nodes: StoppableAudioNode[] = [
     connectOscillator(context, master, { type: "sawtooth", startFrequency: 24, idleFrequency: 44, gain: 0.082 }),
     connectOscillator(context, master, { type: "triangle", startFrequency: 38, idleFrequency: 64, gain: 0.046, delay: 0.04 }),
     connectOscillator(context, master, { type: "sine", startFrequency: 92, idleFrequency: 118, gain: 0.018, delay: 0.12 }),
     connectEngineNoise(context, master),
   ];
 
-  const stopTimers: number[] = [];
+  const timers: number[] = [];
   const idleTimer = window.setTimeout(() => {
     const idleNow = context.currentTime;
     master.gain.cancelScheduledValues(idleNow);
     master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), idleNow);
     master.gain.linearRampToValueAtTime(DEFAULT_VOLUME * 0.58, idleNow + 0.72);
   }, 1500);
-  stopTimers.push(idleTimer);
+  timers.push(idleTimer);
 
-  activeEngine = { context, master, nodes, stopTimers };
+  activeEngine = { context, master, nodes, timers };
   return true;
 }
 
 export function stopAdminLoadingEngineAudio(): void {
   if (!canUseBrowserAudio() || !activeEngine) return;
 
-  const { context, master, nodes, stopTimers } = activeEngine;
+  const { context, master, nodes, timers } = activeEngine;
   const now = context.currentTime;
 
-  stopTimers.forEach((timer) => window.clearTimeout(timer));
+  timers.forEach((timer) => window.clearTimeout(timer));
 
   try {
     master.gain.cancelScheduledValues(now);
