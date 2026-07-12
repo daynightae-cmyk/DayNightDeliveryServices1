@@ -1,6 +1,5 @@
 import {
   handleAdminNotification,
-  handleOperationCompleted,
   playDayNightSound,
   preloadDayNightSounds,
   readDayNightAudioSettings,
@@ -219,21 +218,6 @@ export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdmin
   });
 }
 
-function notificationAudio(type: AdminNotificationType, priority?: AdminNotificationPriority): AdminAudioEvent {
-  if (priority === "critical") return "critical_alert";
-  if (priority === "high") return "urgent_alert";
-  if (type === "khalifa") return "khalifa_insight";
-  if (type === "new_order") return "new_order";
-  if (type === "cod") return "cod_alert";
-  if (type === "print") return "print_ready";
-  if (type === "database") return "database_health_ok";
-  if (type === "daily_closing") return "daily_closing_ready";
-  if (type === "error") return "error";
-  if (type === "warning") return "warning";
-  if (type === "success") return "success";
-  return "notification";
-}
-
 function compactVoiceText(input: string) {
   return input.replace(/COD/g, "التحصيل عند التسليم").replace(/AED/g, "درهم").replace(/\s+/g, " ").trim().slice(0, 180);
 }
@@ -340,12 +324,9 @@ export function addAdminNotification(input: AddNotificationInput): AdminNotifica
   const settings = readAdminAudioSettings();
   showBrowserNotification(item, settings);
 
-  if (!isOldOrInitialNotification(input, now)) {
-    const event = input.audioEvent && item.priority === "normal" ? input.audioEvent : notificationAudio(item.type, item.priority);
-    playAdminAudioEvent(event, settings);
-    if (event === "success" || event === "daily_closing_ready" || event === "print_done") handleOperationCompleted(event);
-    if (item.type === "khalifa") speakKhalifa(item.bodyAr || item.titleAr, "ar", settings);
+  if (!isOldOrInitialNotification(input, now) && settings.enabled && !settings.muted && settings.notificationSounds) {
     handleAdminNotification({ id: item.id, type: item.type, priority: item.priority, createdAt: item.createdAt });
+    if (item.type === "khalifa") speakKhalifa(item.bodyAr || item.titleAr, "ar", settings);
   }
 
   return item;
