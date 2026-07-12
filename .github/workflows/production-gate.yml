@@ -43,7 +43,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: TypeScript check
-        run: pnpm run web:typecheck
+        run: |
+          set +e
+          pnpm run web:typecheck > typecheck-output.log 2>&1
+          status=$?
+          cat typecheck-output.log
+          exit $status
+
+      - name: Upload typecheck diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-output
+          path: typecheck-output.log
 
       - name: Production hardening gate
         run: pnpm run web:gate
