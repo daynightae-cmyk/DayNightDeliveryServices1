@@ -1,4 +1,4 @@
-import { Bell, Car, DoorOpen, GlassWater, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { AlertTriangle, Bell, Car, DoorOpen, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useAdminAudio } from "../../hooks/useAdminAudio";
 
 export default function AdminAudioSettings({ isArabic }: { isArabic: boolean }) {
@@ -51,7 +51,7 @@ export default function AdminAudioSettings({ isArabic }: { isArabic: boolean }) 
       <button type="button" onClick={playDoor}><DoorOpen />{label("تجربة باب الأقسام", "Test section door")}</button>
       <button type="button" onClick={playDoorClose}><DoorOpen />{label("تجربة إغلاق الباب", "Test door close")}</button>
       <button type="button" onClick={playHorn}><Bell />{label("تجربة الكلاكس", "Test horn")}</button>
-      <button type="button" onClick={playGlass}><GlassWater />{label("تجربة كسر الزجاج", "Test glass break")}</button>
+      <button type="button" onClick={playGlass}><AlertTriangle />{label("تجربة كسر الزجاج", "Test glass break")}</button>
       <button type="button" onClick={reset}><RotateCcw />{label("استعادة الافتراضي", "Restore defaults")}</button>
       <button type="button" onClick={() => void allowNotifications()}><Volume2 />{label("السماح بالإشعارات", "Allow notifications")}</button>
       <button type="button" onClick={muteNow}><VolumeX />{label("كتم الآن", "Mute now")}</button>
