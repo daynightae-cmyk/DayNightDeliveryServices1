@@ -1,3 +1,14 @@
+import {
+  playDayNightSound,
+  preloadDayNightSounds,
+  readDayNightAudioSettings,
+  resetDayNightAudioSettings,
+  stopAllDayNightSounds,
+  unlockDayNightAudio,
+  writeDayNightAudioSettings,
+  type DayNightSoundKey,
+} from "./audioManager";
+
 export type AdminAudioEvent =
   | "click"
   | "hover"
@@ -63,6 +74,13 @@ type AddNotificationInput = Omit<AdminNotification, "id" | "createdAt" | "read">
   dedupeMs?: number;
 };
 
+type RoutedAudio = {
+  key: DayNightSoundKey;
+  volume: number;
+  channel: string;
+  minIntervalMs: number;
+};
+
 export const ADMIN_AUDIO_SETTINGS_KEY = "dn_admin_audio_settings_v1";
 export const ADMIN_NOTIFICATIONS_KEY = "dn_admin_notifications_v1";
 export const ADMIN_NOTIFICATION_DEDUPE_KEY = "dn_admin_notification_dedupe_v1";
@@ -70,7 +88,7 @@ export const ADMIN_NOTIFICATION_DEDUPE_KEY = "dn_admin_notification_dedupe_v1";
 const fallback: AdminAudioSettings = {
   enabled: true,
   muted: false,
-  volume: 0.42,
+  volume: 0.35,
   clickSounds: true,
   notificationSounds: true,
   khalifaSounds: true,
@@ -79,9 +97,7 @@ const fallback: AdminAudioSettings = {
   browserNotifications: false,
 };
 
-let ctx: AudioContext | null = null;
 let unlocked = false;
-let lastSoundAt = 0;
 let lastVoiceAt = 0;
 let pendingAudio: AdminAudioEvent[] = [];
 
@@ -98,7 +114,16 @@ function safeJson<T>(raw: string | null, fb: T): T {
 
 export function readAdminAudioSettings(): AdminAudioSettings {
   if (!hasWindow()) return fallback;
-  return safeJson(window.localStorage.getItem(ADMIN_AUDIO_SETTINGS_KEY), fallback);
+  const stored = safeJson(window.localStorage.getItem(ADMIN_AUDIO_SETTINGS_KEY), fallback);
+  const dayNight = readDayNightAudioSettings();
+
+  return {
+    ...fallback,
+    ...stored,
+    enabled: dayNight.enabled,
+    muted: dayNight.muted,
+    volume: dayNight.volume,
+  };
 }
 
 export function writeAdminAudioSettings(settings: AdminAudioSettings) {
@@ -108,49 +133,25 @@ export function writeAdminAudioSettings(settings: AdminAudioSettings) {
     window.localStorage.setItem(ADMIN_AUDIO_SETTINGS_KEY, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("dn-admin-audio-settings-change", { detail: next }));
   } catch {
-    // noop
+    // localStorage can be blocked; audio preferences will still work for this session.
   }
+  writeDayNightAudioSettings({ enabled: next.enabled, muted: next.muted, volume: next.volume });
 }
 
 export function resetAdminAudioSettings() {
+  resetDayNightAudioSettings();
   writeAdminAudioSettings(fallback);
   return fallback;
 }
 
-function getContext() {
-  if (!hasWindow()) return null;
-  const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtor) return null;
-  ctx ||= new AudioCtor();
-  return ctx;
-}
-
 export function unlockAdminAudio() {
-  const audio = getContext();
   unlocked = true;
-  if (audio?.state === "suspended") void audio.resume().catch(() => undefined);
+  unlockDayNightAudio();
+  preloadDayNightSounds();
   const queued = [...pendingAudio].slice(-4);
   pendingAudio = [];
   queued.forEach((event, index) => window.setTimeout(() => playAdminAudioEvent(event), index * 180));
 }
-
-const profiles: Record<AdminAudioEvent, Array<[number, number, OscillatorType?]>> = {
-  click: [[680, 0.045, "sine"]],
-  hover: [[540, 0.035, "sine"]],
-  success: [[660, 0.1, "sine"], [920, 0.14, "sine"], [1240, 0.1, "sine"]],
-  error: [[180, 0.16, "triangle"], [140, 0.18, "sawtooth"]],
-  warning: [[330, 0.13, "sine"], [260, 0.16, "triangle"], [330, 0.12, "sine"]],
-  notification: [[820, 0.08, "sine"], [1120, 0.14, "sine"]],
-  new_order: [[740, 0.08, "sine"], [980, 0.1, "sine"], [1180, 0.14, "sine"]],
-  cod_alert: [[520, 0.09, "triangle"], [660, 0.11, "sine"], [520, 0.12, "triangle"]],
-  khalifa_insight: [[880, 0.08, "sine"], [1320, 0.13, "sine"], [1760, 0.1, "sine"]],
-  daily_closing_ready: [[560, 0.12, "sine"], [720, 0.14, "sine"]],
-  daily_closing_warning: [[300, 0.18, "triangle"], [240, 0.16, "triangle"]],
-  database_health_ok: [[980, 0.08, "sine"], [1240, 0.1, "sine"]],
-  database_health_warning: [[420, 0.11, "square"], [320, 0.16, "triangle"]],
-  print_ready: [[700, 0.075, "sine"], [940, 0.1, "sine"]],
-  print_done: [[760, 0.1, "sine"], [900, 0.09, "sine"]],
-};
 
 function allowed(event: AdminAudioEvent, s: AdminAudioSettings) {
   if (!s.enabled || s.muted) return false;
@@ -161,6 +162,28 @@ function allowed(event: AdminAudioEvent, s: AdminAudioSettings) {
   return true;
 }
 
+function routeAdminAudioEvent(event: AdminAudioEvent): RoutedAudio | null {
+  if (event === "click" || event === "hover") return null;
+
+  if (event === "success" || event === "print_ready" || event === "print_done" || event === "database_health_ok" || event === "daily_closing_ready") {
+    return { key: "doorClose", volume: 0.28, channel: "admin-soft-confirm", minIntervalMs: 850 };
+  }
+
+  if (event === "khalifa_insight") {
+    return { key: "sectionDoor", volume: 0.26, channel: "admin-khalifa", minIntervalMs: 1200 };
+  }
+
+  if (event === "notification" || event === "new_order" || event === "cod_alert") {
+    return { key: "sectionDoor", volume: 0.3, channel: "admin-important-notification", minIntervalMs: 1200 };
+  }
+
+  if (event === "warning" || event === "error" || event === "daily_closing_warning" || event === "database_health_warning") {
+    return { key: "sectionDoor", volume: 0.34, channel: "admin-warning", minIntervalMs: 1200 };
+  }
+
+  return null;
+}
+
 export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdminAudioSettings()) {
   if (!allowed(event, settings)) return;
   if (!unlocked) {
@@ -168,30 +191,14 @@ export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdmin
     return;
   }
 
-  const now = Date.now();
-  if (now - lastSoundAt < 115) return;
-  const audio = getContext();
-  if (!audio) return;
-  if (audio.state === "suspended") void audio.resume().catch(() => undefined);
+  const routed = routeAdminAudioEvent(event);
+  if (!routed) return;
 
-  lastSoundAt = now;
-  let offset = 0;
-  const masterVolume = Math.max(0.001, settings.volume * 0.085);
-
-  for (const [freq, dur, type = "sine"] of profiles[event]) {
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audio.currentTime + offset);
-    gain.gain.setValueAtTime(0.0001, audio.currentTime + offset);
-    gain.gain.exponentialRampToValueAtTime(masterVolume, audio.currentTime + offset + 0.014);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + offset + dur);
-    osc.connect(gain);
-    gain.connect(audio.destination);
-    osc.start(audio.currentTime + offset);
-    osc.stop(audio.currentTime + offset + dur + 0.025);
-    offset += dur + 0.025;
-  }
+  playDayNightSound(routed.key, {
+    channel: routed.channel,
+    volume: routed.volume,
+    minIntervalMs: routed.minIntervalMs,
+  });
 }
 
 function notificationAudio(type: AdminNotificationType, priority?: AdminNotificationPriority): AdminAudioEvent {
@@ -314,4 +321,9 @@ export function markAdminNotificationsRead(ids?: string[]) {
 
 export function clearAdminNotifications() {
   writeAdminNotifications([]);
+}
+
+export function muteAdminAudioImmediately() {
+  stopAllDayNightSounds(120);
+  writeAdminAudioSettings({ ...readAdminAudioSettings(), muted: true });
 }
