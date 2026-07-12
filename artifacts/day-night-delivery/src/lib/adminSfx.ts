@@ -1,5 +1,5 @@
 import type { AdminAudioEvent } from "./adminAudio";
-import { playDayNightSound, preloadDayNightSounds, startDayNightAudioEngineLoop, stopDayNightChannel, type DayNightSoundKey } from "./audioManager";
+import { playDayNightSound, preloadDayNightSounds, stopDayNightChannel, type DayNightSoundKey } from "./audioManager";
 
 export type AdminSfxAssetKey = DayNightSoundKey;
 
@@ -38,7 +38,14 @@ export function playAdminSfxEvent(event: AdminAudioEvent, masterVolume: number):
 }
 
 export async function startAdminLoadingSfx(volume = 0.35): Promise<boolean> {
-  return startDayNightAudioEngineLoop(volume);
+  return playDayNightSound("engineStart", {
+    channel: "admin-loading-engine",
+    volume,
+    restart: true,
+    minIntervalMs: 2800,
+    fadeInMs: 120,
+    fadeOutMs: 500,
+  });
 }
 
 export function stopAdminLoadingSfx(): void {
