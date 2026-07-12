@@ -38,6 +38,10 @@ const text = {
   },
 } as const;
 
+const mapNodes: Array<[number, number]> = [
+  [142, 250], [210, 214], [284, 183], [358, 164], [460, 94], [544, 67], [620, 74], [657, 171], [617, 285], [452, 324], [326, 355], [184, 283], [397, 169], [446, 226], [514, 181],
+];
+
 export default function AuthLoadingScreen({ language = "ar", percent = 82 }: AuthLoadingScreenProps) {
   const isArabic = language === "ar";
   const t = text[language];
@@ -64,7 +68,9 @@ export default function AuthLoadingScreen({ language = "ar", percent = 82 }: Aut
     if (isMuted) {
       stopAdminLoadingEngineAudio();
       setAudioReady(false);
-      return undefined;
+      return () => {
+        mounted = false;
+      };
     }
 
     void startAdminLoadingEngineAudio().then((started) => {
@@ -123,9 +129,7 @@ export default function AuthLoadingScreen({ language = "ar", percent = 82 }: Aut
           <path className="auth-loading-map__route route--one" d="M122 254 C215 200 315 219 397 169 C486 116 565 118 658 171" />
           <path className="auth-loading-map__route route--two" d="M179 283 C267 245 348 287 446 226 C518 181 571 215 617 285" />
           <path className="auth-loading-map__route route--three" d="M280 335 C334 274 367 224 461 91" />
-          {[
-            [142, 250], [210, 214], [284, 183], [358, 164], [460, 94], [544, 67], [620, 74], [657, 171], [617, 285], [452, 324], [326, 355], [184, 283], [397, 169], [446, 226], [514, 181],
-          ].map(([cx, cy], index) => (
+          {mapNodes.map(([cx, cy], index) => (
             <circle key={`${cx}-${cy}`} className="auth-loading-map__node" cx={cx} cy={cy} r={index % 5 === 0 ? 7 : 5} />
           ))}
           <g className="auth-loading-map__pin" transform="translate(386 146)">
