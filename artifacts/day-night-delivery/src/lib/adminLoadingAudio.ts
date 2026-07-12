@@ -1,5 +1,5 @@
 import {
-  playDayNightSound,
+  playEngineStart,
   preloadDayNightSounds,
   readDayNightAudioSettings,
   setDayNightAudioMuted,
@@ -24,14 +24,7 @@ export async function armAdminLoadingAudio(): Promise<boolean> {
 
 export async function startAdminLoadingEngineAudio(): Promise<boolean> {
   unlockDayNightAudio();
-  return playDayNightSound("engineStart", {
-    channel: "admin-loading-engine",
-    volume: 1,
-    restart: true,
-    minIntervalMs: 2800,
-    fadeInMs: 120,
-    fadeOutMs: 500,
-  });
+  return playEngineStart();
 }
 
 export function stopAdminLoadingEngineAudio(): void {
