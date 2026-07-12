@@ -74,7 +74,11 @@ export default function AuthLoadingScreen({ language = "ar", percent = 82 }: Aut
     }
 
     void startAdminLoadingEngineAudio().then((started) => {
-      if (mounted) setAudioReady(started);
+      if (!mounted) {
+        stopAdminLoadingEngineAudio();
+        return;
+      }
+      setAudioReady(started);
     });
 
     return () => {
@@ -87,8 +91,15 @@ export default function AuthLoadingScreen({ language = "ar", percent = 82 }: Aut
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
     setAdminLoadingAudioMuted(nextMuted);
-    if (nextMuted) stopAdminLoadingEngineAudio();
-    else void startAdminLoadingEngineAudio().then(setAudioReady);
+    if (nextMuted) {
+      stopAdminLoadingEngineAudio();
+      setAudioReady(false);
+      return;
+    }
+
+    void startAdminLoadingEngineAudio().then((started) => {
+      setAudioReady(started);
+    });
   }
 
   return (
