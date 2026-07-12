@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
 import { useAppContext } from "../lib/AppContext";
+import { armAdminLoadingAudio } from "../lib/adminLoadingAudio";
 import companyMeta from "../data/companyMeta";
 
 import AuthIntroScreen from "./auth-clean/AuthIntroScreen";
@@ -45,6 +46,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
   async function handleSubmit() {
     setErrorMessage("");
+    void armAdminLoadingAudio();
 
     if (!supabase) {
       setErrorMessage(t.unavailable);
@@ -95,7 +97,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     return <AuthIntroScreen language={authLanguage} onEnter={() => setStage("login")} onToggleLanguage={toggleLanguage} />;
   }
 
-  if (stage === "loading") return <AuthLoadingScreen language={authLanguage} percent={75} />;
+  if (stage === "loading") return <AuthLoadingScreen language={authLanguage} percent={92} />;
 
   return (
     <AuthLoginScreen
