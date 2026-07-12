@@ -41,6 +41,7 @@ const activeByChannel = new Map<string, HTMLAudioElement>();
 const lastPlayedAt = new Map<string, number>();
 let browserUnlocked = false;
 let unlockListenersInstalled = false;
+let navAudioBindingInstalled = false;
 let pendingAfterUnlock: Array<{ key: DayNightSoundKey; options: PlayOptions }> = [];
 
 function hasBrowserAudio(): boolean {
@@ -82,7 +83,8 @@ export function readDayNightAudioSettings(): DayNightAudioSettings {
 }
 
 export function writeDayNightAudioSettings(patch: Partial<DayNightAudioSettings>): DayNightAudioSettings {
-  const next = { ...readDayNightAudioSettings(), ...patch, volume: clamp01(patch.volume ?? readDayNightAudioSettings().volume) };
+  const current = readDayNightAudioSettings();
+  const next = { ...current, ...patch, volume: clamp01(patch.volume ?? current.volume) };
   if (!hasBrowserAudio()) return next;
 
   try {
@@ -140,6 +142,27 @@ function installUnlockListeners(): void {
   window.addEventListener("touchstart", unlock, { passive: true });
 }
 
+export function installAdminNavigationAudioBinding(): void {
+  if (!hasBrowserAudio() || navAudioBindingInstalled) return;
+  navAudioBindingInstalled = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    const button = target?.closest(".dn-admin-side-nav button") as HTMLButtonElement | null;
+    if (!button || button.disabled || button.classList.contains("is-active")) return;
+
+    const label = (button.textContent || "").trim().toLowerCase();
+    unlockDayNightAudio();
+
+    if (label.includes("تسجيل الخروج") || label.includes("logout")) {
+      playDayNightSound("doorClose", { channel: "admin-logout", volume: 0.55, minIntervalMs: 1200, fadeOutMs: 180 });
+      return;
+    }
+
+    playDayNightSound("sectionDoor", { channel: "admin-section-navigation", volume: 0.44, minIntervalMs: 650, fadeOutMs: 160 });
+  }, true);
+}
+
 function fadeVolume(audio: HTMLAudioElement, target: number, durationMs: number, done?: () => void): void {
   if (!hasBrowserAudio() || durationMs <= 0) {
     audio.volume = target;
@@ -164,6 +187,7 @@ function fadeVolume(audio: HTMLAudioElement, target: number, durationMs: number,
 export function preloadDayNightSounds(keys: DayNightSoundKey[] = ["engineStart", "sectionDoor", "doorClose", "carHorn", "glassBreak"]): void {
   if (!hasBrowserAudio()) return;
   installUnlockListeners();
+  installAdminNavigationAudioBinding();
   keys.forEach((key) => {
     const audio = ensureAudio(key);
     try {
@@ -187,6 +211,7 @@ export function unlockDayNightAudio(): void {
 export function playDayNightSound(key: DayNightSoundKey, options: PlayOptions = {}): boolean {
   if (!hasBrowserAudio()) return false;
   installUnlockListeners();
+  installAdminNavigationAudioBinding();
 
   const settings = readDayNightAudioSettings();
   if (options.respectSettings !== false && (!settings.enabled || settings.muted || settings.volume <= 0)) return false;
@@ -278,3 +303,7 @@ export const dayNightAudioDistribution: Array<{ key: DayNightSoundKey; ar: strin
   { key: "carHorn", ar: "زر الكلاكس أو تجربة يضغطها المستخدم فقط", en: "Horn button or explicit user test only", auto: false },
   { key: "glassBreak", ar: "مشهد كسر زجاج مخصص أو تجربة يضغطها المستخدم فقط", en: "Dedicated glass-break scene or explicit user test only", auto: false },
 ];
+
+if (hasBrowserAudio()) {
+  installAdminNavigationAudioBinding();
+}
