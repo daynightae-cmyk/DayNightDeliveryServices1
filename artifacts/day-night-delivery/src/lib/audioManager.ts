@@ -138,7 +138,6 @@ function ensureAudio(key: DayNightSoundKey): HTMLAudioElement | null {
   try {
     const audio = new Audio(DAY_NIGHT_SOUND_URLS[key]);
     audio.preload = "auto";
-    audio.crossOrigin = "anonymous";
     audioByKey.set(key, audio);
     return audio;
   } catch {
