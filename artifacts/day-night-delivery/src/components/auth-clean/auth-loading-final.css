@@ -2,27 +2,28 @@
 .auth-clean--final-loading {
   padding: 0;
   background:
-    radial-gradient(circle at 50% 20%, rgba(25, 170, 255, 0.22), transparent 30%),
-    radial-gradient(circle at 72% 62%, rgba(255, 205, 85, 0.16), transparent 28%),
+    radial-gradient(circle at 50% 18%, rgba(24, 168, 232, 0.22), transparent 32%),
+    radial-gradient(circle at 78% 62%, rgba(255, 210, 91, 0.14), transparent 28%),
     linear-gradient(180deg, #010510 0%, #031027 46%, #020712 100%);
 }
 
 .auth-clean--final-loading::before {
-  opacity: 0.34;
+  opacity: 0.32;
   background:
     linear-gradient(rgba(33, 173, 255, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(33, 173, 255, 0.08) 1px, transparent 1px),
     radial-gradient(circle at center, rgba(255, 210, 91, 0.14), transparent 42%);
-  background-size: 52px 52px, 52px 52px, 100% 100%;
+  background-size: 56px 56px, 56px 56px, 100% 100%;
   mask-image: radial-gradient(circle at 50% 55%, #000 0 58%, transparent 84%);
+  animation: authGridDrift 12s linear infinite;
 }
 
 .auth-clean--final-loading::after {
-  opacity: 0.88;
+  opacity: 0.9;
   background:
-    radial-gradient(ellipse at 50% 91%, rgba(28, 180, 255, 0.46), transparent 29%),
-    radial-gradient(ellipse at 48% 88%, rgba(255, 205, 80, 0.26), transparent 38%),
-    linear-gradient(90deg, transparent 8%, rgba(32, 170, 255, 0.22), rgba(255, 208, 80, 0.18), transparent 92%);
+    radial-gradient(ellipse at 50% 91%, rgba(28, 180, 255, 0.42), transparent 29%),
+    radial-gradient(ellipse at 48% 88%, rgba(255, 205, 80, 0.24), transparent 38%),
+    linear-gradient(90deg, transparent 8%, rgba(32, 170, 255, 0.18), rgba(255, 208, 80, 0.16), transparent 92%);
   transform: translateY(18%);
 }
 
@@ -31,27 +32,25 @@
   min-height: min(820px, calc(100dvh - 24px));
   border-color: rgba(31, 176, 255, 0.34);
   border-radius: clamp(30px, 4vw, 58px);
-  background:
-    linear-gradient(145deg, rgba(3, 13, 34, 0.78), rgba(3, 8, 18, 0.4)),
-    radial-gradient(circle at 50% 38%, rgba(31, 176, 255, 0.16), transparent 34%),
-    radial-gradient(circle at 44% 76%, rgba(255, 203, 72, 0.08), transparent 38%);
+  background: #020817;
   box-shadow:
     0 48px 150px rgba(0, 0, 0, 0.66),
     0 0 84px rgba(27, 165, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 0 42px rgba(31, 176, 255, 0.08);
+  overflow: hidden;
 }
 
 .auth-loading-stage--final::before,
 .auth-loading-stage--final::after {
   content: "";
   position: absolute;
+  inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 
 .auth-loading-stage--final::before {
-  inset: 0;
   background:
     linear-gradient(120deg, transparent 0 38%, rgba(255, 255, 255, 0.08) 48%, transparent 58% 100%),
     radial-gradient(circle at 50% 63%, transparent 0 36%, rgba(31, 176, 255, 0.08) 37%, transparent 54%);
@@ -60,309 +59,159 @@
 }
 
 .auth-loading-stage--final::after {
-  inset-inline: 7%;
-  bottom: 7%;
-  height: 18%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(30, 176, 255, 0.26), rgba(255, 205, 85, 0.12) 48%, transparent 72%);
-  filter: blur(18px);
-  animation: dnFinalGroundPulse 1.45s ease-in-out infinite alternate;
+  background:
+    radial-gradient(ellipse at 50% 86%, rgba(30, 176, 255, 0.22), rgba(255, 205, 85, 0.1) 44%, transparent 66%),
+    linear-gradient(180deg, rgba(1, 5, 16, 0.02), rgba(1, 5, 16, 0.36));
 }
 
-.auth-loading-final-halo,
-.auth-loading-final-halo::before,
-.auth-loading-final-halo::after {
-  position: absolute;
-  inset: auto auto 58% 50%;
-  width: min(34vw, 360px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.auth-loading-final-halo {
-  border: 1px solid rgba(31, 176, 255, 0.32);
-  box-shadow: 0 0 46px rgba(31, 176, 255, 0.2), inset 0 0 32px rgba(255, 205, 85, 0.08);
-  animation: dnFinalHaloSpin 10s linear infinite;
-}
-
-.auth-loading-final-halo::before,
-.auth-loading-final-halo::after {
-  content: "";
-  inset: 9%;
-  width: auto;
-  transform: none;
-  border: 1px dashed rgba(255, 205, 85, 0.38);
-  animation: dnFinalHaloSpin 6s linear infinite reverse;
-}
-
-.auth-loading-final-halo::after {
-  inset: 25%;
-  border-style: solid;
-  border-color: rgba(31, 176, 255, 0.38);
-  filter: blur(0.2px);
-  animation-duration: 4s;
-}
-
-.auth-loading-final-particles {
+.auth-loading-cinematic-frame {
   position: absolute;
   inset: 0;
-  pointer-events: none;
   z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #020817;
+}
+
+.auth-loading-cinematic-image {
+  position: absolute;
+  inset: -4% -3%;
+  width: 106%;
+  height: 108%;
+  object-fit: cover;
+  object-position: center;
+  transform-origin: 50% 58%;
+  filter: saturate(1.18) contrast(1.08) brightness(0.84);
+  animation: dnImageVideoDrift 6.8s ease-in-out infinite alternate;
+  user-select: none;
+}
+
+.auth-loading-cinematic-vignette,
+.auth-loading-cinematic-map-glow,
+.auth-loading-cinematic-engine-glow,
+.auth-loading-cinematic-headlight,
+.auth-loading-cinematic-sweep,
+.auth-loading-cinematic-particles {
+  position: absolute;
+  pointer-events: none;
+}
+
+.auth-loading-cinematic-vignette {
+  inset: 0;
+  z-index: 2;
+  background:
+    radial-gradient(circle at 50% 39%, rgba(2, 7, 18, 0) 0 34%, rgba(2, 7, 18, 0.16) 54%, rgba(1, 4, 12, 0.78) 100%),
+    linear-gradient(180deg, rgba(1, 5, 16, 0.24), rgba(1, 5, 16, 0.1) 44%, rgba(1, 5, 16, 0.78));
+}
+
+.auth-loading-cinematic-map-glow {
+  z-index: 2;
+  top: 7%;
+  left: 28%;
+  width: min(54vw, 680px);
+  aspect-ratio: 1.45;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 52% 46%, rgba(24, 168, 232, 0.24), transparent 42%),
+    radial-gradient(ellipse at 50% 52%, rgba(255, 210, 91, 0.16), transparent 56%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  animation: dnMapGlow 2s ease-in-out infinite alternate;
+}
+
+.auth-loading-cinematic-engine-glow {
+  z-index: 2;
+  left: 28%;
+  right: 28%;
+  bottom: 12%;
+  height: 32%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 52%, rgba(31, 176, 255, 0.36), rgba(255, 205, 85, 0.2) 40%, transparent 70%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  animation: dnEngineGlow 0.72s ease-in-out infinite alternate;
+}
+
+.auth-loading-cinematic-headlight {
+  z-index: 2;
+  bottom: 14%;
+  width: 35%;
+  height: 28%;
+  opacity: 0.72;
+  background: linear-gradient(90deg, rgba(31, 176, 255, 0.52), rgba(255, 214, 107, 0.26), transparent 75%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  transform-origin: bottom center;
+  animation: dnHeadlightSweep 1.2s ease-in-out infinite alternate;
+}
+
+.auth-loading-cinematic-headlight--left {
+  left: 16%;
+  transform: rotate(8deg);
+}
+
+.auth-loading-cinematic-headlight--right {
+  right: 16%;
+  transform: scaleX(-1) rotate(8deg);
+  animation-delay: 0.14s;
+}
+
+.auth-loading-cinematic-sweep {
+  z-index: 2;
+  inset: -12% -40%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: blur(1px);
+  transform: translateX(-54%) rotate(12deg);
+}
+
+.auth-loading-cinematic-sweep--blue {
+  background: linear-gradient(90deg, transparent 0 42%, rgba(31, 176, 255, 0.28) 48%, rgba(255,255,255,0.22) 50%, transparent 59% 100%);
+  animation: dnLightSweep 3.2s ease-in-out infinite;
+}
+
+.auth-loading-cinematic-sweep--gold {
+  background: linear-gradient(90deg, transparent 0 44%, rgba(255, 214, 107, 0.28) 49%, rgba(255,255,255,0.18) 52%, transparent 61% 100%);
+  animation: dnLightSweep 4.4s ease-in-out 0.7s infinite;
+}
+
+.auth-loading-cinematic-particles {
+  inset: 0;
+  z-index: 2;
   background-image:
-    radial-gradient(circle, rgba(255, 214, 107, 0.82) 0 2px, transparent 3px),
-    radial-gradient(circle, rgba(31, 176, 255, 0.7) 0 1px, transparent 2px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.66) 0 1px, transparent 2px);
+    radial-gradient(circle, rgba(255, 214, 107, 0.86) 0 2px, transparent 3px),
+    radial-gradient(circle, rgba(31, 176, 255, 0.72) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.62) 0 1px, transparent 2px);
   background-size: 180px 180px, 128px 128px, 220px 220px;
   background-position: 10% 20%, 80% 30%, 50% 62%;
-  opacity: 0.36;
+  opacity: 0.28;
   animation: dnFinalParticles 9s linear infinite;
 }
 
-.auth-loading-final-road {
-  position: absolute;
-  inset-inline: 7%;
-  bottom: 13%;
-  height: 20%;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.9;
-  background:
-    linear-gradient(90deg, transparent, rgba(31, 176, 255, 0.22), rgba(255, 205, 85, 0.16), transparent),
-    repeating-linear-gradient(96deg, transparent 0 58px, rgba(31, 176, 255, 0.28) 60px 62px, transparent 65px 126px);
-  border-radius: 50%;
-  filter: blur(10px);
-  transform: perspective(500px) rotateX(62deg);
-  animation: dnFinalRoadFlow 1.6s linear infinite;
-}
-
-.auth-loading-map--final {
-  top: 3.5%;
-  width: min(76vw, 900px);
-  filter: drop-shadow(0 0 26px rgba(31, 176, 255, 0.6)) drop-shadow(0 0 10px rgba(255, 205, 85, 0.24));
-  z-index: 2;
-}
-
-.auth-loading-map--final .auth-loading-map__outline {
-  fill: rgba(7, 26, 51, 0.26);
-  stroke-width: 3.8;
-}
-
-.auth-loading-map--final .auth-loading-map__mesh {
-  fill: none;
-  stroke: rgba(31, 176, 255, 0.28);
-  stroke-width: 1.2;
-  filter: url(#dn-auth-map-glow);
-  stroke-dasharray: 8 10;
-  animation: authRouteFlow 2.8s linear infinite reverse;
-}
-
-.auth-loading-map--final .auth-loading-map__route {
-  stroke-width: 4.6;
-  stroke-dasharray: 26 18;
-}
-
-.auth-loading-map--final .auth-loading-map__node {
-  r: 6px;
-}
-
-.auth-loading-map--final .auth-loading-map__pin {
-  filter: drop-shadow(0 0 26px rgba(255, 205, 85, 0.75));
-  animation: dnFinalPinFloat 1.45s ease-in-out infinite alternate;
-}
-
-.auth-loading-car--final {
-  width: min(78vw, 860px);
-  height: min(32vw, 370px);
-  bottom: 11.5%;
-  z-index: 3;
-  animation: authCarIdle 0.46s ease-in-out infinite alternate;
-}
-
-.auth-loading-car--final::before,
-.auth-loading-car--final::after {
-  content: "";
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: -7%;
-  height: 25%;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(31, 176, 255, 0.38), rgba(255, 205, 85, 0.18) 46%, transparent 72%);
-  filter: blur(10px);
-  animation: dnFinalExhaustGlow 0.9s ease-in-out infinite alternate;
-}
-
-.auth-loading-car--final::after {
-  left: -10%;
-  right: -10%;
-  bottom: -18%;
-  height: 42%;
-  opacity: 0.42;
-  filter: blur(22px);
-}
-
-.auth-loading-car--final .auth-loading-car__body {
-  inset: auto 4% 0;
-  height: 62%;
-  border-radius: 42% 42% 16% 16% / 64% 64% 28% 28%;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(180, 224, 255, 0.82) 28%, rgba(8, 29, 56, 0.98) 72%, #01040b 100%),
-    linear-gradient(90deg, rgba(31, 176, 255, 0.08), rgba(255, 205, 85, 0.18));
-  border-color: rgba(255, 255, 255, 0.36);
-  box-shadow:
-    0 32px 86px rgba(0, 0, 0, 0.68),
-    0 0 88px rgba(31, 176, 255, 0.38),
-    inset 0 2px 0 rgba(255, 255, 255, 0.36),
-    inset 0 -18px 34px rgba(0, 0, 0, 0.38);
-}
-
-.auth-loading-car--final .auth-loading-car__body::before {
-  inset: 16% 8%;
-  border-top: 3px solid rgba(255, 214, 107, 0.82);
-  box-shadow: inset 0 18px 26px rgba(31, 176, 255, 0.08);
-}
-
-.auth-loading-car--final .auth-loading-car__body::after {
-  inset: 34% 18% 22%;
-  border: 0;
-  border-radius: 18px;
-  background: linear-gradient(90deg, transparent 0 8%, rgba(0, 0, 0, 0.72) 9% 91%, transparent 92% 100%);
-  box-shadow: inset 0 0 16px rgba(31, 176, 255, 0.24);
-}
-
-.auth-loading-car__grille,
-.auth-loading-car__badge,
-.auth-loading-car__sweep,
-.auth-loading-car__spark {
-  position: absolute;
-  display: block;
-  pointer-events: none;
-}
-
-.auth-loading-car--final .auth-loading-car__roof {
-  left: 25%;
-  right: 25%;
-  top: -30%;
-  height: 58%;
-  background: linear-gradient(180deg, rgba(222, 246, 255, 0.92), rgba(31, 176, 255, 0.22) 44%, rgba(3, 10, 24, 0.92));
-  box-shadow: 0 0 32px rgba(31, 176, 255, 0.26);
-}
-
-.auth-loading-car--final .auth-loading-car__glass {
-  left: 31%;
-  right: 31%;
-  top: -17%;
-  height: 36%;
-  background: linear-gradient(180deg, rgba(46, 190, 255, 0.76), rgba(2, 9, 24, 0.92));
-}
-
-.auth-loading-car--final .auth-loading-car__hood {
-  left: 34%;
-  right: 34%;
-  bottom: 12%;
-  height: 46%;
-  background: linear-gradient(180deg, rgba(7, 26, 51, 0.92), rgba(0, 0, 0, 0.44));
-  box-shadow: inset 0 0 32px rgba(31, 176, 255, 0.24), 0 0 20px rgba(255, 205, 85, 0.12);
-}
-
-.auth-loading-car--final .auth-loading-car__grille {
-  left: 38.5%;
-  right: 38.5%;
-  bottom: 13%;
-  height: 24%;
-  border-radius: 16px;
-  background:
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 3px 8px),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(3, 10, 24, 0.92));
-  border: 1px solid rgba(31, 176, 255, 0.22);
-}
-
-.auth-loading-car--final .auth-loading-car__badge {
-  left: 48.1%;
-  bottom: 39%;
-  width: 3.8%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0 18%, #18a8e8 30%, #071a33 68%);
-  box-shadow: 0 0 18px rgba(31, 176, 255, 0.7);
-}
-
-.auth-loading-car--final .auth-loading-car__light {
-  bottom: 31%;
-  width: 15%;
-  height: 16%;
-  background: radial-gradient(circle, #fff 0 12%, #dff7ff 18%, #18a8e8 38%, rgba(24, 168, 232, 0) 72%);
-  box-shadow:
-    0 0 42px rgba(31, 176, 255, 1),
-    0 0 96px rgba(31, 176, 255, 0.7),
-    0 0 120px rgba(255, 205, 85, 0.32);
-}
-
-.auth-loading-car--final .auth-loading-car__light--left { left: 14%; }
-.auth-loading-car--final .auth-loading-car__light--right { right: 14%; }
-
-.auth-loading-car--final .auth-loading-car__beam {
-  bottom: -18%;
-  width: 57%;
-  height: 96%;
-  opacity: 0.94;
-  background:
-    linear-gradient(100deg, rgba(31, 176, 255, 0.66), rgba(255, 214, 107, 0.36), transparent 76%),
-    radial-gradient(ellipse at 8% 72%, rgba(255, 255, 255, 0.24), transparent 42%);
-  filter: blur(14px);
-}
-
-.auth-loading-car--final .auth-loading-car__beam--left { left: -22%; transform: skewY(9deg) rotate(2deg); }
-.auth-loading-car--final .auth-loading-car__beam--right { right: -22%; transform: scaleX(-1) skewY(9deg) rotate(2deg); }
-
-.auth-loading-car--final .auth-loading-car__wheel {
-  bottom: -13%;
-  width: 17%;
-  box-shadow: 0 0 38px rgba(31, 176, 255, 0.46), inset 0 0 16px rgba(255, 205, 85, 0.12);
-}
-
-.auth-loading-car--final .auth-loading-car__sweep {
-  inset: 0 -22%;
-  height: 115%;
-  background: linear-gradient(110deg, transparent 0 38%, rgba(255, 255, 255, 0.2) 47%, rgba(255, 214, 107, 0.16) 51%, transparent 62% 100%);
-  transform: translateX(-60%);
-  mix-blend-mode: screen;
-  animation: dnFinalCarSweep 2.4s ease-in-out infinite;
-}
-
-.auth-loading-car__spark--one { left: 6%; bottom: -9%; }
-.auth-loading-car__spark--two { right: 7%; bottom: -7%; animation-delay: 0.26s; }
-.auth-loading-car__spark--three { left: 49%; bottom: -14%; animation-delay: 0.5s; }
-.auth-loading-car__spark {
-  width: 10px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #ffd66b;
-  box-shadow: 0 0 18px rgba(255, 214, 107, 0.9), 0 0 36px rgba(31, 176, 255, 0.55);
-  animation: dnFinalSpark 1.2s ease-in-out infinite;
-}
-
 .auth-loading-console--final {
-  width: min(620px, calc(100% - 30px));
-  margin-bottom: clamp(18px, 3.5vh, 36px);
+  position: relative;
+  z-index: 5;
+  width: min(620px, calc(100% - 32px));
+  margin-top: auto;
+  margin-bottom: clamp(18px, 3.8vh, 42px);
   padding: clamp(20px, 2.8vw, 32px);
-  border-color: rgba(255, 214, 107, 0.34);
+  border: 1px solid rgba(255, 214, 107, 0.36);
+  border-radius: 30px;
   background:
-    linear-gradient(135deg, rgba(2, 8, 23, 0.88), rgba(5, 22, 48, 0.68)),
-    radial-gradient(circle at 50% 0%, rgba(31, 176, 255, 0.16), transparent 52%);
+    linear-gradient(135deg, rgba(2, 8, 23, 0.9), rgba(5, 22, 48, 0.66)),
+    radial-gradient(circle at 50% 0%, rgba(31, 176, 255, 0.18), transparent 52%);
   box-shadow:
-    0 30px 92px rgba(0, 0, 0, 0.5),
-    0 0 44px rgba(31, 176, 255, 0.14),
+    0 30px 92px rgba(0, 0, 0, 0.54),
+    0 0 44px rgba(31, 176, 255, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  text-align: center;
+  backdrop-filter: blur(18px);
 }
 
 .auth-loading-console--final .auth-clean__eyebrow {
   margin-bottom: 10px;
-  text-shadow: 0 0 16px rgba(255, 214, 107, 0.4);
+  text-shadow: 0 0 16px rgba(255, 214, 107, 0.42);
 }
 
 .auth-loading-console--final .auth-clean__title {
@@ -389,75 +238,73 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 0 22px rgba(31, 176, 255, 0.12);
 }
 
+.auth-loading-progress span {
+  background: linear-gradient(90deg, #18a8e8, #ffd66b 52%, #ffffff 72%, #18a8e8);
+  background-size: 220% 100%;
+  box-shadow: 0 0 22px rgba(255, 214, 107, 0.44);
+  animation: authProgressFlow 1s linear infinite;
+  transition: width 180ms ease;
+}
+
+@keyframes dnImageVideoDrift {
+  0% { transform: scale(1.04) translate3d(-0.4%, -0.8%, 0); }
+  45% { transform: scale(1.085) translate3d(0.8%, 0.2%, 0); }
+  100% { transform: scale(1.12) translate3d(-0.2%, 0.8%, 0); }
+}
+
 @keyframes dnFinalStageSweep {
-  0%, 100% { transform: translateX(-28%); opacity: 0.28; }
-  50% { transform: translateX(28%); opacity: 0.68; }
+  0%, 100% { transform: translateX(-28%); opacity: 0.26; }
+  50% { transform: translateX(28%); opacity: 0.62; }
 }
 
-@keyframes dnFinalGroundPulse {
-  from { opacity: 0.42; transform: scaleX(0.94); }
-  to { opacity: 0.92; transform: scaleX(1.04); }
+@keyframes dnMapGlow {
+  from { opacity: 0.42; transform: scale(0.96); }
+  to { opacity: 0.9; transform: scale(1.05); }
 }
 
-@keyframes dnFinalHaloSpin {
-  to { transform: translateX(-50%) rotate(360deg); }
+@keyframes dnEngineGlow {
+  from { opacity: 0.42; transform: scaleX(0.94) translateY(3px); }
+  to { opacity: 0.96; transform: scaleX(1.06) translateY(-3px); }
 }
 
-.auth-loading-final-halo::before,
-.auth-loading-final-halo::after { transform: rotate(0deg); }
+@keyframes dnHeadlightSweep {
+  from { opacity: 0.5; filter: blur(22px); }
+  to { opacity: 0.92; filter: blur(14px); }
+}
+
+@keyframes dnLightSweep {
+  0%, 26% { transform: translateX(-54%) rotate(12deg); opacity: 0; }
+  42% { opacity: 0.8; }
+  68%, 100% { transform: translateX(54%) rotate(12deg); opacity: 0; }
+}
 
 @keyframes dnFinalParticles {
   to { background-position: 10% 120%, 80% 130%, 50% 162%; }
 }
 
-@keyframes dnFinalRoadFlow {
-  to { background-position: 0 0, 126px 0; }
-}
-
-@keyframes dnFinalPinFloat {
-  from { transform: translateY(-3px); }
-  to { transform: translateY(5px); }
-}
-
-@keyframes dnFinalExhaustGlow {
-  from { opacity: 0.35; transform: scaleX(0.92); }
-  to { opacity: 0.92; transform: scaleX(1.06); }
-}
-
-@keyframes dnFinalCarSweep {
-  0%, 28% { transform: translateX(-64%); opacity: 0; }
-  46% { opacity: 0.82; }
-  72%, 100% { transform: translateX(64%); opacity: 0; }
-}
-
-@keyframes dnFinalSpark {
-  0%, 100% { transform: translateY(0) scale(0.8); opacity: 0.32; }
-  42% { transform: translateY(-10px) scale(1.25); opacity: 1; }
-}
-
 @media (max-width: 900px) {
   .auth-loading-stage--final { min-height: calc(100dvh - 18px); border-radius: 30px; }
-  .auth-loading-map--final { top: 5%; width: min(106vw, 820px); }
-  .auth-loading-car--final { width: min(104vw, 780px); height: 260px; bottom: 17%; }
-  .auth-loading-final-halo { width: min(58vw, 330px); bottom: auto; top: 7%; }
+  .auth-loading-cinematic-image { inset: -2% -24%; width: 148%; height: 106%; }
+  .auth-loading-cinematic-map-glow { left: 14%; top: 10%; width: 80vw; }
+  .auth-loading-cinematic-engine-glow { left: 16%; right: 16%; bottom: 20%; }
   .auth-loading-console--final { width: min(640px, calc(100% - 20px)); margin-bottom: 12px; }
 }
 
 @media (max-width: 700px) {
   .auth-clean--final-loading { padding: 0; }
   .auth-loading-stage--final { min-height: 100dvh; width: 100vw; border-radius: 0; border-inline: 0; }
-  .auth-loading-map--final { top: 3%; width: 132vw; opacity: 0.88; }
-  .auth-loading-car--final { width: 140vw; height: 210px; bottom: 35%; }
-  .auth-loading-final-road { inset-inline: -14%; bottom: 31%; height: 16%; }
-  .auth-loading-console--final { width: calc(100% - 18px); margin-bottom: 10px; border-radius: 24px; }
+  .auth-loading-cinematic-image { inset: -1% -42%; width: 184%; height: 104%; object-position: center; }
+  .auth-loading-cinematic-vignette { background: linear-gradient(180deg, rgba(1, 5, 16, 0.2), rgba(1,5,16,0.08) 44%, rgba(1,5,16,0.78)); }
+  .auth-loading-cinematic-engine-glow { bottom: 33%; left: 6%; right: 6%; }
+  .auth-loading-cinematic-headlight { bottom: 32%; width: 48%; }
+  .auth-loading-cinematic-headlight--left { left: -2%; }
+  .auth-loading-cinematic-headlight--right { right: -2%; }
+  .auth-loading-console--final { width: calc(100% - 18px); margin-bottom: 10px; border-radius: 24px; padding: 18px 14px; }
   .auth-loading-console--final .auth-clean__title { font-size: clamp(2rem, 9.2vw, 3.15rem); }
   .auth-loading-console--final .auth-clean__body { font-size: 0.92rem; }
-  .auth-loading-final-halo { top: 8%; width: 58vw; opacity: 0.66; }
-  .auth-loading-final-particles { opacity: 0.22; }
+  .auth-loading-cinematic-particles { opacity: 0.2; }
 }
 
 @media (max-width: 420px) {
-  .auth-loading-car--final { width: 154vw; bottom: 37%; }
-  .auth-loading-map--final { width: 148vw; }
-  .auth-loading-console--final { padding: 18px 14px; }
+  .auth-loading-cinematic-image { inset-inline: -54%; width: 208%; }
 }
