@@ -84,7 +84,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       else window.localStorage.removeItem("dn-admin-remember");
 
       setStage("loading");
-      window.setTimeout(() => onAuthSuccess(), 2500);
+      window.setTimeout(() => {
+        window.requestAnimationFrame(() => onAuthSuccess());
+      }, 3400);
     } catch (error) {
       console.error("[DAY NIGHT auth signIn error]", error);
       setErrorMessage(t.generic);
@@ -97,7 +99,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     return <AuthIntroScreen language={authLanguage} onEnter={() => setStage("login")} onToggleLanguage={toggleLanguage} />;
   }
 
-  if (stage === "loading") return <AuthLoadingScreen language={authLanguage} percent={92} />;
+  if (stage === "loading") return <AuthLoadingScreen language={authLanguage} percent={100} />;
 
   return (
     <AuthLoginScreen
