@@ -1,11 +1,7 @@
-type AudioWindow = Window & {
-  AudioContext?: new () => AudioContext;
-  webkitAudioContext?: new () => AudioContext;
-};
+const STORAGE_KEY = "dn_admin_loading_audio_muted_v1";
+const DEFAULT_VOLUME = 0.18;
 
-type StoppableAudioNode = {
-  stop: (when?: number) => void;
-};
+type StoppableAudioNode = { stop: (when?: number) => void };
 
 type EngineAudioState = {
   context: AudioContext;
@@ -13,9 +9,6 @@ type EngineAudioState = {
   nodes: StoppableAudioNode[];
   timers: number[];
 };
-
-const STORAGE_KEY = "dn_admin_loading_audio_muted_v1";
-const DEFAULT_VOLUME = 0.18;
 
 let sharedContext: AudioContext | null = null;
 let activeEngine: EngineAudioState | null = null;
@@ -28,7 +21,7 @@ function getAudioContext(): AudioContext | null {
   if (!canUseBrowserAudio()) return null;
   if (sharedContext) return sharedContext;
 
-  const audioWindow = window as AudioWindow;
+  const audioWindow = window as unknown as { AudioContext?: new () => AudioContext; webkitAudioContext?: new () => AudioContext };
   const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
   if (!AudioContextCtor) return null;
 
