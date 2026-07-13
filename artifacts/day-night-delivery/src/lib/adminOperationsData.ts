@@ -224,6 +224,13 @@ function collectionAmountForPayment(paymentMethod: string, rawAmount: unknown) {
   return paymentMethod === "cod" ? Math.max(0, numberValue(rawAmount, 0)) : 0;
 }
 
+function merchantNetForPayment(paymentMethod: string, collectionAmount: number, deliveryFee: number) {
+  if (paymentMethod === "receiver_pays") return 0;
+  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") return Number((collectionAmount - deliveryFee).toFixed(2));
+  if (paymentMethod === "cod") return Number((collectionAmount - deliveryFee).toFixed(2));
+  return Number((collectionAmount - deliveryFee).toFixed(2));
+}
+
 function paymentMethodArabic(paymentMethod: string) {
   if (paymentMethod === "cod") return "تحصيل عند التسليم";
   if (paymentMethod === "receiver_pays") return "المستلم يدفع رسوم التوصيل";
@@ -239,7 +246,7 @@ export function calculateMerchantStatementNet(input: OpsOrderInput) {
   return {
     deliveryFee,
     collectionAmount,
-    merchantNet: Number((collectionAmount - deliveryFee).toFixed(2)),
+    merchantNet: merchantNetForPayment(paymentMethod, collectionAmount, deliveryFee),
     paymentMethod,
   };
 }
@@ -270,7 +277,7 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
   const description = clean(input.package_description || input.package_type || "Admin shipment");
   const codAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
   const deliveryFee = pricing.total;
-  const merchantNet = Number((codAmount - deliveryFee).toFixed(2));
+  const merchantNet = merchantNetForPayment(paymentMethod, codAmount, deliveryFee);
   const settlementNote = `Payment: ${paymentMethodArabic(paymentMethod)} | Collection ${codAmount.toFixed(2)} AED | Delivery fee ${deliveryFee.toFixed(2)} AED | Merchant statement net ${merchantNet.toFixed(2)} AED`;
 
   const payload = removeEmptyUndefined({
