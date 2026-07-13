@@ -107,6 +107,7 @@ const initialNotificationAudioMuteUntil = moduleLoadedAt + 8500;
 let unlocked = false;
 let lastVoiceAt = 0;
 let pendingAudio: AdminAudioEvent[] = [];
+let khalifaQuestionBindingInstalled = false;
 
 const hasWindow = () => typeof window !== "undefined";
 
@@ -117,6 +118,28 @@ function safeJson<T>(raw: string | null, fb: T): T {
   } catch {
     return fb;
   }
+}
+
+function installKhalifaQuestionAudioBinding() {
+  if (!hasWindow() || khalifaQuestionBindingInstalled) return;
+  khalifaQuestionBindingInstalled = true;
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest("button");
+      if (!button || !button.closest(".dn-khalifa-live") || button.disabled) return;
+
+      const isSubmit = button.getAttribute("type") === "submit";
+      const isQuestionChip = button.classList.contains("dn-khalifa-question-chip");
+      const label = (button.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const isSend = label.includes("إرسال") || label.includes("send") || label.includes("اسأل") || label.includes("ask");
+
+      if (isSubmit || isQuestionChip || isSend) playAdminAudioEvent("khalifa_question", readAdminAudioSettings());
+    },
+    true,
+  );
 }
 
 export function readAdminAudioSettings(): AdminAudioSettings {
@@ -155,6 +178,7 @@ export function unlockAdminAudio() {
   unlocked = true;
   unlockDayNightAudio();
   preloadDayNightSounds();
+  installKhalifaQuestionAudioBinding();
   const queued = [...pendingAudio].slice(-4);
   pendingAudio = [];
   queued.forEach((event, index) => window.setTimeout(() => playAdminAudioEvent(event), index * 180));
@@ -200,6 +224,7 @@ function routeAdminAudioEvent(event: AdminAudioEvent): RoutedAudio | null {
 }
 
 export function playAdminAudioEvent(event: AdminAudioEvent, settings = readAdminAudioSettings()) {
+  installKhalifaQuestionAudioBinding();
   if (!allowed(event, settings)) return;
   if (!unlocked) {
     if (!["notification", "new_order", "cod_alert", "urgent_alert", "critical_alert", "warning", "error"].includes(event)) {
