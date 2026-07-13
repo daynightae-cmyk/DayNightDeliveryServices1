@@ -154,7 +154,7 @@ export async function createOpsMerchant(input: OpsMerchantInput): Promise<OpsCre
     iban: clean(input.iban),
     settlement_cycle: clean(input.settlement_cycle || "weekly"),
     commission_type: clean(input.commission_type || "fixed_delivery_fee"),
-    default_payment_method: clean(input.default_payment_method || "sender_pays"),
+    default_payment_method: clean(input.default_payment_method || "merchant_pays"),
     notes: clean(input.notes),
     status: clean(input.status || "active"),
     created_at: now,
@@ -220,6 +220,30 @@ export function calculateOpsOrderPrice(input: OpsOrderInput) {
   };
 }
 
+function collectionAmountForPayment(paymentMethod: string, rawAmount: unknown) {
+  return paymentMethod === "cod" ? Math.max(0, numberValue(rawAmount, 0)) : 0;
+}
+
+function paymentMethodArabic(paymentMethod: string) {
+  if (paymentMethod === "cod") return "تحصيل عند التسليم";
+  if (paymentMethod === "receiver_pays") return "المستلم يدفع رسوم التوصيل";
+  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") return "التاجر يتحمل رسوم التوصيل";
+  return paymentMethod;
+}
+
+export function calculateMerchantStatementNet(input: OpsOrderInput) {
+  const pricing = calculateOpsOrderPrice(input);
+  const paymentMethod = clean(input.payment_method || "merchant_pays");
+  const collectionAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
+  const deliveryFee = pricing.total;
+  return {
+    deliveryFee,
+    collectionAmount,
+    merchantNet: Number((collectionAmount - deliveryFee).toFixed(2)),
+    paymentMethod,
+  };
+}
+
 export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateResult<Order>> {
   if (!supabase) throw operationsError(null, "Supabase is not configured for order operations.");
   const merchant = input.merchant || null;
@@ -238,13 +262,16 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     input.pickup_street,
     merchant?.pickup_address || merchant?.address || pickupEmirate,
   ]);
-  const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "sender_pays");
+  const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "merchant_pays");
   const isInternational = input.shipping_scope === "international";
   const deliveryEmirate = clean(input.delivery_city || "Dubai");
   const receiverCity = isInternational ? clean(input.destination_country || deliveryEmirate || "WORLD") : deliveryEmirate;
   const receiverAddress = composeLocationAddress([input.delivery_area, input.delivery_street, input.receiver_address || receiverCity]);
   const description = clean(input.package_description || input.package_type || "Admin shipment");
-  const codAmount = paymentMethod === "cod" ? Math.max(0, numberValue(input.cod_amount, 0)) : 0;
+  const codAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
+  const deliveryFee = pricing.total;
+  const merchantNet = Number((codAmount - deliveryFee).toFixed(2));
+  const settlementNote = `Payment: ${paymentMethodArabic(paymentMethod)} | Collection ${codAmount.toFixed(2)} AED | Delivery fee ${deliveryFee.toFixed(2)} AED | Merchant statement net ${merchantNet.toFixed(2)} AED`;
 
   const payload = removeEmptyUndefined({
     tracking_number: trackingNumber,
@@ -273,17 +300,17 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
     cod_amount: codAmount,
-    delivery_price: pricing.total,
-    subtotal: pricing.total,
-    base_price: pricing.total,
-    total: pricing.total,
-    total_price: pricing.total,
-    amount: pricing.total,
-    price: pricing.total,
+    delivery_price: deliveryFee,
+    subtotal: codAmount,
+    base_price: deliveryFee,
+    total: codAmount,
+    total_price: codAmount,
+    amount: codAmount,
+    price: codAmount,
     currency: "AED",
-    notes: clean(input.notes) || "Created from admin operations section",
+    notes: [clean(input.notes), settlementNote].filter(Boolean).join(" | ") || "Created from admin operations section",
     status: clean(input.status || "pending"),
-    status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: "Created from admin operations section" }],
+    status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: settlementNote }],
     created_at: createdAt,
     updated_at: createdAt,
   });
