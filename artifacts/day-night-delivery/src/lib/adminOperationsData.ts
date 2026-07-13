@@ -13,6 +13,8 @@ export type OpsMerchantInput = {
   email?: string;
   emirate?: string;
   city?: string;
+  area?: string;
+  street_details?: string;
   address?: string;
   pickup_address?: string;
   license_number?: string;
@@ -37,7 +39,11 @@ export type OpsOrderInput = {
   shipping_scope: "local" | "international";
   order_count: number;
   pickup_city: string;
+  pickup_area?: string;
+  pickup_street?: string;
   delivery_city: string;
+  delivery_area?: string;
+  delivery_street?: string;
   destination_country?: string;
   receiver_name: string;
   receiver_phone: string;
@@ -73,6 +79,10 @@ function merchantCode(seed?: string) {
   const suffix = clean(seed).replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 4) || "SHOP";
   const serial = Date.now().toString(36).toUpperCase().slice(-5);
   return `DN-MER-${suffix}-${serial}`;
+}
+
+function composeLocationAddress(parts: Array<string | undefined | null>) {
+  return parts.map(clean).filter(Boolean).join(" - ");
 }
 
 function operationsError(error: unknown, fallback: string) {
@@ -121,6 +131,10 @@ export async function fetchOpsSnapshot(): Promise<OpsSnapshot> {
 export async function createOpsMerchant(input: OpsMerchantInput): Promise<OpsCreateResult<Merchant>> {
   if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
   const now = new Date().toISOString();
+  const emirate = clean(input.emirate || "Abu Dhabi");
+  const area = clean(input.area || input.city || emirate);
+  const address = composeLocationAddress([area, input.street_details, input.address]);
+  const pickupAddress = composeLocationAddress([area, input.street_details, input.pickup_address || input.address]);
   const payload = removeEmptyUndefined({
     merchant_code: merchantCode(input.trade_name),
     trade_name: clean(input.trade_name),
@@ -128,10 +142,10 @@ export async function createOpsMerchant(input: OpsMerchantInput): Promise<OpsCre
     phone: clean(input.phone),
     alt_phone: clean(input.alt_phone),
     email: clean(input.email).toLowerCase(),
-    emirate: clean(input.emirate || "Abu Dhabi"),
-    city: clean(input.city || input.emirate || "Abu Dhabi"),
-    address: clean(input.address),
-    pickup_address: clean(input.pickup_address || input.address),
+    emirate,
+    city: area,
+    address,
+    pickup_address: pickupAddress || address,
     license_number: clean(input.license_number),
     trn: clean(input.trn || input.tax_number),
     tax_number: clean(input.tax_number || input.trn),
@@ -216,11 +230,19 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
   const trackingNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
   const senderName = clean(merchant?.trade_name || input.merchant_name || "DAY NIGHT Merchant");
   const senderPhone = clean(merchant?.phone || "971568757331");
-  const senderCity = clean(merchant?.city || merchant?.emirate || input.pickup_city || "Abu Dhabi");
-  const senderAddress = clean(merchant?.pickup_address || merchant?.address || senderCity);
+  const pickupEmirate = clean(input.pickup_city || merchant?.emirate || "Abu Dhabi");
+  const merchantArea = clean(merchant?.city);
+  const pickupArea = clean(input.pickup_area || (merchantArea && merchantArea !== pickupEmirate ? merchantArea : ""));
+  const senderAddress = composeLocationAddress([
+    pickupArea,
+    input.pickup_street,
+    merchant?.pickup_address || merchant?.address || pickupEmirate,
+  ]);
   const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "sender_pays");
   const isInternational = input.shipping_scope === "international";
-  const receiverCity = isInternational ? clean(input.destination_country || input.delivery_city || "WORLD") : clean(input.delivery_city || "Dubai");
+  const deliveryEmirate = clean(input.delivery_city || "Dubai");
+  const receiverCity = isInternational ? clean(input.destination_country || deliveryEmirate || "WORLD") : deliveryEmirate;
+  const receiverAddress = composeLocationAddress([input.delivery_area, input.delivery_street, input.receiver_address || receiverCity]);
   const description = clean(input.package_description || input.package_type || "Admin shipment");
   const codAmount = paymentMethod === "cod" ? Math.max(0, numberValue(input.cod_amount, 0)) : 0;
 
@@ -238,15 +260,15 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     source_domain: "daynightae.com",
     sender_name: senderName,
     sender_phone: senderPhone,
-    sender_city: senderCity,
+    sender_city: pickupEmirate,
     sender_address: senderAddress,
     receiver_name: clean(input.receiver_name),
     receiver_phone: clean(input.receiver_phone),
     receiver_city: receiverCity,
-    receiver_address: clean(input.receiver_address),
+    receiver_address: receiverAddress,
     package_type: description,
     package_description: description,
-    weight: isInternational ? Math.max(1, numberValue(input.weight, 1)) : Math.max(1, numberValue(input.weight, 1)),
+    weight: Math.max(1, numberValue(input.weight, 1)),
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
