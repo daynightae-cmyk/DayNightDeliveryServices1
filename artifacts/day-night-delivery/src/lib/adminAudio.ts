@@ -21,6 +21,7 @@ export type AdminAudioEvent =
   | "cod_alert"
   | "urgent_alert"
   | "critical_alert"
+  | "khalifa_question"
   | "khalifa_insight"
   | "daily_closing_ready"
   | "daily_closing_warning"
@@ -163,7 +164,7 @@ function allowed(event: AdminAudioEvent, s: AdminAudioSettings) {
   if (!s.enabled || s.muted) return false;
   if ((event === "click" || event === "hover") && !s.clickSounds) return false;
   if (["notification", "new_order", "cod_alert", "print_ready", "print_done", "daily_closing_ready", "urgent_alert"].includes(event) && !s.notificationSounds) return false;
-  if (event === "khalifa_insight" && !s.khalifaSounds) return false;
+  if ((event === "khalifa_question" || event === "khalifa_insight") && !s.khalifaSounds) return false;
   if (["error", "warning", "daily_closing_warning", "database_health_warning", "critical_alert"].includes(event) && !s.warningSounds) return false;
   return true;
 }
@@ -175,16 +176,16 @@ function routeAdminAudioEvent(event: AdminAudioEvent): RoutedAudio | null {
     return { key: "glassBreak", volume: 0.5, channel: "admin-critical-alert", minIntervalMs: 6200, priority: 100 };
   }
 
-  if (event === "urgent_alert") {
-    return { key: "carHorn", volume: 0.68, channel: "admin-urgent-horn", minIntervalMs: 2600, priority: 80 };
+  if (event === "khalifa_insight") {
+    return { key: "glassBreak", volume: 0.36, channel: "admin-khalifa-insight", minIntervalMs: 4200, priority: 92 };
+  }
+
+  if (event === "urgent_alert" || event === "khalifa_question") {
+    return { key: "carHorn", volume: event === "khalifa_question" ? 0.62 : 0.68, channel: event === "khalifa_question" ? "admin-khalifa-question" : "admin-urgent-horn", minIntervalMs: event === "khalifa_question" ? 1700 : 2600, priority: 80 };
   }
 
   if (event === "success" || event === "print_ready" || event === "print_done" || event === "database_health_ok" || event === "daily_closing_ready") {
     return { key: "doorClose", volume: 0.28, channel: "admin-soft-confirm", minIntervalMs: 850, priority: 35 };
-  }
-
-  if (event === "khalifa_insight") {
-    return { key: "sectionDoor", volume: 0.26, channel: "admin-khalifa", minIntervalMs: 1200, priority: 18 };
   }
 
   if (event === "notification" || event === "new_order" || event === "cod_alert") {
@@ -325,7 +326,11 @@ export function addAdminNotification(input: AddNotificationInput): AdminNotifica
   showBrowserNotification(item, settings);
 
   if (!isOldOrInitialNotification(input, now) && settings.enabled && !settings.muted && settings.notificationSounds) {
-    handleAdminNotification({ id: item.id, type: item.type, priority: item.priority, createdAt: item.createdAt });
+    if (input.audioEvent === "khalifa_insight" || input.audioEvent === "khalifa_question") {
+      playAdminAudioEvent(input.audioEvent, settings);
+    } else {
+      handleAdminNotification({ id: item.id, type: item.type, priority: item.priority, createdAt: item.createdAt });
+    }
     if (item.type === "khalifa") speakKhalifa(item.bodyAr || item.titleAr, "ar", settings);
   }
 
