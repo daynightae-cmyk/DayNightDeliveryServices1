@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
-import { AlertTriangle, Building2, CheckCircle2, Database, Save } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { AlertTriangle, Building2, CheckCircle2, Database, MapPin, Save } from "lucide-react";
 import { createOpsMerchant, type OpsDataSource, type OpsMerchantInput } from "../../lib/adminOperationsData";
+import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
 import type { Merchant } from "../../types";
 
 const emptyMerchant: OpsMerchantInput = {
@@ -10,7 +11,9 @@ const emptyMerchant: OpsMerchantInput = {
   alt_phone: "",
   email: "",
   emirate: "Abu Dhabi",
-  city: "Abu Dhabi",
+  city: "Mussafah",
+  area: "Mussafah",
+  street_details: "",
   address: "",
   pickup_address: "",
   license_number: "",
@@ -26,16 +29,6 @@ const emptyMerchant: OpsMerchantInput = {
   status: "active",
 };
 
-const emirates = [
-  { value: "Abu Dhabi", ar: "أبوظبي", en: "Abu Dhabi" },
-  { value: "Dubai", ar: "دبي", en: "Dubai" },
-  { value: "Sharjah", ar: "الشارقة", en: "Sharjah" },
-  { value: "Ajman", ar: "عجمان", en: "Ajman" },
-  { value: "Umm Al Quwain", ar: "أم القيوين", en: "Umm Al Quwain" },
-  { value: "Ras Al Khaimah", ar: "رأس الخيمة", en: "Ras Al Khaimah" },
-  { value: "Fujairah", ar: "الفجيرة", en: "Fujairah" },
-];
-
 const settlementOptions = [
   { value: "daily", ar: "يومي", en: "Daily" },
   { value: "weekly", ar: "أسبوعي", en: "Weekly" },
@@ -46,13 +39,13 @@ const settlementOptions = [
 const paymentOptions = [
   { value: "sender_pays", ar: "المرسل يدفع", en: "Sender pays" },
   { value: "receiver_pays", ar: "المستلم يدفع", en: "Receiver pays" },
-  { value: "cod", ar: "تحصيل عند التسليم COD", en: "COD" },
+  { value: "cod", ar: "تحصيل عند التسليم", en: "Collect on delivery" },
 ];
 
 const statusOptions = [
   { value: "active", ar: "نشط", en: "Active" },
-  { value: "review", ar: "قيد المراجعة", en: "Review" },
-  { value: "paused", ar: "متوقف مؤقتاً", en: "Paused" },
+  { value: "review", ar: "قيد المراجعة", en: "Under review" },
+  { value: "paused", ar: "متوقف مؤقتًا", en: "Paused" },
 ];
 
 function inputClass() {
@@ -60,14 +53,18 @@ function inputClass() {
 }
 
 function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boolean) {
-  if (source === "rpc") return isArabic ? "تم عبر RPC الإنتاجي" : "Saved through production RPC";
-  if (source === "db") return isArabic ? "تم عبر جدول merchants مباشرة" : "Saved directly to merchants table";
-  if (source === "pending") return isArabic ? "جاهز للحفظ الحقيقي" : "Ready for live save";
-  return isArabic ? "بانتظار الحفظ" : "Not saved yet";
+  if (source === "rpc") return isArabic ? "تم الحفظ عبر إجراء قاعدة البيانات الإنتاجي" : "Saved through production database procedure";
+  if (source === "db") return isArabic ? "تم الحفظ مباشرة في جدول التجار" : "Saved directly to merchants table";
+  if (source === "pending") return isArabic ? "بانتظار الحفظ" : "Waiting to save";
+  return isArabic ? "لم يتم الحفظ بعد" : "Not saved yet";
 }
 
 function optionalLabel(label: string, isArabic: boolean) {
   return isArabic ? `${label} — اختياري` : `${label} — Optional`;
+}
+
+function optionLabel(option: { ar: string; en: string }, isArabic: boolean) {
+  return isArabic ? option.ar : option.en;
 }
 
 export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: boolean; onSaved?: (merchant: Merchant) => void }) {
@@ -77,8 +74,21 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
   const [error, setError] = useState("");
   const [source, setSource] = useState<OpsDataSource | "pending" | "none">("none");
 
+  const areas = useMemo(() => getAreasForEmirate(form.emirate), [form.emirate]);
+
   function setField<K extends keyof OpsMerchantInput>(key: K, value: OpsMerchantInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setSource("pending");
+  }
+
+  function chooseEmirate(value: string) {
+    const firstArea = getDefaultAreaForEmirate(value);
+    setForm((prev) => ({ ...prev, emirate: value, city: firstArea, area: firstArea }));
+    setSource("pending");
+  }
+
+  function chooseArea(value: string) {
+    setForm((prev) => ({ ...prev, city: value, area: value }));
     setSource("pending");
   }
 
@@ -86,6 +96,8 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
     const email = String(form.email || "").trim();
     if (!form.trade_name.trim()) return isArabic ? "اسم المتجر مطلوب." : "Trade name is required.";
     if (!form.phone.trim()) return isArabic ? "رقم الهاتف الأساسي مطلوب." : "Primary phone is required.";
+    if (!String(form.emirate || "").trim()) return isArabic ? "الإمارة مطلوبة." : "Emirate is required.";
+    if (!String(form.area || form.city || "").trim()) return isArabic ? "المنطقة مطلوبة." : "Area is required.";
     if (email && !/^\S+@\S+\.\S+$/.test(email)) return isArabic ? "صيغة البريد الإلكتروني غير صحيحة." : "Email format is invalid.";
     return "";
   }
@@ -106,7 +118,7 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
       const result = await createOpsMerchant(form);
       const saved = result.row;
       setSource(result.source);
-      setMessage(isArabic ? `تم حفظ التاجر الحقيقي: ${saved.trade_name} · ${saved.merchant_code || "بدون كود"}` : `Live merchant saved: ${saved.trade_name} · ${saved.merchant_code || "no code"}`);
+      setMessage(isArabic ? `تم حفظ التاجر وربطه بقاعدة البيانات: ${saved.trade_name} · ${saved.merchant_code || "بدون كود"}` : `Live merchant saved and linked to database: ${saved.trade_name} · ${saved.merchant_code || "no code"}`);
       setForm(emptyMerchant);
       onSaved?.(saved);
     } catch (err) {
@@ -118,32 +130,33 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
   }
 
   const labels = {
-    title: isArabic ? "إضافة تاجر إنتاجي متصل بقاعدة البيانات" : "Create production DB-backed merchant",
+    title: isArabic ? "إضافة تاجر إنتاجي متصل بقاعدة البيانات" : "Create live database-backed merchant",
     hint: isArabic
-      ? "المطلوب فقط: اسم المتجر والهاتف الأساسي. باقي بيانات التاجر المالية والتشغيلية اختيارية بالكامل، وسيستخدم النظام القيم الافتراضية الآمنة عند تركها فارغة."
-      : "Only trade name and primary phone are required. All secondary finance and operations fields are optional, and safe defaults are used when they are left empty.",
-    save: saving ? (isArabic ? "جاري الحفظ الحقيقي..." : "Saving live...") : (isArabic ? "حفظ التاجر في قاعدة البيانات" : "Save merchant to database"),
+      ? "المطلوب فقط: اسم المتجر والهاتف الأساسي والإمارة والمنطقة. باقي بيانات التاجر المالية والتشغيلية اختيارية بالكامل."
+      : "Required only: trade name, primary phone, emirate, and area. All other finance and operations fields are optional.",
+    save: saving ? (isArabic ? "جارٍ الحفظ في قاعدة البيانات..." : "Saving to database...") : (isArabic ? "حفظ التاجر في قاعدة البيانات" : "Save merchant to database"),
     requiredSection: isArabic ? "بيانات أساسية مطلوبة" : "Required core details",
     optionalSection: isArabic ? "بيانات اختيارية للتشغيل والحسابات" : "Optional operations and finance details",
     optionalHint: isArabic
-      ? "يمكن ترك هذه الخانات فارغة الآن واستكمالها لاحقاً من ملف التاجر. لا يتم منع حفظ التاجر بسببها."
+      ? "يمكن ترك هذه الخانات فارغة الآن واستكمالها لاحقًا من ملف التاجر. لا يتم منع حفظ التاجر بسببها."
       : "These fields can be left empty now and completed later from the merchant profile. They do not block saving.",
     tradeName: isArabic ? "اسم المتجر *" : "Trade name *",
-    owner: isArabic ? "اسم المالك" : "Owner",
+    owner: isArabic ? "اسم المالك" : "Owner name",
     phone: isArabic ? "الهاتف الأساسي *" : "Primary phone *",
     altPhone: optionalLabel(isArabic ? "هاتف إضافي" : "Alt phone", isArabic),
     email: optionalLabel(isArabic ? "البريد الإلكتروني" : "Email", isArabic),
-    emirate: isArabic ? "الإمارة" : "Emirate",
-    city: isArabic ? "المدينة" : "City",
-    address: isArabic ? "العنوان" : "Address",
+    emirate: isArabic ? "الإمارة *" : "Emirate *",
+    area: isArabic ? "المنطقة *" : "Area *",
+    streetDetails: optionalLabel(isArabic ? "الشارع أو الحي أو رقم الفيلا" : "Street, neighborhood, or villa", isArabic),
+    address: optionalLabel(isArabic ? "العنوان التفصيلي" : "Detailed address", isArabic),
     pickupAddress: optionalLabel(isArabic ? "عنوان الاستلام" : "Pickup address", isArabic),
     license: optionalLabel(isArabic ? "الرخصة التجارية" : "Trade license", isArabic),
     bank: optionalLabel(isArabic ? "البنك" : "Bank", isArabic),
     settlement: optionalLabel(isArabic ? "دورة التسوية" : "Settlement cycle", isArabic),
     settlementDefault: isArabic ? "اختياري — الافتراضي: أسبوعي" : "Optional — default: Weekly",
-    defaultPayment: optionalLabel(isArabic ? "طريقة الدفع الافتراضية" : "Default payment", isArabic),
+    defaultPayment: optionalLabel(isArabic ? "طريقة الدفع الافتراضية" : "Default payment method", isArabic),
     defaultPaymentDefault: isArabic ? "اختياري — الافتراضي: المرسل يدفع" : "Optional — default: Sender pays",
-    status: isArabic ? "الحالة" : "Status",
+    status: isArabic ? "حالة الحساب" : "Account status",
     notes: optionalLabel(isArabic ? "ملاحظات تشغيلية" : "Operations notes", isArabic),
     logo: optionalLabel(isArabic ? "رابط الشعار" : "Logo URL", isArabic),
     trn: optionalLabel("TRN", isArabic),
@@ -180,14 +193,15 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.owner}</span><input className={inputClass()} value={form.owner_name || ""} onChange={(event) => setField("owner_name", event.target.value)} /></label>
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.phone}</span><input dir="ltr" className={inputClass()} value={form.phone} onChange={(event) => setField("phone", event.target.value)} /></label>
 
-        <label className="space-y-1">
-          <span className="text-xs font-black text-white/60">{labels.emirate}</span>
-          <select className={inputClass()} value={form.emirate || ""} onChange={(event) => { setField("emirate", event.target.value); setField("city", event.target.value); }}>
-            {emirates.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
-          </select>
-        </label>
+        <div className="rounded-[1.5rem] border border-brand-gold/15 bg-brand-gold/5 p-3 md:col-span-2 xl:col-span-3">
+          <p className="mb-3 flex items-center gap-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "موقع التاجر والاستلام" : "Merchant and pickup location"}</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.emirate}</span><select className={inputClass()} value={form.emirate || "Abu Dhabi"} onChange={(event) => chooseEmirate(event.target.value)}>{UAE_LOCATIONS.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.area}</span><select className={inputClass()} value={form.area || form.city || ""} onChange={(event) => chooseArea(event.target.value)}>{areas.map((area) => <option key={area.value} value={area.value}>{optionLabel(area, isArabic)}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.streetDetails}</span><input className={inputClass()} value={form.street_details || ""} onChange={(event) => setField("street_details", event.target.value)} placeholder={isArabic ? "شارع، حي، بناية، فيلا" : "Street, district, building, villa"} /></label>
+          </div>
+        </div>
 
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.city}</span><input className={inputClass()} value={form.city || ""} onChange={(event) => setField("city", event.target.value)} /></label>
         <label className="space-y-1 md:col-span-2"><span className="text-xs font-black text-white/60">{labels.address}</span><input className={inputClass()} value={form.address || ""} onChange={(event) => setField("address", event.target.value)} /></label>
       </div>
 
@@ -210,7 +224,7 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
           <span className="text-xs font-black text-white/60">{labels.settlement}</span>
           <select className={inputClass()} value={form.settlement_cycle || ""} onChange={(event) => setField("settlement_cycle", event.target.value)}>
             <option value="">{labels.settlementDefault}</option>
-            {settlementOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
+            {settlementOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}
           </select>
         </label>
 
@@ -218,14 +232,14 @@ export default function AdminNewMerchant({ isArabic, onSaved }: { isArabic: bool
           <span className="text-xs font-black text-white/60">{labels.defaultPayment}</span>
           <select className={inputClass()} value={form.default_payment_method || ""} onChange={(event) => setField("default_payment_method", event.target.value)}>
             <option value="">{labels.defaultPaymentDefault}</option>
-            {paymentOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
+            {paymentOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}
           </select>
         </label>
 
         <label className="space-y-1">
           <span className="text-xs font-black text-white/60">{labels.status}</span>
           <select className={inputClass()} value={form.status || "active"} onChange={(event) => setField("status", event.target.value)}>
-            {statusOptions.map((item) => <option key={item.value} value={item.value}>{isArabic ? item.ar : item.en}</option>)}
+            {statusOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}
           </select>
         </label>
 
