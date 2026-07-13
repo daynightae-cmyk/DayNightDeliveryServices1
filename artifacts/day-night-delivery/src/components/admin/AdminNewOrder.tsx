@@ -1,5 +1,17 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, CheckCircle2, Database, MapPin, PackagePlus, ReceiptText, Save } from "lucide-react";
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  Database,
+  FileUp,
+  Loader2,
+  MapPin,
+  PackagePlus,
+  ReceiptText,
+  Save,
+  ScanLine,
+} from "lucide-react";
 import {
   calculateMerchantStatementNet,
   calculateOpsOrderPrice,
@@ -7,6 +19,7 @@ import {
   type OpsDataSource,
   type OpsOrderInput,
 } from "../../lib/adminOperationsData";
+import { importCouponFile, parseCouponText, type CouponImportResult } from "../../lib/couponImport";
 import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
 
@@ -77,6 +90,32 @@ function optionLabel(option: { ar: string; en: string }, isArabic: boolean) {
   return isArabic ? option.ar : option.en;
 }
 
+function matchMerchantFromText(text: string, merchants: Merchant[]) {
+  const compactText = text.toLowerCase().replace(/\s+/g, " ");
+  return merchants.find((merchant) => {
+    const candidates = [merchant.trade_name, merchant.merchant_code, merchant.phone, merchant.email]
+      .map((value) => clean(value).toLowerCase())
+      .filter((value) => value.length >= 3);
+    return candidates.some((candidate) => compactText.includes(candidate));
+  }) || null;
+}
+
+function importWarningLabel(key: string, isArabic: boolean) {
+  const ar: Record<string, string> = {
+    receiver_name: "اسم العميل",
+    receiver_phone: "هاتف العميل",
+    address: "العنوان",
+    coupon_number: "رقم الكوبون أو المرجع",
+  };
+  const en: Record<string, string> = {
+    receiver_name: "receiver name",
+    receiver_phone: "receiver phone",
+    address: "address",
+    coupon_number: "coupon or reference",
+  };
+  return isArabic ? ar[key] || key : en[key] || key;
+}
+
 export default function AdminNewOrder({
   isArabic,
   merchants,
@@ -88,9 +127,13 @@ export default function AdminNewOrder({
 }) {
   const [form, setForm] = useState<OpsOrderInput>(emptyOrder);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [importSummary, setImportSummary] = useState("");
   const [source, setSource] = useState<OpsDataSource | "pending" | "none">("none");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedMerchant = useMemo(
     () => merchants.find((merchant) => merchant.id === form.merchant_id) || null,
@@ -147,6 +190,64 @@ export default function AdminNewOrder({
     return UAE_LOCATIONS.some((item) => item.value === value) ? value || "Abu Dhabi" : "Abu Dhabi";
   }
 
+  function applyImportedCoupon(result: CouponImportResult) {
+    const matchedMerchant = matchMerchantFromText(result.rawText, merchants);
+    const imported = result.fields;
+    const importedNotes = clean(imported.notes);
+    setForm((prev) => ({
+      ...prev,
+      ...imported,
+      merchant: matchedMerchant || prev.merchant,
+      merchant_id: matchedMerchant?.id || prev.merchant_id,
+      merchant_name: matchedMerchant?.trade_name || imported.merchant_name || prev.merchant_name,
+      merchant_code: matchedMerchant?.merchant_code || imported.merchant_code || prev.merchant_code,
+      pickup_city: matchedMerchant?.emirate || prev.pickup_city,
+      pickup_area: matchedMerchant?.city || prev.pickup_area,
+      pickup_street: matchedMerchant?.pickup_address || matchedMerchant?.address || prev.pickup_street,
+      notes: importedNotes ? `${clean(prev.notes)}\n${importedNotes}`.trim() : prev.notes,
+    }));
+
+    const missing = result.warnings.map((key) => importWarningLabel(key, isArabic));
+    setImportSummary(
+      isArabic
+        ? `تم استيراد بيانات الكوبون من ${result.source === "barcode" ? "QR / باركود" : result.source === "ocr" ? "الصورة" : "الملف"}. ${missing.length ? `راجع الحقول الناقصة: ${missing.join("، ")}.` : "تم ملء الحقول الأساسية تلقائيًا."}`
+        : `Coupon data imported from ${result.source === "barcode" ? "QR / barcode" : result.source === "ocr" ? "image" : "file"}. ${missing.length ? `Review missing fields: ${missing.join(", ")}.` : "Core fields were filled automatically."}`,
+    );
+    setSource("pending");
+  }
+
+  async function handleCouponFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setError("");
+    setMessage("");
+    setImportSummary("");
+    setImporting(true);
+    try {
+      const result = await importCouponFile(file);
+      applyImportedCoupon(result);
+    } catch (err) {
+      setError(String((err as Error).message || err));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function importFromClipboardText() {
+    const text = window.prompt(
+      isArabic
+        ? "الصق نص الكوبون أو بيانات الكشف هنا وسيتم توزيعها على الخانات تلقائيًا."
+        : "Paste coupon or manifest text here and it will be mapped into the form automatically.",
+    );
+    if (!text) return;
+    setError("");
+    setMessage("");
+    const result = parseCouponText(text);
+    applyImportedCoupon(result);
+  }
+
   function validate() {
     const missing = [
       !selectedMerchant && !clean(form.merchant_name) ? (isArabic ? "التاجر أو اسم المرسل" : "merchant or sender name") : "",
@@ -189,6 +290,7 @@ export default function AdminNewOrder({
       const tracking = saved.tracking_number || saved.invoice_number || saved.id;
       setSource(result.source);
       setMessage(isArabic ? `تم إنشاء الطلبية وربطها بقاعدة البيانات. رقم التتبع: ${tracking}` : `Live order created and linked to the database. Tracking: ${tracking}`);
+      setImportSummary("");
       setForm({
         ...emptyOrder,
         merchant_id: selectedMerchant?.id || "",
@@ -258,6 +360,35 @@ export default function AdminNewOrder({
         </span>
       </div>
 
+      <div className="mb-4 rounded-[1.5rem] border border-brand-gold/20 bg-brand-gold/5 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-black text-brand-gold">
+          <ScanLine className="h-5 w-5" />
+          {isArabic ? "استيراد بيانات الكوبون بدل الإدخال اليدوي" : "Import coupon data instead of manual entry"}
+        </div>
+        <p className="mb-3 text-xs font-bold leading-6 text-white/55">
+          {isArabic
+            ? "ارفع صورة كوبون أو QR/باركود أو ملف CSV/TXT/JSON، أو افتح الكاميرا من الهاتف. سيتم ملء رقم الكوبون واسم العميل والهاتف والعنوان والتحصيل تلقائيًا، ثم تراجع البيانات قبل الحفظ."
+            : "Upload a coupon image, QR/barcode, CSV/TXT/JSON file, or open the phone camera. The coupon/reference, receiver name, phone, address, and collection fields are filled automatically for review before saving."}
+        </p>
+        <input ref={fileInputRef} type="file" accept="image/*,.csv,.txt,.json,text/csv,text/plain,application/json" className="hidden" onChange={handleCouponFile} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCouponFile} />
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={importing} onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white transition hover:border-brand-gold/50 disabled:opacity-60">
+            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+            {isArabic ? "استيراد ملف أو صورة" : "Import file or image"}
+          </button>
+          <button type="button" disabled={importing} onClick={() => cameraInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white transition hover:border-brand-gold/50 disabled:opacity-60">
+            <Camera className="h-4 w-4" />
+            {isArabic ? "تصوير بالكاميرا" : "Capture with camera"}
+          </button>
+          <button type="button" disabled={importing} onClick={importFromClipboardText} className="inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep transition hover:-translate-y-0.5 disabled:opacity-60">
+            <ScanLine className="h-4 w-4" />
+            {isArabic ? "لصق نص الكوبون" : "Paste coupon text"}
+          </button>
+        </div>
+        {importSummary && <div className="mt-3 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-xs font-bold leading-6 text-emerald-100">{importSummary}</div>}
+      </div>
+
       {message && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 className="h-4 w-4" />{message}</div>}
       {error && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200"><AlertTriangle className="h-4 w-4" />{error}</div>}
 
@@ -305,7 +436,7 @@ export default function AdminNewOrder({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-sm font-black text-brand-deep transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
+        <button type="submit" disabled={saving || importing} className="inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-sm font-black text-brand-deep transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
           <Save className="h-4 w-4" />
           {labels.save}
         </button>
