@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertTriangle,
   Camera,
+  CameraOff,
   CheckCircle2,
   Database,
   FileUp,
@@ -11,6 +12,7 @@ import {
   ReceiptText,
   Save,
   ScanLine,
+  X,
 } from "lucide-react";
 import {
   calculateMerchantStatementNet,
@@ -67,6 +69,10 @@ const statusOptions = [
   { value: "in_transit", ar: "في الطريق", en: "In transit" },
 ];
 
+type BrowserBarcodeDetector = new (options?: unknown) => {
+  detect: (image: HTMLVideoElement | HTMLCanvasElement | ImageBitmap | HTMLImageElement) => Promise<Array<{ rawValue?: string }>>;
+};
+
 function inputClass() {
   return "w-full rounded-2xl border border-brand-sky/20 bg-brand-deep/75 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-brand-gold/70 focus:ring-2 focus:ring-brand-gold/15";
 }
@@ -88,6 +94,10 @@ function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boole
 
 function optionLabel(option: { ar: string; en: string }, isArabic: boolean) {
   return isArabic ? option.ar : option.en;
+}
+
+function getBarcodeDetector() {
+  return (window as unknown as { BarcodeDetector?: BrowserBarcodeDetector }).BarcodeDetector;
 }
 
 function matchMerchantFromText(text: string, merchants: Merchant[]) {
@@ -128,12 +138,14 @@ export default function AdminNewOrder({
   const [form, setForm] = useState<OpsOrderInput>(emptyOrder);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [importSummary, setImportSummary] = useState("");
   const [source, setSource] = useState<OpsDataSource | "pending" | "none">("none");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const selectedMerchant = useMemo(
     () => merchants.find((merchant) => merchant.id === form.merchant_id) || null,
@@ -153,6 +165,15 @@ export default function AdminNewOrder({
     [form, selectedMerchant],
   );
 
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => undefined);
+    }
+  }, [cameraOpen]);
+
+  useEffect(() => () => stopCamera(), []);
+
   function setField<K extends keyof OpsOrderInput>(key: K, value: OpsOrderInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSource("pending");
@@ -170,24 +191,14 @@ export default function AdminNewOrder({
 
   function chooseMerchant(id: string) {
     const merchant = merchants.find((item) => item.id === id) || null;
-    const merchantEmirate = merchant?.emirate || prevSafeEmirate(form.pickup_city);
-    const merchantArea = merchant?.city && merchant.city !== merchantEmirate ? merchant.city : getDefaultAreaForEmirate(merchantEmirate);
     setForm((prev) => ({
       ...prev,
       merchant,
       merchant_id: id,
-      merchant_name: merchant?.trade_name || prev.merchant_name,
+      merchant_name: merchant?.trade_name || "",
       merchant_code: merchant?.merchant_code || "",
-      pickup_city: merchantEmirate,
-      pickup_area: merchantArea,
-      pickup_street: merchant?.pickup_address || merchant?.address || prev.pickup_street || "",
-      payment_method: merchant?.default_payment_method || prev.payment_method || "merchant_pays",
     }));
     setSource("pending");
-  }
-
-  function prevSafeEmirate(value: string | undefined) {
-    return UAE_LOCATIONS.some((item) => item.value === value) ? value || "Abu Dhabi" : "Abu Dhabi";
   }
 
   function applyImportedCoupon(result: CouponImportResult) {
@@ -201,9 +212,6 @@ export default function AdminNewOrder({
       merchant_id: matchedMerchant?.id || prev.merchant_id,
       merchant_name: matchedMerchant?.trade_name || imported.merchant_name || prev.merchant_name,
       merchant_code: matchedMerchant?.merchant_code || imported.merchant_code || prev.merchant_code,
-      pickup_city: matchedMerchant?.emirate || prev.pickup_city,
-      pickup_area: matchedMerchant?.city || prev.pickup_area,
-      pickup_street: matchedMerchant?.pickup_address || matchedMerchant?.address || prev.pickup_street,
       notes: importedNotes ? `${clean(prev.notes)}\n${importedNotes}`.trim() : prev.notes,
     }));
 
@@ -246,6 +254,81 @@ export default function AdminNewOrder({
     setMessage("");
     const result = parseCouponText(text);
     applyImportedCoupon(result);
+  }
+
+  async function openCamera() {
+    setError("");
+    setMessage("");
+    setImportSummary("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(isArabic ? "المتصفح لا يدعم فتح الكاميرا المباشرة. استخدم استيراد صورة من الجهاز." : "This browser does not support direct camera access. Import an image instead.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+    } catch (err) {
+      setError(String((err as Error).message || err));
+    }
+  }
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOpen(false);
+  }
+
+  async function scanCameraBarcode() {
+    if (!videoRef.current) return;
+    const Detector = getBarcodeDetector();
+    if (!Detector) {
+      setError(isArabic ? "قراءة QR/الباركود المباشرة غير مدعومة في هذا المتصفح. صوّر الكوبون ثم استخدم زر قراءة الصورة." : "Live QR/barcode scanning is not supported in this browser. Capture the coupon, then use image reading.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const detector = new Detector({ formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8"] });
+      const codes = await detector.detect(videoRef.current);
+      const text = codes.map((code) => code.rawValue).filter(Boolean).join("\n");
+      if (!text) throw new Error(isArabic ? "لم يتم العثور على QR أو باركود واضح أمام الكاميرا." : "No clear QR or barcode was detected in front of the camera.");
+      applyImportedCoupon({ ...parseCouponText(text), rawText: text, source: "barcode" });
+      stopCamera();
+    } catch (err) {
+      setError(String((err as Error).message || err));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function captureCameraImage() {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setImporting(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas is not available.");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
+      if (!blob) throw new Error("Could not capture camera image.");
+      const result = await importCouponFile(new File([blob], "coupon-camera.png", { type: "image/png" }));
+      applyImportedCoupon(result);
+      stopCamera();
+    } catch (err) {
+      setError(String((err as Error).message || err));
+    } finally {
+      setImporting(false);
+    }
   }
 
   function validate() {
@@ -297,10 +380,6 @@ export default function AdminNewOrder({
         merchant_name: selectedMerchant?.trade_name || "",
         merchant_code: selectedMerchant?.merchant_code || "",
         merchant: selectedMerchant,
-        pickup_city: selectedMerchant?.emirate || emptyOrder.pickup_city,
-        pickup_area: selectedMerchant?.city || emptyOrder.pickup_area,
-        pickup_street: selectedMerchant?.pickup_address || selectedMerchant?.address || "",
-        payment_method: selectedMerchant?.default_payment_method || "merchant_pays",
       });
       onSaved?.(saved);
     } catch (err) {
@@ -314,8 +393,8 @@ export default function AdminNewOrder({
   const labels = {
     title: isArabic ? "إضافة طلبية إنتاجية متصلة بقاعدة البيانات" : "Create live database-backed shipment",
     hint: isArabic
-      ? "حدد من يتحمل رسوم التوصيل: إذا اخترت التاجر يتحمل الرسوم ومبلغ التحصيل 0، ستنزل في كشف التاجر صافي سالب بقيمة رسوم التوصيل."
-      : "Choose who pays the delivery fee: if the merchant pays and collection is 0, the merchant statement posts a negative net equal to the delivery fee.",
+      ? "اختر التاجر بالاسم فقط، ثم املأ بيانات الطلبية أو استوردها من كوبون. يظهر صافي التاجر بالسالب فقط عندما يكون التاجر هو من يتحمل رسوم التوصيل."
+      : "Select the merchant name only, then enter or import shipment details. The merchant net becomes negative only when the merchant pays the delivery fee.",
     merchant: isArabic ? "التاجر" : "Merchant",
     sender: isArabic ? "اسم المرسل" : "Sender name",
     coupon: isArabic ? "رقم الكوبون أو المرجع" : "Coupon or reference",
@@ -367,19 +446,18 @@ export default function AdminNewOrder({
         </div>
         <p className="mb-3 text-xs font-bold leading-6 text-white/55">
           {isArabic
-            ? "ارفع صورة كوبون أو QR/باركود أو ملف CSV/TXT/JSON، أو افتح الكاميرا من الهاتف. سيتم ملء رقم الكوبون واسم العميل والهاتف والعنوان والتحصيل تلقائيًا، ثم تراجع البيانات قبل الحفظ."
-            : "Upload a coupon image, QR/barcode, CSV/TXT/JSON file, or open the phone camera. The coupon/reference, receiver name, phone, address, and collection fields are filled automatically for review before saving."}
+            ? "ارفع صورة كوبون أو QR/باركود أو ملف CSV/TXT/JSON، أو افتح الكاميرا الحية. سيتم ملء رقم الكوبون واسم العميل والهاتف والعنوان والتحصيل تلقائيًا، ثم تراجع البيانات قبل الحفظ."
+            : "Upload a coupon image, QR/barcode, CSV/TXT/JSON file, or open the live camera. The coupon/reference, receiver name, phone, address, and collection fields are filled automatically for review before saving."}
         </p>
         <input ref={fileInputRef} type="file" accept="image/*,.csv,.txt,.json,text/csv,text/plain,application/json" className="hidden" onChange={handleCouponFile} />
-        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCouponFile} />
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={importing} onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white transition hover:border-brand-gold/50 disabled:opacity-60">
             {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
             {isArabic ? "استيراد ملف أو صورة" : "Import file or image"}
           </button>
-          <button type="button" disabled={importing} onClick={() => cameraInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white transition hover:border-brand-gold/50 disabled:opacity-60">
+          <button type="button" disabled={importing} onClick={openCamera} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white transition hover:border-brand-gold/50 disabled:opacity-60">
             <Camera className="h-4 w-4" />
-            {isArabic ? "تصوير بالكاميرا" : "Capture with camera"}
+            {isArabic ? "فتح الكاميرا الحية" : "Open live camera"}
           </button>
           <button type="button" disabled={importing} onClick={importFromClipboardText} className="inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep transition hover:-translate-y-0.5 disabled:opacity-60">
             <ScanLine className="h-4 w-4" />
@@ -388,6 +466,33 @@ export default function AdminNewOrder({
         </div>
         {importSummary && <div className="mt-3 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-xs font-bold leading-6 text-emerald-100">{importSummary}</div>}
       </div>
+
+      {cameraOpen && (
+        <div className="mb-4 rounded-[1.5rem] border border-brand-sky/25 bg-brand-deep/80 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-black text-white">{isArabic ? "الكاميرا مفتوحة — وجّه الكوبون أو QR بوضوح" : "Camera is open — point clearly at the coupon or QR"}</p>
+            <button type="button" onClick={stopCamera} className="inline-flex items-center gap-2 rounded-2xl border border-white/15 px-3 py-2 text-xs font-black text-white/80">
+              <X className="h-4 w-4" />
+              {isArabic ? "إغلاق" : "Close"}
+            </button>
+          </div>
+          <video ref={videoRef} playsInline muted className="max-h-[420px] w-full rounded-2xl border border-brand-sky/20 bg-black object-cover" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" disabled={importing} onClick={scanCameraBarcode} className="inline-flex items-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep disabled:opacity-60">
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+              {isArabic ? "قراءة QR / باركود الآن" : "Read QR / barcode now"}
+            </button>
+            <button type="button" disabled={importing} onClick={captureCameraImage} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-deep/80 px-4 py-3 text-xs font-black text-white disabled:opacity-60">
+              <Camera className="h-4 w-4" />
+              {isArabic ? "التقاط وقراءة الصورة" : "Capture and read image"}
+            </button>
+            <button type="button" onClick={stopCamera} className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-xs font-black text-rose-100">
+              <CameraOff className="h-4 w-4" />
+              {isArabic ? "إيقاف الكاميرا" : "Stop camera"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {message && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-200"><CheckCircle2 className="h-4 w-4" />{message}</div>}
       {error && <div className="mb-4 flex items-center gap-2 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm font-bold text-rose-200"><AlertTriangle className="h-4 w-4" />{error}</div>}
