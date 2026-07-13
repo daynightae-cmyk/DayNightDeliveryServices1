@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { AlertTriangle, CheckCircle2, Database, MapPin, PackagePlus, ReceiptText, Save } from "lucide-react";
 import {
+  calculateMerchantStatementNet,
   calculateOpsOrderPrice,
   createOpsOrder,
   type OpsDataSource,
@@ -30,7 +31,7 @@ const emptyOrder: OpsOrderInput = {
   package_type: "",
   package_description: "",
   weight: 1,
-  payment_method: "sender_pays",
+  payment_method: "merchant_pays",
   cod_amount: "",
   notes: "",
   status: "pending",
@@ -39,9 +40,9 @@ const emptyOrder: OpsOrderInput = {
 const destinations = ["SA", "KW", "BH", "OM", "QA", "WORLD", "USA", "UK", "EU", "Canada", "Australia"];
 
 const paymentOptions = [
-  { value: "sender_pays", ar: "المرسل يدفع", en: "Sender pays" },
-  { value: "receiver_pays", ar: "المستلم يدفع", en: "Receiver pays" },
-  { value: "cod", ar: "تحصيل عند التسليم", en: "Collect on delivery" },
+  { value: "merchant_pays", ar: "التاجر يتحمل رسوم التوصيل", en: "Merchant pays delivery fee" },
+  { value: "receiver_pays", ar: "المستلم يدفع رسوم التوصيل", en: "Receiver pays delivery fee" },
+  { value: "cod", ar: "تحصيل من العميل عند التسليم", en: "Collect from customer on delivery" },
 ];
 
 const statusOptions = [
@@ -59,6 +60,10 @@ function inputClass() {
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function money(value: number, isArabic: boolean) {
+  return isArabic ? `${value.toFixed(2)} درهم` : `${value.toFixed(2)} AED`;
 }
 
 function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boolean) {
@@ -100,6 +105,11 @@ export default function AdminNewOrder({
     [form, selectedMerchant],
   );
 
+  const settlement = useMemo(
+    () => calculateMerchantStatementNet({ ...form, merchant: selectedMerchant }),
+    [form, selectedMerchant],
+  );
+
   function setField<K extends keyof OpsOrderInput>(key: K, value: OpsOrderInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSource("pending");
@@ -128,7 +138,7 @@ export default function AdminNewOrder({
       pickup_city: merchantEmirate,
       pickup_area: merchantArea,
       pickup_street: merchant?.pickup_address || merchant?.address || prev.pickup_street || "",
-      payment_method: merchant?.default_payment_method || prev.payment_method,
+      payment_method: merchant?.default_payment_method || prev.payment_method || "merchant_pays",
     }));
     setSource("pending");
   }
@@ -155,7 +165,7 @@ export default function AdminNewOrder({
     }
 
     if (form.payment_method === "cod" && Number(form.cod_amount || 0) <= 0) {
-      return isArabic ? "عند اختيار التحصيل عند التسليم يجب إدخال مبلغ التحصيل." : "Collection amount is required when collect on delivery is selected.";
+      return isArabic ? "عند اختيار التحصيل من العميل يجب إدخال مبلغ التحصيل." : "Collection amount is required when collecting from the customer.";
     }
 
     return "";
@@ -188,6 +198,7 @@ export default function AdminNewOrder({
         pickup_city: selectedMerchant?.emirate || emptyOrder.pickup_city,
         pickup_area: selectedMerchant?.city || emptyOrder.pickup_area,
         pickup_street: selectedMerchant?.pickup_address || selectedMerchant?.address || "",
+        payment_method: selectedMerchant?.default_payment_method || "merchant_pays",
       });
       onSaved?.(saved);
     } catch (err) {
@@ -201,8 +212,8 @@ export default function AdminNewOrder({
   const labels = {
     title: isArabic ? "إضافة طلبية إنتاجية متصلة بقاعدة البيانات" : "Create live database-backed shipment",
     hint: isArabic
-      ? "لا يتم إنشاء أي طلبية وهمية. يتم حفظ الطلبية في قاعدة البيانات مع الإمارة والمنطقة وتفاصيل الشارع أو الحي أو الفيلا."
-      : "No fake shipments are created. The shipment is saved to the database with emirate, area, and street/neighborhood/villa details.",
+      ? "حدد من يتحمل رسوم التوصيل: إذا اخترت التاجر يتحمل الرسوم ومبلغ التحصيل 0، ستنزل في كشف التاجر صافي سالب بقيمة رسوم التوصيل."
+      : "Choose who pays the delivery fee: if the merchant pays and collection is 0, the merchant statement posts a negative net equal to the delivery fee.",
     merchant: isArabic ? "التاجر" : "Merchant",
     sender: isArabic ? "اسم المرسل" : "Sender name",
     coupon: isArabic ? "رقم الكوبون أو المرجع" : "Coupon or reference",
@@ -220,12 +231,14 @@ export default function AdminNewOrder({
     package: isArabic ? "محتوى الشحنة" : "Package content",
     pieces: isArabic ? "عدد القطع" : "Pieces",
     weight: isArabic ? "الوزن بالكيلو" : "Weight in kg",
-    payment: isArabic ? "طريقة الدفع" : "Payment method",
-    collectionAmount: isArabic ? "مبلغ التحصيل" : "Collection amount",
+    payment: isArabic ? "من يتحمل رسوم التوصيل؟" : "Who pays the delivery fee?",
+    collectionAmount: isArabic ? "مبلغ التحصيل من العميل" : "Customer collection amount",
     status: isArabic ? "حالة البداية" : "Initial status",
     notes: isArabic ? "ملاحظات تشغيلية" : "Operations notes",
     save: saving ? (isArabic ? "جارٍ الحفظ في قاعدة البيانات..." : "Saving to database...") : (isArabic ? "حفظ الطلبية في قاعدة البيانات" : "Save shipment to database"),
   };
+
+  const settlementTone = settlement.merchantNet < 0 ? "border-rose-400/30 bg-rose-400/10 text-rose-100" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-100";
 
   return (
     <form onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
@@ -280,9 +293,15 @@ export default function AdminNewOrder({
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.pieces}</span><input type="number" min="1" className={inputClass()} value={form.order_count} onChange={(event) => setField("order_count", Number(event.target.value))} /></label>
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.weight}</span><input type="number" min="1" step="0.1" className={inputClass()} value={form.weight || 1} onChange={(event) => setField("weight", Number(event.target.value))} /></label>
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.payment}</span><select className={inputClass()} value={form.payment_method} onChange={(event) => setField("payment_method", event.target.value)}>{paymentOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}</select></label>
-        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.collectionAmount}</span><input type="number" min="0" className={inputClass()} value={form.cod_amount || ""} onChange={(event) => setField("cod_amount", event.target.value)} /></label>
+        <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.collectionAmount}</span><input type="number" min="0" className={inputClass()} value={form.cod_amount || ""} onChange={(event) => setField("cod_amount", event.target.value)} placeholder="0" /></label>
         <label className="space-y-1"><span className="text-xs font-black text-white/60">{labels.status}</span><select className={inputClass()} value={form.status || "pending"} onChange={(event) => setField("status", event.target.value)}>{statusOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item, isArabic)}</option>)}</select></label>
         <label className="space-y-1 md:col-span-2 xl:col-span-3"><span className="text-xs font-black text-white/60">{labels.notes}</span><textarea className={`${inputClass()} min-h-24`} value={form.notes || ""} onChange={(event) => setField("notes", event.target.value)} /></label>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 rounded-[1.5rem] border border-brand-sky/20 bg-brand-deep/45 p-4 md:grid-cols-3">
+        <div><p className="text-[11px] font-black text-white/45">{isArabic ? "تحصيل من العميل" : "Customer collection"}</p><p className="text-lg font-black text-white">{money(settlement.collectionAmount, isArabic)}</p></div>
+        <div><p className="text-[11px] font-black text-white/45">{isArabic ? "سعر التوصيل" : "Delivery fee"}</p><p className="text-lg font-black text-brand-gold">{money(settlement.deliveryFee, isArabic)}</p></div>
+        <div className={`rounded-2xl border px-4 py-3 ${settlementTone}`}><p className="text-[11px] font-black opacity-70">{isArabic ? "الصافي في كشف التاجر" : "Merchant statement net"}</p><p className="text-lg font-black">{money(settlement.merchantNet, isArabic)}</p></div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -292,7 +311,7 @@ export default function AdminNewOrder({
         </button>
         <span className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/25 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky">
           <ReceiptText className="h-4 w-4" />
-          {isArabic ? "السعر الإنتاجي" : "Production price"}: {price.total.toFixed(2)} AED
+          {isArabic ? "رسوم التوصيل المحسوبة" : "Calculated delivery fee"}: {price.total.toFixed(2)} AED
         </span>
       </div>
     </form>
