@@ -22,6 +22,36 @@ type CouponFieldKey =
   | "cod_amount"
   | "status";
 
+type BarcodeDetectorCtor = new (options?: unknown) => {
+  detect: (image: ImageBitmap | HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => Promise<Array<{ rawValue?: string }>>;
+};
+
+type TextDetectorCtor = new () => {
+  detect: (image: ImageBitmap | HTMLCanvasElement) => Promise<Array<{ rawValue?: string }>>;
+};
+
+type TesseractModule = {
+  recognize?: (
+    image: string | Blob | File | HTMLCanvasElement,
+    langs?: string,
+    options?: Record<string, unknown>,
+  ) => Promise<{ data?: { text?: string } }>;
+  createWorker?: (
+    langs?: string,
+    oem?: number,
+    options?: Record<string, unknown>,
+  ) => Promise<{
+    recognize: (image: string | Blob | File | HTMLCanvasElement) => Promise<{ data?: { text?: string } }>;
+    setParameters?: (params: Record<string, string>) => Promise<void>;
+    terminate: () => Promise<void>;
+  }>;
+};
+
+const TESSERACT_ESM_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.esm.min.js";
+const TESSERACT_WORKER_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js";
+const TESSERACT_CORE_URL = "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0";
+const TESSERACT_LANG_URL = "https://tessdata.projectnaptha.com/4.0.0";
+
 function normalizeDigits(value: string) {
   const arabic = "٠١٢٣٤٥٦٧٨٩";
   const persian = "۰۱۲۳۴۵۶۷۸۹";
@@ -77,19 +107,24 @@ function findCouponNumber(text: string, lines: string[]) {
     "رقم المرجع",
     "رقم التتبع",
     "رقم الطلب",
+    "رقم بوليصة",
+    "بوليصة",
     "الكوبون",
     "المرجع",
     "coupon",
     "reference",
     "tracking",
+    "tracking number",
     "order number",
+    "waybill",
+    "awb",
   ]);
-  if (labeled) return labeled.replace(/[^A-Za-z0-9\-_/]/g, "").slice(0, 40);
+  if (labeled) return labeled.replace(/[^A-Za-z0-9\-_/]/g, "").slice(0, 50);
 
   const dn = text.match(/DN[-\s]?(?:\d{4})[-\s]?[A-Z0-9\-]{4,}/i)?.[0];
   if (dn) return dn.replace(/\s+/g, "-").toUpperCase();
 
-  const compact = normalizeDigits(text).match(/\b[A-Z]{1,5}[-_]?\d{3,}[-_]?[A-Z0-9]{0,12}\b/i)?.[0];
+  const compact = normalizeDigits(text).match(/\b[A-Z]{1,5}[-_]?\d{3,}[-_]?[A-Z0-9]{0,16}\b/i)?.[0];
   return compact || "";
 }
 
@@ -132,22 +167,22 @@ function splitRow(row: string) {
 }
 
 function normalizeHeader(header: string) {
-  return clean(header).toLowerCase().replace(/[\s_\-:/]+/g, "");
+  return clean(header).toLowerCase().replace(/[\s_\-:/#]+/g, "");
 }
 
 function headerToField(header: string): CouponFieldKey | "delivery_fee" | "net" | "" {
   const h = normalizeHeader(header);
-  if (["رقمالكوبون", "رقمالمرجع", "رقمالطلب", "coupon", "reference", "tracking", "trackingnumber", "ordernumber"].includes(h)) return "coupon_number";
-  if (["اسمالعميل", "اسمالمستلم", "customer", "customername", "receiver", "receivername", "name"].includes(h)) return "receiver_name";
-  if (["هاتفالعميل", "رقمالهاتف", "هاتف", "موبايل", "phone", "mobile", "telephone", "receiverphone"].includes(h)) return "receiver_phone";
+  if (["رقمالكوبون", "رقمالمرجع", "رقمالتتبع", "رقمالطلب", "رقمبوليصة", "بوليصة", "coupon", "reference", "tracking", "trackingnumber", "ordernumber", "waybill", "awb"].includes(h)) return "coupon_number";
+  if (["اسمالعميل", "اسمالمستلم", "العميل", "المستلم", "customer", "customername", "receiver", "receivername", "name"].includes(h)) return "receiver_name";
+  if (["هاتفالعميل", "رقمالهاتف", "هاتف", "تليفون", "موبايل", "phone", "mobile", "telephone", "receiverphone"].includes(h)) return "receiver_phone";
   if (["عنوانالعميل", "عنوانالمستلم", "العنوان", "address", "receiveraddress", "deliveryaddress"].includes(h)) return "receiver_address";
-  if (["الإمارة", "امارة", "الامارة", "emirate", "city", "deliverycity"].includes(h)) return "delivery_city";
+  if (["الإمارة", "الامارة", "امارة", "emirate", "city", "deliverycity"].includes(h)) return "delivery_city";
   if (["المنطقة", "منطقة", "area", "deliveryarea", "district"].includes(h)) return "delivery_area";
   if (["الشارع", "الحى", "الحي", "الفيلا", "street", "villa", "building", "neighborhood"].includes(h)) return "delivery_street";
   if (["المحتوى", "محتوىالشحنة", "الشحنة", "المنتج", "الصنف", "package", "item", "description"].includes(h)) return "package_type";
   if (["عددالقطع", "القطع", "pieces", "qty", "quantity"].includes(h)) return "order_count";
   if (["الوزن", "weight", "kg"].includes(h)) return "weight";
-  if (["الإجمالي", "الاجمالي", "مجموعالإجمالي", "المجموع", "total", "amount", "cod", "collection", "تحصيل", "مبلغالتحصيل"].includes(h)) return "cod_amount";
+  if (["الإجمالي", "الاجمالي", "مجموعالإجمالي", "المجموع", "total", "amount", "cod", "collection", "collect", "تحصيل", "مبلغالتحصيل"].includes(h)) return "cod_amount";
   if (["سعرالتوصيل", "deliveryfee", "deliveryprice", "deliverycharge"].includes(h)) return "delivery_fee";
   if (["الصافي", "net", "merchantnet"].includes(h)) return "net";
   if (["الحالة", "الحالةالمالية", "status", "financialstatus"].includes(h)) return "status";
@@ -157,41 +192,53 @@ function headerToField(header: string): CouponFieldKey | "delivery_fee" | "net" 
 function applyTableValue(fields: Partial<OpsOrderInput>, field: CouponFieldKey, value: string) {
   const cleanValue = clean(value);
   if (!cleanValue) return;
-  if (field === "receiver_address") {
-    fields.receiver_address = cleanValue;
-    fields.delivery_street = cleanValue;
-    return;
+
+  switch (field) {
+    case "receiver_address":
+      fields.receiver_address = cleanValue;
+      fields.delivery_street = cleanValue;
+      break;
+    case "package_type":
+      fields.package_type = cleanValue;
+      fields.package_description = cleanValue;
+      break;
+    case "order_count":
+      fields.order_count = Math.max(1, Number(cleanValue.replace(/[^0-9.]/g, "")) || 1);
+      break;
+    case "weight":
+      fields.weight = Math.max(1, Number(cleanValue.replace(/[^0-9.]/g, "")) || 1);
+      break;
+    case "cod_amount": {
+      const amount = cleanValue.replace(/[^0-9.\-]/g, "");
+      fields.cod_amount = amount || cleanValue;
+      fields.payment_method = Number(amount || 0) > 0 ? "cod" : "merchant_pays";
+      break;
+    }
+    case "delivery_city": {
+      const location = findEmirateAndArea(cleanValue);
+      fields.delivery_city = location.emirate || cleanValue;
+      if (location.area) fields.delivery_area = location.area;
+      break;
+    }
+    case "delivery_area":
+      fields.delivery_area = cleanValue;
+      break;
+    case "coupon_number":
+      fields.coupon_number = cleanValue;
+      break;
+    case "receiver_name":
+      fields.receiver_name = cleanValue;
+      break;
+    case "receiver_phone":
+      fields.receiver_phone = cleanValue;
+      break;
+    case "delivery_street":
+      fields.delivery_street = cleanValue;
+      break;
+    case "status":
+      fields.status = cleanValue;
+      break;
   }
-  if (field === "package_type") {
-    fields.package_type = cleanValue;
-    fields.package_description = cleanValue;
-    return;
-  }
-  if (field === "order_count") {
-    fields.order_count = Math.max(1, Number(cleanValue.replace(/[^0-9.]/g, "")) || 1);
-    return;
-  }
-  if (field === "weight") {
-    fields.weight = Math.max(1, Number(cleanValue.replace(/[^0-9.]/g, "")) || 1);
-    return;
-  }
-  if (field === "cod_amount") {
-    const amount = cleanValue.replace(/[^0-9.\-]/g, "");
-    fields.cod_amount = amount || cleanValue;
-    fields.payment_method = Number(amount || 0) > 0 ? "cod" : "merchant_pays";
-    return;
-  }
-  if (field === "delivery_city") {
-    const location = findEmirateAndArea(cleanValue);
-    fields.delivery_city = location.emirate || cleanValue;
-    if (location.area) fields.delivery_area = location.area;
-    return;
-  }
-  if (field === "delivery_area") {
-    fields.delivery_area = cleanValue;
-    return;
-  }
-  fields[field] = cleanValue as never;
 }
 
 function parseDelimitedTable(text: string): Partial<OpsOrderInput> {
@@ -227,9 +274,8 @@ function parseJsonObject(text: string): Partial<OpsOrderInput> {
     const parsed = JSON.parse(text) as unknown;
     const row = Array.isArray(parsed) ? parsed[0] : parsed;
     if (!row || typeof row !== "object") return {};
-    const entries = Object.entries(row as Record<string, unknown>);
     const fields: Partial<OpsOrderInput> = {};
-    for (const [header, value] of entries) {
+    for (const [header, value] of Object.entries(row as Record<string, unknown>)) {
       const field = headerToField(header);
       if (!field || field === "delivery_fee" || field === "net") continue;
       applyTableValue(fields, field, String(value ?? ""));
@@ -240,14 +286,42 @@ function parseJsonObject(text: string): Partial<OpsOrderInput> {
   }
 }
 
+async function imageFileToCanvas(file: File | Blob, options: { enhance?: boolean } = {}) {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 2400;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas is not available.");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  if (options.enhance) {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.data.length; i += 4) {
+      const gray = data.data[i] * 0.299 + data.data[i + 1] * 0.587 + data.data[i + 2] * 0.114;
+      const boosted = Math.max(0, Math.min(255, (gray - 120) * 1.75 + 150));
+      data.data[i] = boosted;
+      data.data[i + 1] = boosted;
+      data.data[i + 2] = boosted;
+    }
+    ctx.putImageData(data, 0, 0);
+  }
+
+  return canvas;
+}
+
 async function readBarcodeFromImage(file: File): Promise<string> {
   try {
-    const Detector = (window as unknown as { BarcodeDetector?: new (options?: unknown) => { detect: (image: ImageBitmap | HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => Promise<Array<{ rawValue?: string }>> } }).BarcodeDetector;
+    const Detector = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
     if (!Detector) return "";
     const detector = new Detector({ formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8"] });
-    const bitmap = await createImageBitmap(file);
-    const codes = await detector.detect(bitmap);
-    bitmap.close?.();
+    const canvas = await imageFileToCanvas(file);
+    const codes = await detector.detect(canvas);
     return codes.map((code) => code.rawValue).filter(Boolean).join("\n");
   } catch {
     return "";
@@ -256,16 +330,55 @@ async function readBarcodeFromImage(file: File): Promise<string> {
 
 async function readImageWithNativeTextDetector(file: File): Promise<string> {
   try {
-    const TextDetector = (window as unknown as { TextDetector?: new () => { detect: (image: ImageBitmap) => Promise<Array<{ rawValue?: string }>> } }).TextDetector;
+    const TextDetector = (window as unknown as { TextDetector?: TextDetectorCtor }).TextDetector;
     if (!TextDetector) return "";
     const detector = new TextDetector();
-    const bitmap = await createImageBitmap(file);
-    const detections = await detector.detect(bitmap);
-    bitmap.close?.();
+    const canvas = await imageFileToCanvas(file, { enhance: true });
+    const detections = await detector.detect(canvas);
     return detections.map((item) => item.rawValue).filter(Boolean).join("\n");
   } catch {
     return "";
   }
+}
+
+async function readImageWithTesseract(file: File): Promise<string> {
+  try {
+    const moduleUrl = TESSERACT_ESM_URL;
+    const tesseract = (await import(/* @vite-ignore */ moduleUrl)) as TesseractModule;
+    const canvas = await imageFileToCanvas(file, { enhance: true });
+
+    if (tesseract.createWorker) {
+      const worker = await tesseract.createWorker("ara+eng", 1, {
+        workerPath: TESSERACT_WORKER_URL,
+        corePath: TESSERACT_CORE_URL,
+        langPath: TESSERACT_LANG_URL,
+        cacheMethod: "none",
+        logger: () => undefined,
+      });
+      await worker.setParameters?.({
+        tessedit_pageseg_mode: "6",
+        preserve_interword_spaces: "1",
+      });
+      const result = await worker.recognize(canvas);
+      await worker.terminate();
+      return result.data?.text || "";
+    }
+
+    if (tesseract.recognize) {
+      const result = await tesseract.recognize(canvas, "ara+eng", {
+        workerPath: TESSERACT_WORKER_URL,
+        corePath: TESSERACT_CORE_URL,
+        langPath: TESSERACT_LANG_URL,
+        cacheMethod: "none",
+        logger: () => undefined,
+      });
+      return result.data?.text || "";
+    }
+  } catch (error) {
+    console.warn("Coupon OCR failed:", error);
+  }
+
+  return "";
 }
 
 export async function readCouponFile(file: File): Promise<{ text: string; source: CouponImportResult["source"] }> {
@@ -275,9 +388,14 @@ export async function readCouponFile(file: File): Promise<{ text: string; source
   if (type.startsWith("image/")) {
     const barcode = await readBarcodeFromImage(file);
     if (barcode.trim()) return { text: barcode, source: "barcode" };
+
     const nativeText = await readImageWithNativeTextDetector(file);
     if (nativeText.trim()) return { text: nativeText, source: "ocr" };
-    throw new Error("لم يتم العثور على QR أو باركود أو نص مقروء في الصورة. صوّر الكوبون بوضوح أو ارفعه كملف CSV/TXT/JSON.");
+
+    const ocrText = await readImageWithTesseract(file);
+    if (ocrText.trim()) return { text: ocrText, source: "ocr" };
+
+    throw new Error("لم يتم استخراج بيانات من الصورة. تأكد أن الصورة واضحة ومضاءة وقريبة من الكوبون، أو استخدم CSV/TXT/JSON. إذا كانت أول مرة، انتظر ثواني لتحميل OCR ثم أعد المحاولة.");
   }
 
   if (
@@ -291,7 +409,7 @@ export async function readCouponFile(file: File): Promise<{ text: string; source
     return { text: await file.text(), source: "text" };
   }
 
-  throw new Error("Unsupported coupon file. Use an image with QR/barcode/readable text, camera photo, TXT, CSV, or JSON file.");
+  throw new Error("نوع الملف غير مدعوم. استخدم صورة واضحة، QR/باركود، أو ملف CSV/TXT/JSON.");
 }
 
 export function parseCouponText(rawText: string): CouponImportResult {
@@ -337,7 +455,7 @@ export function parseCouponText(rawText: string): CouponImportResult {
   }
 
   if (fields.cod_amount === undefined || fields.cod_amount === "") {
-    const total = findMoney(lines, ["الإجمالي", "مجموع الإجمالي", "المجموع", "total", "amount"]);
+    const total = findMoney(lines, ["الإجمالي", "الاجمالي", "مجموع الإجمالي", "المجموع", "total", "amount"]);
     const cod = findMoney(lines, ["التحصيل", "مبلغ التحصيل", "تحصيل", "cod", "collection", "collect"]);
     const collectionAmount = cod || total;
     if (collectionAmount) {
