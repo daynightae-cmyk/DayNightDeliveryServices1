@@ -8,14 +8,6 @@ export type CouponImportResult = {
   warnings: string[];
 };
 
-type TesseractModule = {
-  recognize: (
-    image: File | Blob | string,
-    langs?: string,
-    options?: Record<string, unknown>,
-  ) => Promise<{ data?: { text?: string } }>;
-};
-
 function normalizeDigits(value: string) {
   const arabic = "٠١٢٣٤٥٦٧٨٩";
   const persian = "۰۱۲۳۴۵۶۷۸۹";
@@ -132,12 +124,18 @@ async function readBarcodeFromImage(file: File): Promise<string> {
   }
 }
 
-async function readImageWithOcr(file: File): Promise<string> {
-  const tesseract = (await import("tesseract.js")) as unknown as TesseractModule;
-  const result = await tesseract.recognize(file, "ara+eng", {
-    logger: undefined,
-  });
-  return result.data?.text || "";
+async function readImageWithNativeTextDetector(file: File): Promise<string> {
+  try {
+    const TextDetector = (window as unknown as { TextDetector?: new () => { detect: (image: ImageBitmap) => Promise<Array<{ rawValue?: string }>> } }).TextDetector;
+    if (!TextDetector) return "";
+    const detector = new TextDetector();
+    const bitmap = await createImageBitmap(file);
+    const detections = await detector.detect(bitmap);
+    bitmap.close?.();
+    return detections.map((item) => item.rawValue).filter(Boolean).join("\n");
+  } catch {
+    return "";
+  }
 }
 
 export async function readCouponFile(file: File): Promise<{ text: string; source: CouponImportResult["source"] }> {
@@ -147,8 +145,9 @@ export async function readCouponFile(file: File): Promise<{ text: string; source
   if (type.startsWith("image/")) {
     const barcode = await readBarcodeFromImage(file);
     if (barcode.trim()) return { text: barcode, source: "barcode" };
-    const ocr = await readImageWithOcr(file);
-    return { text: ocr, source: "ocr" };
+    const nativeText = await readImageWithNativeTextDetector(file);
+    if (nativeText.trim()) return { text: nativeText, source: "ocr" };
+    throw new Error("لم يتم العثور على QR أو باركود أو نص مقروء في الصورة. صوّر الكوبون بوضوح أو ارفعه كملف CSV/TXT/JSON.");
   }
 
   if (
@@ -162,7 +161,7 @@ export async function readCouponFile(file: File): Promise<{ text: string; source
     return { text: await file.text(), source: "text" };
   }
 
-  throw new Error("Unsupported coupon file. Use an image, camera photo, TXT, CSV, or JSON file.");
+  throw new Error("Unsupported coupon file. Use an image with QR/barcode/readable text, camera photo, TXT, CSV, or JSON file.");
 }
 
 export function parseCouponText(rawText: string): CouponImportResult {
