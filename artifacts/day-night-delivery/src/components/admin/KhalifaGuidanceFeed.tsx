@@ -10,6 +10,7 @@ import {
   Pin,
   Play,
   RotateCcw,
+  ScanLine,
   Truck,
   Wallet,
 } from "lucide-react";
@@ -64,12 +65,22 @@ export default function KhalifaGuidanceFeed({
   const todayOrders = orders.filter((order) => String(order.created_at || "").slice(0, 10) === today).length;
   const returned = orders.filter((order) => norm(order.status).includes("return")).length;
   const pending = orders.filter((order) => /pending|review|confirm/.test(norm(order.status))).length;
-
+  const couponSection = /إضافة طلب|طلب جديد|كوبون|new order|coupon/i.test(String(sectionTitle || ""));
   const sectionPrefix = sectionTitle ? (isArabic ? `قسم ${sectionTitle}: ` : `${sectionTitle}: `) : "";
 
   const insights = useMemo<Insight[]>(
     () =>
       [
+        couponSection && {
+          icon: ScanLine,
+          severity: isArabic ? "كوبون" : "Coupon",
+          tone: "blue",
+          title: isArabic ? "إدخال الكوبون بالتصوير" : "Coupon photo intake",
+          metric: isArabic ? "4 خطوات" : "4 steps",
+          message: isArabic
+            ? "صوّر أو ارفع الكوبون، دع النظام يجرّب QR والباركود ثم OCR، راجع الحقول يدوياً، وبعدها أنشئ الطلب الحقيقي من Supabase. لا تعتمد الصورة وحدها ولا تتجاهل فرق السعر."
+            : "Capture or upload the coupon, let the system try QR/barcode then OCR, manually review the fields, and only then create the real Supabase order. Never trust the image alone or ignore a price mismatch.",
+        },
         pending > 0 && {
           icon: AlertTriangle,
           severity: isArabic ? "عاجل" : "Urgent",
@@ -141,7 +152,7 @@ export default function KhalifaGuidanceFeed({
             : `Top activity is in ${metrics.bestRegionId} with ${metrics.bestRegionCount} orders. Use the map filter to monitor it.`,
         },
       ].filter(Boolean) as Insight[],
-    [isArabic, pending, returned, todayOrders, metrics, sectionPrefix],
+    [couponSection, isArabic, pending, returned, todayOrders, metrics, sectionPrefix],
   );
 
   const visibleInsights: Insight[] = insights.length
@@ -170,22 +181,14 @@ export default function KhalifaGuidanceFeed({
 
   useEffect(() => {
     if (paused || pinned || visibleInsights.length <= 1) return;
-
     const timer = window.setInterval(() => {
       setIndex((current) => (current + 1) % visibleInsights.length);
     }, 5200);
-
     return () => window.clearInterval(timer);
   }, [paused, pinned, visibleInsights.length]);
 
-  const next = () => {
-    setIndex((current) => (current + 1) % visibleInsights.length);
-  };
-
-  const previous = () => {
-    setIndex((current) => (current - 1 + visibleInsights.length) % visibleInsights.length);
-  };
-
+  const next = () => setIndex((current) => (current + 1) % visibleInsights.length);
+  const previous = () => setIndex((current) => (current - 1 + visibleInsights.length) % visibleInsights.length);
 
   return (
     <section className="dn-khalifa-feed dn-khalifa-rotator" aria-label={isArabic ? "تغذية خليفة" : "Khalifa Feed"}>
@@ -197,52 +200,23 @@ export default function KhalifaGuidanceFeed({
       </header>
 
       <article key={`${active.title}-${index}`} className={`dn-khalifa-current is-${active.tone}`}>
-        <div className="dn-khalifa-feed-icon">
-          <Icon className="h-5 w-5" />
-        </div>
-
+        <div className="dn-khalifa-feed-icon"><Icon className="h-5 w-5" /></div>
         <div className="dn-khalifa-current-body">
           <div className="dn-khalifa-current-top">
             <strong>{active.title}</strong>
-            <AdminStateChip
-              name="priority"
-              tone={active.tone === "rose" ? "danger" : active.tone === "gold" ? "warning" : "info"}
-            >
-              {active.severity}
-            </AdminStateChip>
+            <AdminStateChip name="priority" tone={active.tone === "rose" ? "danger" : active.tone === "gold" ? "warning" : "info"}>{active.severity}</AdminStateChip>
           </div>
-
           <p>{active.message}</p>
-
-          {active.metric && (
-            <b className="dn-khalifa-current-metric">
-              <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
-              {active.metric}
-            </b>
-          )}
+          {active.metric && <b className="dn-khalifa-current-metric"><BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />{active.metric}</b>}
         </div>
       </article>
 
       <div className="dn-khalifa-rotator-controls">
-        <button type="button" onClick={previous} aria-label={isArabic ? "السابق" : "Previous"}>
-          <ChevronRight className="h-4 w-4" />
-        </button>
-
-        <button type="button" onClick={() => setPaused((value) => !value)} aria-label={paused ? (isArabic ? "تشغيل التدوير" : "Play rotation") : (isArabic ? "إيقاف التدوير" : "Pause rotation")}>
-          {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-        </button>
-
-        <button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""} aria-label={isArabic ? "تثبيت التوصية" : "Pin insight"}>
-          <Pin className="h-4 w-4" />
-        </button>
-
-        <button type="button" onClick={next} aria-label={isArabic ? "التالي" : "Next"}>
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-
-        <span className="dn-khalifa-numbered-indicator" aria-live="polite">
-          {index + 1} / {visibleInsights.length}
-        </span>
+        <button type="button" onClick={previous} aria-label={isArabic ? "السابق" : "Previous"}><ChevronRight className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setPaused((value) => !value)} aria-label={paused ? (isArabic ? "تشغيل التدوير" : "Play rotation") : (isArabic ? "إيقاف التدوير" : "Pause rotation")}>{paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}</button>
+        <button type="button" onClick={() => setPinned((value) => !value)} className={pinned ? "is-active" : ""} aria-label={isArabic ? "تثبيت التوصية" : "Pin insight"}><Pin className="h-4 w-4" /></button>
+        <button type="button" onClick={next} aria-label={isArabic ? "التالي" : "Next"}><ChevronLeft className="h-4 w-4" /></button>
+        <span className="dn-khalifa-numbered-indicator" aria-live="polite">{isArabic ? `التوصية ${index + 1} من ${visibleInsights.length}` : `Insight ${index + 1} of ${visibleInsights.length}`}</span>
       </div>
 
       <KhalifaLiveAssistant orders={orders} merchants={merchants} financeSummary={financeSummary} activeSection={sectionTitle} isArabic={isArabic} />
