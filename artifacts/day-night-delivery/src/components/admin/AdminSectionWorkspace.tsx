@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CalendarClock, FileText, Filter, RotateCcw, Search, Sparkles, Truck, XCircle } from "lucide-react";
 import AdminLiveOperationsMap from "./AdminLiveOperationsMap";
 import AdminPdfExportButton from "./AdminPdfExportButton";
@@ -33,6 +33,8 @@ type ExtendedOrder = Order & {
   delivery_city?: string;
   driver_id?: string;
   assigned_driver_id?: string;
+  internal_notes?: string;
+  admin_notes?: string;
 };
 
 type OrderStatusOption = {
@@ -67,8 +69,8 @@ const orderStatusOptions: OrderStatusOption[] = [
   { value: "cancelled", ar: "ملغي", en: "Cancelled", icon: XCircle },
 ];
 
-const normalize = (value: unknown) => String(value ?? "").toLowerCase();
-const normalizeStatusKey = (value: unknown) => normalize(value).trim().replace(/[\s-]+/g, "_");
+const normalize = (value: unknown) => String(value ?? "").toLowerCase().replace(/[ـ]/g, "").trim();
+const normalizeStatusKey = (value: unknown) => normalize(value).replace(/[\s-]+/g, "_");
 const money = (value: unknown, isArabic: boolean) => isArabic ? `${Number(value || 0).toFixed(2)} درهم` : `${Number(value || 0).toFixed(2)} AED`;
 const extra = (order: Order) => order as ExtendedOrder;
 const tracking = (order: Order) => order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
@@ -108,6 +110,7 @@ const categoryWords: Record<string, { ar: string; en: string }> = {
 
 const statusWords: Record<string, { ar: string; en: string }> = {
   pending: { ar: "قيد الانتظار", en: "Pending" },
+  order_pending: { ar: "قيد الانتظار", en: "Pending" },
   confirmed: { ar: "تم التأكيد", en: "Confirmed" },
   assigned: { ar: "تم تعيين مندوب", en: "Driver assigned" },
   picked_up: { ar: "تم الإحضار", en: "Picked up" },
@@ -116,10 +119,13 @@ const statusWords: Record<string, { ar: string; en: string }> = {
   out_for_delivery: { ar: "في الطريق", en: "Out for delivery" },
   cancelled: { ar: "ملغي", en: "Cancelled" },
   canceled: { ar: "ملغي", en: "Canceled" },
+  order_cancelled: { ar: "ملغي", en: "Cancelled" },
   failed: { ar: "فشل", en: "Failed" },
   delivered: { ar: "تم التسليم", en: "Delivered" },
+  order_delivered: { ar: "تم التسليم", en: "Delivered" },
   completed: { ar: "مكتمل", en: "Completed" },
   returned: { ar: "راجع", en: "Returned" },
+  return_to_merchant: { ar: "راجع للتاجر", en: "Returned to merchant" },
   postponed: { ar: "مؤجل", en: "Postponed" },
   review: { ar: "قيد المراجعة", en: "Under review" },
   under_review: { ar: "قيد المراجعة", en: "Under review" },
@@ -131,6 +137,7 @@ const OTHER_EMIRATES_RE = /dubai|sharjah|ajman|umm al quwain|ras al khaimah|fuja
 
 function orderSearchText(order: Order) {
   return normalize([
+    tracking(order),
     order.sender_city,
     order.receiver_city,
     extra(order).pickup_city,
@@ -139,9 +146,22 @@ function orderSearchText(order: Order) {
     order.service_type,
     order.shipping_scope,
     order.notes,
+    extra(order).internal_notes,
+    extra(order).admin_notes,
     order.sender_address,
     order.receiver_address,
+    order.payment_method,
+    order.merchant_name,
+    order.sender_name,
+    order.receiver_name,
+    order.customer_name,
+    order.receiver_phone,
+    order.sender_phone,
   ].join(" "));
+}
+
+function statusBlob(order: Order) {
+  return normalize(`${normalizeStatusKey(order.status)} ${order.status || ""} ${orderSearchText(order)}`);
 }
 
 function isInternationalOrder(order: Order) {
@@ -166,10 +186,10 @@ function statusText(value: unknown, isArabic: boolean) {
 
 function statusTone(value: unknown) {
   const key = normalizeStatusKey(value);
-  if (/deliver|complete/.test(key)) return "is-success";
-  if (/cancel|fail/.test(key)) return "is-danger";
-  if (/return|postpone/.test(key)) return "is-warning";
-  if (/review|pending/.test(key)) return "is-muted";
+  if (/deliver|complete|تم_التسليم|مكتمل/.test(key)) return "is-success";
+  if (/cancel|fail|ملغي|ملغية|كنسل/.test(key)) return "is-danger";
+  if (/return|postpone|راجع|راجعة|مرتجع|مؤجل/.test(key)) return "is-warning";
+  if (/review|pending|مراجعة|انتظار/.test(key)) return "is-muted";
   return "is-active";
 }
 
@@ -189,24 +209,23 @@ function categoryText(value: string, isArabic: boolean) {
 }
 
 function statusMatch(order: Order, id: AdminSectionId) {
-  const s = normalizeStatusKey(order.status);
-  const text = orderSearchText(order);
+  const blob = statusBlob(order);
   if (["all_orders", "reports", "print"].includes(id)) return true;
-  if (id === "cancelled") return /cancelled|canceled|cancel|failed|fail|ملغي|ملغية|كنسل/.test(`${s} ${text}`);
-  if (id === "review") return /review|under_review|needs_review|manual_review|manual_approval|hold|مراجعة/.test(`${s} ${text}`);
-  if (id === "postponed") return /postpone|postponed|defer|deferred|schedule|scheduled|later|مؤجل|مؤجلة|تأجيل/.test(`${s} ${text}`);
-  if (id === "returned") return /return|returned|راجع|راجعة|مرتجع|مرتجعة/.test(`${s} ${text}`);
-  if (id === "pickup") return /pick|picked_up|pickup|assign|assigned|collect|إحضار|احضار|مندوب/.test(`${s} ${text}`);
+  if (id === "cancelled") return /order_cancelled|cancelled|canceled|cancel|failed|fail|ملغي|ملغية|الغاء|إلغاء|كنسل/.test(blob);
+  if (id === "review") return /under_review|needs_review|manual_review|manual_approval|review|hold|مراجعة|قيد_المراجعة/.test(blob);
+  if (id === "postponed") return /postponed|postpone|deferred|defer|scheduled|schedule|later|مؤجل|مؤجلة|تأجيل/.test(blob);
+  if (id === "returned") return /return_to_merchant|returned|return|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع/.test(blob);
+  if (id === "pickup") return /picked_up|pickup|pick|assigned|assign|collect|إحضار|احضار|مندوب/.test(blob);
   if (id === "abu_dhabi") return isAbuDhabiOrder(order);
   if (id === "external") return isInternationalOrder(order);
-  if (id === "out_scope") return isOtherEmiratesOrder(order) || /out.?of.?scope|unsupported|خارج النطاق/.test(`${text} ${s}`);
+  if (id === "out_scope") return isOtherEmiratesOrder(order) || /out.?of.?scope|unsupported|خارج_النطاق|خارج النطاق/.test(blob);
   return true;
 }
 
 function metricValue(key: string, rows: Order[], merchants: Merchant[], summary: FinanceSummary | null, isArabic: boolean) {
   const lower = key.toLowerCase();
-  const delivered = rows.filter((order) => /deliver|complete/.test(normalizeStatusKey(order.status)));
-  const cancelled = rows.filter((order) => /cancel|fail/.test(normalizeStatusKey(order.status)));
+  const delivered = rows.filter((order) => /deliver|complete|تم_التسليم|مكتمل/.test(normalizeStatusKey(order.status)));
+  const cancelled = rows.filter((order) => /cancel|fail|ملغي|كنسل/.test(normalizeStatusKey(order.status)));
   const cod = rows.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0);
   const revenue = rows.reduce((sum, order) => sum + Number(order.delivery_price || order.price || extra(order).service_fee || 0), 0);
   if (lower.includes("merchant") && !lower.includes("payable") && !lower.includes("balance")) return merchants.length;
@@ -238,14 +257,23 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
   const refresh = onRefresh || (async () => undefined);
   const isFinance = financeSections.has(id);
 
+  useEffect(() => {
+    setQuery("");
+    setFilters({});
+    setNotice("");
+    setStatusDrafts({});
+    setStatusBusy("");
+  }, [id]);
+
   const baseRows = useMemo(() => orders.filter((order) => statusMatch(order, id)), [id, orders]);
   const rows = useMemo(() => baseRows.filter((order) => {
-    const haystack = [tracking(order), order.receiver_phone, order.sender_phone, order.receiver_name, order.customer_name, order.merchant_name, order.sender_name, order.status, order.service_type, order.payment_method, order.sender_city, order.receiver_city].join(" ").toLowerCase();
-    if (query && !haystack.includes(query.toLowerCase())) return false;
-    if (filters.status && !normalizeStatusKey(order.status).includes(normalizeStatusKey(filters.status))) return false;
+    const haystack = orderSearchText(order);
+    const q = normalize(query);
+    if (q && !haystack.includes(q)) return false;
+    if (filters.status && !statusBlob(order).includes(normalize(filters.status))) return false;
     if (filters.merchant && !normalize(`${order.merchant_id || ""} ${order.merchant_name || ""} ${order.sender_name || ""}`).includes(normalize(filters.merchant))) return false;
     if (filters.driver && !normalize(`${order.driver_code || ""} ${order.driver_name || ""} ${order.driver_phone || ""} ${extra(order).driver_id || ""} ${extra(order).assigned_driver_id || ""}`).includes(normalize(filters.driver))) return false;
-    if ((filters.emirate || filters.city) && !normalize(`${order.sender_city} ${order.receiver_city}`).includes(normalize(filters.emirate || filters.city))) return false;
+    if ((filters.emirate || filters.city) && !haystack.includes(normalize(filters.emirate || filters.city))) return false;
     if (filters.codOnly && Number(order.cod_amount || 0) <= 0) return false;
     return true;
   }).slice(0, 120), [baseRows, filters, query]);
@@ -358,7 +386,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
         {config.kpis.slice(0, 8).map((key) => (
           <article key={key}>
             <span>{kpiLabel(key, isArabic)}</span>
-            <strong>{metricValue(key, baseRows.length ? baseRows : orders, merchants, financeSummary, isArabic)}</strong>
+            <strong>{metricValue(key, baseRows, merchants, financeSummary, isArabic)}</strong>
             <small>{source}</small>
           </article>
         ))}
