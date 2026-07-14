@@ -44,6 +44,19 @@ type OrderStatusOption = {
   icon: typeof CheckCircle2;
 };
 
+type CanonicalOrderStatus =
+  | "pending"
+  | "review"
+  | "confirmed"
+  | "assigned"
+  | "picked_up"
+  | "in_transit"
+  | "delivered"
+  | "postponed"
+  | "returned"
+  | "cancelled"
+  | string;
+
 const financeSections = new Set<AdminSectionId>([
   "finance_dashboard",
   "driver_statements",
@@ -68,6 +81,8 @@ const orderStatusOptions: OrderStatusOption[] = [
   { value: "returned", ar: "راجع", en: "Returned", icon: RotateCcw },
   { value: "cancelled", ar: "ملغي", en: "Cancelled", icon: XCircle },
 ];
+
+const ORDER_STATUS_VALUES = new Set(orderStatusOptions.map((option) => option.value));
 
 const normalize = (value: unknown) => String(value ?? "").toLowerCase().replace(/[ـ]/g, "").trim();
 const normalizeStatusKey = (value: unknown) => normalize(value).replace(/[\s-]+/g, "_");
@@ -160,8 +175,43 @@ function orderSearchText(order: Order) {
   ].join(" "));
 }
 
+function canonicalOrderStatus(value: unknown): CanonicalOrderStatus {
+  const key = normalizeStatusKey(value);
+  const raw = normalize(value);
+  const text = `${key} ${raw}`;
+
+  if (!key) return "pending";
+  if (/order_cancelled|cancelled|canceled|cancel|failed|fail|ملغي|ملغية|الغاء|إلغاء|كنسل|مرفوض|رفض/.test(text)) return "cancelled";
+  if (/return_to_merchant|returned|return|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع|استرجاع/.test(text)) return "returned";
+  if (/postponed|postpone|deferred|defer|scheduled|schedule|later|مؤجل|مؤجلة|تأجيل|تاجيل/.test(text)) return "postponed";
+  if (/under_review|needs_review|manual_review|manual_approval|review|hold|مراجعة|قيد_المراجعة|تحتاج_قرار/.test(text)) return "review";
+  if (/order_delivered|delivered|complete|completed|تم_التسليم|مسلم|تسليم/.test(text)) return "delivered";
+  if (/in_transit|out_for_delivery|transit|on_the_way|في_الطريق|بالطريق/.test(text)) return "in_transit";
+  if (/picked_up|pickup|collected|collect|تم_الإحضار|تم_الاحضار|قيد_الإحضار|قيد_الاحضار|إحضار|احضار/.test(text)) return "picked_up";
+  if (/driver_assigned|assigned|assign|تم_تعيين|تعيين_مندوب|مندوب/.test(text)) return "assigned";
+  if (/confirmed|accepted|approved|تم_التأكيد|تم_التاكيد|مؤكد|اعتماد|معتمد/.test(text)) return "confirmed";
+  if (/order_pending|pending|waiting|قيد_الانتظار|انتظار|جديد/.test(text)) return "pending";
+
+  return key;
+}
+
+function selectStatusValue(value: unknown) {
+  const canonical = canonicalOrderStatus(value);
+  return ORDER_STATUS_VALUES.has(canonical) ? canonical : "pending";
+}
+
+function statusText(value: unknown, isArabic: boolean) {
+  const key = normalizeStatusKey(value);
+  const canonical = canonicalOrderStatus(value);
+  if (statusWords[key]) return isArabic ? statusWords[key].ar : statusWords[key].en;
+  if (statusWords[canonical]) return isArabic ? statusWords[canonical].ar : statusWords[canonical].en;
+  if (!key) return "—";
+  return isArabic ? "حالة محفوظة" : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function statusBlob(order: Order) {
-  return normalize(`${normalizeStatusKey(order.status)} ${order.status || ""} ${orderSearchText(order)}`);
+  const canonical = canonicalOrderStatus(order.status);
+  return normalize(`${normalizeStatusKey(order.status)} ${order.status || ""} ${canonical} ${statusText(canonical, true)} ${statusText(canonical, false)}`);
 }
 
 function isInternationalOrder(order: Order) {
@@ -177,19 +227,12 @@ function isOtherEmiratesOrder(order: Order) {
   return !isInternationalOrder(order) && !isAbuDhabiOrder(order) && OTHER_EMIRATES_RE.test(text);
 }
 
-function statusText(value: unknown, isArabic: boolean) {
-  const key = normalizeStatusKey(value);
-  if (statusWords[key]) return isArabic ? statusWords[key].ar : statusWords[key].en;
-  if (!key) return "—";
-  return isArabic ? "حالة محفوظة" : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 function statusTone(value: unknown) {
-  const key = normalizeStatusKey(value);
-  if (/deliver|complete|تم_التسليم|مكتمل/.test(key)) return "is-success";
-  if (/cancel|fail|ملغي|ملغية|كنسل/.test(key)) return "is-danger";
-  if (/return|postpone|راجع|راجعة|مرتجع|مؤجل/.test(key)) return "is-warning";
-  if (/review|pending|مراجعة|انتظار/.test(key)) return "is-muted";
+  const canonical = canonicalOrderStatus(value);
+  if (canonical === "delivered") return "is-success";
+  if (canonical === "cancelled") return "is-danger";
+  if (canonical === "returned" || canonical === "postponed") return "is-warning";
+  if (canonical === "review" || canonical === "pending") return "is-muted";
   return "is-active";
 }
 
@@ -209,23 +252,25 @@ function categoryText(value: string, isArabic: boolean) {
 }
 
 function statusMatch(order: Order, id: AdminSectionId) {
-  const blob = statusBlob(order);
   if (["all_orders", "reports", "print"].includes(id)) return true;
-  if (id === "cancelled") return /order_cancelled|cancelled|canceled|cancel|failed|fail|ملغي|ملغية|الغاء|إلغاء|كنسل/.test(blob);
-  if (id === "review") return /under_review|needs_review|manual_review|manual_approval|review|hold|مراجعة|قيد_المراجعة/.test(blob);
-  if (id === "postponed") return /postponed|postpone|deferred|defer|scheduled|schedule|later|مؤجل|مؤجلة|تأجيل/.test(blob);
-  if (id === "returned") return /return_to_merchant|returned|return|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع/.test(blob);
-  if (id === "pickup") return /picked_up|pickup|pick|assigned|assign|collect|إحضار|احضار|مندوب/.test(blob);
+
+  const canonical = canonicalOrderStatus(order.status);
+  if (id === "cancelled") return canonical === "cancelled";
+  if (id === "review") return canonical === "review";
+  if (id === "postponed") return canonical === "postponed";
+  if (id === "returned") return canonical === "returned";
+  if (id === "pickup") return canonical === "assigned" || canonical === "picked_up";
   if (id === "abu_dhabi") return isAbuDhabiOrder(order);
   if (id === "external") return isInternationalOrder(order);
-  if (id === "out_scope") return isOtherEmiratesOrder(order) || /out.?of.?scope|unsupported|خارج_النطاق|خارج النطاق/.test(blob);
+  if (id === "out_scope") return isOtherEmiratesOrder(order);
+
   return true;
 }
 
 function metricValue(key: string, rows: Order[], merchants: Merchant[], summary: FinanceSummary | null, isArabic: boolean) {
   const lower = key.toLowerCase();
-  const delivered = rows.filter((order) => /deliver|complete|تم_التسليم|مكتمل/.test(normalizeStatusKey(order.status)));
-  const cancelled = rows.filter((order) => /cancel|fail|ملغي|كنسل/.test(normalizeStatusKey(order.status)));
+  const delivered = rows.filter((order) => canonicalOrderStatus(order.status) === "delivered");
+  const cancelled = rows.filter((order) => canonicalOrderStatus(order.status) === "cancelled");
   const cod = rows.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0);
   const revenue = rows.reduce((sum, order) => sum + Number(order.delivery_price || order.price || extra(order).service_fee || 0), 0);
   if (lower.includes("merchant") && !lower.includes("payable") && !lower.includes("balance")) return merchants.length;
@@ -253,6 +298,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
   const [notice, setNotice] = useState("");
   const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
   const [statusBusy, setStatusBusy] = useState("");
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
   const navigate = (target: AdminSectionId) => onNavigate?.(target);
   const refresh = onRefresh || (async () => undefined);
   const isFinance = financeSections.has(id);
@@ -265,7 +311,32 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
     setStatusBusy("");
   }, [id]);
 
-  const baseRows = useMemo(() => orders.filter((order) => statusMatch(order, id)), [id, orders]);
+  useEffect(() => {
+    setStatusOverrides((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      for (const order of orders) {
+        const rowKey = String(order.id || tracking(order));
+        if (next[rowKey] && canonicalOrderStatus(order.status) === next[rowKey]) {
+          delete next[rowKey];
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [orders]);
+
+  const liveOrders = useMemo(() => orders.map((order) => {
+    const rowKey = String(order.id || tracking(order));
+    const overrideStatus = statusOverrides[rowKey];
+
+    if (!overrideStatus || canonicalOrderStatus(order.status) === overrideStatus) return order;
+    return { ...order, status: overrideStatus };
+  }), [orders, statusOverrides]);
+
+  const baseRows = useMemo(() => liveOrders.filter((order) => statusMatch(order, id)), [id, liveOrders]);
   const rows = useMemo(() => baseRows.filter((order) => {
     const haystack = orderSearchText(order);
     const q = normalize(query);
@@ -303,9 +374,10 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
 
   async function changeOrderStatus(order: Order) {
     const rowKey = String(order.id || tracking(order));
-    const nextStatus = statusDrafts[rowKey] || normalizeStatusKey(order.status || "pending");
+    const currentStatus = selectStatusValue(order.status || "pending");
+    const nextStatus = selectStatusValue(statusDrafts[rowKey] || currentStatus);
     if (!order.id || !nextStatus) return;
-    if (nextStatus === normalizeStatusKey(order.status)) {
+    if (nextStatus === currentStatus) {
       setNotice(isArabic ? "لم يتغير شيء؛ الحالة المختارة هي نفس الحالة الحالية." : "No change; selected status is already current.");
       return;
     }
@@ -317,6 +389,12 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
     try {
       const ok = await updateExistingOrderStatus(order.id, nextStatus, isArabic ? `تحديث من لوحة الإدارة إلى: ${label}` : `Admin updated status to: ${label}`);
       if (!ok) throw new Error("status_update_failed");
+
+      setStatusOverrides((prev) => ({ ...prev, [rowKey]: nextStatus }));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("dn-admin-order-status-change", { detail: { orderId: order.id, status: nextStatus } }));
+      }
+
       playAdminAudioEvent(nextStatus === "delivered" ? "success" : "notification");
       addAdminNotification({
         type: "success",
@@ -341,7 +419,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
   }
 
   if (isFinance) {
-    return <AdminFinanceOperationsCenter isArabic={isArabic} activeSection={id as FinanceArea} orders={orders} merchants={merchants} financeSummary={financeSummary} financeSummarySource={financeSummarySource} onRefresh={refresh} onNavigate={(target) => navigate(target as AdminSectionId)} />;
+    return <AdminFinanceOperationsCenter isArabic={isArabic} activeSection={id as FinanceArea} orders={liveOrders} merchants={merchants} financeSummary={financeSummary} financeSummarySource={financeSummarySource} onRefresh={refresh} onNavigate={(target) => navigate(target as AdminSectionId)} />;
   }
 
   return (
@@ -379,7 +457,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
         </div>
       </header>
 
-      {id === "dashboard" && <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />}
+      {id === "dashboard" && <AdminLiveOperationsMap isArabic={isArabic} orders={liveOrders} />}
       {financeWarning && <p className="dn-clean-note">{isArabic ? "ملخص مالي مشتق مؤقتاً من الطلبات" : "Finance summary temporarily derived from orders"}</p>}
 
       <div className="dn-section-kpis">
@@ -437,7 +515,7 @@ export default function AdminSectionWorkspace({ id, isArabic, orders, merchants,
             <tbody>
               {rows.map((order) => {
                 const rowKey = String(order.id || tracking(order));
-                const currentStatus = normalizeStatusKey(order.status || "pending");
+                const currentStatus = selectStatusValue(order.status || "pending");
                 const draftStatus = statusDrafts[rowKey] || currentStatus;
                 const isBusy = statusBusy === rowKey;
                 return (
