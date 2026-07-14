@@ -21,6 +21,7 @@ Apply in order:
 
 1. `supabase/migrations/20260714103000_coupon_photo_intake.sql`
 2. `supabase/migrations/20260714104000_coupon_photo_intake_health_rpc.sql`
+3. `supabase/migrations/20260714105000_coupon_public_audit_hardening.sql`
 
 Then run:
 
@@ -65,6 +66,8 @@ Then run:
 10. Confirm `/tracking` can find the returned number.
 11. Confirm public coupon metadata is audited only after order creation.
 12. Confirm anonymous users cannot list audit rows or read coupon images.
+13. Confirm the public audit row stores no name, phone, full address, image path, or raw OCR text.
+14. Repeat the same tracking reference and confirm the audit row is updated rather than duplicated.
 
 ## Browser fallback QA
 
@@ -89,8 +92,9 @@ Expected behavior:
 - `coupon-images` remains private.
 - Only admin/support users can upload/read/delete admin coupon images.
 - Anonymous users may call only the metadata-only public RPC.
-- Public audit records do not contain full addresses or image bytes.
-- OCR raw text is capped before database storage.
+- Public audit requires a real existing order reference.
+- Public audit records do not contain names, phones, full addresses, raw OCR text, or image bytes.
+- Admin OCR raw text is capped before database storage.
 - Manual review is required before order creation.
 - No fake success is shown if Supabase order creation fails.
 
