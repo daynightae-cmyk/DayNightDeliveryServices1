@@ -84,20 +84,33 @@ function polishNode(node: Node) {
   list.forEach(polishNode);
 }
 
-function normalize(value: unknown) { return String(value || "").toLowerCase().replace(/[ـ]/g, "").replace(/[_-]/g, " ").trim(); }
-function route(order: Record<string, unknown>) { return [order.sender_city, order.receiver_city, order.pickup_city, order.delivery_city, order.destination_country, order.shipping_scope, order.service_type, order.notes, order.internal_notes, order.admin_notes].map((value) => String(value || "")).join(" ").toLowerCase(); }
-function status(order: Record<string, unknown>) { return normalize(`${order.status || ""} ${route(order)}`); }
+function normalize(value: unknown) { return String(value || "").toLowerCase().replace(/[ـ]/g, "").trim(); }
+function normalizeStatus(value: unknown) { return normalize(value).replace(/[\s-]+/g, "_"); }
+function route(order: Record<string, unknown>) { return [order.sender_city, order.receiver_city, order.pickup_city, order.delivery_city, order.destination_country, order.shipping_scope, order.service_type].map((value) => String(value || "")).join(" ").toLowerCase(); }
+function status(order: Record<string, unknown>) { return normalizeStatus(order.status); }
+function canonicalStatus(order: Record<string, unknown>) {
+  const key = status(order);
+  const raw = normalize(order.status);
+  const text = `${key} ${raw}`;
+
+  if (/order_cancelled|cancelled|canceled|cancel|failed|fail|ملغي|ملغية|الغاء|إلغاء|كنسل|مرفوض|رفض/.test(text)) return "cancelled";
+  if (/return_to_merchant|returned|return|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع|استرجاع/.test(text)) return "returned";
+  if (/postponed|postpone|deferred|defer|scheduled|schedule|later|مؤجل|مؤجلة|تأجيل|تاجيل/.test(text)) return "postponed";
+  if (/under_review|needs_review|manual_review|manual_approval|review|hold|مراجعة|قيد_المراجعة|تحتاج_قرار/.test(text)) return "review";
+  if (/picked_up|pickup|collected|collect|تم_الإحضار|تم_الاحضار|قيد_الإحضار|قيد_الاحضار|إحضار|احضار/.test(text)) return "pickup";
+  return key;
+}
 function isInternational(order: Record<string, unknown>) { return /international|external|gcc|world|worldwide|saudi|kuwait|qatar|bahrain|oman|usa|uk|europe|canada|australia|دولي|خارجي|خليجي|السعودية|الكويت|قطر|البحرين|عمان/.test(route(order)); }
 function isAbuDhabiRoute(order: Record<string, unknown>) { return !isInternational(order) && /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي|العين|مصفح/.test(route(order)); }
 function isOtherEmirate(order: Record<string, unknown>) { return !isInternational(order) && !isAbuDhabiRoute(order) && /dubai|sharjah|ajman|umm al quwain|ras al khaimah|fujairah|khor fakkan|دبي|الشارقة|عجمان|أم القيوين|ام القيوين|رأس الخيمة|راس الخيمة|الفجيرة|خورفكان/.test(route(order)); }
 function calc(data: Record<string, unknown>[]): Metrics {
   return {
     total: data.length,
-    cancelled: data.filter((order) => /cancel|canceled|cancelled|fail|ملغ|الغاء|إلغاء|كنسل/.test(status(order))).length,
-    review: data.filter((order) => /review|under.?review|manual|hold|مراجعة/.test(status(order))).length,
-    postponed: data.filter((order) => /postpone|defer|schedule|later|مؤجل|تأجيل/.test(status(order))).length,
-    returned: data.filter((order) => /return|returned|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع/.test(status(order))).length,
-    pickup: data.filter((order) => /pick|pickup|assign|assigned|collect|إحضار|احضار|مندوب/.test(status(order))).length,
+    cancelled: data.filter((order) => canonicalStatus(order) === "cancelled").length,
+    review: data.filter((order) => canonicalStatus(order) === "review").length,
+    postponed: data.filter((order) => canonicalStatus(order) === "postponed").length,
+    returned: data.filter((order) => canonicalStatus(order) === "returned").length,
+    pickup: data.filter((order) => canonicalStatus(order) === "assigned" || canonicalStatus(order) === "pickup").length,
     abuDhabi: data.filter(isAbuDhabiRoute).length,
     external: data.filter(isInternational).length,
     outScope: data.filter(isOtherEmirate).length,
@@ -217,6 +230,7 @@ if (isBrowser) {
   window.addEventListener("popstate", schedule);
   window.addEventListener("hashchange", schedule);
   window.addEventListener("dn-admin-settings-change", schedule);
+  window.addEventListener("dn-admin-order-status-change", () => { void refreshMetrics(true); schedule(); });
   window.setTimeout(schedule, 250); window.setTimeout(schedule, 900); window.setTimeout(schedule, 1800);
   intervalId = window.setInterval(() => { if (isAdminPage()) void refreshMetrics(); }, 30000);
   window.addEventListener("beforeunload", () => { if (intervalId) window.clearInterval(intervalId); });
