@@ -6,35 +6,96 @@ function normalizeStatusNote(note?: string | null) {
 }
 
 export function normalizeAdminOrderStatus(status: string) {
-  const raw = String(status || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const raw = String(status || "").trim().toLowerCase().replace(/[ـ]/g, "").replace(/[\s-]+/g, "_");
   const map: Record<string, string> = {
     pending: "pending",
     waiting: "pending",
+    order_pending: "pending",
+    قيد_الانتظار: "pending",
+    انتظار: "pending",
+    جديد: "pending",
+
     review: "review",
     under_review: "review",
+    needs_review: "review",
+    manual_review: "review",
+    manual_approval: "review",
+    hold: "review",
+    قيد_المراجعة: "review",
+    مراجعة: "review",
+    تحتاج_قرار: "review",
+
     confirmed: "confirmed",
     accepted: "confirmed",
     approved: "confirmed",
+    تم_التأكيد: "confirmed",
+    تم_التاكيد: "confirmed",
+    مؤكد: "confirmed",
+    معتمد: "confirmed",
+
     assigned: "assigned",
     driver_assigned: "assigned",
+    assign: "assigned",
+    تم_تعيين_مندوب: "assigned",
+    تعيين_مندوب: "assigned",
+
     picked_up: "picked_up",
     pickup: "picked_up",
     collected: "picked_up",
+    collect: "picked_up",
+    قيد_الإحضار: "picked_up",
+    قيد_الاحضار: "picked_up",
+    تم_الإحضار: "picked_up",
+    تم_الاحضار: "picked_up",
+    إحضار: "picked_up",
+    احضار: "picked_up",
+
     in_transit: "in_transit",
     transit: "in_transit",
     out_for_delivery: "in_transit",
     on_the_way: "in_transit",
+    في_الطريق: "in_transit",
+    بالطريق: "in_transit",
+
     delivered: "delivered",
+    order_delivered: "delivered",
     complete: "delivered",
     completed: "delivered",
+    تم_التسليم: "delivered",
+    مسلم: "delivered",
+    تسليم: "delivered",
+
     postponed: "postponed",
     deferred: "postponed",
     scheduled: "postponed",
+    later: "postponed",
+    مؤجل: "postponed",
+    مؤجلة: "postponed",
+    تأجيل: "postponed",
+    تاجيل: "postponed",
+
     returned: "returned",
     return: "returned",
+    return_to_merchant: "returned",
+    راجع: "returned",
+    راجعة: "returned",
+    مرتجع: "returned",
+    مرتجعة: "returned",
+    إرجاع: "returned",
+    ارجاع: "returned",
+    استرجاع: "returned",
+
     failed: "cancelled",
     cancelled: "cancelled",
-    canceled: "cancelled"
+    canceled: "cancelled",
+    order_cancelled: "cancelled",
+    ملغي: "cancelled",
+    ملغية: "cancelled",
+    إلغاء: "cancelled",
+    الغاء: "cancelled",
+    كنسل: "cancelled",
+    مرفوض: "cancelled",
+    رفض: "cancelled"
   };
   return map[raw] || raw || "pending";
 }
