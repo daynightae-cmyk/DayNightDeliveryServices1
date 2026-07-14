@@ -49,7 +49,8 @@ export function secureHeaders() {
     "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
-    "Content-Security-Policy": "default-src 'self' https: data: blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https: wss:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
-    "X-Powered-By": ""
+    "Content-Security-Policy":
+      "default-src 'self' https: data: blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https: https://vercel.live; connect-src 'self' https: wss: https://vercel.live https://*.vercel.live wss://*.vercel.live; frame-src 'self' https://vercel.live https://*.vercel.live; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    "X-Powered-By": "",
   };
 }

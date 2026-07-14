@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { adminUpdateOrderStatus } from "../supabaseAdminOps";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
@@ -412,17 +413,7 @@ export async function fetchAdminStats(): Promise<AdminStats> {
 }
 
 export async function updateOrderStatus(orderId: string, status: string, note?: string): Promise<Order | null> {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const rpcOrder = await callRpc<Order>("admin_update_order_status", { p_order_id: orderId, p_status: clean(status), p_note: clean(note || "Admin status update") });
-  if (rpcOrder?.id) return rpcOrder;
-  const { data, error } = await supabase
-    .from("orders")
-    .update({ status: clean(status), updated_at: new Date().toISOString() })
-    .eq("id", orderId)
-    .select("*")
-    .single();
-  if (error) throw new Error(error.message);
-  return data as Order;
+  return adminUpdateOrderStatus({ orderRef: orderId, nextStatus: clean(status), note: clean(note || "Admin status update") });
 }
 
 const emptyFinanceSummary: FinanceSummary = {
@@ -798,6 +789,8 @@ type AdminDbHealthTarget = Omit<AdminDbHealthCheck, "status" | "rowCount" | "mes
 const adminDbHealthTargets: AdminDbHealthTarget[] = [
   { id: "finance_summary", labelAr: "ملخص المالية", labelEn: "finance_summary", kind: "view" },
   { id: "get_finance_summary", labelAr: "دالة ملخص المالية", labelEn: "get_finance_summary", kind: "rpc" },
+  { id: "admin_normalize_order_status", labelAr: "تطبيع حالة الطلب", labelEn: "admin_normalize_order_status", kind: "rpc" },
+  { id: "admin_update_order_status", labelAr: "تحديث حالة الطلب", labelEn: "admin_update_order_status", kind: "rpc" },
   { id: "admin_create_expense", labelAr: "إنشاء مصروف", labelEn: "admin_create_expense", kind: "rpc" },
   { id: "admin_create_adjustment", labelAr: "إنشاء تعديل", labelEn: "admin_create_adjustment", kind: "rpc" },
   { id: "admin_create_print_job", labelAr: "إنشاء طباعة", labelEn: "admin_create_print_job", kind: "rpc" },
@@ -833,7 +826,9 @@ export async function fetchAdminDatabaseHealth(): Promise<AdminDbHealthCheck[]> 
   const client = supabase;
   const checks = await Promise.all(adminDbHealthTargets.map(async (target): Promise<AdminDbHealthCheck> => {
     if (target.kind === "rpc") {
-      const rpcArgs: Record<string, unknown> = target.id === "admin_create_expense" ? { p_expense: { _health_check: true, category: "health_check", amount: 0, status: "draft" } }
+      const rpcArgs: Record<string, unknown> = target.id === "admin_normalize_order_status" ? { p_status: "قيد المراجعة" }
+        : target.id === "admin_update_order_status" ? { p_order_ref: "00000000-0000-0000-0000-000000000000", p_status: "review", p_note: "health_check_no_write_expected" }
+        : target.id === "admin_create_expense" ? { p_expense: { _health_check: true, category: "health_check", amount: 0, status: "draft" } }
         : target.id === "admin_create_adjustment" ? { p_adjustment: { _health_check: true, adjustment_type: "health_check", amount: 0, reason: "health_check", status: "draft" } }
         : target.id === "admin_create_print_job" ? { p_job: { _health_check: true, job_type: "health_check", language: "ar", status: "queued" } }
         : target.id === "admin_mark_print_job_printed" ? { p_job_id: "00000000-0000-0000-0000-000000000000" }
@@ -842,6 +837,9 @@ export async function fetchAdminDatabaseHealth(): Promise<AdminDbHealthCheck[]> 
         : {};
       const { data, error } = await client.rpc(target.id, rpcArgs);
       if (error) {
+        if (target.id === "admin_update_order_status" && String(error.code || "").toUpperCase() === "P0002") {
+          return { ...target, status: "ok", rowCount: 1, messageAr: "تحديث حالة الطلب متصل بقاعدة البيانات.", messageEn: "Order status update is connected to the database." };
+        }
         const status = classifyHealthError(error);
         console.warn("Database health RPC warning:", target.id, status);
         return { ...target, status, ...healthMessage(status, target.kind) };

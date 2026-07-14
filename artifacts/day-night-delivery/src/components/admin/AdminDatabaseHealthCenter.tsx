@@ -37,6 +37,8 @@ const kindText: Record<AdminDbHealthCheck["kind"], { ar: string; en: string }> =
 const objectMeta: Record<string, ObjectMeta> = {
   finance_summary: { ar: "ملخص المالية", en: "Finance summary", areaAr: "المالية", areaEn: "Finance" },
   get_finance_summary: { ar: "إجراء ملخص المالية", en: "Finance summary procedure", areaAr: "المالية", areaEn: "Finance" },
+  admin_normalize_order_status: { ar: "تطبيع حالة الطلب", en: "Normalize order status RPC", areaAr: "حالات الطلب", areaEn: "Order status" },
+  admin_update_order_status: { ar: "تحديث حالة الطلب", en: "Update order status RPC", areaAr: "حالات الطلب", areaEn: "Order status" },
   admin_create_expense: { ar: "إجراء إنشاء مصروف", en: "Create expense procedure", areaAr: "المصروفات", areaEn: "Expenses" },
   admin_create_adjustment: { ar: "إجراء إنشاء تسوية", en: "Create adjustment procedure", areaAr: "التسويات", areaEn: "Adjustments" },
   admin_create_print_job: { ar: "إجراء إنشاء مهمة طباعة", en: "Create print job procedure", areaAr: "الطباعة", areaEn: "Print" },
@@ -80,9 +82,15 @@ function areaName(check: AdminDbHealthCheck, isArabic: boolean) {
 }
 
 function statusMessage(check: AdminDbHealthCheck, isArabic: boolean) {
-  if (check.status === "ok") return isArabic ? "متصل ويستجيب من قاعدة البيانات." : "Connected and responding from the database.";
+  if (check.status === "ok") {
+    if (check.id === "admin_update_order_status") return isArabic ? "تحديث حالة الطلب متصل بقاعدة البيانات." : "Order status update is connected to the database.";
+    return isArabic ? "متصل ويستجيب من قاعدة البيانات." : "Connected and responding from the database.";
+  }
   if (check.status === "empty") return isArabic ? "الكائن موجود وجاهز، لكنه لا يحتوي صفوفاً حالياً." : "Object exists and is ready, but currently has no rows.";
-  if (check.status === "missing") return isArabic ? "غير مطبق في Supabase. طبّق ملف قاعدة البيانات الموحد ثم أعد الفحص." : "Not applied in Supabase. Apply the unified database file, then re-run checks.";
+  if (check.status === "missing") {
+    if (check.id === "admin_update_order_status" || check.id === "admin_normalize_order_status") return isArabic ? "Migration حالة الطلب غير مطبق في Supabase." : "Order status migration is not applied in Supabase.";
+    return isArabic ? "غير مطبق في Supabase. طبّق ملف قاعدة البيانات الموحد ثم أعد الفحص." : "Not applied in Supabase. Apply the unified database file, then re-run checks.";
+  }
   if (check.status === "permission") return isArabic ? "الكائن موجود غالباً، لكن صلاحيات الأدمن أو RLS تمنع القراءة/التنفيذ." : "Object likely exists, but admin permissions or RLS blocks access.";
   if (check.status === "unknown") return isArabic ? "لا يمكن تأكيد الحالة من المتصفح حالياً." : "The browser cannot confirm this object right now.";
   return isArabic ? "يحتاج مراجعة إدارية بدون عرض خطأ Supabase الخام." : "Needs admin review without exposing raw Supabase errors.";
