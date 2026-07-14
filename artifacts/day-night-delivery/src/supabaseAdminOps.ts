@@ -6,7 +6,11 @@ function normalizeStatusNote(note?: string | null) {
 }
 
 export function normalizeAdminOrderStatus(status: string) {
-  const raw = String(status || "").trim().toLowerCase().replace(/[ـ]/g, "").replace(/[\s-]+/g, "_");
+  const raw = String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[ـ]/g, "")
+    .replace(/[\s-]+/g, "_");
   const map: Record<string, string> = {
     pending: "pending",
     waiting: "pending",
@@ -95,24 +99,35 @@ export function normalizeAdminOrderStatus(status: string) {
     الغاء: "cancelled",
     كنسل: "cancelled",
     مرفوض: "cancelled",
-    رفض: "cancelled"
+    رفض: "cancelled",
   };
   return map[raw] || raw || "pending";
 }
 
 function buildStatusHistoryItem(status: string, note: string) {
   const now = new Date().toISOString();
-  return { status, note, created_at: now, date: now, timestamp: now, changed_by: "admin" };
+  return {
+    status,
+    note,
+    created_at: now,
+    date: now,
+    timestamp: now,
+    changed_by: "admin",
+  };
 }
 
-async function appendOrderStatusHistoryRow(orderId: string, status: string, note: string) {
+async function appendOrderStatusHistoryRow(
+  orderId: string,
+  status: string,
+  note: string,
+) {
   if (!supabase || !orderId) return;
   try {
     await supabase.from("order_status_history").insert({
       order_id: orderId,
       status,
       note,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     });
   } catch {
     // History table is optional in older databases. The orders row still carries status_history when available.
@@ -141,7 +156,11 @@ export async function isAdminUser(userId: string): Promise<boolean> {
   }
 }
 
-export async function updateExistingOrderStatus(orderId: string, status: string, note?: string): Promise<boolean> {
+export async function updateExistingOrderStatus(
+  orderId: string,
+  status: string,
+  note?: string,
+): Promise<boolean> {
   if (!supabase || !orderId || !status) {
     return false;
   }
@@ -153,21 +172,25 @@ export async function updateExistingOrderStatus(orderId: string, status: string,
   const rpcResult = await supabase.rpc("admin_update_order_status", {
     p_order_id: orderId,
     p_status: normalizedStatus,
-    p_note: cleanNote
+    p_note: cleanNote,
   });
 
   if (!rpcResult.error && rpcResult.data) {
     return true;
   }
 
+  const orderMatch = `id.eq.${orderId},tracking_number.eq.${orderId},invoice_number.eq.${orderId},coupon_number.eq.${orderId}`;
+
   const { data: existing } = await supabase
     .from("orders")
-    .select("status_history")
-    .eq("id", orderId)
+    .select("id,status_history")
+    .or(orderMatch)
     .maybeSingle();
 
-  const history = Array.isArray((existing as { status_history?: unknown[] } | null)?.status_history)
-    ? [...(((existing as { status_history?: unknown[] }).status_history) || [])]
+  const history = Array.isArray(
+    (existing as { status_history?: unknown[] } | null)?.status_history,
+  )
+    ? [...((existing as { status_history?: unknown[] }).status_history || [])]
     : [];
   history.push(buildStatusHistoryItem(normalizedStatus, cleanNote));
 
@@ -176,14 +199,18 @@ export async function updateExistingOrderStatus(orderId: string, status: string,
     .update({
       status: normalizedStatus,
       status_history: history,
-      updated_at: updatedAt
+      updated_at: updatedAt,
     })
-    .eq("id", orderId)
+    .or(orderMatch)
     .select("id")
     .maybeSingle();
 
   if (!modernUpdate.error) {
-    await appendOrderStatusHistoryRow(orderId, normalizedStatus, cleanNote);
+    await appendOrderStatusHistoryRow(
+      String(modernUpdate.data?.id || orderId),
+      normalizedStatus,
+      cleanNote,
+    );
     return true;
   }
 
@@ -191,15 +218,23 @@ export async function updateExistingOrderStatus(orderId: string, status: string,
     .from("orders")
     .update({
       status: normalizedStatus,
-      updated_at: updatedAt
+      updated_at: updatedAt,
     })
-    .eq("id", orderId);
+    .or(orderMatch);
 
   if (legacyError) {
-    console.error("Order status update failed:", legacyError.message, legacyError.details || "");
+    console.error(
+      "Order status update failed:",
+      legacyError.message,
+      legacyError.details || "",
+    );
     return false;
   }
 
-  await appendOrderStatusHistoryRow(orderId, normalizedStatus, cleanNote);
+  await appendOrderStatusHistoryRow(
+    String((existing as { id?: string } | null)?.id || orderId),
+    normalizedStatus,
+    cleanNote,
+  );
   return true;
 }
