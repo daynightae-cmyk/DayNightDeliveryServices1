@@ -84,19 +84,19 @@ function polishNode(node: Node) {
   list.forEach(polishNode);
 }
 
-function normalize(value: unknown) { return String(value || "").toLowerCase().replace(/[_-]/g, " ").trim(); }
-function route(order: Record<string, unknown>) { return [order.sender_city, order.receiver_city, order.pickup_city, order.delivery_city, order.destination_country, order.shipping_scope, order.service_type].map((value) => String(value || "")).join(" ").toLowerCase(); }
-function status(order: Record<string, unknown>) { return normalize(order.status); }
+function normalize(value: unknown) { return String(value || "").toLowerCase().replace(/[ـ]/g, "").replace(/[_-]/g, " ").trim(); }
+function route(order: Record<string, unknown>) { return [order.sender_city, order.receiver_city, order.pickup_city, order.delivery_city, order.destination_country, order.shipping_scope, order.service_type, order.notes, order.internal_notes, order.admin_notes].map((value) => String(value || "")).join(" ").toLowerCase(); }
+function status(order: Record<string, unknown>) { return normalize(`${order.status || ""} ${route(order)}`); }
 function isInternational(order: Record<string, unknown>) { return /international|external|gcc|world|worldwide|saudi|kuwait|qatar|bahrain|oman|usa|uk|europe|canada|australia|دولي|خارجي|خليجي|السعودية|الكويت|قطر|البحرين|عمان/.test(route(order)); }
-function isAbuDhabiRoute(order: Record<string, unknown>) { return /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي|العين|مصفح/.test(route(order)); }
+function isAbuDhabiRoute(order: Record<string, unknown>) { return !isInternational(order) && /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي|العين|مصفح/.test(route(order)); }
 function isOtherEmirate(order: Record<string, unknown>) { return !isInternational(order) && !isAbuDhabiRoute(order) && /dubai|sharjah|ajman|umm al quwain|ras al khaimah|fujairah|khor fakkan|دبي|الشارقة|عجمان|أم القيوين|ام القيوين|رأس الخيمة|راس الخيمة|الفجيرة|خورفكان/.test(route(order)); }
 function calc(data: Record<string, unknown>[]): Metrics {
   return {
     total: data.length,
-    cancelled: data.filter((order) => /cancel|canceled|cancelled|fail|ملغ|كنسل/.test(status(order))).length,
+    cancelled: data.filter((order) => /cancel|canceled|cancelled|fail|ملغ|الغاء|إلغاء|كنسل/.test(status(order))).length,
     review: data.filter((order) => /review|under.?review|manual|hold|مراجعة/.test(status(order))).length,
     postponed: data.filter((order) => /postpone|defer|schedule|later|مؤجل|تأجيل/.test(status(order))).length,
-    returned: data.filter((order) => /return|returned|راجع|مرتجع/.test(status(order))).length,
+    returned: data.filter((order) => /return|returned|راجع|راجعة|مرتجع|مرتجعة|ارجاع|إرجاع/.test(status(order))).length,
     pickup: data.filter((order) => /pick|pickup|assign|assigned|collect|إحضار|احضار|مندوب/.test(status(order))).length,
     abuDhabi: data.filter(isAbuDhabiRoute).length,
     external: data.filter(isInternational).length,
@@ -137,12 +137,20 @@ function injectStyle() {
   const style = document.createElement("style");
   style.id = "dn-admin-command-style";
   style.textContent = `
-    .dn-admin-layout-full { grid-template-columns: minmax(0, 1fr) 220px !important; gap: 9px !important; padding: 9px !important; }
-    .dn-admin-home-full { grid-template-columns: 205px minmax(0, 1fr) !important; gap: 9px !important; align-items: start !important; }
-    .dn-admin-sidebar-full { position: sticky !important; top: 9px !important; max-height: calc(100dvh - 18px) !important; overflow-y: auto !important; border-radius: 16px !important; padding: 8px !important; }
-    .dn-admin-brand-block { padding: 8px !important; border-radius: 13px !important; } .dn-admin-brand-block img { width: 68px !important; height: 68px !important; }
-    .dn-admin-side-nav { gap: 5px !important; } .dn-admin-side-nav h3 { margin: 5px 0 2px !important; font-size: .64rem !important; } .dn-admin-side-nav button { min-height: 29px !important; padding: 4px 6px !important; border-radius: 10px !important; font-size: .70rem !important; }
-    .dn-admin-sidebar-icon { width: 46px !important; min-width: 46px !important; height: 24px !important; }
+    .dn-admin-fullscreen .dn-admin-layout-full { grid-template-columns: minmax(0, 1fr) clamp(282px, 17vw, 330px) !important; gap: 10px !important; padding: 9px !important; }
+    .dn-admin-fullscreen .dn-admin-home-full { grid-template-columns: 205px minmax(0, 1fr) !important; gap: 9px !important; align-items: start !important; }
+    .dn-admin-fullscreen .dn-admin-sidebar-full { position: sticky !important; top: 9px !important; width: 100% !important; min-width: 282px !important; max-width: 330px !important; max-height: calc(100dvh - 18px) !important; overflow-y: auto !important; overflow-x: hidden !important; border-radius: 16px !important; padding: 8px !important; }
+    .dn-admin-fullscreen .dn-admin-brand-block { padding: 8px !important; border-radius: 13px !important; } .dn-admin-fullscreen .dn-admin-brand-block img { width: 62px !important; height: 62px !important; }
+    .dn-admin-fullscreen .dn-admin-side-nav { gap: 5px !important; }
+    .dn-admin-fullscreen .dn-admin-side-nav h3 { margin: 5px 0 2px !important; font-size: .64rem !important; }
+    .dn-admin-fullscreen .dn-admin-side-nav button { display: grid !important; grid-template-columns: 38px minmax(0, 1fr) !important; align-items: center !important; gap: 8px !important; width: 100% !important; min-height: 32px !important; padding: 4px 7px !important; border-radius: 10px !important; font-size: .73rem !important; line-height: 1.25 !important; }
+    .dn-admin-fullscreen[dir="rtl"] .dn-admin-side-nav button { grid-template-columns: minmax(0, 1fr) 38px !important; }
+    .dn-admin-fullscreen[dir="rtl"] .dn-admin-side-nav button .dn-admin-sidebar-icon { grid-column: 2 !important; grid-row: 1 !important; }
+    .dn-admin-fullscreen[dir="rtl"] .dn-admin-side-nav button > span:last-child { grid-column: 1 !important; grid-row: 1 !important; text-align: right !important; }
+    .dn-admin-fullscreen[dir="ltr"] .dn-admin-side-nav button .dn-admin-sidebar-icon { grid-column: 1 !important; grid-row: 1 !important; }
+    .dn-admin-fullscreen[dir="ltr"] .dn-admin-side-nav button > span:last-child { grid-column: 2 !important; grid-row: 1 !important; text-align: left !important; }
+    .dn-admin-fullscreen .dn-admin-side-nav button > span:last-child { display: block !important; min-width: 0 !important; width: 100% !important; opacity: 1 !important; visibility: visible !important; color: inherit !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; font-weight: 950 !important; }
+    .dn-admin-fullscreen .dn-admin-sidebar-icon { width: 38px !important; min-width: 38px !important; height: 24px !important; min-height: 24px !important; }
     .dn-admin-left-ai { max-height: calc(100dvh - 110px) !important; overflow-y: auto !important; border-radius: 15px !important; }
     .dn-admin-top-strip { min-height: 36px !important; padding: 6px 8px !important; margin-bottom: 6px !important; } .dn-admin-current-section { min-height: 28px !important; margin: 2px 0 7px !important; padding: 4px 8px !important; }
     .dn-admin-dashboard-hero { min-height: auto !important; padding: 12px 16px !important; border-radius: 18px !important; } .dn-admin-dashboard-hero h1 { font-size: clamp(1.35rem, 2.4vw, 2.35rem) !important; line-height: 1.1 !important; }
@@ -156,7 +164,7 @@ function injectStyle() {
     .dn-admin-command-card:hover { transform: translateY(-1px); border-color: rgba(250,204,21,.68); box-shadow: 0 12px 28px rgba(0,0,0,.22); } .dn-admin-command-card.is-current { border-color: rgba(245,183,0,.8); background: linear-gradient(145deg, rgba(245,183,0,.34), rgba(7,26,51,.9)); }
     .dn-admin-command-card[data-tone="review"] { background: linear-gradient(145deg, rgba(24,168,232,.22), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="cancelled"], .dn-admin-command-card[data-tone="danger"] { background: linear-gradient(145deg, rgba(239,68,68,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="postponed"] { background: linear-gradient(145deg, rgba(168,85,247,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="returned"] { background: linear-gradient(145deg, rgba(251,146,60,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="pickup"] { background: linear-gradient(145deg, rgba(20,184,166,.22), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="external"] { background: linear-gradient(145deg, rgba(59,130,246,.2), rgba(7,26,51,.88)); }
     @media (max-width: 1500px) { .dn-admin-command-deck { grid-template-columns: repeat(5, minmax(105px, 1fr)); } .dn-admin-dashboard-kpis { grid-template-columns: repeat(3, minmax(145px, 1fr)) !important; } }
-    @media (max-width: 1180px) { .dn-admin-layout-full { display: block !important; } .dn-admin-home-full { grid-template-columns: 1fr !important; } .dn-admin-left-ai { display: none !important; } .dn-admin-map-first-grid { grid-template-columns: 1fr !important; } .dn-admin-command-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dn-admin-sidebar-full { position: fixed !important; inset: 12px 12px auto auto !important; width: min(92vw, 330px) !important; max-height: calc(100dvh - 24px) !important; z-index: 70 !important; } }
+    @media (max-width: 1180px) { .dn-admin-layout-full { display: block !important; } .dn-admin-home-full { grid-template-columns: 1fr !important; } .dn-admin-left-ai { display: none !important; } .dn-admin-map-first-grid { grid-template-columns: 1fr !important; } .dn-admin-command-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dn-admin-sidebar-full { position: fixed !important; inset: 12px 12px auto auto !important; width: min(92vw, 330px) !important; min-width: 0 !important; max-height: calc(100dvh - 24px) !important; z-index: 70 !important; } }
     @media (max-width: 680px) { .dn-admin-command-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dn-admin-dashboard-kpis { grid-template-columns: 1fr !important; } .dn-live-map-shell > .leaflet-container { min-height: 300px !important; } }
   `;
   document.head.appendChild(style);
