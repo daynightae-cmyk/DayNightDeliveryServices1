@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -16,6 +17,7 @@ import type { Merchant } from "../../types";
 import type { FinanceSummary } from "../../lib/adminData";
 import { deriveCommandMetrics } from "../../data/adminCommandExpansion";
 import KhalifaLiveAssistant from "./KhalifaLiveAssistant";
+import { AdminStateChip } from "./adminIconSystem";
 
 type Props = {
   isArabic: boolean;
@@ -188,7 +190,9 @@ export default function KhalifaGuidanceFeed({
   return (
     <section className="dn-khalifa-feed dn-khalifa-rotator" aria-label={isArabic ? "تغذية خليفة" : "Khalifa Feed"}>
       <header>
-        <span>{isArabic ? "خليفة مباشر" : "Live Khalifa"}</span>
+        <AdminStateChip name="live-data" tone="success">
+          {isArabic ? "خليفة مباشر" : "Live Khalifa"}
+        </AdminStateChip>
         <strong>{sectionTitle || (isArabic ? "تنبيهات وإرشادات" : "Notifications & Guidance")}</strong>
       </header>
 
@@ -200,12 +204,22 @@ export default function KhalifaGuidanceFeed({
         <div className="dn-khalifa-current-body">
           <div className="dn-khalifa-current-top">
             <strong>{active.title}</strong>
-            <span>{active.severity}</span>
+            <AdminStateChip
+              name="priority"
+              tone={active.tone === "rose" ? "danger" : active.tone === "gold" ? "warning" : "info"}
+            >
+              {active.severity}
+            </AdminStateChip>
           </div>
 
           <p>{active.message}</p>
 
-          {active.metric && <b className="dn-khalifa-current-metric">{active.metric}</b>}
+          {active.metric && (
+            <b className="dn-khalifa-current-metric">
+              <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+              {active.metric}
+            </b>
+          )}
         </div>
       </article>
 
@@ -226,7 +240,7 @@ export default function KhalifaGuidanceFeed({
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <span>
+        <span className="dn-khalifa-numbered-indicator" aria-live="polite">
           {index + 1} / {visibleInsights.length}
         </span>
       </div>

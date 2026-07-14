@@ -21,7 +21,19 @@ const labels = {
 } as const;
 
 type LabelGroup = keyof typeof labels;
-function getLabel(group: LabelGroup, key: string, isArabic: boolean) { const pair = (labels[group] as Record<string, readonly [string,string]>)[key]; return pair ? pair[isArabic ? 0 : 1] : key; }
+function humanizeAdminKey(key: string) {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase()) || "Undefined";
+}
+
+function getLabel(group: LabelGroup, key: string, isArabic: boolean) {
+  const pair = (labels[group] as Record<string, readonly [string, string]>)[key];
+  if (pair) return pair[isArabic ? 0 : 1];
+  return isArabic ? "غير محدد" : humanizeAdminKey(key);
+}
 export const fieldLabel = (field: string, isArabic: boolean) => getLabel("field", field, isArabic);
 export const actionLabel = (action: string, isArabic: boolean) => getLabel("action", action, isArabic);
 export const kpiLabel = (kpi: string, isArabic: boolean) => getLabel("kpi", kpi, isArabic);
@@ -31,10 +43,10 @@ export const sectionFallbackLabel = (key: string, isArabic: boolean) => getLabel
 export const tableColumnLabel = (key: string, isArabic: boolean) => getLabel("table", key, isArabic);
 export function getAdminLabel(key: string, isArabic: boolean): string {
   for (const group of ["field", "action", "kpi", "status", "fallback", "table", "finance"] as LabelGroup[]) {
-    const value = getLabel(group, key, isArabic);
-    if (value !== key) return value;
+    const pair = (labels[group] as Record<string, readonly [string, string]>)[key];
+    if (pair) return pair[isArabic ? 0 : 1];
   }
-  return isArabic ? "غير محدد" : key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim().replace(/^./, (char) => char.toUpperCase()) || "Undefined";
+  return isArabic ? "غير محدد" : humanizeAdminKey(key);
 }
 
 export const adminSectionWorkspaceCopy = {

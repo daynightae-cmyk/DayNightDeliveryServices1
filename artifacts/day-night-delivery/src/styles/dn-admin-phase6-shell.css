@@ -9,9 +9,12 @@ body:has(.dn-admin-fullscreen) { overflow-x: hidden !important; }
 body:has(.dn-auth-page-final) .fixed.top-0.left-0.right-0.z-50,
 body:has(.dn-admin-fullscreen) .fixed.top-0.left-0.right-0.z-50,
 body:has(.dn-auth-page-final) footer,
-body:has(.dn-admin-fullscreen) footer,
-body:has(.dn-auth-page-final) [aria-hidden="true"],
-body:has(.dn-admin-fullscreen) [aria-hidden="true"] { display: none !important; }
+body:has(.dn-admin-fullscreen) footer { display: none !important; }
+
+/* Hide only the public-site header spacer. Broad aria-hidden selectors also hide Lucide SVGs. */
+body:has(.dn-admin-fullscreen) #root > div > div[aria-hidden="true"] {
+  display: none !important;
+}
 
 body:has(.dn-auth-page-final) #root > div > main,
 body:has(.dn-admin-fullscreen) #root > div > main {

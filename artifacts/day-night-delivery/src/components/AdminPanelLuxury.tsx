@@ -34,7 +34,10 @@ import {
   AlertOctagon,
   Scale,
   Landmark,
+  Loader2,
   FileMinus,
+  RefreshCw,
+  Send,
   X,
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
@@ -495,6 +498,43 @@ function getMenuLabel(item: (typeof menu)[number], isArabic: boolean) {
   return isArabic ? item.ar : item.en;
 }
 
+const sectionIconMap: Partial<Record<SectionId, AdminIconName>> = {
+  dashboard: "dashboard",
+  new_order: "add-order",
+  new_merchant: "add-merchant",
+  merchants: "merchant",
+  all_orders: "orders",
+  cancelled: "cancelled-orders",
+  review: "review-orders-status",
+  postponed: "postponed-orders",
+  returned: "returned-orders",
+  pickup: "active-orders",
+  abu_dhabi: "map",
+  external: "external-orders",
+  out_scope: "out-scope",
+  finance_dashboard: "finance",
+  driver_statements: "driver",
+  merchant_statements: "merchant",
+  income: "income",
+  cod: "cod",
+  expenses: "expenses",
+  accounts: "accounts",
+  adjustments: "adjustments",
+  audit_log: "audit",
+  import: "import",
+  print: "printer",
+  reports: "pdf-export",
+  settings: "settings",
+  support: "support",
+  database_health: "database-health",
+  production_readiness: "production-readiness",
+  logout: "logout",
+};
+
+function iconForSection(id: SectionId): AdminIconName {
+  return sectionIconMap[id] || "info";
+}
+
 function normalize(value: unknown) {
   return String(value || "")
     .toLowerCase()
@@ -636,7 +676,13 @@ function KhalifaPanel({
 
       <div className="dn-admin-khalifa-card">
         <img src={avatar} alt={ui.helper} />
-        <h2>{ui.helper}</h2>
+        <div className="dn-khalifa-profile-title">
+          <AdminIconBadge
+            name="khalifa"
+            label={isArabic ? "مساعد العمليات خليفة" : "Khalifa operations assistant"}
+          />
+          <h2>{ui.helper}</h2>
+        </div>
         <p>{ui.helperRole}</p>
         <small>{ui.helperText}</small>
 
@@ -647,14 +693,14 @@ function KhalifaPanel({
         <div className="mt-3 grid gap-2 text-xs font-black text-white/80">
           <div className="dn-khalifa-status-row">
             <span>
-              <AdminIconBadge name="dashboard" />
+              <AdminIconBadge name={iconForSection(active)} />
               {isArabic ? "القسم الحالي" : "Current section"}
             </span>
             <b>{activeTitle}</b>
           </div>
           <div className="dn-khalifa-status-row">
             <span>
-              <AdminIconBadge name="live-data" />
+              <AdminIconBadge name="last-sync" />
               {ui.lastSync}
             </span>
             <b>
@@ -672,7 +718,15 @@ function KhalifaPanel({
           </div>
         </div>
 
-        <button type="button">{ui.ask}</button>
+        <button
+          type="button"
+          onClick={() =>
+            document.getElementById("dn-khalifa-question")?.focus()
+          }
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
+          {ui.ask}
+        </button>
       </div>
 
       <KhalifaGuidanceFeed
@@ -707,6 +761,7 @@ function AdminOrderCommandDeck({
     hintEn: string;
     tone: string;
     count: number;
+    icon: AdminIconName;
   }> = [
     {
       id: "all_orders",
@@ -716,6 +771,7 @@ function AdminOrderCommandDeck({
       hintEn: "All orders",
       tone: "all",
       count: stats.all_orders,
+      icon: "orders",
     },
     {
       id: "cancelled",
@@ -725,6 +781,7 @@ function AdminOrderCommandDeck({
       hintEn: "Cancelled only",
       tone: "cancelled",
       count: stats.cancelled,
+      icon: "cancelled-orders",
     },
     {
       id: "review",
@@ -734,6 +791,7 @@ function AdminOrderCommandDeck({
       hintEn: "Review only",
       tone: "review",
       count: stats.review,
+      icon: "review-orders-status",
     },
     {
       id: "postponed",
@@ -743,6 +801,7 @@ function AdminOrderCommandDeck({
       hintEn: "Postponed only",
       tone: "postponed",
       count: stats.postponed,
+      icon: "postponed-orders",
     },
     {
       id: "returned",
@@ -752,6 +811,7 @@ function AdminOrderCommandDeck({
       hintEn: "Returned only",
       tone: "returned",
       count: stats.returned,
+      icon: "returned-orders",
     },
     {
       id: "pickup",
@@ -761,6 +821,7 @@ function AdminOrderCommandDeck({
       hintEn: "Assigned / picked up",
       tone: "pickup",
       count: stats.pickup,
+      icon: "active-orders",
     },
     {
       id: "abu_dhabi",
@@ -770,6 +831,7 @@ function AdminOrderCommandDeck({
       hintEn: "Abu Dhabi routes",
       tone: "abu-dhabi",
       count: stats.abu_dhabi,
+      icon: "map",
     },
     {
       id: "external",
@@ -779,6 +841,7 @@ function AdminOrderCommandDeck({
       hintEn: "GCC / worldwide",
       tone: "external",
       count: stats.external,
+      icon: "external-orders",
     },
     {
       id: "out_scope",
@@ -788,6 +851,7 @@ function AdminOrderCommandDeck({
       hintEn: "Dubai / Sharjah / Ajman",
       tone: "other",
       count: stats.out_scope,
+      icon: "out-scope",
     },
   ];
 
@@ -804,7 +868,13 @@ function AdminOrderCommandDeck({
           data-tone={card.tone}
           onClick={() => onSelect(card.id)}
         >
-          <span>{isArabic ? card.ar : card.en}</span>
+          <span className="dn-admin-command-card-title">
+            <AdminIconBadge
+              name={card.icon}
+              label={isArabic ? card.ar : card.en}
+            />
+            {isArabic ? card.ar : card.en}
+          </span>
           <strong>{card.count}</strong>
           <small>{isArabic ? card.hintAr : card.hintEn}</small>
         </button>
@@ -1066,9 +1136,16 @@ export default function AdminPanelLuxury() {
     return (
       <section className="dn-admin-center-zone dn-admin-dashboard-polished">
         <header className="dn-admin-main-title dn-admin-dashboard-hero">
-          <span>{ui.commandCenter}</span>
-          <h1>{ui.welcome}</h1>
-          <p>{ui.subtitle}</p>
+          <AdminIconBadge
+            name="dashboard"
+            label={isArabic ? "مركز القيادة" : "Command Center"}
+            className="dn-admin-hero-icon"
+          />
+          <div>
+            <span>{ui.commandCenter}</span>
+            <h1>{ui.welcome}</h1>
+            <p>{ui.subtitle}</p>
+          </div>
         </header>
 
         <div className="dn-admin-section-kpis dn-admin-dashboard-kpis">
@@ -1106,7 +1183,7 @@ export default function AdminPanelLuxury() {
               {quickActions.map(({ title, hint, icon, onClick, pdf }) =>
                 pdf ? (
                   <div
-                    className="dn-admin-action-tile dn-admin-action-tile-pdf"
+                    className="dn-admin-action-tile dn-iconized-action-tile dn-admin-action-tile-pdf"
                     key={title}
                     role="group"
                     aria-label={title}
@@ -1131,7 +1208,7 @@ export default function AdminPanelLuxury() {
                 ) : (
                   <button
                     type="button"
-                    className="dn-admin-action-tile"
+                    className="dn-admin-action-tile dn-iconized-action-tile"
                     key={title}
                     onClick={onClick}
                     aria-label={`${title} · ${hint}`}
@@ -1153,9 +1230,13 @@ export default function AdminPanelLuxury() {
 
         <section className="dn-admin-dashboard-secondary-grid">
           <article className="dn-admin-secondary-panel">
-            <h2>{ui.liveData}</h2>
+            <div className="dn-admin-secondary-head">
+              <AdminIconBadge name="live-data" label={ui.liveData} />
+              <h2>{ui.liveData}</h2>
+            </div>
             <p>
-              {ui.lastSync}:{" "}
+              <AdminIconBadge name="last-sync" label={ui.lastSync} />
+              <span>{ui.lastSync}:</span>{" "}
               <b>
                 {lastSyncAt
                   ? lastSyncAt.toLocaleString(isArabic ? "ar-AE" : "en-AE")
@@ -1168,6 +1249,7 @@ export default function AdminPanelLuxury() {
                 onOpen={() => setNotificationsOpen(true)}
               />
               <button type="button" onClick={() => void refreshAdminData()}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 {ui.refresh}
               </button>
             </div>
@@ -1180,27 +1262,28 @@ export default function AdminPanelLuxury() {
             )}
           </article>
 
-          {[
-            [ui.latest, ui.noUpdates, FileText],
-            [ui.shipmentInfo, ui.noData, PackageCheck],
+          {([
+            [ui.latest, ui.noUpdates, "notifications"],
+            [ui.shipmentInfo, ui.noData, "shipment-details"],
             [
               ui.details,
               `${metrics.total} ${isArabic ? "طلبات" : "orders"}`,
-              ClipboardList,
+              "package",
             ],
-            [ui.quickHelp, ui.preparing, Headphones],
-          ].map(([title, text, Icon]) => {
-            const CardIcon = Icon as typeof FileText;
-            return (
-              <article className="dn-admin-secondary-panel" key={String(title)}>
-                <div className="dn-admin-secondary-icon">
-                  <CardIcon className="h-5 w-5" />
-                </div>
+            [ui.quickHelp, ui.preparing, "quick-help"],
+          ] as Array<[string, string, AdminIconName]>).map(
+            ([title, text, icon]) => (
+              <article className="dn-admin-secondary-panel" key={title}>
+                <AdminIconBadge
+                  name={icon}
+                  label={title}
+                  className="dn-admin-secondary-icon"
+                />
                 <strong>{title as string}</strong>
                 <p>{text as string}</p>
               </article>
-            );
-          })}
+            ),
+          )}
 
           <AdminDailyClosingPanel
             isArabic={isArabic}
@@ -1434,6 +1517,7 @@ export default function AdminPanelLuxury() {
               </button>
 
               <button type="button" onClick={() => void refreshAdminData()}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 {ui.refresh}
               </button>
             </div>
@@ -1447,7 +1531,10 @@ export default function AdminPanelLuxury() {
           />
 
           {adminLoading && (
-            <div className="dn-admin-loading-banner">{ui.loading}</div>
+            <div className="dn-admin-loading-banner" role="status">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {ui.loading}
+            </div>
           )}
 
           <AdminNotificationCenter
@@ -1464,8 +1551,14 @@ export default function AdminPanelLuxury() {
           )}
 
           <div className="dn-admin-current-section">
-            <span>{isArabic ? activeItem.groupAr : activeItem.groupEn}</span>
-            <strong>{activeTitle}</strong>
+            <AdminIconBadge
+              name={iconForSection(active)}
+              label={activeTitle}
+            />
+            <div>
+              <span>{isArabic ? activeItem.groupAr : activeItem.groupEn}</span>
+              <strong>{activeTitle}</strong>
+            </div>
           </div>
 
           <div className="dn-admin-home-full">

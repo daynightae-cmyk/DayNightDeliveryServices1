@@ -20,11 +20,6 @@ body:has(.dn-admin-fullscreen) footer {
   display: none !important;
 }
 
-body:has(.dn-auth-page-final) [aria-hidden="true"],
-body:has(.dn-admin-fullscreen) [aria-hidden="true"] {
-  display: none !important;
-}
-
 body:has(.dn-auth-page-final) #root > div > main,
 body:has(.dn-admin-fullscreen) #root > div > main {
   width: 100% !important;
