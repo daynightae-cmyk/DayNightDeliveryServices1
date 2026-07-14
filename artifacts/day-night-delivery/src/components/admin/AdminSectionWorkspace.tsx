@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   CalendarClock,
-  FileText,
-  Filter,
+  Loader2,
+  RefreshCw,
   RotateCcw,
   Search,
-  Sparkles,
   Truck,
   XCircle,
 } from "lucide-react";
@@ -23,6 +22,13 @@ import {
   sectionFallbackLabel,
   tableColumnLabel,
 } from "../../data/adminTranslations";
+import {
+  AdminEmptyState,
+  AdminIconBadge,
+  AdminStateChip,
+  type AdminIconName,
+  type AdminIconTone,
+} from "./adminIconSystem";
 import {
   addAdminNotification,
   playAdminAudioEvent,
@@ -246,14 +252,70 @@ function statusBlob(order: Order) {
   );
 }
 
-function statusTone(value: unknown) {
+function sectionIcon(name: string): AdminIconName {
+  const value = name.toLowerCase();
+  if (/packageplus/.test(value)) return "add-order";
+  if (/userroundplus|store/.test(value)) return "add-merchant";
+  if (/clipboard/.test(value)) return "orders";
+  if (/shield/.test(value)) return "review-orders-status";
+  if (/rotate/.test(value)) return "returned-orders";
+  if (/truck/.test(value)) return "driver";
+  if (/mappin/.test(value)) return "map";
+  if (/import|globe/.test(value)) return "external-orders";
+  if (/barchart/.test(value)) return "finance";
+  if (/wallet|receipt/.test(value)) return "cod";
+  if (/database/.test(value)) return "database-health";
+  if (/printer/.test(value)) return "printer";
+  if (/headphones/.test(value)) return "support";
+  if (/settings/.test(value)) return "settings";
+  return "info";
+}
+
+function kpiIcon(key: string): AdminIconName {
+  const value = key.toLowerCase();
+  if (/deliver|complete/.test(value)) return "delivered-orders";
+  if (/cancel/.test(value)) return "cancelled-orders";
+  if (/return/.test(value)) return "returned-orders";
+  if (/postpone|delay|overdue|date|wave/.test(value)) return "postponed-orders";
+  if (/unassigned/.test(value)) return "unassigned-orders";
+  if (/driver|pickup/.test(value)) return "driver";
+  if (/merchant/.test(value)) return "merchant";
+  if (/cod|cash|collection|balance|payable/.test(value)) return "cod";
+  if (/income|revenue|net|expense|value|amount|fee|earning/.test(value)) return "income";
+  if (/review|risk|problem|missing|warning/.test(value)) return "warning";
+  if (/region|area|route|emirate|city/.test(value)) return "map";
+  return "orders";
+}
+
+function actionIcon(action: string): AdminIconName {
+  const value = action.toLowerCase();
+  if (/addorder|createorder|saveorder/.test(value)) return "add-order";
+  if (/addmerchant|merchant/.test(value)) return "add-merchant";
+  if (/export|pdf|report|manifest|label/.test(value)) return "pdf-export";
+  if (/print/.test(value)) return "printer";
+  if (/finance|income|expense|account|statement/.test(value)) return "finance";
+  if (/cod|cash|collect|reconcile/.test(value)) return "cash-collection";
+  if (/approve/.test(value)) return "approve";
+  if (/reject|cancel|void|deactivate/.test(value)) return "reject";
+  if (/confirm/.test(value)) return "merchant-confirmation";
+  if (/postpone|reschedule/.test(value)) return "postponed-orders";
+  if (/support/.test(value)) return "support";
+  if (/driver|assign/.test(value)) return "driver";
+  if (/map|route/.test(value)) return "map";
+  if (/status|review/.test(value)) return "review-orders";
+  if (/import|upload|file/.test(value)) return "import";
+  if (/view|open/.test(value)) return "view";
+  return "click";
+}
+
+function stateChip(value: unknown): { name: AdminIconName; tone: AdminIconTone } {
   const canonical = canonicalOrderStatus(value);
-  if (canonical === "delivered") return "is-success";
-  if (canonical === "cancelled") return "is-danger";
-  if (canonical === "returned" || canonical === "postponed")
-    return "is-warning";
-  if (canonical === "review" || canonical === "pending") return "is-muted";
-  return "is-active";
+  if (canonical === "delivered") return { name: "delivered-orders", tone: "success" };
+  if (canonical === "cancelled") return { name: "cancelled-orders", tone: "danger" };
+  if (canonical === "returned") return { name: "returned-orders", tone: "warning" };
+  if (canonical === "postponed") return { name: "postponed-orders", tone: "warning" };
+  if (canonical === "review" || canonical === "pending") return { name: "review-orders-status", tone: "neutral" };
+  return { name: "active-orders", tone: "info" };
 }
 
 function sourceText(value: string, isArabic: boolean) {
@@ -594,15 +656,19 @@ export default function AdminSectionWorkspace({
   return (
     <section className="dn-section-workspace" dir={isArabic ? "rtl" : "ltr"}>
       <header className="dn-section-hero">
-        <div>
-          <span>
-            {categoryText(config.category, isArabic)} · {source}
-          </span>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
+        <div className="dn-section-hero-copy">
+          <AdminIconBadge name={sectionIcon(config.icon)} label={title} />
+          <div>
+            <span>
+              {categoryText(config.category, isArabic)} · {source}
+            </span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
         </div>
         <div className="dn-section-hero-actions">
           <button type="button" onClick={() => void refresh()}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
             {isArabic ? "تحديث" : "Refresh"}
           </button>
           <AdminPdfExportButton
@@ -650,10 +716,15 @@ export default function AdminSectionWorkspace({
       <div className="dn-section-kpis">
         {config.kpis.slice(0, 8).map((key) => (
           <article key={key}>
-            <span>{kpiLabel(key, isArabic)}</span>
+            <AdminIconBadge
+              name={kpiIcon(key)}
+              label={kpiLabel(key, isArabic)}
+              className="dn-admin-kpi-icon"
+            />
             <strong>
               {metricValue(key, baseRows, merchants, financeSummary, isArabic)}
             </strong>
+            <span>{kpiLabel(key, isArabic)}</span>
             <small>{source}</small>
           </article>
         ))}
@@ -662,7 +733,7 @@ export default function AdminSectionWorkspace({
       <div className="dn-section-panels">
         <article>
           <h3>
-            <Filter />
+            <AdminIconBadge name="filters" />
             {isArabic ? "الفلاتر والمدخلات" : "Filters & inputs"}
           </h3>
           <div className="dn-section-form">
@@ -700,7 +771,7 @@ export default function AdminSectionWorkspace({
 
         <article>
           <h3>
-            <Sparkles />
+            <AdminIconBadge name="click" />
             {isArabic ? "إجراءات جاهزة" : "Ready actions"}
           </h3>
           <div className="dn-action-grid">
@@ -710,6 +781,10 @@ export default function AdminSectionWorkspace({
                 type="button"
                 onClick={() => doAction(action)}
               >
+                <AdminIconBadge
+                  name={actionIcon(action)}
+                  className="dn-admin-action-icon"
+                />
                 {actionLabel(action, isArabic)}
               </button>
             ))}
@@ -724,7 +799,7 @@ export default function AdminSectionWorkspace({
 
       <article className="dn-section-table-card">
         <h3>
-          <FileText />
+          <AdminIconBadge name="rows" />
           {isArabic ? "الصفوف الحالية" : "Current rows"}
         </h3>
         {notice && <p className="dn-clean-note">{notice}</p>}
@@ -757,11 +832,12 @@ export default function AdminSectionWorkspace({
                       </span>
                     </td>
                     <td>
-                      <span
-                        className={`dn-order-status-chip ${statusTone(order.status)}`}
+                      <AdminStateChip
+                        name={stateChip(order.status).name}
+                        tone={stateChip(order.status).tone}
                       >
                         {statusText(order.status || "", isArabic)}
-                      </span>
+                      </AdminStateChip>
                     </td>
                     <td>{order.merchant_name || order.sender_name || "—"}</td>
                     <td>{route(order)}</td>
@@ -794,6 +870,11 @@ export default function AdminSectionWorkspace({
                           disabled={isBusy || draftStatus === currentStatus}
                           onClick={() => void changeOrderStatus(order)}
                         >
+                          {isBusy ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                          )}
                           {isBusy
                             ? isArabic
                               ? "جارٍ الحفظ..."
@@ -810,10 +891,17 @@ export default function AdminSectionWorkspace({
             </tbody>
           </table>
           {!rows.length && (
-            <div className="dn-empty-state">
-              <Search className="h-5 w-5" />
-              {sectionFallbackLabel("noMatchingOrders", isArabic)}
-            </div>
+            <AdminEmptyState
+              icon="empty-state"
+              title={isArabic ? "لا توجد صفوف مطابقة" : "No matching rows"}
+              message={sectionFallbackLabel("noMatchingOrders", isArabic)}
+              action={
+                <button type="button" onClick={() => { setQuery(""); setFilters({}); }}>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  {isArabic ? "مسح الفلاتر" : "Clear filters"}
+                </button>
+              }
+            />
           )}
         </div>
       </article>

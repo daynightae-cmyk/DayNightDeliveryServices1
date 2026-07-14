@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent, type ChangeEvent } from "react";
-import { Landmark, Navigation, Receipt, Send, ShieldCheck, Sparkles, Trash2, Wallet, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Bot, Landmark, Loader2, Navigation, Receipt, Send, ShieldCheck, Sparkles, Trash2, Wallet } from "lucide-react";
 import type { Merchant, Order } from "../../types";
 import type { AdminDbHealthCheck, FinanceSummary } from "../../lib/adminData";
 import { deriveCommandMetrics } from "../../data/adminCommandExpansion";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
+import { AdminIconBadge, AdminStateChip } from "./adminIconSystem";
 
 type Props = { orders: Order[]; merchants: Merchant[]; financeSummary?: FinanceSummary | null; activeSection?: string; isArabic: boolean; dbHealthChecks?: AdminDbHealthCheck[] };
 type ChatItem = { id: string; question: string; answer: string };
@@ -150,5 +151,97 @@ export default function KhalifaLiveAssistant(props: Props) {
     if (/افتح|open|next|التالي/i.test(item)) return Navigation;
     return Sparkles;
   };
-  return <section className="dn-khalifa-live"><form onSubmit={submit}><label>{hint}</label><textarea value={question} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setQuestion(event.target.value)} placeholder={hint} rows={3} /><div className="dn-khalifa-live-actions"><button type="submit" disabled={loading}><Send className="h-4 w-4" />{loading ? (props.isArabic ? "يفكر..." : "Thinking...") : (props.isArabic ? "إرسال" : "Send")}</button><button type="button" onClick={() => setHistory([])}><Trash2 className="h-4 w-4" />{props.isArabic ? "مسح" : "Clear"}</button></div></form><small>{note}</small><div className="dn-khalifa-examples">{examples.map((item) => { const ExampleIcon = iconForExample(item); return <button type="button" className="dn-khalifa-question-chip" key={item} onClick={() => askNow(item)}><ExampleIcon className="h-3.5 w-3.5" aria-hidden="true" />{item}</button>; })}</div>{latest && <article className="dn-khalifa-answer"><strong>{props.isArabic ? "إجابة خليفة" : "Khalifa answer"}</strong><p>{latest}</p></article>}<ul>{history.slice(0, 4).map((item) => <li key={item.id}><b>{item.question}</b><span>{item.answer}</span></li>)}</ul></section>;
+  return (
+    <section
+      className="dn-khalifa-live"
+      aria-label={props.isArabic ? "اسأل خليفة" : "Ask Khalifa"}
+    >
+      <header className="dn-khalifa-live-header">
+        <AdminIconBadge name="question" />
+        <div>
+          <strong>{props.isArabic ? "اسأل خليفة" : "Ask Khalifa"}</strong>
+          <small>{note}</small>
+        </div>
+      </header>
+
+      <form onSubmit={submit}>
+        <label htmlFor="dn-khalifa-question">{hint}</label>
+        <div className="dn-khalifa-question-field">
+          <Bot className="h-4 w-4" aria-hidden="true" />
+          <textarea
+            id="dn-khalifa-question"
+            value={question}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+              setQuestion(event.target.value)
+            }
+            placeholder={hint}
+            rows={3}
+          />
+        </div>
+        <div className="dn-khalifa-live-actions">
+          <button type="submit" disabled={loading || !question.trim()}>
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Send className="h-4 w-4" aria-hidden="true" />
+            )}
+            {loading
+              ? props.isArabic
+                ? "يفكر..."
+                : "Thinking..."
+              : props.isArabic
+                ? "إرسال"
+                : "Send"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setHistory([])}
+            disabled={!history.length}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {props.isArabic ? "مسح" : "Clear"}
+          </button>
+        </div>
+      </form>
+
+      <AdminStateChip name="live-data" tone="success">
+        {note}
+      </AdminStateChip>
+
+      <div className="dn-khalifa-examples">
+        {examples.map((item) => {
+          const ExampleIcon = iconForExample(item);
+          return (
+            <button
+              type="button"
+              className="dn-khalifa-question-chip"
+              key={item}
+              onClick={() => askNow(item)}
+            >
+              <ExampleIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              {item}
+            </button>
+          );
+        })}
+      </div>
+
+      {latest && (
+        <article className="dn-khalifa-answer">
+          <AdminIconBadge name="khalifa-insight" />
+          <strong>{props.isArabic ? "إجابة خليفة" : "Khalifa answer"}</strong>
+          <p>{latest}</p>
+        </article>
+      )}
+
+      <ul>
+        {history.slice(0, 4).map((item) => (
+          <li key={item.id}>
+            <AdminIconBadge name="question" />
+            <b>{item.question}</b>
+            <span>{item.answer}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }

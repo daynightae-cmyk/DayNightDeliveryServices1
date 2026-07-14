@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "../../styles/dn-admin-video-map-final.css";
 import "../../styles/dn-admin-map-shipment-rescue.css";
 import L from "leaflet";
-import { AlertTriangle, CalendarDays, Filter, Layers, LocateFixed, MapPin, Minus, Navigation, PackagePlus, Plus, RefreshCw, RotateCcw, Route, Search, SearchCheck, Truck, type LucideIcon } from "lucide-react";
-import { AdminStateChip } from "./adminIconSystem";
+import { AlertTriangle, CalendarDays, Filter, Globe2, Layers, Loader2, Map as MapIcon, MapPin, Navigation, PackagePlus, Route, Search, SearchCheck, Truck } from "lucide-react";
+import { AdminIconBadge, AdminStateChip, IconizedMapControlButton } from "./adminIconSystem";
 import { defaultLocations } from "../../data/defaultLocations";
 import { adminMapRegions, orderRegionId } from "../../data/adminCommandExpansion";
 import { addAdminNotification, playAdminAudioEvent, unlockAdminAudio } from "../../lib/adminAudio";
@@ -22,8 +22,18 @@ export type AdminLiveOperationsMapProps = {
   selectedOrder?: any | null;
 };
 
-const pickupIcon = L.divIcon({ className: "dn-live-map-marker dn-live-map-marker-pickup", html: `<div class="dn-marker-core"><span></span></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
-const destinationIcon = L.divIcon({ className: "dn-live-map-marker dn-live-map-marker-dest", html: `<div class="dn-marker-core"><span></span></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+const pickupIcon = L.divIcon({
+  className: "dn-live-map-marker dn-live-map-marker-pickup",
+  html: `<div class="dn-marker-core" role="img" aria-label="Pickup point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8.5 12 4l7 4.5v8L12 20l-7-3.5v-8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m5.5 8.5 6.5 4 6.5-4M12 12.5V20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+});
+const destinationIcon = L.divIcon({
+  className: "dn-live-map-marker dn-live-map-marker-dest",
+  html: `<div class="dn-marker-core" role="img" aria-label="Delivery point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg></div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 34],
+});
 const driverIcon = L.divIcon({
   className: "dn-live-map-driver dn-live-map-vehicle",
   html: `<div class="dn-vehicle-marker" aria-label="DAY NIGHT vehicle"><svg viewBox="0 0 64 64" role="img"><path d="M10 36h4l5-12c1-3 3-4 6-4h17c3 0 5 1 7 4l5 12h2c2 0 4 2 4 4v8c0 2-2 4-4 4h-4a8 8 0 0 1-16 0H28a8 8 0 0 1-16 0h-2c-2 0-4-2-4-4v-8c0-2 2-4 4-4Z" fill="#D4AF37"/><path d="M22 25h11v10H18l4-10Zm14 0h7l5 10H36V25Z" fill="#071A33"/><circle cx="20" cy="52" r="5" fill="#071A33"/><circle cx="44" cy="52" r="5" fill="#071A33"/><path d="M14 39h42" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".75"/></svg></div>`,
@@ -32,7 +42,7 @@ const driverIcon = L.divIcon({
 });
 
 const modeLabels = [
-  { mode: "standard" as const, ar: "عادي", en: "Standard", Icon: MapPin },
+  { mode: "standard" as const, ar: "عادي", en: "Standard", Icon: MapIcon },
   { mode: "satellite" as const, ar: "فضائي", en: "Satellite", Icon: Layers },
   { mode: "terrain" as const, ar: "تضاريس", en: "Terrain", Icon: Route },
 ];
@@ -107,39 +117,39 @@ function translatedStatus(status: unknown, isArabic: boolean) {
 function MapRefresh({ points, driver, focusRegion, focusCommand, mapMode, refreshNonce }: { points: LatLngTuple[]; driver: LatLngTuple; focusRegion: AdminMapRegion; focusCommand: FocusCommand; mapMode: MapMode; refreshNonce: number }) {
   const map = useMap();
   useEffect(() => {
-    const timer = window.setTimeout(() => map.invalidateSize({ animate: true }), 150);
+    const timer = window.setTimeout(() => map.invalidateSize({ animate: false }), 150);
     return () => window.clearTimeout(timer);
   }, [map, mapMode, refreshNonce]);
   useEffect(() => {
     const validPoints = points.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
-    if (focusCommand?.type === "driver") { map.setView(driver, 13, { animate: true }); return; }
-    if (focusCommand?.type === "region" && focusRegion.id !== "all") { map.setView(focusRegion.center, focusRegion.zoom, { animate: true }); return; }
-    if (validPoints.length >= 2) { map.fitBounds(validPoints, { padding: [56, 56], maxZoom: 13, animate: true }); return; }
-    map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: true });
+    map.stop();
+    map.invalidateSize({ animate: false });
+    if (focusCommand?.type === "driver") { map.setView(driver, 13, { animate: false }); return; }
+    if (focusCommand?.type === "region" && focusRegion.id !== "all") { map.setView(focusRegion.center, focusRegion.zoom, { animate: false }); return; }
+    if (validPoints.length >= 2) { map.fitBounds(validPoints, { padding: [56, 56], maxZoom: 13, animate: false }); return; }
+    map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: false });
   }, [map, points, driver, focusRegion, focusCommand]);
   return null;
-}
-
-function MapButton({ Icon, labelText, onClick }: { Icon: LucideIcon; labelText: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} aria-label={labelText} title={labelText} className="dn-map-control-button"><Icon className="h-4 w-4" aria-hidden="true" /></button>;
 }
 
 function MapCommandControls({ isArabic, fitPoints, driver, focusRegion, onReset }: { isArabic: boolean; fitPoints: LatLngTuple[]; driver: LatLngTuple; focusRegion: AdminMapRegion; onReset: (type?: FocusCommandType) => void }) {
   const map = useMap();
   const fitRoute = () => {
     const validPoints = fitPoints.filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
-    if (validPoints.length >= 2) map.fitBounds(validPoints, { padding: [64, 64], maxZoom: 13, animate: true });
+    map.stop();
+    map.invalidateSize({ animate: false });
+    if (validPoints.length >= 2) map.fitBounds(validPoints, { padding: [64, 64], maxZoom: 13, animate: false });
     onReset("fit");
   };
-  const resetMap = () => { map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: true }); onReset("refresh"); };
+  const resetMap = () => { map.stop(); map.invalidateSize({ animate: false }); map.setView(focusRegion.id === "all" ? defaultLocations.abuDhabi : focusRegion.center, focusRegion.id === "all" ? 9 : focusRegion.zoom, { animate: false }); onReset("refresh"); };
   return (
-    <div className="dn-map-floating-controls" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>
-      <MapButton Icon={Plus} labelText={isArabic ? "تكبير الخريطة" : "Zoom in"} onClick={() => map.zoomIn()} />
-      <MapButton Icon={Minus} labelText={isArabic ? "تصغير الخريطة" : "Zoom out"} onClick={() => map.zoomOut()} />
-      <MapButton Icon={Route} labelText={isArabic ? "ملاءمة المسار" : "Fit route"} onClick={fitRoute} />
-      <MapButton Icon={LocateFixed} labelText={isArabic ? "تركيز على المندوب" : "Focus driver"} onClick={() => { map.setView(driver, 13, { animate: true }); onReset("driver"); }} />
-      <MapButton Icon={RotateCcw} labelText={isArabic ? "إعادة ضبط الخريطة" : "Reset map"} onClick={resetMap} />
-      <MapButton Icon={RefreshCw} labelText={isArabic ? "تحديث الخريطة" : "Refresh map"} onClick={() => { map.invalidateSize({ animate: true }); onReset("refresh"); }} />
+    <div className="dn-map-control-dock" role="toolbar" aria-label={isArabic ? "أدوات الخريطة" : "Map controls"}>
+      <IconizedMapControlButton icon="zoom-in" title={isArabic ? "تكبير الخريطة" : "Zoom in"} ariaLabel={isArabic ? "تكبير الخريطة" : "Zoom in"} onClick={() => { map.stop(); map.zoomIn(1, { animate: false }); }} />
+      <IconizedMapControlButton icon="zoom-out" title={isArabic ? "تصغير الخريطة" : "Zoom out"} ariaLabel={isArabic ? "تصغير الخريطة" : "Zoom out"} onClick={() => { map.stop(); map.zoomOut(1, { animate: false }); }} />
+      <IconizedMapControlButton icon="fit-route" title={isArabic ? "ملاءمة المسار" : "Fit route"} ariaLabel={isArabic ? "ملاءمة المسار" : "Fit route"} onClick={fitRoute} />
+      <IconizedMapControlButton icon="focus-driver" title={isArabic ? "تركيز على المندوب" : "Focus driver"} ariaLabel={isArabic ? "تركيز على المندوب" : "Focus driver"} onClick={() => { map.stop(); map.invalidateSize({ animate: false }); map.setView(driver, 13, { animate: false }); onReset("driver"); }} />
+      <IconizedMapControlButton icon="reset-map" title={isArabic ? "إعادة ضبط الخريطة" : "Reset map"} ariaLabel={isArabic ? "إعادة ضبط الخريطة" : "Reset map"} onClick={resetMap} />
+      <IconizedMapControlButton icon="refresh" title={isArabic ? "تحديث الخريطة" : "Refresh map"} ariaLabel={isArabic ? "تحديث الخريطة" : "Refresh map"} onClick={() => { map.stop(); map.invalidateSize({ animate: false }); onReset("refresh"); }} />
     </div>
   );
 }
@@ -216,31 +226,173 @@ export default function AdminLiveOperationsMap({ isArabic, orders, selectedOrder
     return <TileLayer key={`standard-${refreshNonce}`} url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" eventHandlers={tileHandlers} />;
   };
 
-  if (!isMounted) return <div className="min-h-[420px] w-full animate-pulse rounded-[28px] border border-brand-gold/20 bg-[#020812]" />;
+  if (!isMounted) {
+    return (
+      <div className="dn-admin-map-loading" role="status">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <span>{isArabic ? "جاري تجهيز الخريطة الحية..." : "Preparing live map..."}</span>
+      </div>
+    );
+  }
 
   return (
-    <section className="dn-video-clean-live-map dn-admin-live-map-fixed w-full max-w-[920px] rounded-[28px] border border-brand-gold/20 bg-[#031226]/95 p-3 shadow-2xl shadow-black/25" dir={isArabic ? "rtl" : "ltr"} aria-label={isArabic ? "خريطة العمليات الحية" : "Live operations map"}>
-      <header className="dn-map-header-clean">
-        <div className="dn-map-title-row"><div className="min-w-0"><p><MapPin className="h-4 w-4" aria-hidden="true" />{isArabic ? "خريطة العمليات الحية" : "Live Operations Map"}</p><span dir="ltr">{String(reference).slice(0, 42)}</span></div><div className="dn-map-header-actions"><AdminStateChip name="live-data" tone="success">{isArabic ? "الطبقة" : "Layer"}: {isArabic ? activeMode.ar : activeMode.en}</AdminStateChip><button type="button" className="dn-map-add-shipment" onClick={requestCreateShipment}><PackagePlus className="h-4 w-4" />{isArabic ? "إضافة طلبية" : "Add shipment"}</button></div></div>
-        <div className="dn-map-form-grid"><label><span>{isArabic ? "بحث" : "Search"}</span><div><Search className="h-3.5 w-3.5" aria-hidden="true" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={isArabic ? "مدينة / تاجر / هاتف / رقم شحنة" : "City / merchant / phone / shipment"} /></div></label><label><span>{isArabic ? "الإمارة" : "Emirate"}</span><select value={regionFilter} onChange={(event) => setRegion(event.target.value)}>{adminMapRegions.map((region) => <option key={region.id} value={region.id}>{isArabic ? region.ar : region.en}</option>)}</select></label><label><span>{isArabic ? "الحالة" : "Status"}</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setFocusCommand({ type: "fit", nonce: Date.now() }); }}>{statusFilters.map((item) => <option key={item.id} value={item.id}>{isArabic ? item.ar : item.en}</option>)}</select></label><label className="dn-map-shipment-picker"><span>{isArabic ? "اختيار الشحنة" : "Select shipment"}</span><select value={selectedOrderId} onChange={(event) => selectShipment(event.target.value)} disabled={!visibleOrders.length}>{!visibleOrders.length && <option value="">{isArabic ? "لا توجد شحنات مطابقة" : "No matching shipments"}</option>}{visibleOrders.slice(0, 120).map((order) => <option key={orderKey(order)} value={orderKey(order)}>{orderTitle(order, isArabic)}</option>)}</select></label></div>
-        <div className="dn-map-chip-row"><span>{isArabic ? "عرض الخريطة" : "Map view"}</span>{modeLabels.map(({ mode, ar, en, Icon }) => <button key={mode} type="button" onClick={() => selectMode(mode)} aria-pressed={mapMode === mode} className={mapMode === mode ? "is-active" : ""}><Icon className="h-3.5 w-3.5" aria-hidden="true" />{isArabic ? ar : en}</button>)}</div>
-        <div className="dn-map-chip-row"><span>{isArabic ? "المناطق" : "Regions"}</span>{compactRegions.map((region) => <button key={region.id} type="button" onClick={() => setRegion(region.id)} className={regionFilter === region.id ? "is-active" : ""}><SearchCheck className="h-3.5 w-3.5" />{isArabic ? region.ar : region.en}</button>)}</div>
+    <section
+      className="dn-live-map-shell dn-video-clean-live-map dn-admin-live-map-fixed"
+      dir={isArabic ? "rtl" : "ltr"}
+      aria-label={isArabic ? "خريطة العمليات الحية" : "Live operations map"}
+    >
+      <header className="dn-live-map-ops-panel dn-map-header-clean">
+        <div className="dn-map-title-row">
+          <div className="dn-map-title-card min-w-0">
+            <p>
+              <AdminIconBadge name="map" />
+              {isArabic ? "خريطة العمليات الحية" : "Live Operations Map"}
+            </p>
+            <b dir="ltr">{String(reference).slice(0, 42)}</b>
+          </div>
+          <div className="dn-map-header-actions">
+            <AdminStateChip name="live-data" tone="success">
+              {isArabic ? "الطبقة" : "Layer"}: {isArabic ? activeMode.ar : activeMode.en}
+            </AdminStateChip>
+            <button type="button" className="dn-map-add-shipment" onClick={requestCreateShipment}>
+              <PackagePlus className="h-4 w-4" aria-hidden="true" />
+              {isArabic ? "إضافة طلبية" : "Add shipment"}
+            </button>
+          </div>
+        </div>
+
+        <div className="dn-map-form-grid dn-map-control-grid">
+          <label>
+            <span>{isArabic ? "بحث" : "Search"}</span>
+            <div className="dn-map-search-inline">
+              <Search className="h-3.5 w-3.5" aria-hidden="true" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={isArabic ? "مدينة / تاجر / هاتف / رقم شحنة" : "City / merchant / phone / shipment"}
+              />
+            </div>
+          </label>
+          <label>
+            <span>{isArabic ? "الإمارة" : "Emirate"}</span>
+            <select value={regionFilter} onChange={(event) => setRegion(event.target.value)}>
+              {adminMapRegions.map((region) => (
+                <option key={region.id} value={region.id}>{isArabic ? region.ar : region.en}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{isArabic ? "الحالة" : "Status"}</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setFocusCommand({ type: "fit", nonce: Date.now() });
+              }}
+            >
+              {statusFilters.map((item) => (
+                <option key={item.id} value={item.id}>{isArabic ? item.ar : item.en}</option>
+              ))}
+            </select>
+          </label>
+          <label className="dn-map-shipment-picker">
+            <span>{isArabic ? "اختيار الشحنة" : "Select shipment"}</span>
+            <select value={selectedOrderId} onChange={(event) => selectShipment(event.target.value)} disabled={!visibleOrders.length}>
+              {!visibleOrders.length && <option value="">{isArabic ? "لا توجد شحنات مطابقة" : "No matching shipments"}</option>}
+              {visibleOrders.slice(0, 120).map((order) => (
+                <option key={orderKey(order)} value={orderKey(order)}>{orderTitle(order, isArabic)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
-      {activeLayerFailed && <div className="dn-map-warning"><AlertTriangle className="h-4 w-4" />{isArabic ? "تعذر تحميل هذه الطبقة مؤقتاً، جرّب وضعاً آخر." : "This layer could not be loaded temporarily; try another mode."}</div>}
-      <div className="dn-video-map-square dn-live-map-square-clean mt-3 w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#020812]" style={{ aspectRatio: "1 / 1" }}>
-        <MapContainer key={`${mapMode}-${refreshNonce}`} center={driverPos} zoom={regionFilter === "all" ? 10 : focusRegion.zoom} className="h-full w-full" style={{ height: "100%", width: "100%" }} scrollWheelZoom zoomControl={false} keyboard>
-          <MapCommandControls isArabic={isArabic} fitPoints={fitPoints} driver={driverPos} focusRegion={focusRegion} onReset={(type = "refresh") => { setRefreshNonce((value) => value + 1); setFocusCommand({ type, nonce: Date.now() }); }} />
+
+      <nav className="dn-map-mode-bar" aria-label={isArabic ? "أنماط الخريطة" : "Map modes"}>
+        <span>{isArabic ? "عرض الخريطة" : "Map view"}</span>
+        {modeLabels.map(({ mode, ar, en, Icon }) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => selectMode(mode)}
+            aria-pressed={mapMode === mode}
+            className={`dn-map-mode-button ${mapMode === mode ? "is-active" : ""}`}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {isArabic ? ar : en}
+          </button>
+        ))}
+      </nav>
+
+      <nav className="dn-map-region-chips" aria-label={isArabic ? "مناطق الخريطة" : "Map regions"}>
+        <span>{isArabic ? "المناطق" : "Regions"}</span>
+        {compactRegions.map((region) => {
+          const RegionIcon = region.id === "external" ? Globe2 : region.id === "all" ? MapIcon : SearchCheck;
+          return (
+            <button
+              key={region.id}
+              type="button"
+              onClick={() => setRegion(region.id)}
+              aria-pressed={regionFilter === region.id}
+              className={`dn-map-region-button ${regionFilter === region.id ? "is-active" : ""}`}
+            >
+              <RegionIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              {isArabic ? region.ar : region.en}
+            </button>
+          );
+        })}
+      </nav>
+
+      {activeLayerFailed && (
+        <div className="dn-map-warning">
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          {isArabic ? "تعذر تحميل هذه الطبقة مؤقتاً، جرّب وضعاً آخر." : "This layer could not be loaded temporarily; try another mode."}
+        </div>
+      )}
+
+      <div className="dn-video-map-square dn-live-map-square-clean">
+        <MapContainer
+          key={`${mapMode}-${refreshNonce}`}
+          center={driverPos}
+          zoom={regionFilter === "all" ? 10 : focusRegion.zoom}
+          className="h-full w-full"
+          style={{ height: "100%", width: "100%" }}
+          scrollWheelZoom
+          zoomControl={false}
+          keyboard
+        >
+          <MapCommandControls
+            isArabic={isArabic}
+            fitPoints={fitPoints}
+            driver={driverPos}
+            focusRegion={focusRegion}
+            onReset={(type = "refresh") => {
+              setFocusCommand({ type, nonce: Date.now() });
+            }}
+          />
           {renderBaseLayers()}
           <MapRefresh points={fitPoints} driver={driverPos} focusRegion={focusRegion} focusCommand={focusCommand} mapMode={mapMode} refreshNonce={refreshNonce} />
           <Polyline positions={routePoints} pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }} />
           <Polyline positions={[pickupPos, driverPos, destPos]} pathOptions={{ color: "#18A8E8", weight: 2.5, opacity: 0.76, dashArray: "10 12" }} />
-          {routePoints.map((point, index) => <CircleMarker key={`${point[0]}-${point[1]}-${index}`} center={point} radius={3} pathOptions={{ color: "#F5B700", fillColor: "#F5B700", fillOpacity: 0.75, opacity: 0.55 }} />)}
-          <Marker position={pickupPos} icon={pickupIcon}><Popup><b>{isArabic ? "نقطة الاستلام" : "Pickup Point"}</b><br />{getOrderString(activeOrder, ["sender_address", "pickup_address", "origin_address"]) || (isArabic ? pickup.labelAr : pickup.labelEn)}</Popup></Marker>
-          <Marker position={driverPos} icon={driverIcon}><Popup><b>{isArabic ? "سيارة DAY NIGHT" : "DAY NIGHT Vehicle"}</b><br />{hasLiveDriver ? (isArabic ? "موقع السيارة المباشر" : "Live vehicle location") : (isArabic ? "موقع الشحنة التقديري" : "Estimated shipment position")}<br />{isArabic ? "المندوب" : "Driver"}: {label(activeOrder?.driver_name || activeOrder?.assigned_driver_name, isArabic ? "بدون مندوب" : "Unassigned")}</Popup></Marker>
-          <Marker position={destPos} icon={destinationIcon}><Popup><b>{isArabic ? "نقطة التسليم" : "Delivery Point"}</b><br />{getOrderString(activeOrder, ["receiver_address", "delivery_address", "destination_address"]) || (isArabic ? destination.labelAr : destination.labelEn)}</Popup></Marker>
+          <Marker position={pickupPos} icon={pickupIcon}>
+            <Popup><b>{isArabic ? "نقطة الاستلام" : "Pickup Point"}</b><br />{getOrderString(activeOrder, ["sender_address", "pickup_address", "origin_address"]) || (isArabic ? pickup.labelAr : pickup.labelEn)}</Popup>
+          </Marker>
+          <Marker position={driverPos} icon={driverIcon}>
+            <Popup><b>{isArabic ? "سيارة DAY NIGHT" : "DAY NIGHT Vehicle"}</b><br />{hasLiveDriver ? (isArabic ? "موقع السيارة المباشر" : "Live vehicle location") : (isArabic ? "موقع الشحنة التقديري" : "Estimated shipment position")}<br />{isArabic ? "المندوب" : "Driver"}: {label(activeOrder?.driver_name || activeOrder?.assigned_driver_name, isArabic ? "بدون مندوب" : "Unassigned")}</Popup>
+          </Marker>
+          <Marker position={destPos} icon={destinationIcon}>
+            <Popup><b>{isArabic ? "نقطة التسليم" : "Delivery Point"}</b><br />{getOrderString(activeOrder, ["receiver_address", "delivery_address", "destination_address"]) || (isArabic ? destination.labelAr : destination.labelEn)}</Popup>
+          </Marker>
         </MapContainer>
       </div>
-      <footer className="dn-video-map-summary dn-map-summary-clean mt-3 grid gap-2 rounded-3xl border border-white/10 bg-[#05182f]/70 p-3 text-[0.7rem] font-black text-white/75 sm:grid-cols-2 lg:grid-cols-3"><span><MapPin className="h-3.5 w-3.5 text-brand-gold" />{isArabic ? pickup.labelAr : pickup.labelEn}</span><span><Route className="h-3.5 w-3.5 text-brand-gold" />{distanceKm} km</span><span><Truck className="h-3.5 w-3.5 text-brand-sky" />{label(activeOrder?.driver_name || activeOrder?.assigned_driver_name, isArabic ? "بدون مندوب" : "Unassigned")}</span><span><Navigation className="h-3.5 w-3.5 text-brand-sky" />{isArabic ? destination.labelAr : destination.labelEn}</span><span><Filter className="h-3.5 w-3.5 text-brand-gold" />{selectedStatus}</span><span><CalendarDays className="h-3.5 w-3.5 text-brand-sky" />{amount ? `${amount.toFixed(2)} AED` : "—"}</span></footer>
+
+      <footer className="dn-video-map-summary dn-map-route-summary dn-map-summary-clean">
+        <span><MapPin className="h-3.5 w-3.5" />{isArabic ? pickup.labelAr : pickup.labelEn}</span>
+        <span><Route className="h-3.5 w-3.5" />{distanceKm} km</span>
+        <span><Truck className="h-3.5 w-3.5" />{label(activeOrder?.driver_name || activeOrder?.assigned_driver_name, isArabic ? "بدون مندوب" : "Unassigned")}</span>
+        <span><Navigation className="h-3.5 w-3.5" />{isArabic ? destination.labelAr : destination.labelEn}</span>
+        <span><Filter className="h-3.5 w-3.5" />{selectedStatus}</span>
+        <span><CalendarDays className="h-3.5 w-3.5" />{amount ? `${amount.toFixed(2)} AED` : "—"}</span>
+      </footer>
     </section>
   );
 }
