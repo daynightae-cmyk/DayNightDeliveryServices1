@@ -125,6 +125,38 @@ const statusWords: Record<string, { ar: string; en: string }> = {
   under_review: { ar: "قيد المراجعة", en: "Under review" },
 };
 
+const INTERNATIONAL_RE = /international|external|gcc|world|worldwide|saudi|kuwait|qatar|bahrain|oman|usa|uk|europe|canada|australia|دولي|خارجي|خليجي|السعودية|الكويت|قطر|البحرين|عمان/;
+const ABU_DHABI_RE = /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي|العين|مصفح/;
+const OTHER_EMIRATES_RE = /dubai|sharjah|ajman|umm al quwain|ras al khaimah|fujairah|khor fakkan|دبي|الشارقة|عجمان|أم القيوين|ام القيوين|رأس الخيمة|راس الخيمة|الفجيرة|خورفكان/;
+
+function orderSearchText(order: Order) {
+  return normalize([
+    order.sender_city,
+    order.receiver_city,
+    extra(order).pickup_city,
+    extra(order).delivery_city,
+    order.destination_country,
+    order.service_type,
+    order.shipping_scope,
+    order.notes,
+    order.sender_address,
+    order.receiver_address,
+  ].join(" "));
+}
+
+function isInternationalOrder(order: Order) {
+  return INTERNATIONAL_RE.test(orderSearchText(order));
+}
+
+function isAbuDhabiOrder(order: Order) {
+  return !isInternationalOrder(order) && ABU_DHABI_RE.test(orderSearchText(order));
+}
+
+function isOtherEmiratesOrder(order: Order) {
+  const text = orderSearchText(order);
+  return !isInternationalOrder(order) && !isAbuDhabiOrder(order) && OTHER_EMIRATES_RE.test(text);
+}
+
 function statusText(value: unknown, isArabic: boolean) {
   const key = normalizeStatusKey(value);
   if (statusWords[key]) return isArabic ? statusWords[key].ar : statusWords[key].en;
@@ -158,16 +190,16 @@ function categoryText(value: string, isArabic: boolean) {
 
 function statusMatch(order: Order, id: AdminSectionId) {
   const s = normalizeStatusKey(order.status);
-  const text = normalize(`${order.sender_city} ${order.receiver_city} ${extra(order).pickup_city || ""} ${extra(order).delivery_city || ""} ${order.destination_country} ${order.service_type} ${order.shipping_scope} ${order.notes}`);
+  const text = orderSearchText(order);
   if (["all_orders", "reports", "print"].includes(id)) return true;
-  if (id === "cancelled") return /cancel|fail/.test(s);
-  if (id === "review") return /review|pending|confirm|hold/.test(s);
-  if (id === "postponed") return /postpone|defer|schedule/.test(s);
-  if (id === "returned") return /return/.test(s);
-  if (id === "pickup") return /pick|assign|collect/.test(s);
-  if (id === "abu_dhabi") return /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي/.test(text);
-  if (id === "external") return /international|external|gcc|world|saudi|kuwait|qatar|bahrain|oman|دولي|خارجي/.test(text);
-  if (id === "out_scope") return /out.?of.?scope|unsupported|خارج النطاق/.test(`${text} ${s}`);
+  if (id === "cancelled") return /cancelled|canceled|cancel|failed|fail|ملغي|ملغية|كنسل/.test(`${s} ${text}`);
+  if (id === "review") return /review|under_review|needs_review|manual_review|manual_approval|hold|مراجعة/.test(`${s} ${text}`);
+  if (id === "postponed") return /postpone|postponed|defer|deferred|schedule|scheduled|later|مؤجل|مؤجلة|تأجيل/.test(`${s} ${text}`);
+  if (id === "returned") return /return|returned|راجع|راجعة|مرتجع|مرتجعة/.test(`${s} ${text}`);
+  if (id === "pickup") return /pick|picked_up|pickup|assign|assigned|collect|إحضار|احضار|مندوب/.test(`${s} ${text}`);
+  if (id === "abu_dhabi") return isAbuDhabiOrder(order);
+  if (id === "external") return isInternationalOrder(order);
+  if (id === "out_scope") return isOtherEmiratesOrder(order) || /out.?of.?scope|unsupported|خارج النطاق/.test(`${text} ${s}`);
   return true;
 }
 
