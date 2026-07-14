@@ -1,6 +1,12 @@
 const isBrowser = typeof window !== "undefined" && typeof document !== "undefined";
 
 const AR_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/الطلبات الخارجية/g, "الطلبات الدولية"],
+  [/الطلبيات الخارجية/g, "الطلبيات الدولية"],
+  [/خارجي/g, "دولي"],
+  [/الطلبات خارج النطاق/g, "باقي الإمارات"],
+  [/الطلبيات خارج النطاق/g, "باقي الإمارات"],
+  [/خارج النطاق/g, "باقي الإمارات"],
   [/إضافة طلب جديد/g, "إضافة طلبية جديدة"],
   [/إضافة طلب(?!ية)/g, "إضافة طلبية"],
   [/طلب جديد/g, "طلبية جديدة"],
@@ -22,6 +28,9 @@ const AR_REPLACEMENTS: Array<[RegExp, string]> = [
 ];
 
 const EN_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bExternal\s*Orders\b/g, "International Orders"],
+  [/\bExternal\b/g, "International"],
+  [/\bOut\s*of\s*Scope\b/g, "Other Emirates"],
   [/\bCOD\s*Collection\b/g, "Cash on Delivery"],
   [/\bPending\s*COD\b/g, "Pending Cash"],
   [/\bOrder\s*COD\b/g, "Order Cash"],
@@ -33,6 +42,7 @@ type Metrics = Record<MetricKey, number>;
 type Card = { id: string; metric: MetricKey; tone: string; ar: string; en: string; hintAr: string; hintEn: string; navAr: string[]; navEn: string[] };
 
 const EMPTY: Metrics = { total: 0, cancelled: 0, review: 0, postponed: 0, returned: 0, pickup: 0, abuDhabi: 0, external: 0, outScope: 0 };
+const MENU_ORDER = ["dashboard", "new_order", "new_merchant", "merchants", "all_orders", "cancelled", "review", "postponed", "returned", "pickup", "abu_dhabi", "external", "out_scope", "finance_dashboard", "driver_statements", "merchant_statements", "income", "cod", "expenses", "accounts", "adjustments", "audit_log", "import", "print", "reports", "settings", "support", "database_health", "production_readiness", "logout"];
 const CARDS: Card[] = [
   { id: "all_orders", metric: "total", tone: "all", ar: "الكل", en: "All", hintAr: "كل الطلبيات", hintEn: "All shipments", navAr: ["كافة الطلبات", "كافة الطلبيات"], navEn: ["All Orders", "All Shipments"] },
   { id: "cancelled", metric: "cancelled", tone: "cancelled", ar: "ملغية", en: "Cancelled", hintAr: "المكنسل", hintEn: "Cancelled", navAr: ["الطلبات الملغية", "الطلبيات الملغية", "ملغية"], navEn: ["Cancelled Orders", "Cancelled"] },
@@ -41,8 +51,8 @@ const CARDS: Card[] = [
   { id: "returned", metric: "returned", tone: "returned", ar: "راجعة", en: "Returned", hintAr: "مرتجعات", hintEn: "Returns", navAr: ["الطلبات الراجعة", "الطلبيات الراجعة", "راجعة"], navEn: ["Returned Orders", "Returned"] },
   { id: "pickup", metric: "pickup", tone: "pickup", ar: "قيد الإحضار", en: "Pickup", hintAr: "إحضار وتوزيع", hintEn: "Pickup flow", navAr: ["الطلبات قيد الإحضار", "الطلبيات قيد الإحضار", "قيد الإحضار"], navEn: ["Pickup Orders", "Pickup"] },
   { id: "abu_dhabi", metric: "abuDhabi", tone: "local", ar: "أبوظبي", en: "Abu Dhabi", hintAr: "محلي", hintEn: "Local", navAr: ["طلبات أبوظبي", "طلبيات أبوظبي", "أبوظبي"], navEn: ["Abu Dhabi Orders", "Abu Dhabi"] },
-  { id: "external", metric: "external", tone: "external", ar: "خارجي", en: "External", hintAr: "خارج الإمارة/دولي", hintEn: "External / international", navAr: ["الطلبات الخارجية", "الطلبيات الخارجية", "خارجي"], navEn: ["External Orders", "External"] },
-  { id: "out_scope", metric: "outScope", tone: "danger", ar: "خارج النطاق", en: "Out of scope", hintAr: "يحتاج موافقة", hintEn: "Needs approval", navAr: ["الطلبات خارج النطاق", "الطلبيات خارج النطاق", "خارج النطاق"], navEn: ["Out of Scope"] },
+  { id: "external", metric: "external", tone: "external", ar: "الدولي", en: "International", hintAr: "خليجي/عالمي", hintEn: "GCC / worldwide", navAr: ["الطلبات الدولية", "الطلبيات الدولية", "الدولي"], navEn: ["International Orders", "International"] },
+  { id: "out_scope", metric: "outScope", tone: "danger", ar: "باقي الإمارات", en: "Other Emirates", hintAr: "دبي/الشارقة/عجمان", hintEn: "Dubai / Sharjah / Ajman", navAr: ["باقي الإمارات"], navEn: ["Other Emirates"] },
 ];
 
 let metrics: Metrics = { ...EMPTY };
@@ -77,17 +87,20 @@ function polishNode(node: Node) {
 function normalize(value: unknown) { return String(value || "").toLowerCase().replace(/[_-]/g, " ").trim(); }
 function route(order: Record<string, unknown>) { return [order.sender_city, order.receiver_city, order.pickup_city, order.delivery_city, order.destination_country, order.shipping_scope, order.service_type].map((value) => String(value || "")).join(" ").toLowerCase(); }
 function status(order: Record<string, unknown>) { return normalize(order.status); }
+function isInternational(order: Record<string, unknown>) { return /international|external|gcc|world|worldwide|saudi|kuwait|qatar|bahrain|oman|usa|uk|europe|canada|australia|دولي|خارجي|خليجي|السعودية|الكويت|قطر|البحرين|عمان/.test(route(order)); }
+function isAbuDhabiRoute(order: Record<string, unknown>) { return /abu dhabi|mussafah|khalifa|mbz|al ain|أبوظبي|ابوظبي|العين|مصفح/.test(route(order)); }
+function isOtherEmirate(order: Record<string, unknown>) { return !isInternational(order) && !isAbuDhabiRoute(order) && /dubai|sharjah|ajman|umm al quwain|ras al khaimah|fujairah|khor fakkan|دبي|الشارقة|عجمان|أم القيوين|ام القيوين|رأس الخيمة|راس الخيمة|الفجيرة|خورفكان/.test(route(order)); }
 function calc(data: Record<string, unknown>[]): Metrics {
   return {
     total: data.length,
     cancelled: data.filter((order) => /cancel|canceled|cancelled|fail|ملغ|كنسل/.test(status(order))).length,
-    review: data.filter((order) => /pending|review|confirm|hold|مراجعة|انتظار/.test(status(order))).length,
+    review: data.filter((order) => /review|under.?review|manual|hold|مراجعة/.test(status(order))).length,
     postponed: data.filter((order) => /postpone|defer|schedule|later|مؤجل|تأجيل/.test(status(order))).length,
     returned: data.filter((order) => /return|returned|راجع|مرتجع/.test(status(order))).length,
     pickup: data.filter((order) => /pick|pickup|assign|assigned|collect|إحضار|احضار|مندوب/.test(status(order))).length,
-    abuDhabi: data.filter((order) => /abu dhabi|mussafah|khalifa|mbz|أبوظبي|ابوظبي/.test(route(order))).length,
-    external: data.filter((order) => /international|external|gcc|world|saudi|kuwait|qatar|bahrain|oman|دولي|خارجي/.test(route(order))).length,
-    outScope: data.filter((order) => /out.?of.?scope|unsupported|خارج النطاق/.test(`${order.status || ""} ${order.notes || ""} ${order.internal_notes || ""} ${order.admin_notes || ""}`.toLowerCase())).length,
+    abuDhabi: data.filter(isAbuDhabiRoute).length,
+    external: data.filter(isInternational).length,
+    outScope: data.filter(isOtherEmirate).length,
   };
 }
 
@@ -124,17 +137,18 @@ function injectStyle() {
   const style = document.createElement("style");
   style.id = "dn-admin-command-style";
   style.textContent = `
-    .dn-admin-layout-full { grid-template-columns: minmax(0, 1fr) 226px !important; gap: 10px !important; padding: 10px !important; }
-    .dn-admin-home-full { grid-template-columns: 210px minmax(0, 1fr) !important; gap: 10px !important; align-items: start !important; }
-    .dn-admin-sidebar-full { position: sticky !important; top: 10px !important; max-height: calc(100dvh - 20px) !important; overflow-y: auto !important; border-radius: 18px !important; padding: 10px !important; }
-    .dn-admin-brand-block { padding: 10px !important; border-radius: 14px !important; } .dn-admin-brand-block img { width: 72px !important; height: 72px !important; }
-    .dn-admin-side-nav { gap: 7px !important; } .dn-admin-side-nav h3 { margin: 6px 0 3px !important; font-size: .68rem !important; } .dn-admin-side-nav button { min-height: 31px !important; padding: 5px 7px !important; border-radius: 10px !important; font-size: .74rem !important; }
-    .dn-admin-left-ai { max-height: calc(100dvh - 112px) !important; overflow-y: auto !important; border-radius: 16px !important; }
-    .dn-admin-top-strip { min-height: 38px !important; padding: 6px 8px !important; margin-bottom: 7px !important; } .dn-admin-current-section { min-height: 30px !important; margin: 3px 0 7px !important; padding: 4px 8px !important; }
+    .dn-admin-layout-full { grid-template-columns: minmax(0, 1fr) 220px !important; gap: 9px !important; padding: 9px !important; }
+    .dn-admin-home-full { grid-template-columns: 205px minmax(0, 1fr) !important; gap: 9px !important; align-items: start !important; }
+    .dn-admin-sidebar-full { position: sticky !important; top: 9px !important; max-height: calc(100dvh - 18px) !important; overflow-y: auto !important; border-radius: 16px !important; padding: 8px !important; }
+    .dn-admin-brand-block { padding: 8px !important; border-radius: 13px !important; } .dn-admin-brand-block img { width: 68px !important; height: 68px !important; }
+    .dn-admin-side-nav { gap: 5px !important; } .dn-admin-side-nav h3 { margin: 5px 0 2px !important; font-size: .64rem !important; } .dn-admin-side-nav button { min-height: 29px !important; padding: 4px 6px !important; border-radius: 10px !important; font-size: .70rem !important; }
+    .dn-admin-sidebar-icon { width: 46px !important; min-width: 46px !important; height: 24px !important; }
+    .dn-admin-left-ai { max-height: calc(100dvh - 110px) !important; overflow-y: auto !important; border-radius: 15px !important; }
+    .dn-admin-top-strip { min-height: 36px !important; padding: 6px 8px !important; margin-bottom: 6px !important; } .dn-admin-current-section { min-height: 28px !important; margin: 2px 0 7px !important; padding: 4px 8px !important; }
     .dn-admin-dashboard-hero { min-height: auto !important; padding: 12px 16px !important; border-radius: 18px !important; } .dn-admin-dashboard-hero h1 { font-size: clamp(1.35rem, 2.4vw, 2.35rem) !important; line-height: 1.1 !important; }
     .dn-admin-dashboard-kpis { grid-template-columns: repeat(6, minmax(125px, 1fr)) !important; gap: 8px !important; } .dn-admin-dashboard-kpis > article { min-height: 68px !important; padding: 9px !important; border-radius: 14px !important; }
     .dn-admin-map-first-grid { grid-template-columns: 250px minmax(0, 1fr) !important; gap: 10px !important; justify-content: stretch !important; } [dir="rtl"] .dn-admin-map-first-grid .dn-admin-quick-actions-compact { order: 1 !important; } [dir="rtl"] .dn-admin-map-first-grid .dn-admin-map-primary { order: 2 !important; }
-    .dn-admin-map-primary, .dn-live-map-shell { max-width: 100% !important; } .dn-live-map-shell { padding: 8px !important; border-radius: 16px !important; gap: 7px !important; } .dn-live-map-shell > .leaflet-container { min-height: 360px !important; aspect-ratio: 16 / 9 !important; border-radius: 14px !important; }
+    .dn-admin-map-primary, .dn-live-map-shell { max-width: 100% !important; } .dn-live-map-shell { padding: 8px !important; border-radius: 16px !important; gap: 7px !important; } .dn-live-map-shell > .leaflet-container { min-height: 340px !important; aspect-ratio: 16 / 9 !important; border-radius: 14px !important; }
     .dn-admin-action-grid { grid-template-columns: 1fr !important; gap: 7px !important; } .dn-admin-action-tile { min-height: 42px !important; padding: 7px !important; border-radius: 12px !important; }
     .dn-admin-command-deck { position: relative; z-index: 25; display: grid; grid-template-columns: repeat(9, minmax(92px, 1fr)); gap: 8px; margin: 0 0 10px; padding: 8px; border: 1px solid rgba(24,168,232,.18); border-radius: 18px; background: linear-gradient(135deg, rgba(7,26,51,.92), rgba(2,8,18,.74)); box-shadow: 0 14px 32px rgba(0,0,0,.18); }
     .dn-admin-command-card { display: grid; align-content: center; gap: 2px; min-height: 66px; padding: 9px 10px; border: 1px solid rgba(245,183,0,.22); border-radius: 14px; background: linear-gradient(145deg, rgba(0,87,184,.16), rgba(7,26,51,.88)); color: #fff; text-align: center; cursor: pointer; transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease; }
@@ -142,19 +156,27 @@ function injectStyle() {
     .dn-admin-command-card:hover { transform: translateY(-1px); border-color: rgba(250,204,21,.68); box-shadow: 0 12px 28px rgba(0,0,0,.22); } .dn-admin-command-card.is-current { border-color: rgba(245,183,0,.8); background: linear-gradient(145deg, rgba(245,183,0,.34), rgba(7,26,51,.9)); }
     .dn-admin-command-card[data-tone="review"] { background: linear-gradient(145deg, rgba(24,168,232,.22), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="cancelled"], .dn-admin-command-card[data-tone="danger"] { background: linear-gradient(145deg, rgba(239,68,68,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="postponed"] { background: linear-gradient(145deg, rgba(168,85,247,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="returned"] { background: linear-gradient(145deg, rgba(251,146,60,.2), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="pickup"] { background: linear-gradient(145deg, rgba(20,184,166,.22), rgba(7,26,51,.88)); } .dn-admin-command-card[data-tone="external"] { background: linear-gradient(145deg, rgba(59,130,246,.2), rgba(7,26,51,.88)); }
     @media (max-width: 1500px) { .dn-admin-command-deck { grid-template-columns: repeat(5, minmax(105px, 1fr)); } .dn-admin-dashboard-kpis { grid-template-columns: repeat(3, minmax(145px, 1fr)) !important; } }
-    @media (max-width: 1180px) { .dn-admin-layout-full { display: block !important; } .dn-admin-home-full { grid-template-columns: 1fr !important; } .dn-admin-left-ai { display: none !important; } .dn-admin-map-first-grid { grid-template-columns: 1fr !important; } .dn-admin-command-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 1180px) { .dn-admin-layout-full { display: block !important; } .dn-admin-home-full { grid-template-columns: 1fr !important; } .dn-admin-left-ai { display: none !important; } .dn-admin-map-first-grid { grid-template-columns: 1fr !important; } .dn-admin-command-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dn-admin-sidebar-full { position: fixed !important; inset: 12px 12px auto auto !important; width: min(92vw, 330px) !important; max-height: calc(100dvh - 24px) !important; z-index: 70 !important; } }
     @media (max-width: 680px) { .dn-admin-command-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dn-admin-dashboard-kpis { grid-template-columns: 1fr !important; } .dn-live-map-shell > .leaflet-container { min-height: 300px !important; } }
   `;
   document.head.appendChild(style);
 }
 
 function currentText() { return root()?.querySelector(".dn-admin-current-section strong")?.textContent || ""; }
-function isCurrent(card: Card) { const current = currentText(); const labels = isArabic() ? card.navAr : card.navEn; return labels.some((label) => current.includes(label) || label.includes(current)); }
+function isCurrent(card: Card) { const current = polishText(currentText()); const labels = isArabic() ? [...card.navAr, card.ar] : [...card.navEn, card.en]; return labels.some((label) => current.includes(label) || label.includes(current)); }
 function clickSection(id: string) {
-  const card = CARDS.find((item) => item.id === id); if (!card) return;
-  const labels = isArabic() ? card.navAr : card.navEn;
-  const target = Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-admin-side-nav button")).find((button) => labels.some((label) => (button.textContent || "").replace(/\s+/g, " ").trim().includes(label)));
-  target?.click();
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-admin-side-nav button"));
+  const card = CARDS.find((item) => item.id === id);
+  const labels = card ? (isArabic() ? card.navAr : card.navEn).map((label) => polishText(label).replace(/\s+/g, " ").trim()) : [];
+  const targetByText = buttons.find((button) => {
+    const text = polishText(button.textContent || "").replace(/\s+/g, " ").trim();
+    return labels.some((label) => text === label || text.endsWith(label));
+  });
+  const targetByIndex = buttons[MENU_ORDER.indexOf(id)];
+  const target = targetByText || targetByIndex;
+  if (!target) return;
+  if (target.classList.contains("is-active")) return;
+  target.click();
 }
 
 function renderDeck() {
