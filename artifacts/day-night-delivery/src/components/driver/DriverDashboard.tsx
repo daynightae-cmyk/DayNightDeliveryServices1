@@ -1,26 +1,42 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Banknote,
+  BatteryCharging,
   CheckCircle2,
   Clock3,
   Crosshair,
+  Gauge,
+  History,
+  Home,
   LogOut,
+  MapPin,
+  MessageCircle,
   Navigation,
   PauseCircle,
+  Phone,
   PlayCircle,
   RefreshCw,
   Route,
+  Settings2,
+  ShieldCheck,
+  Signal,
   Truck,
   UserRound,
   Wifi,
 } from "lucide-react";
 import { supabase } from "../../supabase";
 import { driverErrorMessage, setDriverPresence, updateDriverOrderStatus } from "../../lib/driverData";
-import type { DriverProfile, ProfileRole } from "../../types/driver";
+import type { DriverProfile, DriverShiftStatus, ProfileRole } from "../../types/driver";
 import { useDriverOrders } from "../../hooks/useDriverOrders";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import DriverOrderCard from "./DriverOrderCard";
 import DriverProfilePanel from "./DriverProfilePanel";
+
+const ADMIN_PHONE = "+971568757331";
+const closedStatuses = ["delivered", "cancelled", "returned"];
+
+type DriverTab = "home" | "active" | "history" | "profile";
 
 function accuracyLabel(value: number | null | undefined, isArabic: boolean) {
   if (value == null) return "—";
@@ -28,6 +44,38 @@ function accuracyLabel(value: number | null | undefined, isArabic: boolean) {
   if (value <= 50) return isArabic ? "جيدة" : "Good";
   if (value <= 150) return isArabic ? "متوسطة" : "Moderate";
   return isArabic ? "ضعيفة" : "Low";
+}
+
+function daysUntil(value?: string | null) {
+  if (!value) return null;
+  const target = new Date(value).getTime();
+  if (!Number.isFinite(target)) return null;
+  return Math.ceil((target - Date.now()) / 86_400_000);
+}
+
+function profileCompletion(profile: ProfileRole, driver: DriverProfile) {
+  const values = [
+    driver.avatar_path,
+    driver.full_name || profile.full_name,
+    driver.phone || profile.phone,
+    driver.emergency_contact,
+    driver.work_area,
+    driver.address,
+    driver.bio,
+    driver.vehicle_type,
+    driver.vehicle_plate,
+    driver.emirate,
+    driver.license_number,
+  ];
+  return Math.round((values.filter(Boolean).length / values.length) * 100);
+}
+
+function orderDestination(order: ReturnType<typeof useDriverOrders>["activeOrders"][number] | undefined) {
+  if (!order) return "";
+  const lat = Number(order.receiver_lat ?? order.delivery_lat);
+  const lng = Number(order.receiver_lng ?? order.delivery_lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat},${lng}`;
+  return [order.receiver_city, order.receiver_address].filter(Boolean).join(", ");
 }
 
 export default function DriverDashboard({
@@ -50,15 +98,45 @@ export default function DriverDashboard({
     error,
     refresh,
   } = useDriverOrders(driver.id);
-  const currentOrderId = useMemo(() => activeOrders[0]?.id || null, [activeOrders]);
+  const currentOrder = activeOrders[0];
+  const currentOrderId = currentOrder?.id || null;
   const [shiftStarted, setShiftStarted] = useState(true);
-  const [tab, setTab] = useState<"active" | "history" | "profile">("active");
+  const [shiftMode, setShiftMode] = useState<DriverShiftStatus>(
+    driver.shift_status === "busy" ? "busy" : driver.shift_status === "paused" ? "paused" : "available",
+  );
+  const [tab, setTab] = useState<DriverTab>("home");
   const [busyOrder, setBusyOrder] = useState("");
   const [actionError, setActionError] = useState("");
   const [shiftBusy, setShiftBusy] = useState(false);
+  const [clockNow, setClockNow] = useState(Date.now());
   const gps = useDriverLocation(driver.id, currentOrderId, shiftStarted, isArabic);
   const name = driver.full_name || driver.name || profile.full_name || "DAY NIGHT Driver";
   const accuracy = gps.position?.coords.accuracy;
+  const completion = profileCompletion(profile, driver);
+  const licenseDays = daysUntil(driver.license_expiry);
+  const registrationDays = daysUntil(driver.vehicle_registration_expiry);
+  const documentWarnings = [
+    licenseDays != null && licenseDays <= 30
+      ? isArabic
+        ? `الرخصة ${licenseDays < 0 ? "منتهية" : `تنتهي خلال ${licenseDays} يوم`}`
+        : `License ${licenseDays < 0 ? "expired" : `expires in ${licenseDays} days`}`
+      : null,
+    registrationDays != null && registrationDays <= 30
+      ? isArabic
+        ? `تسجيل المركبة ${registrationDays < 0 ? "منتهٍ" : `ينتهي خلال ${registrationDays} يوم`}`
+        : `Registration ${registrationDays < 0 ? "expired" : `expires in ${registrationDays} days`}`
+      : null,
+  ].filter(Boolean) as string[];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const sessionMinutes = useMemo(() => {
+    if (!gps.sessionStartedAt) return 0;
+    return Math.max(0, Math.floor((clockNow - new Date(gps.sessionStartedAt).getTime()) / 60_000));
+  }, [clockNow, gps.sessionStartedAt]);
 
   async function toggleShift() {
     setShiftBusy(true);
@@ -67,13 +145,29 @@ export default function DriverDashboard({
       if (shiftStarted) {
         await gps.stopShift();
         setShiftStarted(false);
+        setShiftMode("offline");
       } else {
         await setDriverPresence(true, "available", "Driver manually resumed shift");
         setShiftStarted(true);
+        setShiftMode("available");
         window.setTimeout(() => gps.requestLocation(), 50);
       }
     } catch (shiftError) {
       setActionError(driverErrorMessage(shiftError, isArabic));
+    } finally {
+      setShiftBusy(false);
+    }
+  }
+
+  async function changeShiftMode(mode: "available" | "paused") {
+    if (!shiftStarted || shiftBusy) return;
+    setShiftBusy(true);
+    setActionError("");
+    try {
+      await setDriverPresence(true, mode, mode === "paused" ? "Driver started a short break" : "Driver is ready for dispatch");
+      setShiftMode(mode);
+    } catch (presenceError) {
+      setActionError(driverErrorMessage(presenceError, isArabic));
     } finally {
       setShiftBusy(false);
     }
@@ -94,6 +188,8 @@ export default function DriverDashboard({
     try {
       await updateDriverOrderStatus(orderId, status, note);
       await refresh();
+      if (closedStatuses.includes(status)) setShiftMode("available");
+      else setShiftMode("busy");
     } catch (statusError) {
       setActionError(driverErrorMessage(statusError, isArabic));
     } finally {
@@ -104,10 +200,14 @@ export default function DriverDashboard({
   const lastSyncLabel = gps.lastSyncedAt
     ? new Date(gps.lastSyncedAt).toLocaleTimeString(isArabic ? "ar-AE" : "en-AE")
     : "—";
+  const destination = orderDestination(currentOrder);
+  const navigationUrl = destination
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`
+    : undefined;
 
   return (
-    <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
-      <header className="dn-driver-topbar">
+    <section className="dn-driver-shell dn-driver-shell-v2" dir={isArabic ? "rtl" : "ltr"}>
+      <header className="dn-driver-topbar dn-driver-topbar-v2">
         <div className="dn-driver-identity">
           <span className={`dn-driver-avatar ${driver.avatar_url ? "has-photo" : ""}`}>
             {driver.avatar_url ? <img src={driver.avatar_url} alt={name} /> : <Truck />}
@@ -118,9 +218,14 @@ export default function DriverDashboard({
             <p>{driver.vehicle_type || "Toyota Rush"} · {driver.vehicle_plate || (isArabic ? "بدون لوحة مسجلة" : "No plate registered")}</p>
           </div>
         </div>
-        <button type="button" className="dn-driver-icon-button" onClick={() => void logout()} aria-label="Sign out">
-          <LogOut />
-        </button>
+        <div className="dn-driver-top-actions">
+          <span className={`dn-driver-shift-badge is-${shiftStarted ? shiftMode : "offline"}`}>
+            {shiftStarted ? shiftMode : "offline"}
+          </span>
+          <button type="button" className="dn-driver-icon-button" onClick={() => void logout()} aria-label="Sign out">
+            <LogOut />
+          </button>
+        </div>
       </header>
 
       <section className={`dn-driver-shift-card ${shiftStarted ? "is-active" : ""}`}>
@@ -128,28 +233,47 @@ export default function DriverDashboard({
           <span className="dn-driver-shift-indicator"><Wifi /></span>
           <div>
             <small>{isArabic ? "حالة التتبع والوردية" : "Tracking & shift status"}</small>
-            <h2>{shiftStarted ? (isArabic ? "تم تشغيل التتبع تلقائيًا" : "Tracking started automatically") : (isArabic ? "الوردية متوقفة" : "Shift is offline")}</h2>
+            <h2>{shiftStarted ? (isArabic ? "أنت متصل بمركز العمليات" : "Connected to operations") : (isArabic ? "الوردية متوقفة" : "Shift is offline")}</h2>
             <p>
               {shiftStarted
-                ? isArabic ? "يُطلب GPS فور تسجيل الدخول، ويظهر موقعك الحقيقي فقط للإدارة." : "GPS is requested immediately after login and only your real location is shared."
-                : isArabic ? "استأنف الوردية لإعادة تفعيل GPS والطلبات المباشرة." : "Resume the shift to reactivate GPS and live dispatch."}
+                ? isArabic ? "يتم إرسال موقع GPS الحقيقي وحالة الجهاز تلقائيًا." : "Real GPS and device health are syncing automatically."
+                : isArabic ? "استأنف الوردية لإعادة التتبع والمهام المباشرة." : "Resume the shift to reactivate tracking and dispatch."}
             </p>
           </div>
         </div>
         <button type="button" disabled={shiftBusy} onClick={() => void toggleShift()}>
           {shiftStarted ? <PauseCircle /> : <PlayCircle />}
-          {shiftStarted ? (isArabic ? "إيقاف الوردية" : "Pause shift") : (isArabic ? "استئناف الوردية" : "Resume shift")}
+          {shiftStarted ? (isArabic ? "إنهاء الوردية" : "End shift") : (isArabic ? "بدء الوردية" : "Start shift")}
         </button>
       </section>
 
-      <div className="dn-driver-kpi-grid">
+      {shiftStarted && (
+        <div className="dn-driver-presence-switch">
+          <button type="button" className={shiftMode === "available" ? "is-active" : ""} disabled={shiftBusy || Boolean(currentOrder)} onClick={() => void changeShiftMode("available")}>
+            <CheckCircle2 /> {isArabic ? "متاح للاستلام" : "Available"}
+          </button>
+          <button type="button" className={shiftMode === "paused" ? "is-active" : ""} disabled={shiftBusy || Boolean(currentOrder)} onClick={() => void changeShiftMode("paused")}>
+            <PauseCircle /> {isArabic ? "استراحة قصيرة" : "Short break"}
+          </button>
+          {currentOrder && <span><Route /> {isArabic ? "مشغول بمهمة حالية" : "Busy on current job"}</span>}
+        </div>
+      )}
+
+      <div className="dn-driver-kpi-grid dn-driver-kpi-grid-v2">
         <article><Route /><small>{isArabic ? "طلبات نشطة" : "Active orders"}</small><strong>{activeOrders.length}</strong></article>
         <article><CheckCircle2 /><small>{isArabic ? "تم اليوم" : "Delivered today"}</small><strong>{deliveredToday}</strong></article>
         <article><Banknote /><small>{isArabic ? "تحصيل نشط" : "Active COD"}</small><strong>{activeCod.toFixed(2)} <em>AED</em></strong></article>
         <article><Navigation /><small>{isArabic ? "دقة GPS" : "GPS accuracy"}</small><strong>{accuracy != null ? `${Math.round(accuracy)}m` : "—"}</strong><em>{accuracyLabel(accuracy, isArabic)}</em></article>
       </div>
 
-      <section className="dn-driver-live-strip">
+      <section className="dn-driver-device-health">
+        <article><Clock3 /><div><small>{isArabic ? "مدة الوردية" : "Shift duration"}</small><strong>{sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`}</strong></div></article>
+        <article><Gauge /><div><small>{isArabic ? "المسافة التقريبية" : "Approx. distance"}</small><strong>{gps.travelledMeters < 1000 ? `${Math.round(gps.travelledMeters)}m` : `${(gps.travelledMeters / 1000).toFixed(1)}km`}</strong></div></article>
+        <article><BatteryCharging /><div><small>{isArabic ? "البطارية" : "Battery"}</small><strong>{gps.batteryLevel != null ? `${gps.batteryLevel}%` : "—"}</strong></div></article>
+        <article><Signal /><div><small>{isArabic ? "الشبكة" : "Network"}</small><strong>{gps.networkState || "—"}</strong></div></article>
+      </section>
+
+      <section className="dn-driver-live-strip dn-driver-live-strip-v2">
         <span className={gps.permission === "granted" && shiftStarted ? "is-online" : "is-offline"}>
           <Wifi /> {gps.permission === "granted" && shiftStarted ? (isArabic ? "GPS مباشر" : "Live GPS") : (isArabic ? "GPS يحتاج إذنًا" : "GPS permission required")}
         </span>
@@ -167,29 +291,61 @@ export default function DriverDashboard({
         <div className="dn-driver-alert">{actionError || gps.error || error}</div>
       )}
 
-      <nav className="dn-driver-tabs">
-        <button type="button" className={tab === "active" ? "is-active" : ""} onClick={() => setTab("active")}>
-          <Truck /> {isArabic ? "المهام الحالية" : "Active jobs"} <span>{activeOrders.length}</span>
-        </button>
-        <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => setTab("history")}>
-          <Clock3 /> {isArabic ? "السجل" : "History"} <span>{completedOrders.length}</span>
-        </button>
-        <button type="button" className={tab === "profile" ? "is-active" : ""} onClick={() => setTab("profile")}>
-          <UserRound /> {isArabic ? "ملفي" : "Profile"}
-        </button>
+      <nav className="dn-driver-tabs dn-driver-tabs-v2">
+        <button type="button" className={tab === "home" ? "is-active" : ""} onClick={() => setTab("home")}><Home /> {isArabic ? "الرئيسية" : "Home"}</button>
+        <button type="button" className={tab === "active" ? "is-active" : ""} onClick={() => setTab("active")}><Truck /> {isArabic ? "المهام" : "Jobs"}<span>{activeOrders.length}</span></button>
+        <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => setTab("history")}><History /> {isArabic ? "السجل" : "History"}<span>{completedOrders.length}</span></button>
+        <button type="button" className={tab === "profile" ? "is-active" : ""} onClick={() => setTab("profile")}><UserRound /> {isArabic ? "ملفي" : "Profile"}</button>
       </nav>
 
-      <div className="dn-driver-section-heading">
-        <div>
-          <h2>{tab === "active" ? (isArabic ? "الطلبات المسندة الآن" : "Current assigned orders") : tab === "history" ? (isArabic ? "آخر الطلبات المغلقة" : "Recent closed orders") : (isArabic ? "ملف المندوب الكامل" : "Complete driver profile")}</h2>
-          <p>{tab === "active" ? (isArabic ? "غيّر الحالة فقط حسب سير المهمة الفعلي." : "Update status only as the real delivery progresses.") : tab === "history" ? (isArabic ? "طلبات تم تسليمها أو إغلاقها مؤخرًا." : "Recently delivered, returned or closed orders.") : (isArabic ? "أضف صورتك وبيانات التواصل والعمل؛ بيانات المركبة والرخصة تبقى تحت تحكم الإدارة." : "Add your photo and working details; vehicle and license data remain admin-controlled.")}</p>
+      {tab === "home" && (
+        <div className="dn-driver-home-grid">
+          <section className="dn-driver-current-job">
+            <header><div><small>{isArabic ? "المهمة الحالية" : "Current job"}</small><h2>{currentOrder ? currentOrder.tracking_number || currentOrder.invoice_number || currentOrder.id : isArabic ? "لا توجد مهمة جارية" : "No active job"}</h2></div><Route /></header>
+            {currentOrder ? (
+              <>
+                <div className="dn-driver-current-job-route">
+                  <article><span>1</span><div><small>{isArabic ? "الاستلام" : "Pickup"}</small><strong>{[currentOrder.sender_city, currentOrder.sender_address].filter(Boolean).join("، ") || "—"}</strong></div></article>
+                  <article><span>2</span><div><small>{isArabic ? "التسليم" : "Drop-off"}</small><strong>{[currentOrder.receiver_city, currentOrder.receiver_address].filter(Boolean).join("، ") || "—"}</strong></div></article>
+                </div>
+                <div className="dn-driver-current-job-actions">
+                  <button type="button" onClick={() => setTab("active")}><Settings2 /> {isArabic ? "إدارة المهمة" : "Manage job"}</button>
+                  <a href={navigationUrl} target="_blank" rel="noreferrer"><Navigation /> {isArabic ? "ابدأ الملاحة" : "Navigate"}</a>
+                </div>
+              </>
+            ) : (
+              <div className="dn-driver-current-job-empty"><ShieldCheck /><p>{isArabic ? "أنت جاهز لاستقبال طلب جديد من لوحة الإدارة." : "You are ready for the next dispatch assignment."}</p></div>
+            )}
+          </section>
+
+          <section className="dn-driver-readiness-card">
+            <header><div><small>{isArabic ? "جاهزية الملف" : "Profile readiness"}</small><h2>{completion}%</h2></div><UserRound /></header>
+            <div className="dn-driver-progress"><i style={{ width: `${completion}%` }} /></div>
+            <p>{completion === 100 ? (isArabic ? "ملفك مكتمل وجاهز للتشغيل." : "Your operational profile is complete.") : (isArabic ? "أكمل الصورة وبيانات الاتصال والمنطقة لتحسين إدارة المهام." : "Complete photo, contact and work-area details for better dispatch.")}</p>
+            <button type="button" onClick={() => setTab("profile")}><Settings2 /> {isArabic ? "تحديث الملف" : "Update profile"}</button>
+          </section>
+
+          <section className="dn-driver-support-card">
+            <header><div><small>{isArabic ? "التواصل مع العمليات" : "Operations support"}</small><h2>{isArabic ? "مساعدة مباشرة" : "Direct support"}</h2></div><MessageCircle /></header>
+            <div><a href={`tel:${ADMIN_PHONE}`}><Phone /> {isArabic ? "اتصال بالإدارة" : "Call operations"}</a><a href={`https://wa.me/${ADMIN_PHONE.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><MessageCircle /> WhatsApp</a></div>
+          </section>
+
+          <section className={`dn-driver-compliance-card ${documentWarnings.length ? "has-warning" : ""}`}>
+            <header><div><small>{isArabic ? "الوثائق التشغيلية" : "Operational documents"}</small><h2>{documentWarnings.length ? (isArabic ? "تحتاج مراجعة" : "Needs attention") : (isArabic ? "الحالة سليمة" : "All clear")}</h2></div>{documentWarnings.length ? <AlertTriangle /> : <ShieldCheck />}</header>
+            {documentWarnings.length ? documentWarnings.map((warning) => <p key={warning}>{warning}</p>) : <p>{isArabic ? "لا توجد تنبيهات انتهاء مسجلة حاليًا." : "No recorded expiry warnings right now."}</p>}
+          </section>
         </div>
-        {tab !== "profile" && (
-          <button type="button" className="dn-driver-icon-button" onClick={() => void refresh()} aria-label="Refresh">
-            <RefreshCw className={loading ? "animate-spin" : ""} />
-          </button>
-        )}
-      </div>
+      )}
+
+      {tab !== "home" && (
+        <div className="dn-driver-section-heading">
+          <div>
+            <h2>{tab === "active" ? (isArabic ? "الطلبات المسندة الآن" : "Current assigned orders") : tab === "history" ? (isArabic ? "آخر الطلبات المغلقة" : "Recent closed orders") : (isArabic ? "ملف المندوب الكامل" : "Complete driver profile")}</h2>
+            <p>{tab === "active" ? (isArabic ? "غيّر الحالة فقط حسب سير المهمة الفعلي." : "Update status only as the real delivery progresses.") : tab === "history" ? (isArabic ? "طلبات تم تسليمها أو إغلاقها مؤخرًا." : "Recently delivered, returned or closed orders.") : (isArabic ? "صورتك وبياناتك تظهر مباشرة في لوحة الإدارة والخريطة." : "Your photo and details appear immediately in admin and on the live map.")}</p>
+          </div>
+          {tab !== "profile" && <button type="button" className="dn-driver-icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw className={loading ? "animate-spin" : ""} /></button>}
+        </div>
+      )}
 
       {tab === "active" && (
         <div className="dn-driver-order-list">
@@ -201,13 +357,18 @@ export default function DriverDashboard({
       {tab === "history" && (
         <div className="dn-driver-order-list">
           {!loading && completedOrders.length === 0 && <div className="dn-driver-empty"><Clock3 /><h3>{isArabic ? "لا يوجد سجل حتى الآن" : "No history yet"}</h3></div>}
-          {completedOrders.slice(0, 20).map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={false} onStatus={() => undefined} />)}
+          {completedOrders.slice(0, 30).map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={false} onStatus={() => undefined} />)}
         </div>
       )}
 
-      {tab === "profile" && (
-        <DriverProfilePanel profile={profile} driver={driver} isArabic={isArabic} onUpdated={onProfileUpdated} />
-      )}
+      {tab === "profile" && <DriverProfilePanel profile={profile} driver={driver} isArabic={isArabic} onUpdated={onProfileUpdated} />}
+
+      <nav className="dn-driver-mobile-dock" aria-label="Driver navigation">
+        <button type="button" className={tab === "home" ? "is-active" : ""} onClick={() => setTab("home")}><Home /><span>{isArabic ? "الرئيسية" : "Home"}</span></button>
+        <button type="button" className={tab === "active" ? "is-active" : ""} onClick={() => setTab("active")}><Truck /><span>{isArabic ? "المهام" : "Jobs"}</span>{activeOrders.length > 0 && <b>{activeOrders.length}</b>}</button>
+        <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => setTab("history")}><History /><span>{isArabic ? "السجل" : "History"}</span></button>
+        <button type="button" className={tab === "profile" ? "is-active" : ""} onClick={() => setTab("profile")}><UserRound /><span>{isArabic ? "ملفي" : "Profile"}</span></button>
+      </nav>
     </section>
   );
 }
