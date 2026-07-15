@@ -1,9 +1,95 @@
 import { useState, type FormEvent } from "react";
-import { Loader2, LockKeyhole } from "lucide-react";
+import { Eye, EyeOff, Loader2, LockKeyhole, Navigation, ShieldCheck } from "lucide-react";
 import { supabase } from "../../supabase";
 
 export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(""); if (!supabase) { setError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured."); setBusy(false); return; } const { error: authError } = await supabase.auth.signInWithPassword({ email, password }); if (authError) setError(authError.message); setBusy(false); }
-  return <section className="mx-auto max-w-md rounded-[2rem] border border-white/10 bg-[#071A33]/90 p-6 shadow-2xl" dir={isArabic ? "rtl" : "ltr"}><div className="mb-6 text-center"><LockKeyhole className="mx-auto mb-3 h-10 w-10 text-brand-gold" /><h1 className="text-2xl font-black text-white">{isArabic ? "دخول المندوب" : "Driver login"}</h1><p className="mt-2 text-sm text-white/60">{isArabic ? "استخدم حساب المندوب المعتمد من الإدارة." : "Use your approved DAY NIGHT driver account."}</p></div><form onSubmit={submit} className="space-y-4"><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 text-white outline-none focus:border-brand-gold" placeholder={isArabic ? "البريد الإلكتروني" : "Email"} required /><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 text-white outline-none focus:border-brand-gold" placeholder={isArabic ? "كلمة المرور" : "Password"} required />{error && <p className="rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}<button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-4 font-black text-[#071A33]">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{isArabic ? "دخول" : "Sign in"}</button></form></section>;
+  const [email, setEmail] = useState("driver@daynightae.com");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+
+    if (!supabase) {
+      setError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured.");
+      setBusy(false);
+      return;
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (authError) {
+      setError(isArabic ? "بيانات الدخول غير صحيحة أو الحساب غير مفعل." : authError.message);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section className="dn-driver-login-page" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="dn-driver-login-card">
+        <div className="dn-driver-login-brand">
+          <span className="dn-driver-login-icon"><Navigation /></span>
+          <div>
+            <small>DAY NIGHT DELIVERY SERVICES</small>
+            <h1>{isArabic ? "بوابة المندوب" : "Driver Operations Portal"}</h1>
+            <p>{isArabic ? "طلباتك، موقعك الحي، وحالة التوصيل من هاتفك." : "Assigned orders, live GPS and delivery status from your phone."}</p>
+          </div>
+        </div>
+
+        <div className="dn-driver-login-security">
+          <ShieldCheck className="h-5 w-5" />
+          <span>{isArabic ? "الدخول محمي بحساب Supabase المعتمد" : "Protected by approved Supabase authentication"}</span>
+        </div>
+
+        <form onSubmit={submit} className="dn-driver-login-form">
+          <label>
+            <span>{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
+            <input
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            <span>{isArabic ? "كلمة المرور" : "Password"}</span>
+            <div className="dn-driver-password-field">
+              <input
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+              <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label="Toggle password visibility">
+                {showPassword ? <EyeOff /> : <Eye />}
+              </button>
+            </div>
+          </label>
+
+          {error && <p className="dn-driver-login-error">{error}</p>}
+
+          <button type="submit" disabled={busy} className="dn-driver-primary-button">
+            {busy ? <Loader2 className="animate-spin" /> : <LockKeyhole />}
+            {isArabic ? "دخول إلى قسم المندوب" : "Open driver workspace"}
+          </button>
+        </form>
+
+        <p className="dn-driver-login-note">
+          {isArabic
+            ? "بعد الدخول اضغط بدء الوردية واسمح للموقع حتى تظهر حركتك للإدارة."
+            : "After login, start your shift and allow location access so operations can follow your route."}
+        </p>
+      </div>
+    </section>
+  );
 }
