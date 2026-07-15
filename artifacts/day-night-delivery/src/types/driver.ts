@@ -1,0 +1,5 @@
+export type DriverStatus = "online" | "idle" | "offline" | "problem";
+export type DriverProfile = { id: string; user_id: string; full_name?: string | null; name?: string | null; phone?: string | null; status?: string | null; vehicle_type?: string | null; vehicle_plate?: string | null; created_at?: string | null; updated_at?: string | null };
+export type DriverLocation = { id?: string; driver_id: string; lat: number; lng: number; accuracy?: number | null; heading?: number | null; speed?: number | null; is_online?: boolean | null; last_seen_at?: string | null; current_order_id?: string | null; updated_at?: string | null; created_at?: string | null };
+export type DriverTrailPoint = { id?: string; driver_id: string; order_id?: string | null; lat: number; lng: number; accuracy?: number | null; heading?: number | null; speed?: number | null; recorded_at?: string | null };
+export type ProfileRole = { id: string; role?: string | null; full_name?: string | null; name?: string | null; phone?: string | null; status?: string | null };
