@@ -55,13 +55,20 @@ export function useDriverLocation(
   const lastSent = useRef<{ at: number; coords: GeolocationCoordinates } | null>(null);
   const latestPosition = useRef<GeolocationPosition | null>(null);
   const activeRef = useRef(false);
+  const generationRef = useRef(0);
+
+  const isCurrentGeneration = useCallback(
+    (generation: number) => activeRef.current && generationRef.current === generation,
+    [],
+  );
 
   const writeLocation = useCallback(
-    async (nextPosition: GeolocationPosition) => {
-      if (!driverId || !activeRef.current) return;
+    async (nextPosition: GeolocationPosition, generation = generationRef.current) => {
+      if (!driverId || !isCurrentGeneration(generation)) return;
       setSending(true);
       try {
         const signals = await deviceSignals();
+        if (!isCurrentGeneration(generation)) return;
         await reportDriverLocation({
           latitude: nextPosition.coords.latitude,
           longitude: nextPosition.coords.longitude,
@@ -73,20 +80,21 @@ export function useDriverLocation(
           batteryLevel: signals.batteryLevel,
           networkState: signals.networkState,
         });
+        if (!isCurrentGeneration(generation)) return;
         setLastSyncedAt(new Date().toISOString());
         setError("");
       } catch (writeError) {
-        setError(driverErrorMessage(writeError, isArabic));
+        if (isCurrentGeneration(generation)) setError(driverErrorMessage(writeError, isArabic));
       } finally {
-        setSending(false);
+        if (isCurrentGeneration(generation)) setSending(false);
       }
     },
-    [currentOrderId, driverId, isArabic],
+    [currentOrderId, driverId, isArabic, isCurrentGeneration],
   );
 
   const acceptPosition = useCallback(
-    (nextPosition: GeolocationPosition, force = false) => {
-      if (!activeRef.current) return;
+    (nextPosition: GeolocationPosition, generation: number, force = false) => {
+      if (!isCurrentGeneration(generation)) return;
       setPermission("granted");
       setPosition(nextPosition);
       latestPosition.current = nextPosition;
@@ -95,15 +103,15 @@ export function useDriverLocation(
       const elapsed = previous ? Date.now() - previous.at >= MIN_SEND_MS : true;
       if (force || moved || elapsed) {
         lastSent.current = { at: Date.now(), coords: nextPosition.coords };
-        void writeLocation(nextPosition);
+        void writeLocation(nextPosition, generation);
       }
     },
-    [writeLocation],
+    [isCurrentGeneration, writeLocation],
   );
 
   const rejectPosition = useCallback(
-    (geoError: GeolocationPositionError) => {
-      if (!activeRef.current) return;
+    (geoError: GeolocationPositionError, generation: number) => {
+      if (!isCurrentGeneration(generation)) return;
       const denied = geoError.code === geoError.PERMISSION_DENIED;
       setPermission(denied ? "denied" : "prompt");
       setError(driverErrorMessage(geoError.message, isArabic));
@@ -111,7 +119,7 @@ export function useDriverLocation(
         void setDriverPresence(false, "paused", "GPS permission denied").catch(() => undefined);
       }
     },
-    [isArabic],
+    [isArabic, isCurrentGeneration],
   );
 
   const requestLocation = useCallback(() => {
@@ -120,15 +128,17 @@ export function useDriverLocation(
       setError(isArabic ? "هذا الهاتف لا يدعم تحديد الموقع من المتصفح." : "Browser geolocation is not supported.");
       return;
     }
+    const generation = generationRef.current;
     navigator.geolocation.getCurrentPosition(
-      (nextPosition) => acceptPosition(nextPosition, true),
-      rejectPosition,
+      (nextPosition) => acceptPosition(nextPosition, generation, true),
+      (geoError) => rejectPosition(geoError, generation),
       GEO_OPTIONS,
     );
   }, [acceptPosition, isArabic, rejectPosition]);
 
   useEffect(() => {
     if (!driverId || !enabled) {
+      generationRef.current += 1;
       activeRef.current = false;
       return;
     }
@@ -138,41 +148,65 @@ export function useDriverLocation(
       return;
     }
 
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     activeRef.current = true;
+    lastSent.current = null;
+
     void setDriverPresence(true, "available", "Driver signed in; automatic GPS tracking started").catch((presenceError) => {
-      if (activeRef.current) setError(driverErrorMessage(presenceError, isArabic));
+      if (isCurrentGeneration(generation)) setError(driverErrorMessage(presenceError, isArabic));
     });
 
-    requestLocation();
+    navigator.geolocation.getCurrentPosition(
+      (nextPosition) => acceptPosition(nextPosition, generation, true),
+      (geoError) => rejectPosition(geoError, generation),
+      GEO_OPTIONS,
+    );
+
     const watchId = navigator.geolocation.watchPosition(
-      (nextPosition) => acceptPosition(nextPosition),
-      rejectPosition,
+      (nextPosition) => acceptPosition(nextPosition, generation),
+      (geoError) => rejectPosition(geoError, generation),
       GEO_OPTIONS,
     );
 
     const heartbeat = window.setInterval(() => {
-      if (latestPosition.current) void writeLocation(latestPosition.current);
-      else requestLocation();
+      if (!isCurrentGeneration(generation)) return;
+      if (latestPosition.current) void writeLocation(latestPosition.current, generation);
+      else {
+        navigator.geolocation.getCurrentPosition(
+          (nextPosition) => acceptPosition(nextPosition, generation, true),
+          (geoError) => rejectPosition(geoError, generation),
+          GEO_OPTIONS,
+        );
+      }
     }, HEARTBEAT_MS);
 
     const syncWhenVisible = () => {
-      if (document.visibilityState === "visible") requestLocation();
+      if (document.visibilityState !== "visible" || !isCurrentGeneration(generation)) return;
+      navigator.geolocation.getCurrentPosition(
+        (nextPosition) => acceptPosition(nextPosition, generation, true),
+        (geoError) => rejectPosition(geoError, generation),
+        GEO_OPTIONS,
+      );
     };
-    const syncWhenOnline = () => requestLocation();
+    const syncWhenOnline = () => syncWhenVisible();
     document.addEventListener("visibilitychange", syncWhenVisible);
     window.addEventListener("online", syncWhenOnline);
 
     return () => {
+      if (generationRef.current === generation) generationRef.current += 1;
       activeRef.current = false;
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(heartbeat);
       document.removeEventListener("visibilitychange", syncWhenVisible);
       window.removeEventListener("online", syncWhenOnline);
     };
-  }, [acceptPosition, driverId, enabled, isArabic, rejectPosition, requestLocation, writeLocation]);
+  }, [acceptPosition, driverId, enabled, isArabic, isCurrentGeneration, rejectPosition, writeLocation]);
 
   const stopShift = useCallback(async () => {
+    generationRef.current += 1;
     activeRef.current = false;
+    setSending(false);
     try {
       await setDriverPresence(false, "offline", "Driver ended shift");
       setError("");
