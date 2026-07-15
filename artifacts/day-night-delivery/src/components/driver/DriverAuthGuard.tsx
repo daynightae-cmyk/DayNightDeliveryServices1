@@ -128,5 +128,5 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
     );
   }
 
-  return <DriverDashboard profile={profile} driver={driver} isArabic={isArabic} />;
+  return <DriverDashboard profile={profile} driver={driver} isArabic={isArabic} onProfileUpdated={load} />;
 }
