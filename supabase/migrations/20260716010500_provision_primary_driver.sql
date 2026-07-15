@@ -1,5 +1,10 @@
 -- DAY NIGHT — Provision the existing Auth account without touching auth.users/passwords.
--- Run 20260716010250_driver_enum_compatibility.sql first on legacy databases.
+-- Legacy order:
+-- 1) 20260716010250_driver_enum_compatibility.sql
+-- 2) 20260716010350_driver_id_defaults.sql
+-- 3) this provisioning migration
+
+create extension if not exists pgcrypto;
 
 do $dn$
 declare
@@ -20,7 +25,36 @@ begin
   if v_status_type is not null
      and exists (select 1 from pg_type where oid = v_status_type and typtype = 'e')
      and not exists (select 1 from pg_enum where enumtypid = v_status_type and enumlabel = 'active') then
-    raise exception 'driver_enum_compatibility_required: run 20260716010250_driver_enum_compatibility.sql first, then run this file again';
+    raise exception 'driver_enum_compatibility_required: run 20260716010250_driver_enum_compatibility.sql first, commit it, then run this file again';
+  end if;
+
+  -- Defensive compatibility: old driver tables can have NOT NULL UUID ids with no defaults.
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='driver_profiles' and column_name='id'
+  ) then
+    alter table public.driver_profiles alter column id set default gen_random_uuid();
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='driver_locations' and column_name='id'
+  ) then
+    alter table public.driver_locations alter column id set default gen_random_uuid();
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='driver_location_history' and column_name='id'
+  ) then
+    alter table public.driver_location_history alter column id set default gen_random_uuid();
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='driver_events' and column_name='id'
+  ) then
+    alter table public.driver_events alter column id set default gen_random_uuid();
   end if;
 
   if exists (
@@ -41,3 +75,19 @@ end
 $dn$;
 
 select public.driver_module_health();
+
+select
+  au.email,
+  p.role::text as profile_role,
+  p.full_name,
+  p.is_active,
+  dp.id as driver_profile_id,
+  dp.status::text as driver_status,
+  dp.shift_status::text as shift_status,
+  dp.vehicle_type,
+  dp.vehicle_plate,
+  dp.emirate
+from auth.users au
+join public.profiles p on p.id=au.id
+join public.driver_profiles dp on dp.user_id=au.id
+where lower(au.email)=lower('driver@daynightae.com');
