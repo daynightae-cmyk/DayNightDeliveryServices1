@@ -8,7 +8,7 @@ const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, 
 
 const toRad = (value: number) => (value * Math.PI) / 180;
 
-function distanceMeters(a: GeolocationCoordinates, b: GeolocationCoordinates) {
+function calculateDistanceMeters(a: GeolocationCoordinates, b: GeolocationCoordinates) {
   const radius = 6_371_000;
   const dLat = toRad(b.latitude - a.latitude);
   const dLng = toRad(b.longitude - a.longitude);
@@ -52,7 +52,12 @@ export function useDriverLocation(
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [networkState, setNetworkState] = useState<string>(navigator.onLine ? "online" : "offline");
+  const [travelledMeters, setTravelledMeters] = useState(0);
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
   const lastSent = useRef<{ at: number; coords: GeolocationCoordinates } | null>(null);
+  const lastAccepted = useRef<GeolocationCoordinates | null>(null);
   const latestPosition = useRef<GeolocationPosition | null>(null);
   const activeRef = useRef(false);
   const generationRef = useRef(0);
@@ -69,6 +74,8 @@ export function useDriverLocation(
       try {
         const signals = await deviceSignals();
         if (!isCurrentGeneration(generation)) return;
+        setBatteryLevel(signals.batteryLevel);
+        setNetworkState(signals.networkState);
         await reportDriverLocation({
           latitude: nextPosition.coords.latitude,
           longitude: nextPosition.coords.longitude,
@@ -98,8 +105,16 @@ export function useDriverLocation(
       setPermission("granted");
       setPosition(nextPosition);
       latestPosition.current = nextPosition;
+
+      const acceptedPrevious = lastAccepted.current;
+      if (acceptedPrevious) {
+        const segment = calculateDistanceMeters(acceptedPrevious, nextPosition.coords);
+        if (segment >= 3 && segment <= 2_000) setTravelledMeters((current) => current + segment);
+      }
+      lastAccepted.current = nextPosition.coords;
+
       const previous = lastSent.current;
-      const moved = previous ? distanceMeters(previous.coords, nextPosition.coords) >= MIN_MOVE_METERS : true;
+      const moved = previous ? calculateDistanceMeters(previous.coords, nextPosition.coords) >= MIN_MOVE_METERS : true;
       const elapsed = previous ? Date.now() - previous.at >= MIN_SEND_MS : true;
       if (force || moved || elapsed) {
         lastSent.current = { at: Date.now(), coords: nextPosition.coords };
@@ -152,6 +167,9 @@ export function useDriverLocation(
     generationRef.current = generation;
     activeRef.current = true;
     lastSent.current = null;
+    lastAccepted.current = null;
+    setTravelledMeters(0);
+    setSessionStartedAt(new Date().toISOString());
 
     void setDriverPresence(true, "available", "Driver signed in; automatic GPS tracking started").catch((presenceError) => {
       if (isCurrentGeneration(generation)) setError(driverErrorMessage(presenceError, isArabic));
@@ -207,6 +225,7 @@ export function useDriverLocation(
     generationRef.current += 1;
     activeRef.current = false;
     setSending(false);
+    setSessionStartedAt(null);
     try {
       await setDriverPresence(false, "offline", "Driver ended shift");
       setError("");
@@ -216,5 +235,18 @@ export function useDriverLocation(
     }
   }, [isArabic]);
 
-  return { permission, position, error, sending, lastSyncedAt, writeLocation, stopShift, requestLocation };
+  return {
+    permission,
+    position,
+    error,
+    sending,
+    lastSyncedAt,
+    batteryLevel,
+    networkState,
+    travelledMeters,
+    sessionStartedAt,
+    writeLocation,
+    stopShift,
+    requestLocation,
+  };
 }
