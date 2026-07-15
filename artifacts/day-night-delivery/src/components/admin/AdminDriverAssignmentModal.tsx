@@ -41,6 +41,7 @@ export default function AdminDriverAssignmentModal({ order, isArabic, open, onCl
   }, [open]);
 
   if (!open || !order) return null;
+  const activeOrder = order;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +52,7 @@ export default function AdminDriverAssignmentModal({ order, isArabic, open, onCl
     setBusy(true);
     setMessage("");
     try {
-      await assignDriverToOrder(order.id, driverId, note.trim() || undefined);
+      await assignDriverToOrder(activeOrder.id, driverId, note.trim() || undefined);
       setMessage(isArabic ? "تم إسناد الطلب وإشعار المندوب." : "Order assigned and driver notified.");
       await onSaved?.();
       window.dispatchEvent(new CustomEvent("dn-admin-orders-updated"));
@@ -66,7 +67,7 @@ export default function AdminDriverAssignmentModal({ order, isArabic, open, onCl
     <div className="dn-admin-modal-backdrop" role="dialog" aria-modal="true" dir={isArabic ? "rtl" : "ltr"}>
       <form className="dn-admin-action-modal" onSubmit={submit}>
         <header>
-          <div><span>{isArabic ? "تعيين مندوب للطلب" : "Assign driver"}</span><strong>{orderRef(order)}</strong></div>
+          <div><span>{isArabic ? "تعيين مندوب للطلب" : "Assign driver"}</span><strong>{orderRef(activeOrder)}</strong></div>
           <button type="button" onClick={onClose}><X className="h-4 w-4" /></button>
         </header>
 
