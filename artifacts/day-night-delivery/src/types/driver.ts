@@ -1,5 +1,95 @@
-export type DriverStatus = "online" | "idle" | "offline" | "problem";
-export type DriverProfile = { id: string; user_id: string; full_name?: string | null; name?: string | null; phone?: string | null; status?: string | null; vehicle_type?: string | null; vehicle_plate?: string | null; created_at?: string | null; updated_at?: string | null };
-export type DriverLocation = { id?: string; driver_id: string; lat: number; lng: number; accuracy?: number | null; heading?: number | null; speed?: number | null; is_online?: boolean | null; last_seen_at?: string | null; current_order_id?: string | null; updated_at?: string | null; created_at?: string | null };
-export type DriverTrailPoint = { id?: string; driver_id: string; order_id?: string | null; lat: number; lng: number; accuracy?: number | null; heading?: number | null; speed?: number | null; recorded_at?: string | null };
-export type ProfileRole = { id: string; role?: string | null; full_name?: string | null; name?: string | null; phone?: string | null; status?: string | null };
+import type { Order } from "../types";
+
+export type DriverPresence = "online" | "idle" | "offline" | "problem";
+export type DriverShiftStatus = "offline" | "available" | "busy" | "paused";
+export type DriverAccountStatus = "active" | "inactive" | "suspended";
+
+export type ProfileRole = {
+  id: string;
+  role?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  is_active?: boolean | null;
+};
+
+export type DriverProfile = {
+  id: string;
+  user_id: string;
+  full_name?: string | null;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: DriverAccountStatus | string | null;
+  shift_status?: DriverShiftStatus | string | null;
+  vehicle_type?: string | null;
+  vehicle_plate?: string | null;
+  vehicle_color?: string | null;
+  emirate?: string | null;
+  license_number?: string | null;
+  emergency_contact?: string | null;
+  last_status_note?: string | null;
+  joined_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type DriverLocation = {
+  id?: string;
+  driver_id: string;
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  heading?: number | null;
+  speed?: number | null;
+  altitude?: number | null;
+  is_online?: boolean | null;
+  battery_level?: number | null;
+  network_state?: string | null;
+  last_seen_at?: string | null;
+  current_order_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type DriverTrailPoint = {
+  id?: string;
+  driver_id: string;
+  order_id?: string | null;
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  heading?: number | null;
+  speed?: number | null;
+  altitude?: number | null;
+  recorded_at?: string | null;
+};
+
+export type DriverSessionPayload = {
+  profile: ProfileRole;
+  driver: DriverProfile;
+};
+
+export type DriverOrder = Order & {
+  driver_id?: string | null;
+  assigned_driver_id?: string | null;
+  priority?: string | null;
+  pickup_date_time?: string | null;
+  delivery_date_time?: string | null;
+};
+
+export type DriverOverviewRow = DriverProfile & {
+  location?: DriverLocation | null;
+  orders: DriverOrder[];
+  trail: DriverTrailPoint[];
+  presence: DriverPresence;
+  active_orders: number;
+  delivered_today: number;
+  cod_active: number;
+};
+
+export type DriverStatusAction = {
+  value: "accepted" | "picked_up" | "in_transit" | "delivered" | "cancelled" | "returned";
+  ar: string;
+  en: string;
+  requiresNote?: boolean;
+};
