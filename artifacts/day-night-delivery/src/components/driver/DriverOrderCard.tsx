@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
+  ClipboardCopy,
   Clock3,
   MapPin,
   MessageCircle,
@@ -9,6 +10,7 @@ import {
   Phone,
   Route,
   Send,
+  ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
 import type { DriverOrder, DriverStatusAction } from "../../types/driver";
@@ -29,6 +31,7 @@ const actions: DriverStatusAction[] = [
   { value: "returned", ar: "إرجاع للتاجر", en: "Return to merchant", requiresNote: true },
 ];
 
+const progressStatuses = ["assigned", "accepted", "picked_up", "in_transit", "delivered"];
 const cleanPhone = (value?: string) => String(value || "").replace(/[^+\d]/g, "");
 const statusText = (status: string, isArabic: boolean) => {
   const normalized = String(status || "").toLowerCase();
@@ -57,9 +60,11 @@ function nextActions(status: string) {
 export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Props) {
   const [note, setNote] = useState("");
   const [selectedAction, setSelectedAction] = useState<DriverStatusAction | null>(null);
+  const [copied, setCopied] = useState(false);
   const phone = cleanPhone(order.receiver_phone || order.customer_phone);
   const pickupAddress = [order.sender_city, order.sender_address].filter(Boolean).join("، ");
   const deliveryAddress = [order.receiver_city, order.receiver_address].filter(Boolean).join("، ");
+  const reference = order.tracking_number || order.tracking_code || order.invoice_number || order.id;
   const mapQuery = useMemo(() => {
     const lat = Number(order.receiver_lat ?? order.delivery_lat);
     const lng = Number(order.receiver_lng ?? order.delivery_lng);
@@ -68,6 +73,9 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
   }, [deliveryAddress, order.delivery_lat, order.delivery_lng, order.receiver_lat, order.receiver_lng]);
   const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
   const availableActions = nextActions(order.status);
+  const normalizedStatus = String(order.status || "assigned").toLowerCase();
+  const activeStep = Math.max(0, progressStatuses.indexOf(normalizedStatus));
+  const isClosed = ["delivered", "cancelled", "returned"].includes(normalizedStatus);
 
   function confirmAction() {
     if (!selectedAction) return;
@@ -77,18 +85,39 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
     setNote("");
   }
 
+  async function copyReference() {
+    await navigator.clipboard.writeText(reference);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
   return (
-    <article className="dn-driver-order-card">
+    <article className={`dn-driver-order-card dn-driver-order-card-v2 ${isClosed ? "is-closed" : ""}`}>
       <header className="dn-driver-order-header">
         <div>
-          <small>{order.tracking_number || order.tracking_code || order.invoice_number || order.id}</small>
+          <button type="button" className="dn-driver-order-reference" onClick={() => void copyReference()}>
+            <small>{reference}</small><ClipboardCopy />
+          </button>
+          {copied && <em className="dn-driver-copy-confirm">{isArabic ? "تم النسخ" : "Copied"}</em>}
           <h3>{order.receiver_name || order.customer_name || (isArabic ? "عميل بدون اسم" : "Unnamed customer")}</h3>
           <p>{order.sender_city || "—"} <Route /> {order.receiver_city || "—"}</p>
         </div>
-        <span className={`dn-driver-status dn-driver-status-${String(order.status || "assigned").toLowerCase()}`}>
-          {statusText(order.status, isArabic)}
-        </span>
+        <div className="dn-driver-order-badges">
+          {order.priority && <span className={`dn-driver-priority is-${String(order.priority).toLowerCase()}`}>{order.priority}</span>}
+          <span className={`dn-driver-status dn-driver-status-${normalizedStatus}`}>{statusText(order.status, isArabic)}</span>
+        </div>
       </header>
+
+      {!isClosed && (
+        <div className="dn-driver-order-progress" aria-label="Order progress">
+          {progressStatuses.map((status, index) => (
+            <span key={status} className={index <= activeStep ? "is-complete" : ""}>
+              <i>{index < activeStep ? <CheckCircle2 /> : index + 1}</i>
+              <small>{statusText(status, isArabic)}</small>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="dn-driver-order-route">
         <div>
@@ -101,9 +130,11 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
         </div>
       </div>
 
-      <div className="dn-driver-order-meta">
+      <div className="dn-driver-order-meta dn-driver-order-meta-v2">
         <span><Banknote /> COD: {Number(order.cod_amount || 0).toFixed(2)} AED</span>
         <span><Clock3 /> {new Date(order.created_at).toLocaleString(isArabic ? "ar-AE" : "en-AE")}</span>
+        <span><PackageCheck /> {order.pieces || 1} {isArabic ? "قطعة" : "pcs"} · {Number(order.weight || 0).toFixed(1)}kg</span>
+        <span><ShieldCheck /> {order.service_type || "standard"} · {order.payment_method || "—"}</span>
       </div>
 
       {(order.notes || order.package_description) && (
@@ -114,15 +145,9 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
       )}
 
       <div className="dn-driver-contact-grid">
-        <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone}>
-          <Phone /> <span>{isArabic ? "اتصال" : "Call"}</span>
-        </a>
-        <a href={phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!phone}>
-          <MessageCircle /> <span>WhatsApp</span>
-        </a>
-        <a href={mapUrl} target="_blank" rel="noreferrer">
-          <MapPin /> <span>{isArabic ? "الملاحة" : "Navigate"}</span>
-        </a>
+        <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone}><Phone /> <span>{isArabic ? "اتصال" : "Call"}</span></a>
+        <a href={phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!phone}><MessageCircle /> <span>WhatsApp</span></a>
+        <a href={mapUrl} target="_blank" rel="noreferrer"><MapPin /> <span>{isArabic ? "الملاحة" : "Navigate"}</span></a>
       </div>
 
       {availableActions.length > 0 && (
