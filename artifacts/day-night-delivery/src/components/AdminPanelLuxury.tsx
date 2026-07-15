@@ -56,6 +56,7 @@ import AdminProspectingLinks from "./AdminProspectingLinks";
 import AdminNewMerchant from "./admin/AdminNewMerchant";
 import AdminNewOrder from "./admin/AdminNewOrder";
 import AdminLiveOperationsMap from "./admin/AdminLiveOperationsMap";
+import DriverTrackingPanel from "./admin/DriverTrackingPanel";
 import KhalifaGuidanceFeed from "./admin/KhalifaGuidanceFeed";
 import AdminPdfExportButton from "./admin/AdminPdfExportButton";
 import AdminControlSettings from "./admin/AdminControlSettings";
@@ -102,6 +103,14 @@ const menu = [
     groupAr: "القيادة",
     groupEn: "Command",
     Icon: LayoutDashboard,
+  },
+  {
+    id: "live_drivers",
+    ar: "المندوبون المباشرون",
+    en: "Live Drivers",
+    groupAr: "التوزيع",
+    groupEn: "Dispatch",
+    Icon: Truck,
   },
   {
     id: "new_order",
@@ -1375,6 +1384,10 @@ export default function AdminPanelLuxury() {
           />
         </section>
       );
+    }
+
+    if (active === "live_drivers") {
+      return <section className="dn-admin-center-zone"><DriverTrackingPanel isArabic={isArabic} /></section>;
     }
 
     if (active === "settings") {

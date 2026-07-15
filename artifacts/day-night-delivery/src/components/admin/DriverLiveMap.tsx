@@ -1,0 +1,9 @@
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import L from "leaflet";
+import { useEffect } from "react";
+import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
+import { driverPresence } from "../../hooks/useAdminDrivers";
+const UAE:[number,number]=[24.4539,54.3773];
+function icon(color:string){return L.divIcon({className:"dn-driver-live-marker",html:`<span style="display:block;width:18px;height:18px;border-radius:99px;background:${color};border:3px solid white;box-shadow:0 0 18px ${color}"></span>`});}
+function Fit({drivers}:{drivers:AdminDriverRow[]}){const map=useMap(); useEffect(()=>{const pts=drivers.filter(d=>d.location).map(d=>[d.location!.lat,d.location!.lng] as [number,number]); if(pts.length) map.fitBounds(pts,{padding:[30,30]});},[drivers,map]); return null;}
+export default function DriverLiveMap({drivers,isArabic}:{drivers:AdminDriverRow[];isArabic:boolean}){return <div className="overflow-hidden rounded-[2rem] border border-white/10"><MapContainer center={UAE} zoom={8} style={{height:420,width:"100%"}}><TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><Fit drivers={drivers}/>{drivers.map(d=>{if(!d.location) return null; const p=driverPresence(d.location.last_seen_at); const c=p==="online"?"#22c55e":p==="idle"?"#eab308":"#94a3b8"; return <Marker key={d.id} position={[d.location.lat,d.location.lng]} icon={icon(c)}><Popup><b>{d.full_name || d.name || d.id}</b><br/>{isArabic?"الحالة":"Status"}: {p}<br/>{isArabic?"آخر تحديث":"Last seen"}: {d.location.last_seen_at ? new Date(d.location.last_seen_at).toLocaleString() : "—"}<br/>{isArabic?"الطلب الحالي":"Current order"}: {d.location.current_order_id || "—"}</Popup></Marker>})}{drivers.map(d=>d.trail.length>1?<Polyline key={`t-${d.id}`} positions={d.trail.map(t=>[t.lat,t.lng])} pathOptions={{color:"#f5b700",weight:3,opacity:.65}}/>:null)}</MapContainer></div>}
