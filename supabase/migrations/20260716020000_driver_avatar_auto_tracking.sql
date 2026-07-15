@@ -145,7 +145,11 @@ begin
       bio=nullif(btrim(coalesce(p_bio,'')),''),
       work_area=nullif(btrim(coalesce(p_work_area,'')),''),
       address=nullif(btrim(coalesce(p_address,'')),''),
-      preferred_language=case when lower(coalesce(p_preferred_language,'ar')) in ('ar','en') then lower(p_preferred_language) else 'ar' end,
+      preferred_language=case
+        when lower(coalesce(p_preferred_language,'ar')) in ('ar','en')
+          then lower(coalesce(p_preferred_language,'ar'))
+        else 'ar'
+      end,
       updated_at=now()
   where id=v_driver.id
   returning * into v_driver;
@@ -298,8 +302,8 @@ as $dn$
       select 1 from public.driver_profiles dp join auth.users au on au.id=coalesce(dp.user_id,dp.id)
       where lower(au.email)=lower(p_email)
     ),
-    'avatar_bucket',exists(select 1 from storage.buckets where id='avatars'),
-    'avatar_private',coalesce((select not public from storage.buckets where id='avatars'),false),
+    'avatar_bucket',exists(select 1 from storage.buckets b where b.id='avatars'),
+    'avatar_private',coalesce((select not b.public from storage.buckets b where b.id='avatars'),false),
     'avatar_column',exists(
       select 1 from information_schema.columns
       where table_schema='public' and table_name='driver_profiles' and column_name='avatar_path'
