@@ -90,6 +90,7 @@ export async function fetchDriverSession(): Promise<DriverSessionPayload | null>
     .limit(1)
     .maybeSingle();
   if (driverError) throw new Error(`Driver operational profile access failed: ${driverError.message}`);
+  if (!driverRow) throw new Error("driver_setup_required: operational driver profile missing");
 
   return {
     profile: profile as ProfileRole,
