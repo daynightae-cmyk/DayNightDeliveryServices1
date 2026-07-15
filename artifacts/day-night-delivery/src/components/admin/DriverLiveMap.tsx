@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { Fragment, useEffect, useMemo } from "react";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -86,7 +86,7 @@ export default function DriverLiveMap({
           const location = driver.location!;
           const selectedDriver = driver.id === selectedId;
           return (
-            <div key={driver.id}>
+            <Fragment key={driver.id}>
               {selectedDriver && Number(location.accuracy || 0) > 0 && (
                 <Circle
                   center={[location.lat, location.lng]}
@@ -116,7 +116,7 @@ export default function DriverLiveMap({
                   </div>
                 </Popup>
               </Marker>
-            </div>
+            </Fragment>
           );
         })}
         {selected && selected.trail.length > 1 && (
