@@ -47,6 +47,8 @@ export type DriverLocation = {
   driver_id: string;
   lat: number;
   lng: number;
+  latitude?: number | null;
+  longitude?: number | null;
   accuracy?: number | null;
   heading?: number | null;
   speed?: number | null;
@@ -66,11 +68,23 @@ export type DriverTrailPoint = {
   order_id?: string | null;
   lat: number;
   lng: number;
+  latitude?: number | null;
+  longitude?: number | null;
   accuracy?: number | null;
   heading?: number | null;
   speed?: number | null;
   altitude?: number | null;
   recorded_at?: string | null;
+};
+
+export type DriverEvent = {
+  id: string;
+  driver_id: string;
+  event_type: string;
+  order_id?: string | null;
+  payload?: Record<string, unknown> | null;
+  actor_id?: string | null;
+  created_at: string;
 };
 
 export type DriverSessionPayload = {
@@ -90,6 +104,7 @@ export type DriverOverviewRow = DriverProfile & {
   location?: DriverLocation | null;
   orders: DriverOrder[];
   trail: DriverTrailPoint[];
+  events: DriverEvent[];
   presence: DriverPresence;
   active_orders: number;
   delivered_today: number;
