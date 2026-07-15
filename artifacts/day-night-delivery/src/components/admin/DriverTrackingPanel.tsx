@@ -2,9 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Banknote,
+  Camera,
   CheckCircle2,
   ClipboardCopy,
+  Copy,
+  Crosshair,
   Edit3,
+  ExternalLink,
   MapPinned,
   MessageCircle,
   Phone,
@@ -13,6 +17,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Truck,
+  UserRound,
   UserRoundCheck,
   Wifi,
   WifiOff,
@@ -20,11 +25,20 @@ import {
 } from "lucide-react";
 import DriverLiveMap from "./DriverLiveMap";
 import { useAdminDrivers } from "../../hooks/useAdminDrivers";
-import { setAdminDriverStatus, updateAdminDriverProfile } from "../../lib/driverData";
+import { setAdminDriverStatus, updateAdminDriverProfile, uploadDriverAvatarFile } from "../../lib/driverData";
 import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
 import "../../styles/dn-driver-operations.css";
+import "../../styles/dn-driver-profiles.css";
 
 const DRIVER_LINK = "https://daynightae.com/driver";
+
+function accuracyQuality(value: number | null | undefined, isArabic: boolean) {
+  if (value == null) return "—";
+  if (value <= 15) return isArabic ? "ممتازة" : "Excellent";
+  if (value <= 50) return isArabic ? "جيدة" : "Good";
+  if (value <= 150) return isArabic ? "متوسطة" : "Moderate";
+  return isArabic ? "ضعيفة" : "Low";
+}
 
 export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean }) {
   const { drivers, stats, loading, error, lastUpdatedAt, refresh } = useAdminDrivers();
@@ -34,12 +48,13 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const filteredDrivers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return drivers.filter((driver) => {
       const matchesPresence = presenceFilter === "all" || driver.presence === presenceFilter;
-      const haystack = [driver.full_name, driver.name, driver.phone, driver.vehicle_plate, driver.vehicle_type, driver.emirate]
+      const haystack = [driver.full_name, driver.name, driver.phone, driver.vehicle_plate, driver.vehicle_type, driver.emirate, driver.work_area]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -57,6 +72,12 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
   async function copyDriverLink() {
     await navigator.clipboard.writeText(DRIVER_LINK);
     setMessage(isArabic ? "تم نسخ رابط تطبيق المندوب." : "Driver app link copied.");
+  }
+
+  async function copyCoordinates() {
+    if (!selected?.location) return;
+    await navigator.clipboard.writeText(`${selected.location.lat},${selected.location.lng}`);
+    setMessage(isArabic ? "تم نسخ إحداثيات GPS الحقيقية." : "Real GPS coordinates copied.");
   }
 
   async function changeStatus(status: string) {
@@ -79,6 +100,9 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
     setSaving(true);
     setMessage("");
     try {
+      let avatarPath = selected.avatar_path || null;
+      if (avatarFile) avatarPath = await uploadDriverAvatarFile(selected.user_id || selected.id, avatarFile);
+
       await updateAdminDriverProfile({
         driverId: selected.id,
         fullName: String(formData.get("full_name") || "").trim(),
@@ -91,10 +115,18 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         emirate: String(formData.get("emirate") || "").trim() || null,
         licenseNumber: String(formData.get("license_number") || "").trim() || null,
         emergencyContact: String(formData.get("emergency_contact") || "").trim() || null,
+        avatarPath,
+        bio: String(formData.get("bio") || "").trim() || null,
+        workArea: String(formData.get("work_area") || "").trim() || null,
+        nationality: String(formData.get("nationality") || "").trim() || null,
+        address: String(formData.get("address") || "").trim() || null,
+        licenseExpiry: String(formData.get("license_expiry") || "").trim() || null,
+        vehicleRegistrationExpiry: String(formData.get("vehicle_registration_expiry") || "").trim() || null,
         note: String(formData.get("note") || "").trim() || null,
       });
-      setMessage(isArabic ? "تم حفظ بيانات المندوب." : "Driver profile saved.");
+      setMessage(isArabic ? "تم حفظ ملف المندوب وصورته." : "Driver profile and avatar saved.");
       setEditing(false);
+      setAvatarFile(null);
       await refresh();
     } catch (profileError) {
       setMessage(profileError instanceof Error ? profileError.message : String(profileError));
@@ -109,7 +141,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         <div>
           <span><Activity /> {isArabic ? "مركز تشغيل المندوبين المباشر" : "Live Driver Operations Center"}</span>
           <h1>{isArabic ? "المندوبون والتوزيع المباشر" : "Drivers & Live Dispatch"}</h1>
-          <p>{isArabic ? "إدارة حسابات المندوبين، الورديات، المركبات، المواقع الحية، خط السير والطلبات المسندة من شاشة واحدة." : "Manage driver accounts, shifts, vehicles, live GPS, route trails and assigned orders from one workspace."}</p>
+          <p>{isArabic ? "الموقع الظاهر هنا يأتي حصريًا من GPS هاتف المندوب. لا تُستخدم أي إحداثيات افتراضية أو بيانات وهمية." : "Every location shown here comes exclusively from the driver's phone GPS. No default or fake coordinates are used."}</p>
         </div>
         <div className="dn-admin-driver-hero-actions">
           <button type="button" onClick={() => void copyDriverLink()}><ClipboardCopy /> {isArabic ? "نسخ رابط المندوب" : "Copy driver link"}</button>
@@ -128,7 +160,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
       </div>
 
       <div className="dn-admin-driver-toolbar">
-        <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالاسم أو الهاتف أو اللوحة..." : "Search name, phone or plate..."} /></label>
+        <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالاسم أو الهاتف أو اللوحة أو المنطقة..." : "Search name, phone, plate or area..."} /></label>
         <select value={presenceFilter} onChange={(event) => setPresenceFilter(event.target.value)}>
           <option value="all">{isArabic ? "كل الحالات" : "All presence"}</option>
           <option value="online">{isArabic ? "متصل" : "Online"}</option>
@@ -148,6 +180,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
           {!loading && filteredDrivers.length === 0 && <div className="dn-admin-driver-empty">{isArabic ? "لا توجد نتائج مطابقة." : "No matching drivers."}</div>}
           {filteredDrivers.map((driver) => (
             <button type="button" key={driver.id} className={selected?.id === driver.id ? "is-selected" : ""} onClick={() => setSelectedId(driver.id)}>
+              <span className="dn-admin-driver-list-avatar">{driver.avatar_url ? <img src={driver.avatar_url} alt={driver.full_name || "Driver"} /> : <UserRound />}</span>
               <span className={`dn-admin-driver-presence is-${driver.presence}`}></span>
               <div><strong>{driver.full_name || driver.name || driver.id}</strong><small>{driver.vehicle_type || "—"} · {driver.vehicle_plate || "—"}</small><em>{driver.active_orders} {isArabic ? "طلب نشط" : "active"}</em></div>
               <b>{driver.presence}</b>
@@ -161,7 +194,11 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
           {selected && (
             <section className="dn-admin-driver-detail">
               <header>
-                <div><span className={`dn-admin-driver-presence is-${selected.presence}`}></span><section><h2>{selected.full_name || selected.name || selected.id}</h2><p>{selected.vehicle_type || "—"} · {selected.vehicle_plate || "—"} · {selected.emirate || "—"}</p></section></div>
+                <div>
+                  <span className="dn-admin-driver-detail-avatar">{selected.avatar_url ? <img src={selected.avatar_url} alt={selected.full_name || "Driver"} /> : <UserRound />}</span>
+                  <span className={`dn-admin-driver-presence is-${selected.presence}`}></span>
+                  <section><h2>{selected.full_name || selected.name || selected.id}</h2><p>{selected.vehicle_type || "—"} · {selected.vehicle_plate || "—"} · {selected.emirate || "—"}</p></section>
+                </div>
                 <div>
                   <button type="button" onClick={() => setEditing(true)}><Edit3 /> {isArabic ? "تعديل الملف" : "Edit profile"}</button>
                   {String(selected.status || "active") === "active" ? <button type="button" className="is-danger" disabled={saving} onClick={() => void changeStatus("suspended")}><ShieldAlert /> {isArabic ? "إيقاف" : "Suspend"}</button> : <button type="button" disabled={saving} onClick={() => void changeStatus("active")}><UserRoundCheck /> {isArabic ? "تفعيل" : "Activate"}</button>}
@@ -171,16 +208,28 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
               <div className="dn-admin-driver-detail-grid">
                 <article><small>{isArabic ? "آخر ظهور" : "Last seen"}</small><strong>{selected.location?.last_seen_at ? new Date(selected.location.last_seen_at).toLocaleString(isArabic ? "ar-AE" : "en-AE") : "—"}</strong></article>
                 <article><small>{isArabic ? "السرعة" : "Speed"}</small><strong>{selected.location?.speed != null ? `${Math.round(Number(selected.location.speed) * 3.6)} km/h` : "—"}</strong></article>
-                <article><small>{isArabic ? "دقة الموقع" : "GPS accuracy"}</small><strong>{selected.location?.accuracy ? `${Math.round(selected.location.accuracy)}m` : "—"}</strong></article>
+                <article><small>{isArabic ? "دقة الموقع" : "GPS accuracy"}</small><strong>{selected.location?.accuracy != null ? `${Math.round(selected.location.accuracy)}m · ${accuracyQuality(selected.location.accuracy, isArabic)}` : "—"}</strong></article>
                 <article><small>{isArabic ? "البطارية" : "Battery"}</small><strong>{selected.location?.battery_level != null ? `${selected.location.battery_level}%` : "—"}</strong></article>
                 <article><small>{isArabic ? "الشبكة" : "Network"}</small><strong>{selected.location?.network_state || "—"}</strong></article>
                 <article><small>{isArabic ? "تحصيل نشط" : "Active COD"}</small><strong>{selected.cod_active.toFixed(2)} AED</strong></article>
+                <article><small>{isArabic ? "خط العرض" : "Latitude"}</small><strong>{selected.location ? selected.location.lat.toFixed(6) : "—"}</strong></article>
+                <article><small>{isArabic ? "خط الطول" : "Longitude"}</small><strong>{selected.location ? selected.location.lng.toFixed(6) : "—"}</strong></article>
               </div>
 
               <div className="dn-admin-driver-contact-actions">
                 <a href={selected.phone ? `tel:${selected.phone}` : undefined} aria-disabled={!selected.phone}><Phone /> {isArabic ? "اتصال" : "Call"}</a>
                 <a href={selected.phone ? `https://wa.me/${String(selected.phone).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!selected.phone}><MessageCircle /> WhatsApp</a>
+                <button type="button" disabled={!selected.location} onClick={() => void copyCoordinates()}><Copy /> {isArabic ? "نسخ الإحداثيات" : "Copy coordinates"}</button>
+                <a href={selected.location ? `https://www.google.com/maps?q=${selected.location.lat},${selected.location.lng}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!selected.location}><ExternalLink /> {isArabic ? "فتح الخريطة" : "Open map"}</a>
               </div>
+
+              <section className="dn-admin-driver-profile-summary">
+                <article><small>{isArabic ? "منطقة العمل" : "Work area"}</small><strong>{selected.work_area || selected.emirate || "—"}</strong></article>
+                <article><small>{isArabic ? "الجنسية" : "Nationality"}</small><strong>{selected.nationality || "—"}</strong></article>
+                <article><small>{isArabic ? "انتهاء الرخصة" : "License expiry"}</small><strong>{selected.license_expiry || "—"}</strong></article>
+                <article><small>{isArabic ? "انتهاء تسجيل المركبة" : "Registration expiry"}</small><strong>{selected.vehicle_registration_expiry || "—"}</strong></article>
+                {selected.bio && <article className="is-wide"><small>{isArabic ? "نبذة المندوب" : "Driver bio"}</small><strong>{selected.bio}</strong></article>}
+              </section>
 
               <div className="dn-admin-driver-orders">
                 <h3>{isArabic ? "الطلبات المسندة" : "Assigned orders"}</h3>
@@ -195,7 +244,12 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
       {editing && selected && (
         <div className="dn-admin-driver-modal" role="dialog" aria-modal="true">
           <form onSubmit={(event) => { event.preventDefault(); void saveProfile(new FormData(event.currentTarget)); }}>
-            <header><div><small>{isArabic ? "إدارة ملف المندوب" : "Driver management"}</small><h2>{selected.full_name || selected.name}</h2></div><button type="button" onClick={() => setEditing(false)}><X /></button></header>
+            <header><div><small>{isArabic ? "إدارة ملف المندوب" : "Driver management"}</small><h2>{selected.full_name || selected.name}</h2></div><button type="button" onClick={() => { setEditing(false); setAvatarFile(null); }}><X /></button></header>
+            <div className="dn-admin-driver-avatar-field">
+              <span>{selected.avatar_url ? <img src={selected.avatar_url} alt={selected.full_name || "Driver"} /> : <UserRound />}</span>
+              <label><Camera /> {isArabic ? "رفع صورة المندوب" : "Upload driver photo"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setAvatarFile(event.target.files?.[0] || null)} /></label>
+              {avatarFile && <small>{avatarFile.name}</small>}
+            </div>
             <div className="dn-admin-driver-form-grid">
               <label>{isArabic ? "الاسم" : "Full name"}<input name="full_name" defaultValue={selected.full_name || selected.name || ""} required /></label>
               <label>{isArabic ? "الهاتف" : "Phone"}<input name="phone" defaultValue={selected.phone || ""} /></label>
@@ -205,11 +259,17 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
               <label>{isArabic ? "رقم اللوحة" : "Vehicle plate"}<input name="vehicle_plate" defaultValue={selected.vehicle_plate || ""} /></label>
               <label>{isArabic ? "لون المركبة" : "Vehicle color"}<input name="vehicle_color" defaultValue={selected.vehicle_color || "White"} /></label>
               <label>{isArabic ? "الإمارة" : "Emirate"}<input name="emirate" defaultValue={selected.emirate || "Abu Dhabi"} /></label>
+              <label>{isArabic ? "منطقة العمل" : "Work area"}<input name="work_area" defaultValue={selected.work_area || ""} /></label>
+              <label>{isArabic ? "الجنسية" : "Nationality"}<input name="nationality" defaultValue={selected.nationality || ""} /></label>
               <label>{isArabic ? "رقم الرخصة" : "License number"}<input name="license_number" defaultValue={selected.license_number || ""} /></label>
+              <label>{isArabic ? "انتهاء الرخصة" : "License expiry"}<input type="date" name="license_expiry" defaultValue={selected.license_expiry || ""} /></label>
+              <label>{isArabic ? "انتهاء تسجيل المركبة" : "Registration expiry"}<input type="date" name="vehicle_registration_expiry" defaultValue={selected.vehicle_registration_expiry || ""} /></label>
               <label>{isArabic ? "اتصال الطوارئ" : "Emergency contact"}<input name="emergency_contact" defaultValue={selected.emergency_contact || ""} /></label>
+              <label className="is-wide">{isArabic ? "العنوان" : "Address"}<input name="address" defaultValue={selected.address || ""} /></label>
+              <label className="is-wide">{isArabic ? "نبذة المندوب" : "Driver bio"}<textarea name="bio" defaultValue={selected.bio || ""} rows={3} /></label>
               <label className="is-wide">{isArabic ? "ملاحظة إدارية" : "Admin note"}<textarea name="note" defaultValue={selected.last_status_note || ""} rows={3} /></label>
             </div>
-            <footer><button type="button" onClick={() => setEditing(false)}>{isArabic ? "إلغاء" : "Cancel"}</button><button type="submit" disabled={saving}><ShieldCheck /> {isArabic ? "حفظ التغييرات" : "Save changes"}</button></footer>
+            <footer><button type="button" onClick={() => { setEditing(false); setAvatarFile(null); }}>{isArabic ? "إلغاء" : "Cancel"}</button><button type="submit" disabled={saving}><ShieldCheck /> {isArabic ? "حفظ التغييرات" : "Save changes"}</button></footer>
           </form>
         </div>
       )}

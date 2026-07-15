@@ -90,7 +90,23 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
     );
   }
 
-  if (String(profile?.role || "").toLowerCase() !== "driver") {
+  if (!profile) {
+    return (
+      <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
+        <div className="dn-driver-state-card dn-driver-state-error">
+          <AlertTriangle className="h-9 w-9" />
+          <h1>{isArabic ? "ملف الحساب العام غير موجود" : "Public account profile is missing"}</h1>
+          <p>{isArabic ? "حساب الدخول صحيح، لكن سجل profiles المطلوب للتشغيل غير موجود." : "Authentication succeeded, but the required profiles record is missing."}</p>
+          <div className="dn-driver-state-actions">
+            <button type="button" onClick={() => void load()}><RefreshCw className="h-4 w-4" />{isArabic ? "إعادة الفحص" : "Check again"}</button>
+            <button type="button" onClick={() => void signOut()}><LogOut className="h-4 w-4" />{isArabic ? "تسجيل الخروج" : "Sign out"}</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (String(profile.role || "").toLowerCase() !== "driver") {
     return (
       <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
         <div className="dn-driver-state-card dn-driver-state-error">
@@ -128,5 +144,5 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
     );
   }
 
-  return <DriverDashboard profile={profile} driver={driver} isArabic={isArabic} />;
+  return <DriverDashboard profile={profile} driver={driver} isArabic={isArabic} onProfileUpdated={load} />;
 }

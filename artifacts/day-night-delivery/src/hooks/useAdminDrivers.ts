@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
+import { resolveDriverAvatarUrls } from "../lib/driverData";
 import type {
   DriverLocation,
   DriverOverviewRow,
@@ -19,6 +20,19 @@ export function driverPresence(lastSeen?: string | null, onlineFlag?: boolean | 
   if (age < 120_000) return "online";
   if (age < 600_000) return "idle";
   return "offline";
+}
+
+function validLocation(location: DriverLocation | null) {
+  return Boolean(
+    location &&
+      Number.isFinite(Number(location.lat)) &&
+      Number.isFinite(Number(location.lng)) &&
+      Number(location.lat) >= -90 &&
+      Number(location.lat) <= 90 &&
+      Number(location.lng) >= -180 &&
+      Number(location.lng) <= 180 &&
+      location.last_seen_at,
+  );
 }
 
 export function useAdminDrivers() {
@@ -43,7 +57,8 @@ export function useAdminDrivers() {
     const firstError = profilesResult.error || locationsResult.error || ordersResult.error || trailResult.error;
     if (firstError) setError(firstError.message);
 
-    const profiles = (profilesResult.data || []) as DriverProfile[];
+    const rawProfiles = (profilesResult.data || []) as DriverProfile[];
+    const profiles = await resolveDriverAvatarUrls(rawProfiles);
     const locations = (locationsResult.data || []) as DriverLocation[];
     const orderRows = (ordersResult.data || []) as DriverOrder[];
     const trails = (trailResult.data || []) as DriverTrailPoint[];
@@ -51,7 +66,8 @@ export function useAdminDrivers() {
 
     setDrivers(
       profiles.map((driver) => {
-        const location = locations.find((row) => row.driver_id === driver.id) || null;
+        const rawLocation = locations.find((row) => row.driver_id === driver.id) || null;
+        const location = validLocation(rawLocation) ? rawLocation : null;
         const orders = orderRows.filter(
           (order) => order.driver_id === driver.id || order.assigned_driver_id === driver.id,
         );
@@ -67,7 +83,10 @@ export function useAdminDrivers() {
           ...driver,
           location,
           orders,
-          trail: trails.filter((point) => point.driver_id === driver.id).slice(0, 120).reverse(),
+          trail: trails
+            .filter((point) => point.driver_id === driver.id && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+            .slice(0, 120)
+            .reverse(),
           presence: driverPresence(location?.last_seen_at, location?.is_online),
           active_orders: activeOrders.length,
           delivered_today: deliveredToday,

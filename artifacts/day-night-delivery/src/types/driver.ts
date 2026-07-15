@@ -28,6 +28,15 @@ export type DriverProfile = {
   license_number?: string | null;
   emergency_contact?: string | null;
   last_status_note?: string | null;
+  avatar_path?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  work_area?: string | null;
+  nationality?: string | null;
+  address?: string | null;
+  preferred_language?: string | null;
+  license_expiry?: string | null;
+  vehicle_registration_expiry?: string | null;
   joined_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;

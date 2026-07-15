@@ -6,6 +6,10 @@ import type {
   ProfileRole,
 } from "../types/driver";
 
+const DRIVER_AVATAR_BUCKET = "avatars";
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 function requireClient() {
   if (!supabase) throw new Error("Supabase client is not configured.");
   return supabase;
@@ -15,6 +19,41 @@ function messageOf(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "object" && error && "message" in error) return String(error.message);
   return String(error || "Unknown driver operation error");
+}
+
+function extensionFor(file: File) {
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  return "jpg";
+}
+
+export async function resolveDriverAvatarUrl(profile: DriverProfile): Promise<DriverProfile> {
+  if (profile.avatar_url) return profile;
+  if (!profile.avatar_path) return profile;
+  const client = requireClient();
+  const { data, error } = await client.storage.from(DRIVER_AVATAR_BUCKET).createSignedUrl(profile.avatar_path, 60 * 60);
+  if (error || !data?.signedUrl) return profile;
+  return { ...profile, avatar_url: data.signedUrl };
+}
+
+export async function resolveDriverAvatarUrls(profiles: DriverProfile[]) {
+  return Promise.all(profiles.map((profile) => resolveDriverAvatarUrl(profile)));
+}
+
+export async function uploadDriverAvatarFile(ownerId: string, file: File) {
+  if (!ownerId) throw new Error("Driver owner id is required.");
+  if (!AVATAR_TYPES.has(file.type)) throw new Error("Avatar must be JPG, PNG or WebP.");
+  if (file.size > MAX_AVATAR_BYTES) throw new Error("Avatar image must be 5 MB or smaller.");
+
+  const client = requireClient();
+  const path = `${ownerId}/driver-avatar.${extensionFor(file)}`;
+  const { error } = await client.storage.from(DRIVER_AVATAR_BUCKET).upload(path, file, {
+    upsert: true,
+    cacheControl: "3600",
+    contentType: file.type,
+  });
+  if (error) throw new Error(error.message);
+  return path;
 }
 
 export async function fetchDriverSession(): Promise<DriverSessionPayload | null> {
@@ -27,7 +66,9 @@ export async function fetchDriverSession(): Promise<DriverSessionPayload | null>
   const { data: rpcData, error: rpcError } = await client.rpc("driver_get_session_profile");
   if (!rpcError && rpcData) {
     const payload = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as DriverSessionPayload | null;
-    if (payload?.profile && payload?.driver) return payload;
+    if (payload?.profile && payload?.driver) {
+      return { ...payload, driver: await resolveDriverAvatarUrl(payload.driver) };
+    }
   }
 
   const { data: profileRow, error: profileError } = await client
@@ -45,13 +86,15 @@ export async function fetchDriverSession(): Promise<DriverSessionPayload | null>
   const { data: driverRow, error: driverError } = await client
     .from("driver_profiles")
     .select("*")
-    .eq("user_id", user.id)
+    .or(`user_id.eq.${user.id},id.eq.${user.id}`)
+    .limit(1)
     .maybeSingle();
   if (driverError) throw new Error(`Driver operational profile access failed: ${driverError.message}`);
+  if (!driverRow) throw new Error("driver_setup_required: operational driver profile missing");
 
   return {
     profile: profile as ProfileRole,
-    driver: driverRow as DriverProfile,
+    driver: await resolveDriverAvatarUrl(driverRow as DriverProfile),
   };
 }
 
@@ -103,6 +146,30 @@ export async function updateDriverOrderStatus(orderId: string, status: string, n
   if (error) throw new Error(error.message);
 }
 
+export type DriverOwnProfileInput = {
+  phone?: string | null;
+  emergencyContact?: string | null;
+  avatarPath?: string | null;
+  bio?: string | null;
+  workArea?: string | null;
+  address?: string | null;
+  preferredLanguage?: string | null;
+};
+
+export async function updateDriverOwnProfile(input: DriverOwnProfileInput) {
+  const client = requireClient();
+  const { error } = await client.rpc("driver_update_own_profile", {
+    p_phone: input.phone || null,
+    p_emergency_contact: input.emergencyContact || null,
+    p_avatar_path: input.avatarPath || null,
+    p_bio: input.bio || null,
+    p_work_area: input.workArea || null,
+    p_address: input.address || null,
+    p_preferred_language: input.preferredLanguage || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function assignDriverToOrder(orderId: string, driverId: string, note?: string) {
   const client = requireClient();
   const { error } = await client.rpc("admin_assign_driver", {
@@ -125,12 +192,19 @@ export type AdminDriverProfileInput = {
   emirate?: string | null;
   licenseNumber?: string | null;
   emergencyContact?: string | null;
+  avatarPath?: string | null;
+  bio?: string | null;
+  workArea?: string | null;
+  nationality?: string | null;
+  address?: string | null;
+  licenseExpiry?: string | null;
+  vehicleRegistrationExpiry?: string | null;
   note?: string | null;
 };
 
 export async function updateAdminDriverProfile(input: AdminDriverProfileInput) {
   const client = requireClient();
-  const { error } = await client.rpc("admin_update_driver_profile", {
+  const { error } = await client.rpc("admin_update_driver_profile_v2", {
     p_driver_id: input.driverId,
     p_full_name: input.fullName,
     p_phone: input.phone || null,
@@ -142,6 +216,13 @@ export async function updateAdminDriverProfile(input: AdminDriverProfileInput) {
     p_emirate: input.emirate || null,
     p_license_number: input.licenseNumber || null,
     p_emergency_contact: input.emergencyContact || null,
+    p_avatar_path: input.avatarPath || null,
+    p_bio: input.bio || null,
+    p_work_area: input.workArea || null,
+    p_nationality: input.nationality || null,
+    p_address: input.address || null,
+    p_license_expiry: input.licenseExpiry || null,
+    p_vehicle_registration_expiry: input.vehicleRegistrationExpiry || null,
     p_note: input.note || null,
   });
   if (error) throw new Error(error.message);
@@ -170,6 +251,11 @@ export async function fetchCurrentDriverLocation(driverId: string): Promise<Driv
 
 export function driverErrorMessage(error: unknown, isArabic: boolean) {
   const raw = messageOf(error);
+  if (/permissions policy|disabled in this document/i.test(raw)) {
+    return isArabic
+      ? "المتصفح منع GPS بسبب سياسة الموقع. حدّث الصفحة بعد اكتمال نشر إعدادات Vercel الجديدة."
+      : "The browser blocked GPS through the site permissions policy. Refresh after the new Vercel deployment is ready.";
+  }
   if (/driver_setup_required|driver profile/i.test(raw)) {
     return isArabic
       ? "حساب الدخول موجود، لكن ملف تشغيل المندوب غير مكتمل في قاعدة البيانات."
