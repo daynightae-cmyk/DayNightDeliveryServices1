@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Truck, X } from "lucide-react";
 import type { Order } from "../../types";
 import { supabase } from "../../supabase";
 import type { DriverProfile } from "../../types/driver";
-import { createAdminAuditEvent } from "../../lib/adminData";
+import { assignDriverToOrder } from "../../lib/driverData";
 
 type Props = {
   order: Order | null;
@@ -13,7 +13,7 @@ type Props = {
   onSaved?: () => Promise<void> | void;
 };
 
-const ref = (order: Order) => order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
+const orderRef = (order: Order) => order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
 export default function AdminDriverAssignmentModal({ order, isArabic, open, onClose, onSaved }: Props) {
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
@@ -21,17 +21,22 @@ export default function AdminDriverAssignmentModal({ order, isArabic, open, onCl
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
 
   useEffect(() => {
     if (!open || !supabase) return;
+    setLoadingDrivers(true);
+    setMessage("");
     void supabase
       .from("driver_profiles")
       .select("*")
-      .neq("status", "inactive")
+      .eq("status", "active")
+      .order("shift_status", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) setMessage(error.message);
         else setDrivers((data || []) as DriverProfile[]);
+        setLoadingDrivers(false);
       });
   }, [open]);
 
@@ -39,106 +44,56 @@ export default function AdminDriverAssignmentModal({ order, isArabic, open, onCl
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !order) return;
     if (!driverId) {
-      setMessage(isArabic ? "اختر مندوباً حقيقياً." : "Select a real driver.");
+      setMessage(isArabic ? "اختر مندوبًا حقيقيًا من القائمة." : "Select a real driver.");
       return;
     }
-
     setBusy(true);
     setMessage("");
-
-    const driver = drivers.find((row) => row.id === driverId);
-    const now = new Date().toISOString();
-    const payload = {
-      driver_id: driverId,
-      assigned_driver_id: driverId,
-      driver_name: driver?.full_name || driver?.name || null,
-      driver_phone: driver?.phone || null,
-      status: "assigned",
-      updated_at: now,
-    };
-
-    const { error } = await supabase.from("orders").update(payload).eq("id", order.id);
-    if (error) {
-      setMessage(error.message);
+    try {
+      await assignDriverToOrder(order.id, driverId, note.trim() || undefined);
+      setMessage(isArabic ? "تم إسناد الطلب وإشعار المندوب." : "Order assigned and driver notified.");
+      await onSaved?.();
+      window.dispatchEvent(new CustomEvent("dn-admin-orders-updated"));
+    } catch (assignmentError) {
+      setMessage(assignmentError instanceof Error ? assignmentError.message : String(assignmentError));
+    } finally {
       setBusy(false);
-      return;
     }
-
-    const { error: historyError } = await supabase.from("order_status_history").insert({
-      order_id: order.id,
-      status: "assigned",
-      note: note || "Admin assigned driver",
-      driver_id: driverId,
-      created_at: now,
-    });
-
-    if (historyError) {
-      setMessage(historyError.message);
-      setBusy(false);
-      return;
-    }
-
-    const { error: notificationError } = await supabase.from("notifications").insert({
-      user_id: driver?.user_id,
-      title: "New assigned order",
-      message: ref(order),
-      type: "driver_assignment",
-      created_at: now,
-    });
-
-    if (notificationError) {
-      console.warn("DAY NIGHT driver assignment notification skipped", notificationError.message);
-    }
-
-    await createAdminAuditEvent({
-      entity_type: "order",
-      entity_id: order.id,
-      action: "driver_assigned",
-      metadata: { driver_id: driverId, note },
-    }).catch(() => undefined);
-
-    setMessage(isArabic ? "تم إسناد الطلب للمندوب." : "Order assigned to driver.");
-    await onSaved?.();
-    setBusy(false);
   }
 
   return (
-    <div className="dn-admin-modal-backdrop" role="dialog" aria-modal="true">
+    <div className="dn-admin-modal-backdrop" role="dialog" aria-modal="true" dir={isArabic ? "rtl" : "ltr"}>
       <form className="dn-admin-action-modal" onSubmit={submit}>
         <header>
-          <div>
-            <span>{isArabic ? "تعيين مندوب" : "Assign driver"}</span>
-            <strong>{ref(order)}</strong>
-          </div>
-          <button type="button" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </button>
+          <div><span>{isArabic ? "تعيين مندوب للطلب" : "Assign driver"}</span><strong>{orderRef(order)}</strong></div>
+          <button type="button" onClick={onClose}><X className="h-4 w-4" /></button>
         </header>
+
         <label>
-          {isArabic ? "المندوب" : "Driver"}
-          <select value={driverId} onChange={(event) => setDriverId(event.target.value)} required>
-            <option value="">{isArabic ? "اختر مندوباً" : "Select driver"}</option>
+          {isArabic ? "المندوب المتاح" : "Available driver"}
+          <select value={driverId} onChange={(event) => setDriverId(event.target.value)} required disabled={loadingDrivers}>
+            <option value="">{loadingDrivers ? (isArabic ? "جاري التحميل..." : "Loading...") : (isArabic ? "اختر المندوب" : "Select driver")}</option>
             {drivers.map((driver) => (
               <option key={driver.id} value={driver.id}>
-                {driver.full_name || driver.name || driver.id} {driver.phone ? `· ${driver.phone}` : ""}
+                {driver.full_name || driver.name || driver.id} · {driver.shift_status || "offline"} · {driver.vehicle_plate || "—"}
               </option>
             ))}
           </select>
         </label>
+
         <label>
-          {isArabic ? "ملاحظة التعيين" : "Assignment note"}
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+          {isArabic ? "تعليمات التوزيع" : "Dispatch instructions"}
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} placeholder={isArabic ? "ملاحظات الاستلام أو التسليم للمندوب" : "Pickup or delivery instructions for the driver"} />
         </label>
+
         {message && <p className="dn-admin-modal-message">{message}</p>}
+
         <footer>
-          <button type="button" onClick={onClose}>
-            {isArabic ? "إغلاق" : "Close"}
-          </button>
-          <button type="submit" disabled={busy}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isArabic ? "إسناد للمندوب" : "Assign driver"}
+          <button type="button" onClick={onClose}>{isArabic ? "إغلاق" : "Close"}</button>
+          <button type="submit" disabled={busy || loadingDrivers || drivers.length === 0}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
+            {isArabic ? "إسناد الطلب" : "Assign order"}
           </button>
         </footer>
       </form>

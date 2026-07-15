@@ -1,17 +1,132 @@
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Loader2, LogOut, RefreshCw } from "lucide-react";
 import { supabase } from "../../supabase";
+import { driverErrorMessage, fetchDriverSession } from "../../lib/driverData";
 import DriverLogin from "./DriverLogin";
 import DriverDashboard from "./DriverDashboard";
 import type { DriverProfile, ProfileRole } from "../../types/driver";
 
 export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
-  const [loading, setLoading] = useState(true); const [profile, setProfile] = useState<ProfileRole | null>(null); const [driver, setDriver] = useState<DriverProfile | null>(null); const [signedIn, setSignedIn] = useState(false);
-  async function load() { if (!supabase) { setLoading(false); return; } setLoading(true); const { data: sessionData } = await supabase.auth.getSession(); const user = sessionData.session?.user; setSignedIn(Boolean(user)); if (!user) { setProfile(null); setDriver(null); setLoading(false); return; } const { data: profileRow } = await supabase.from("profiles").select("id, role, full_name, name, phone, status").eq("id", user.id).maybeSingle(); const p = profileRow as ProfileRole | null; setProfile(p); if (String(p?.role || "").toLowerCase() === "driver") { const { data: driverRow } = await supabase.from("driver_profiles").select("*").eq("user_id", user.id).maybeSingle(); setDriver(driverRow as DriverProfile | null); } setLoading(false); }
-  useEffect(() => { void load(); if (!supabase) return; const { data } = supabase.auth.onAuthStateChange(() => void load()); return () => data.subscription.unsubscribe(); }, []);
-  if (loading) return <div className="grid min-h-[55vh] place-items-center text-white"><Loader2 className="h-8 w-8 animate-spin text-brand-gold" /></div>;
+  const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  const [profile, setProfile] = useState<ProfileRole | null>(null);
+  const [driver, setDriver] = useState<DriverProfile | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    if (!supabase) {
+      setError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await supabase.auth.getSession();
+      setSignedIn(Boolean(data.session?.user));
+      if (!data.session?.user) {
+        setProfile(null);
+        setDriver(null);
+        return;
+      }
+
+      const payload = await fetchDriverSession();
+      setProfile(payload?.profile || null);
+      setDriver(payload?.driver?.id ? payload.driver : null);
+    } catch (loadError) {
+      setError(driverErrorMessage(loadError, isArabic));
+    } finally {
+      setLoading(false);
+    }
+  }, [isArabic]);
+
+  useEffect(() => {
+    void load();
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange(() => void load());
+    return () => data.subscription.unsubscribe();
+  }, [load]);
+
+  async function signOut() {
+    await supabase?.auth.signOut();
+    setSignedIn(false);
+    setProfile(null);
+    setDriver(null);
+  }
+
+  if (loading) {
+    return (
+      <div className="dn-driver-shell grid min-h-[65vh] place-items-center">
+        <div className="dn-driver-loading-card">
+          <Loader2 className="h-9 w-9 animate-spin" />
+          <strong>{isArabic ? "جاري التحقق من حساب المندوب..." : "Validating driver account..."}</strong>
+        </div>
+      </div>
+    );
+  }
+
   if (!signedIn) return <DriverLogin isArabic={isArabic} />;
-  if (String(profile?.role || "").toLowerCase() !== "driver") return <div className="mx-auto max-w-md rounded-3xl border border-red-400/20 bg-red-500/10 p-6 text-center font-black text-red-100">{isArabic ? "هذا القسم مخصص للمندوبين فقط" : "This section is for drivers only."}</div>;
-  if (!driver || String(driver.status || "active").toLowerCase() === "inactive") return <div className="mx-auto max-w-md rounded-3xl border border-amber-400/20 bg-amber-500/10 p-6 text-center font-black text-amber-100">{isArabic ? "حساب المندوب غير مفعل. تواصل مع الإدارة." : "Driver profile is not active. Contact admin."}</div>;
-  return <DriverDashboard profile={profile as ProfileRole} driver={driver} isArabic={isArabic} />;
+
+  if (error) {
+    return (
+      <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
+        <div className="dn-driver-state-card dn-driver-state-error">
+          <AlertTriangle className="h-9 w-9" />
+          <h1>{isArabic ? "تعذر فتح قسم المندوب" : "Driver portal is not ready"}</h1>
+          <p>{error}</p>
+          <div className="dn-driver-state-actions">
+            <button type="button" onClick={() => void load()}>
+              <RefreshCw className="h-4 w-4" />
+              {isArabic ? "إعادة المحاولة" : "Retry"}
+            </button>
+            <button type="button" onClick={() => void signOut()}>
+              <LogOut className="h-4 w-4" />
+              {isArabic ? "تسجيل الخروج" : "Sign out"}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (String(profile?.role || "").toLowerCase() !== "driver") {
+    return (
+      <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
+        <div className="dn-driver-state-card dn-driver-state-error">
+          <AlertTriangle className="h-9 w-9" />
+          <h1>{isArabic ? "هذا القسم مخصص للمندوبين فقط" : "Drivers only"}</h1>
+          <p>{isArabic ? "الحساب الحالي لا يحمل صلاحية مندوب." : "The current account does not have the driver role."}</p>
+          <button type="button" onClick={() => void signOut()}>
+            <LogOut className="h-4 w-4" />
+            {isArabic ? "تسجيل الخروج" : "Sign out"}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!driver || String(driver.status || "active").toLowerCase() !== "active") {
+    return (
+      <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
+        <div className="dn-driver-state-card dn-driver-state-warning">
+          <AlertTriangle className="h-9 w-9" />
+          <h1>{isArabic ? "ملف المندوب غير مفعل" : "Driver profile is inactive"}</h1>
+          <p>{isArabic ? "فعّل ملف المندوب من لوحة الإدارة ثم أعد المحاولة." : "Activate the driver profile from the admin dashboard, then retry."}</p>
+          <div className="dn-driver-state-actions">
+            <button type="button" onClick={() => void load()}>
+              <RefreshCw className="h-4 w-4" />
+              {isArabic ? "إعادة الفحص" : "Check again"}
+            </button>
+            <button type="button" onClick={() => void signOut()}>
+              <LogOut className="h-4 w-4" />
+              {isArabic ? "تسجيل الخروج" : "Sign out"}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return <DriverDashboard profile={profile} driver={driver} isArabic={isArabic} />;
 }

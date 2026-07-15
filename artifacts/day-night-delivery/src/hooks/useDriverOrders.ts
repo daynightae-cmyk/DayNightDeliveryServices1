@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
-import type { Order } from "../types";
+import type { DriverOrder } from "../types/driver";
 
-const activeStatuses = ["assigned", "accepted", "picked_up", "in_transit", "postponed", "review", "confirmed"];
+const closedStatuses = new Set(["delivered", "cancelled", "returned"]);
 
 export function useDriverOrders(driverId?: string) {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<DriverOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -18,12 +18,11 @@ export function useDriverOrders(driverId?: string) {
       .from("orders")
       .select("*")
       .or(`driver_id.eq.${driverId},assigned_driver_id.eq.${driverId}`)
-      .in("status", activeStatuses)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (fetchError) setError(fetchError.message);
-    else setOrders((data || []) as Order[]);
+    else setOrders((data || []) as DriverOrder[]);
     setLoading(false);
   }, [driverId]);
 
@@ -45,5 +44,35 @@ export function useDriverOrders(driverId?: string) {
     };
   }, [driverId, refresh]);
 
-  return { orders, loading, error, refresh };
+  const activeOrders = useMemo(
+    () => orders.filter((order) => !closedStatuses.has(String(order.status || "").toLowerCase())),
+    [orders],
+  );
+  const completedOrders = useMemo(
+    () => orders.filter((order) => closedStatuses.has(String(order.status || "").toLowerCase())),
+    [orders],
+  );
+  const deliveredToday = useMemo(() => {
+    const today = new Date().toDateString();
+    return orders.filter(
+      (order) =>
+        String(order.status || "").toLowerCase() === "delivered" &&
+        new Date(order.updated_at || order.created_at).toDateString() === today,
+    ).length;
+  }, [orders]);
+  const activeCod = useMemo(
+    () => activeOrders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0),
+    [activeOrders],
+  );
+
+  return {
+    orders,
+    activeOrders,
+    completedOrders,
+    deliveredToday,
+    activeCod,
+    loading,
+    error,
+    refresh,
+  };
 }
