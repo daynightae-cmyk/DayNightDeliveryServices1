@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { resolveDriverAvatarUrls } from "../lib/driverData";
 import type {
+  DriverEvent,
   DriverLocation,
   DriverOverviewRow,
   DriverPresence,
@@ -22,17 +23,31 @@ export function driverPresence(lastSeen?: string | null, onlineFlag?: boolean | 
   return "offline";
 }
 
-function validLocation(location: DriverLocation | null) {
-  return Boolean(
-    location &&
-      Number.isFinite(Number(location.lat)) &&
-      Number.isFinite(Number(location.lng)) &&
-      Number(location.lat) >= -90 &&
-      Number(location.lat) <= 90 &&
-      Number(location.lng) >= -180 &&
-      Number(location.lng) <= 180 &&
-      location.last_seen_at,
-  );
+function normalizeLocation(row: DriverLocation | null): DriverLocation | null {
+  if (!row) return null;
+  const lat = Number(row.lat ?? row.latitude);
+  const lng = Number(row.lng ?? row.longitude);
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180 ||
+    !row.last_seen_at
+  ) {
+    return null;
+  }
+  return { ...row, lat, lng };
+}
+
+function normalizeTrailPoint(point: DriverTrailPoint): DriverTrailPoint | null {
+  const lat = Number(point.lat ?? point.latitude);
+  const lng = Number(point.lng ?? point.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return null;
+  }
+  return { ...point, lat, lng };
 }
 
 export function useAdminDrivers() {
@@ -40,6 +55,7 @@ export function useAdminDrivers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const refreshTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     const client = supabase;
@@ -47,14 +63,16 @@ export function useAdminDrivers() {
     setLoading(true);
     setError("");
 
-    const [profilesResult, locationsResult, ordersResult, trailResult] = await Promise.all([
+    const [profilesResult, locationsResult, ordersResult, trailResult, eventsResult] = await Promise.all([
       client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
       client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
       client.from("orders").select("*").or("driver_id.not.is.null,assigned_driver_id.not.is.null").order("created_at", { ascending: false }).limit(1000),
       client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
+      client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
     ]);
 
-    const firstError = profilesResult.error || locationsResult.error || ordersResult.error || trailResult.error;
+    const firstError =
+      profilesResult.error || locationsResult.error || ordersResult.error || trailResult.error || eventsResult.error;
     if (firstError) setError(firstError.message);
 
     const rawProfiles = (profilesResult.data || []) as DriverProfile[];
@@ -62,12 +80,13 @@ export function useAdminDrivers() {
     const locations = (locationsResult.data || []) as DriverLocation[];
     const orderRows = (ordersResult.data || []) as DriverOrder[];
     const trails = (trailResult.data || []) as DriverTrailPoint[];
+    const events = (eventsResult.data || []) as DriverEvent[];
     const today = new Date().toDateString();
 
     setDrivers(
       profiles.map((driver) => {
         const rawLocation = locations.find((row) => row.driver_id === driver.id) || null;
-        const location = validLocation(rawLocation) ? rawLocation : null;
+        const location = normalizeLocation(rawLocation);
         const orders = orderRows.filter(
           (order) => order.driver_id === driver.id || order.assigned_driver_id === driver.id,
         );
@@ -79,14 +98,19 @@ export function useAdminDrivers() {
             String(order.status || "").toLowerCase() === "delivered" &&
             new Date(order.updated_at || order.created_at).toDateString() === today,
         ).length;
+        const driverTrail = trails
+          .filter((point) => point.driver_id === driver.id)
+          .map(normalizeTrailPoint)
+          .filter((point): point is DriverTrailPoint => Boolean(point))
+          .slice(0, 180)
+          .reverse();
+
         return {
           ...driver,
           location,
           orders,
-          trail: trails
-            .filter((point) => point.driver_id === driver.id && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
-            .slice(0, 120)
-            .reverse(),
+          trail: driverTrail,
+          events: events.filter((event) => event.driver_id === driver.id).slice(0, 40),
           presence: driverPresence(location?.last_seen_at, location?.is_online),
           active_orders: activeOrders.length,
           delivered_today: deliveredToday,
@@ -98,6 +122,11 @@ export function useAdminDrivers() {
     setLoading(false);
   }, []);
 
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => void refresh(), 350);
+  }, [refresh]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -107,15 +136,17 @@ export function useAdminDrivers() {
     if (!client) return;
     const channel = client
       .channel("admin-driver-operations-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "driver_profiles" }, () => void refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, () => void refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "driver_location_history" }, () => void refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => void refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_profiles" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_location_history" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_events" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, scheduleRefresh)
       .subscribe();
     return () => {
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
       void client.removeChannel(channel);
     };
-  }, [refresh]);
+  }, [scheduleRefresh]);
 
   const stats = useMemo(
     () => ({
@@ -126,6 +157,16 @@ export function useAdminDrivers() {
       activeOrders: drivers.reduce((sum, driver) => sum + driver.active_orders, 0),
       codActive: drivers.reduce((sum, driver) => sum + driver.cod_active, 0),
       deliveredToday: drivers.reduce((sum, driver) => sum + driver.delivered_today, 0),
+      attention: drivers.filter((driver) => {
+        const noGps = !driver.location;
+        const noPhone = !driver.phone;
+        const noAvatar = !driver.avatar_path;
+        const licenseExpired = driver.license_expiry ? new Date(driver.license_expiry).getTime() < Date.now() : false;
+        const registrationExpired = driver.vehicle_registration_expiry
+          ? new Date(driver.vehicle_registration_expiry).getTime() < Date.now()
+          : false;
+        return noGps || noPhone || noAvatar || licenseExpired || registrationExpired || driver.presence === "problem";
+      }).length,
     }),
     [drivers],
   );
