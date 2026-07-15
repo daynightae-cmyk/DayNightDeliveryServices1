@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Camera, CheckCircle2, Loader2, MapPin, Phone, Save, ShieldCheck, UserRound } from "lucide-react";
 import { driverErrorMessage, updateDriverOwnProfile, uploadDriverAvatarFile } from "../../lib/driverData";
 import type { DriverProfile, ProfileRole } from "../../types/driver";
@@ -15,10 +15,20 @@ export default function DriverProfilePanel({
   onUpdated: () => Promise<void> | void;
 }) {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState(driver.avatar_url || "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const previewUrl = useMemo(() => (avatarFile ? URL.createObjectURL(avatarFile) : driver.avatar_url || ""), [avatarFile, driver.avatar_url]);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setPreviewUrl(driver.avatar_url || "");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(avatarFile);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [avatarFile, driver.avatar_url]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
