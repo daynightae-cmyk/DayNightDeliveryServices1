@@ -32,15 +32,12 @@ export default function DriverDashboard({
     if (!supabase) return;
     await supabase
       .from("driver_locations")
-      .upsert(
-        {
-          driver_id: driver.id,
-          is_online: false,
-          last_seen_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "driver_id" },
-      );
+      .update({
+        is_online: false,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("driver_id", driver.id);
     await supabase.auth.signOut();
   }
 
