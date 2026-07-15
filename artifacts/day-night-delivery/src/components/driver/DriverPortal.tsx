@@ -2,6 +2,7 @@ import { useAppContext } from "../../lib/AppContext";
 import DriverAuthGuard from "./DriverAuthGuard";
 import "../../styles/dn-driver-operations.css";
 import "../../styles/dn-driver-profiles.css";
+import "../../styles/dn-driver-flex.css";
 
 export default function DriverPortal() {
   const { language } = useAppContext();
