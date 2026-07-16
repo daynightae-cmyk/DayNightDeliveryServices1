@@ -67,14 +67,32 @@ function normalizeResult(data: unknown): DriverDispatchResult {
 export async function fetchDispatchRuntimeHealth(): Promise<DispatchRuntimeHealth> {
   const db = client();
   const { data, error } = await db.rpc("admin_dispatch_runtime_health");
-  if (error) {
+  if (!error) {
+    return (Array.isArray(data) ? data[0] : data) as DispatchRuntimeHealth;
+  }
+
+  // During PostgREST schema reload the new health RPC can briefly be absent.
+  // Ask the already-deployed legacy health function whether the audited
+  // transaction RPC is usable, so the UI does not block real operations.
+  const { data: legacyData, error: legacyError } = await db.rpc("admin_dispatch_health");
+  if (!legacyError && legacyData) {
+    const legacy = (Array.isArray(legacyData) ? legacyData[0] : legacyData) as Record<string, unknown>;
+    const transactionAvailable = Boolean(legacy.dispatch_rpc || legacy.assign_wrapper);
     return {
-      ok: false,
+      ok: transactionAvailable,
+      transaction_rpc: transactionAvailable,
       runtime_rpc: false,
-      transaction_rpc: !/admin_dispatch_order/i.test(error.message),
+      candidates_rpc: false,
+      assignment_history_table: Boolean(legacy.assignment_history_table),
+      orders_assignment_metadata: Boolean(legacy.orders_assignment_metadata),
     };
   }
-  return (Array.isArray(data) ? data[0] : data) as DispatchRuntimeHealth;
+
+  return {
+    ok: false,
+    runtime_rpc: false,
+    transaction_rpc: false,
+  };
 }
 
 export async function fetchDispatchCandidates(orderId?: string | null): Promise<DispatchCandidate[]> {
