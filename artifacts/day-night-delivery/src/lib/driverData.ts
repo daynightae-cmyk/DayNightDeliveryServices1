@@ -1,5 +1,7 @@
 import { supabase } from "../supabase";
 import type {
+  DriverDispatchAction,
+  DriverDispatchResult,
   DriverLocation,
   DriverProfile,
   DriverSessionPayload,
@@ -170,14 +172,44 @@ export async function updateDriverOwnProfile(input: DriverOwnProfileInput) {
   if (error) throw new Error(error.message);
 }
 
-export async function assignDriverToOrder(orderId: string, driverId: string, note?: string) {
+export type DispatchOrderInput = {
+  orderId: string;
+  driverId?: string | null;
+  action: DriverDispatchAction;
+  note?: string | null;
+  force?: boolean;
+};
+
+export async function dispatchOrder(input: DispatchOrderInput): Promise<DriverDispatchResult> {
   const client = requireClient();
-  const { error } = await client.rpc("admin_assign_driver", {
-    p_order_id: orderId,
-    p_driver_id: driverId,
-    p_note: note || null,
+  const { data, error } = await client.rpc("admin_dispatch_order", {
+    p_order_id: input.orderId,
+    p_driver_id: input.driverId || null,
+    p_action: input.action,
+    p_note: input.note || null,
+    p_force: Boolean(input.force),
   });
   if (error) throw new Error(error.message);
+  const result = (Array.isArray(data) ? data[0] : data) as DriverDispatchResult | null;
+  if (!result?.ok) throw new Error("dispatch_operation_failed");
+  return result;
+}
+
+export async function assignDriverToOrder(orderId: string, driverId: string, note?: string) {
+  return dispatchOrder({ orderId, driverId, action: "assign", note });
+}
+
+export async function reassignDriverToOrder(
+  orderId: string,
+  driverId: string,
+  note: string,
+  force = false,
+) {
+  return dispatchOrder({ orderId, driverId, action: "reassign", note, force });
+}
+
+export async function unassignDriverFromOrder(orderId: string, note: string, force = false) {
+  return dispatchOrder({ orderId, action: "unassign", note, force });
 }
 
 export type AdminDriverProfileInput = {
@@ -247,6 +279,23 @@ export async function fetchCurrentDriverLocation(driverId: string): Promise<Driv
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data as DriverLocation | null;
+}
+
+export function dispatchErrorMessage(error: unknown, isArabic: boolean) {
+  const raw = messageOf(error);
+  const messages: Array<[RegExp, string, string]> = [
+    [/closed_order_cannot_be_dispatched/i, "لا يمكن تعيين طلب مُسلّم أو ملغي أو راجع.", "Closed orders cannot be dispatched."],
+    [/reassignment_reason_required/i, "اكتب سبب إعادة التعيين.", "A reassignment reason is required."],
+    [/unassignment_reason_required/i, "اكتب سبب إلغاء الإسناد.", "An unassignment reason is required."],
+    [/force_required_for_in_progress_reassign/i, "الطلب بدأ تنفيذه؛ فعّل النقل الاضطراري بعد التأكد من استلام المندوب الجديد.", "This order is already in progress. Enable forced transfer after confirming the handoff."],
+    [/force_required_for_in_progress_unassign/i, "الطلب بدأ تنفيذه؛ فعّل الإلغاء الاضطراري لإعادته إلى المراجعة.", "This order is already in progress. Enable forced unassignment to return it to review."],
+    [/active_driver_not_found/i, "المندوب غير موجود أو حسابه غير نشط.", "The driver does not exist or is inactive."],
+    [/order_not_found/i, "الطلب غير موجود في قاعدة البيانات.", "The order was not found."],
+    [/not_authorized|permission|row-level security/i, "حساب الإدارة لا يملك صلاحية التوزيع المطلوبة.", "The admin account lacks dispatch permission."],
+    [/admin_dispatch_order|schema cache|function .* does not exist/i, "طبّق Migration مركز توزيع الطلبات في Supabase أولاً.", "Apply the order dispatch migration in Supabase first."],
+  ];
+  const match = messages.find(([pattern]) => pattern.test(raw));
+  return match ? (isArabic ? match[1] : match[2]) : raw;
 }
 
 export function driverErrorMessage(error: unknown, isArabic: boolean) {

@@ -32,8 +32,13 @@ import {
   X,
 } from "lucide-react";
 import DriverLiveMap from "./DriverLiveMap";
+import DriverDispatchCenter from "./DriverDispatchCenter";
 import { useAdminDrivers } from "../../hooks/useAdminDrivers";
-import { setAdminDriverStatus, updateAdminDriverProfile, uploadDriverAvatarFile } from "../../lib/driverData";
+import {
+  setAdminDriverStatus,
+  updateAdminDriverProfile,
+  uploadDriverAvatarFile,
+} from "../../lib/driverData";
 import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
 import type { DriverEvent } from "../../types/driver";
 import "../../styles/dn-driver-operations.css";
@@ -97,12 +102,25 @@ function eventLabel(event: DriverEvent, isArabic: boolean) {
     self_profile_updated: ["حدّث المندوب ملفه", "Driver updated profile"],
     account_status_changed: ["تغيرت حالة الحساب", "Account status changed"],
     driver_assigned: ["تم إسناد طلب", "Order assigned"],
+    order_assigned: ["تم إسناد طلب", "Order assigned"],
+    order_reassigned_to: ["تم نقل طلب إلى المندوب", "Order transferred to driver"],
+    order_reassigned_from: ["تم نقل طلب من المندوب", "Order transferred from driver"],
+    order_unassigned: ["تم إلغاء إسناد طلب", "Order unassigned"],
   };
   return labels[event.event_type]?.[isArabic ? 0 : 1] || event.event_type.replace(/_/g, " ");
 }
 
 export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean }) {
-  const { drivers, stats, loading, error, lastUpdatedAt, refresh } = useAdminDrivers();
+  const {
+    drivers,
+    dispatchOrders,
+    assignmentHistory,
+    stats,
+    loading,
+    error,
+    lastUpdatedAt,
+    refresh,
+  } = useAdminDrivers();
   const [query, setQuery] = useState("");
   const [presenceFilter, setPresenceFilter] = useState("all");
   const [operationsFilter, setOperationsFilter] = useState("all");
@@ -122,7 +140,15 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         (operationsFilter === "active" && driver.active_orders > 0) ||
         (operationsFilter === "no_gps" && !driver.location) ||
         (operationsFilter === "ready" && !requiresAttention(driver));
-      const haystack = [driver.full_name, driver.name, driver.phone, driver.vehicle_plate, driver.vehicle_type, driver.emirate, driver.work_area]
+      const haystack = [
+        driver.full_name,
+        driver.name,
+        driver.phone,
+        driver.vehicle_plate,
+        driver.vehicle_type,
+        driver.emirate,
+        driver.work_area,
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -131,14 +157,19 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
   }, [drivers, operationsFilter, presenceFilter, query]);
 
   const selected = drivers.find((driver) => driver.id === selectedId) || filteredDrivers[0] || null;
-  const currentOrder = selected?.orders.find((order) => !closedStatuses.includes(String(order.status || "").toLowerCase())) || null;
+  const currentOrder =
+    selected?.orders.find(
+      (order) => !closedStatuses.includes(String(order.status || "").toLowerCase()),
+    ) || null;
   const readiness = selected ? profileReadiness(selected) : 0;
   const licenseDays = daysUntil(selected?.license_expiry);
   const registrationDays = daysUntil(selected?.vehicle_registration_expiry);
 
   useEffect(() => {
     if (!selectedId && filteredDrivers[0]) setSelectedId(filteredDrivers[0].id);
-    if (selectedId && !drivers.some((driver) => driver.id === selectedId)) setSelectedId(filteredDrivers[0]?.id || null);
+    if (selectedId && !drivers.some((driver) => driver.id === selectedId)) {
+      setSelectedId(filteredDrivers[0]?.id || null);
+    }
   }, [drivers, filteredDrivers, selectedId]);
 
   async function copyDriverLink() {
@@ -213,7 +244,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         <div>
           <span><Activity /> {isArabic ? "مركز تشغيل المندوبين المباشر" : "Live Driver Operations Center"}</span>
           <h1>{isArabic ? "المندوبون والتوزيع المباشر" : "Drivers & Live Dispatch"}</h1>
-          <p>{isArabic ? "إدارة تشغيلية كاملة من GPS الهاتف الحقيقي: الموقع، الجاهزية، الطلب الحالي، الوثائق، الصورة والسجل الحي." : "Complete operations from real phone GPS: position, readiness, current job, documents, avatar and live history."}</p>
+          <p>{isArabic ? "إدارة كاملة: تعيين الطلبات الفعلية، GPS الهاتف، الجاهزية، الطلب الحالي، الوثائق، الصورة والسجل الحي." : "Complete operations: real-order assignment, phone GPS, readiness, current job, documents, avatar and live history."}</p>
         </div>
         <div className="dn-admin-driver-hero-actions">
           <button type="button" onClick={() => void copyDriverLink()}><ClipboardCopy /> {isArabic ? "نسخ رابط المندوب" : "Copy driver link"}</button>
@@ -226,16 +257,38 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         <article className="is-online"><Wifi /><small>{isArabic ? "متصل الآن" : "Online now"}</small><strong>{stats.online}</strong></article>
         <article className="is-idle"><Activity /><small>{isArabic ? "خامل مؤقتًا" : "Idle"}</small><strong>{stats.idle}</strong></article>
         <article><WifiOff /><small>{isArabic ? "غير متصل" : "Offline"}</small><strong>{stats.offline}</strong></article>
-        <article><MapPinned /><small>{isArabic ? "طلبات نشطة" : "Active orders"}</small><strong>{stats.activeOrders}</strong></article>
+        <article className={stats.unassigned > 0 ? "is-warning" : ""}><MapPinned /><small>{isArabic ? "بدون مندوب" : "Unassigned"}</small><strong>{stats.unassigned}</strong></article>
         <article><CheckCircle2 /><small>{isArabic ? "تم اليوم" : "Delivered today"}</small><strong>{stats.deliveredToday}</strong></article>
         <article><Banknote /><small>{isArabic ? "تحصيل نشط" : "Active COD"}</small><strong>{stats.codActive.toFixed(2)} <em>AED</em></strong></article>
         <article className={stats.attention > 0 ? "is-warning" : ""}><FileWarning /><small>{isArabic ? "تحتاج متابعة" : "Needs attention"}</small><strong>{stats.attention}</strong></article>
       </div>
 
+      <DriverDispatchCenter
+        isArabic={isArabic}
+        drivers={drivers}
+        orders={dispatchOrders}
+        history={assignmentHistory}
+        selectedDriverId={selected?.id || null}
+        onSelectDriver={setSelectedId}
+        onChanged={refresh}
+      />
+
       <div className="dn-admin-driver-toolbar dn-admin-driver-toolbar-v2">
         <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالاسم أو الهاتف أو اللوحة أو المنطقة..." : "Search name, phone, plate or area..."} /></label>
-        <select value={presenceFilter} onChange={(event) => setPresenceFilter(event.target.value)}><option value="all">{isArabic ? "كل حالات الاتصال" : "All presence"}</option><option value="online">{isArabic ? "متصل" : "Online"}</option><option value="idle">{isArabic ? "خامل" : "Idle"}</option><option value="offline">{isArabic ? "غير متصل" : "Offline"}</option><option value="problem">{isArabic ? "مشكلة" : "Problem"}</option></select>
-        <select value={operationsFilter} onChange={(event) => setOperationsFilter(event.target.value)}><option value="all">{isArabic ? "كل حالات التشغيل" : "All operations"}</option><option value="active">{isArabic ? "لديه طلب نشط" : "Has active order"}</option><option value="attention">{isArabic ? "يحتاج متابعة" : "Needs attention"}</option><option value="no_gps">{isArabic ? "بدون GPS" : "No GPS"}</option><option value="ready">{isArabic ? "جاهز بالكامل" : "Fully ready"}</option></select>
+        <select value={presenceFilter} onChange={(event) => setPresenceFilter(event.target.value)}>
+          <option value="all">{isArabic ? "كل حالات الاتصال" : "All presence"}</option>
+          <option value="online">{isArabic ? "متصل" : "Online"}</option>
+          <option value="idle">{isArabic ? "خامل" : "Idle"}</option>
+          <option value="offline">{isArabic ? "غير متصل" : "Offline"}</option>
+          <option value="problem">{isArabic ? "مشكلة" : "Problem"}</option>
+        </select>
+        <select value={operationsFilter} onChange={(event) => setOperationsFilter(event.target.value)}>
+          <option value="all">{isArabic ? "كل حالات التشغيل" : "All operations"}</option>
+          <option value="active">{isArabic ? "لديه طلب نشط" : "Has active order"}</option>
+          <option value="attention">{isArabic ? "يحتاج متابعة" : "Needs attention"}</option>
+          <option value="no_gps">{isArabic ? "بدون GPS" : "No GPS"}</option>
+          <option value="ready">{isArabic ? "جاهز بالكامل" : "Fully ready"}</option>
+        </select>
         <span><ListFilter /> {filteredDrivers.length} / {drivers.length}</span>
         <span>{isArabic ? "آخر تحديث" : "Last update"}: {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString(isArabic ? "ar-AE" : "en-AE") : "—"}</span>
       </div>
@@ -270,7 +323,11 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
                 </div>
                 <div>
                   <button type="button" onClick={() => setEditing(true)}><Edit3 /> {isArabic ? "تعديل الملف" : "Edit profile"}</button>
-                  {String(selected.status || "active") === "active" ? <button type="button" className="is-danger" disabled={saving} onClick={() => void changeStatus("suspended")}><ShieldAlert /> {isArabic ? "إيقاف" : "Suspend"}</button> : <button type="button" disabled={saving} onClick={() => void changeStatus("active")}><UserRoundCheck /> {isArabic ? "تفعيل" : "Activate"}</button>}
+                  {String(selected.status || "active") === "active" ? (
+                    <button type="button" className="is-danger" disabled={saving} onClick={() => void changeStatus("suspended")}><ShieldAlert /> {isArabic ? "إيقاف" : "Suspend"}</button>
+                  ) : (
+                    <button type="button" disabled={saving} onClick={() => void changeStatus("active")}><UserRoundCheck /> {isArabic ? "تفعيل" : "Activate"}</button>
+                  )}
                 </div>
               </header>
 
@@ -278,7 +335,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
                 <article><Radio /><div><small>{isArabic ? "حالة التشغيل" : "Operations status"}</small><strong>{selected.presence} · {selected.shift_status || "offline"}</strong></div></article>
                 <article><Route /><div><small>{isArabic ? "المهمة الحالية" : "Current job"}</small><strong>{currentOrder ? currentOrder.tracking_number || currentOrder.invoice_number || currentOrder.id : "—"}</strong></div></article>
                 <article><Gauge /><div><small>{isArabic ? "جاهزية الملف" : "Profile readiness"}</small><strong>{readiness}%</strong></div></article>
-                <article><CalendarClock /><div><small>{isArabic ? "الوثائق" : "Documents"}</small><strong>{licenseDays != null && licenseDays <= 30 || registrationDays != null && registrationDays <= 30 ? (isArabic ? "تحتاج مراجعة" : "Review needed") : (isArabic ? "سليمة" : "Clear")}</strong></div></article>
+                <article><CalendarClock /><div><small>{isArabic ? "الوثائق" : "Documents"}</small><strong>{(licenseDays != null && licenseDays <= 30) || (registrationDays != null && registrationDays <= 30) ? (isArabic ? "تحتاج مراجعة" : "Review needed") : (isArabic ? "سليمة" : "Clear")}</strong></div></article>
               </section>
 
               {currentOrder && (

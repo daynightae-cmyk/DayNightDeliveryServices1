@@ -3,6 +3,7 @@ import type { Order } from "../types";
 export type DriverPresence = "online" | "idle" | "offline" | "problem";
 export type DriverShiftStatus = "offline" | "available" | "busy" | "paused";
 export type DriverAccountStatus = "active" | "inactive" | "suspended";
+export type DriverDispatchAction = "assign" | "reassign" | "unassign";
 
 export type ProfileRole = {
   id: string;
@@ -87,6 +88,32 @@ export type DriverEvent = {
   created_at: string;
 };
 
+export type DriverAssignmentHistory = {
+  id: string;
+  order_id: string;
+  action: "assigned" | "reassigned" | "unassigned" | string;
+  previous_driver_id?: string | null;
+  driver_id?: string | null;
+  previous_status?: string | null;
+  resulting_status?: string | null;
+  note?: string | null;
+  forced?: boolean | null;
+  actor_id?: string | null;
+  created_at: string;
+};
+
+export type DriverDispatchResult = {
+  ok: boolean;
+  action: string;
+  order_id: string;
+  driver_id?: string | null;
+  previous_driver_id?: string | null;
+  status?: string | null;
+  assignment_version?: number | null;
+  already_assigned?: boolean;
+  already_unassigned?: boolean;
+};
+
 export type DriverSessionPayload = {
   profile: ProfileRole;
   driver: DriverProfile;
@@ -98,6 +125,10 @@ export type DriverOrder = Order & {
   priority?: string | null;
   pickup_date_time?: string | null;
   delivery_date_time?: string | null;
+  driver_assigned_at?: string | null;
+  driver_assigned_by?: string | null;
+  driver_assignment_note?: string | null;
+  driver_assignment_version?: number | null;
 };
 
 export type DriverOverviewRow = DriverProfile & {

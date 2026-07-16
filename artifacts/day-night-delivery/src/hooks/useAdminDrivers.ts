@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { resolveDriverAvatarUrls } from "../lib/driverData";
 import type {
+  DriverAssignmentHistory,
   DriverEvent,
   DriverLocation,
   DriverOverviewRow,
@@ -12,6 +13,15 @@ import type {
 } from "../types/driver";
 
 export type AdminDriverRow = DriverOverviewRow;
+
+const CLOSED_STATUSES = new Set(["delivered", "cancelled", "returned"]);
+const IN_PROGRESS_STATUSES = new Set(["accepted", "picked_up", "in_transit"]);
+
+const statusKey = (value: unknown) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
 
 export function driverPresence(lastSeen?: string | null, onlineFlag?: boolean | null): DriverPresence {
   if (!lastSeen || onlineFlag === false) return "offline";
@@ -50,8 +60,14 @@ function normalizeTrailPoint(point: DriverTrailPoint): DriverTrailPoint | null {
   return { ...point, lat, lng };
 }
 
+function optionalDispatchTableError(message?: string | null) {
+  return Boolean(message && /driver_assignment_history|schema cache|does not exist/i.test(message));
+}
+
 export function useAdminDrivers() {
   const [drivers, setDrivers] = useState<AdminDriverRow[]>([]);
+  const [dispatchOrders, setDispatchOrders] = useState<DriverOrder[]>([]);
+  const [assignmentHistory, setAssignmentHistory] = useState<DriverAssignmentHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
@@ -63,17 +79,22 @@ export function useAdminDrivers() {
     setLoading(true);
     setError("");
 
-    const [profilesResult, locationsResult, ordersResult, trailResult, eventsResult] = await Promise.all([
-      client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
-      client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
-      client.from("orders").select("*").or("driver_id.not.is.null,assigned_driver_id.not.is.null").order("created_at", { ascending: false }).limit(1000),
-      client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
-      client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
-    ]);
+    const [profilesResult, locationsResult, ordersResult, trailResult, eventsResult, assignmentsResult] =
+      await Promise.all([
+        client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
+        client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
+        client.from("orders").select("*").order("created_at", { ascending: false }).limit(2000),
+        client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
+        client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
+        client.from("driver_assignment_history").select("*").order("created_at", { ascending: false }).limit(2000),
+      ]);
 
-    const firstError =
+    const coreError =
       profilesResult.error || locationsResult.error || ordersResult.error || trailResult.error || eventsResult.error;
-    if (firstError) setError(firstError.message);
+    if (coreError) setError(coreError.message);
+    else if (assignmentsResult.error && !optionalDispatchTableError(assignmentsResult.error.message)) {
+      setError(assignmentsResult.error.message);
+    }
 
     const rawProfiles = (profilesResult.data || []) as DriverProfile[];
     const profiles = await resolveDriverAvatarUrls(rawProfiles);
@@ -81,7 +102,11 @@ export function useAdminDrivers() {
     const orderRows = (ordersResult.data || []) as DriverOrder[];
     const trails = (trailResult.data || []) as DriverTrailPoint[];
     const events = (eventsResult.data || []) as DriverEvent[];
+    const assignments = (assignmentsResult.data || []) as DriverAssignmentHistory[];
     const today = new Date().toDateString();
+
+    setDispatchOrders(orderRows.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status))));
+    setAssignmentHistory(assignments);
 
     setDrivers(
       profiles.map((driver) => {
@@ -90,12 +115,10 @@ export function useAdminDrivers() {
         const orders = orderRows.filter(
           (order) => order.driver_id === driver.id || order.assigned_driver_id === driver.id,
         );
-        const activeOrders = orders.filter(
-          (order) => !["delivered", "cancelled", "returned"].includes(String(order.status || "").toLowerCase()),
-        );
+        const activeOrders = orders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status)));
         const deliveredToday = orders.filter(
           (order) =>
-            String(order.status || "").toLowerCase() === "delivered" &&
+            statusKey(order.status) === "delivered" &&
             new Date(order.updated_at || order.created_at).toDateString() === today,
         ).length;
         const driverTrail = trails
@@ -140,6 +163,7 @@ export function useAdminDrivers() {
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_location_history" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_events" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_assignment_history" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, scheduleRefresh)
       .subscribe();
     return () => {
@@ -148,8 +172,14 @@ export function useAdminDrivers() {
     };
   }, [scheduleRefresh]);
 
-  const stats = useMemo(
-    () => ({
+  const stats = useMemo(() => {
+    const unassigned = dispatchOrders.filter(
+      (order) => !order.assigned_driver_id && !order.driver_id,
+    ).length;
+    const assigned = dispatchOrders.length - unassigned;
+    const inProgress = dispatchOrders.filter((order) => IN_PROGRESS_STATUSES.has(statusKey(order.status))).length;
+
+    return {
       total: drivers.length,
       online: drivers.filter((driver) => driver.presence === "online").length,
       idle: drivers.filter((driver) => driver.presence === "idle").length,
@@ -157,6 +187,10 @@ export function useAdminDrivers() {
       activeOrders: drivers.reduce((sum, driver) => sum + driver.active_orders, 0),
       codActive: drivers.reduce((sum, driver) => sum + driver.cod_active, 0),
       deliveredToday: drivers.reduce((sum, driver) => sum + driver.delivered_today, 0),
+      unassigned,
+      assigned,
+      inProgress,
+      dispatchable: dispatchOrders.length,
       attention: drivers.filter((driver) => {
         const noGps = !driver.location;
         const noPhone = !driver.phone;
@@ -167,9 +201,17 @@ export function useAdminDrivers() {
           : false;
         return noGps || noPhone || noAvatar || licenseExpired || registrationExpired || driver.presence === "problem";
       }).length,
-    }),
-    [drivers],
-  );
+    };
+  }, [dispatchOrders, drivers]);
 
-  return { drivers, stats, loading, error, lastUpdatedAt, refresh };
+  return {
+    drivers,
+    dispatchOrders,
+    assignmentHistory,
+    stats,
+    loading,
+    error,
+    lastUpdatedAt,
+    refresh,
+  };
 }
