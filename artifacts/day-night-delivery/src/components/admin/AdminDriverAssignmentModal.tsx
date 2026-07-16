@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertTriangle, Loader2, Radio, Truck, Wifi, WifiOff, X } from "lucide-react";
 import type { Order } from "../../types";
+import { supabase } from "../../supabase";
+import { resolveDriverAvatarUrls } from "../../lib/driverData";
 import {
   dispatchOrderRuntime,
   dispatchRuntimeErrorMessage,
   fetchDispatchCandidates,
   type DispatchCandidate,
 } from "../../lib/driverDispatchRuntime";
+import type { DriverLocation, DriverProfile } from "../../types/driver";
 
 type Props = {
   order: Order | null;
@@ -16,6 +19,14 @@ type Props = {
   onSaved?: () => Promise<void> | void;
 };
 
+type AssignmentOrderRow = {
+  driver_id?: string | null;
+  assigned_driver_id?: string | null;
+  status?: string | null;
+};
+
+const CLOSED = new Set(["delivered", "cancelled", "returned"]);
+
 const orderRef = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
@@ -23,6 +34,70 @@ const assignedDriverId = (order: Order) => {
   const row = order as Order & { assigned_driver_id?: string | null; driver_id?: string | null };
   return row.assigned_driver_id || row.driver_id || null;
 };
+
+async function loadDirectRealCandidates(): Promise<DispatchCandidate[]> {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+
+  const [profilesResult, locationsResult, ordersResult] = await Promise.all([
+    supabase.from("driver_profiles").select("*").eq("status", "active").order("created_at", { ascending: false }),
+    supabase.from("driver_locations").select("*"),
+    supabase.from("orders").select("driver_id,assigned_driver_id,status"),
+  ]);
+
+  if (profilesResult.error) throw profilesResult.error;
+  if (locationsResult.error) throw locationsResult.error;
+  if (ordersResult.error) throw ordersResult.error;
+
+  const profiles = await resolveDriverAvatarUrls((profilesResult.data || []) as DriverProfile[]);
+  const locations = (locationsResult.data || []) as DriverLocation[];
+  const orderRows = (ordersResult.data || []) as AssignmentOrderRow[];
+  const load = new Map<string, number>();
+
+  for (const row of orderRows) {
+    const driver = row.assigned_driver_id || row.driver_id;
+    const status = String(row.status || "").toLowerCase().replace(/[-\s]+/g, "_");
+    if (!driver || CLOSED.has(status)) continue;
+    load.set(driver, (load.get(driver) || 0) + 1);
+  }
+
+  return profiles
+    .map((profile) => {
+      const location = locations.find((row) => row.driver_id === profile.id) || null;
+      const lat = Number(location?.lat ?? location?.latitude);
+      const lng = Number(location?.lng ?? location?.longitude);
+      const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+      return {
+        ...profile,
+        active_orders: load.get(profile.id) || 0,
+        is_online: Boolean(location?.is_online),
+        last_seen_at: location?.last_seen_at || null,
+        lat: hasLocation ? lat : null,
+        lng: hasLocation ? lng : null,
+        accuracy: location?.accuracy || null,
+        current_order_id: location?.current_order_id || null,
+        location: hasLocation
+          ? {
+              ...location,
+              driver_id: profile.id,
+              lat,
+              lng,
+            }
+          : null,
+      } satisfies DispatchCandidate;
+    })
+    .sort((a, b) => {
+      if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+      const shiftRank = (value: unknown) => {
+        if (value === "available") return 0;
+        if (value === "busy") return 1;
+        if (value === "paused") return 2;
+        return 3;
+      };
+      const shift = shiftRank(a.shift_status) - shiftRank(b.shift_status);
+      if (shift) return shift;
+      return a.active_orders - b.active_orders;
+    });
+}
 
 export default function AdminDriverAssignmentModal({
   order,
@@ -52,9 +127,13 @@ export default function AdminDriverAssignmentModal({
     setDriverId(currentDriverId || "");
 
     void fetchDispatchCandidates(order.id)
+      .catch(async () => loadDirectRealCandidates())
       .then((rows) => {
         if (!active) return;
         setDrivers(rows);
+        if (!rows.length) {
+          setError(isArabic ? "لا توجد حسابات مندوبين نشطة في قاعدة البيانات." : "No active driver accounts exist in the database.");
+        }
       })
       .catch((loadError) => {
         if (!active) return;
