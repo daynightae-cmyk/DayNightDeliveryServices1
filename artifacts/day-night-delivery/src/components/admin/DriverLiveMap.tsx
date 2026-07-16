@@ -31,12 +31,14 @@ function markerIcon(driver: AdminDriverRow, selected: boolean) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+  const accessibleName = escapeHtml(driver.full_name || driver.name || "Driver");
   const content = driver.avatar_url
-    ? `<img src="${escapeHtml(driver.avatar_url)}" alt="${escapeHtml(driver.full_name || "Driver")}" />`
-    : `<b>${escapeHtml(initials)}</b>`;
+    ? `<span class="dn-driver-map-avatar-frame"><img src="${escapeHtml(driver.avatar_url)}" alt="${accessibleName}" width="52" height="52" decoding="async" /></span>`
+    : `<span class="dn-driver-map-avatar-frame is-initials"><b>${escapeHtml(initials)}</b></span>`;
+
   return L.divIcon({
     className: "dn-driver-map-marker-shell",
-    html: `<span class="dn-driver-map-marker ${selected ? "is-selected" : ""}" style="--marker:${color}">${content}<i></i></span>`,
+    html: `<span class="dn-driver-map-marker ${selected ? "is-selected" : ""}" style="--marker:${color}">${content}<i aria-hidden="true"></i></span>`,
     iconSize: [58, 66],
     iconAnchor: [29, 60],
     popupAnchor: [0, -54],
@@ -102,7 +104,7 @@ export default function DriverLiveMap({
                 <Popup>
                   <div className="dn-driver-map-popup" dir={isArabic ? "rtl" : "ltr"}>
                     <div className="dn-driver-map-popup-head">
-                      {driver.avatar_url ? <img src={driver.avatar_url} alt={driver.full_name || "Driver"} /> : null}
+                      {driver.avatar_url ? <img src={driver.avatar_url} alt={driver.full_name || "Driver"} width={44} height={44} /> : null}
                       <section><strong>{driver.full_name || driver.name || driver.id}</strong><small>{driver.vehicle_type || "—"} · {driver.vehicle_plate || "—"}</small></section>
                     </div>
                     <span>{isArabic ? "الحالة" : "Status"}: {driver.presence}</span>
