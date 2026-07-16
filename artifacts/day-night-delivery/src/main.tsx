@@ -15,7 +15,7 @@ import './styles/dn-map-tile-fallback-guard.css';
 const FALLBACK_LOGO = 'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png';
 
 function isMapTileImage(img: HTMLImageElement) {
-  return img.classList.contains('leaflet-tile') || Boolean(img.closest('.leaflet-container, .dn-live-map-shell, .dn-3d-tracking-map'));
+  return img.classList.contains('leaflet-tile');
 }
 
 if (typeof window !== 'undefined') {
