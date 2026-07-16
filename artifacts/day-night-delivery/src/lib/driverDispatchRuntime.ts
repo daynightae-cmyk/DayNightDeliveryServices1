@@ -72,15 +72,15 @@ export async function fetchDispatchRuntimeHealth(): Promise<DispatchRuntimeHealt
   }
 
   // During PostgREST schema reload the new health RPC can briefly be absent.
-  // Ask the already-deployed legacy health function whether the audited
-  // transaction RPC is usable, so the UI does not block real operations.
+  // The existing health function is accepted only when its complete production
+  // check is green; merely finding a wrapper is not enough.
   const { data: legacyData, error: legacyError } = await db.rpc("admin_dispatch_health");
   if (!legacyError && legacyData) {
     const legacy = (Array.isArray(legacyData) ? legacyData[0] : legacyData) as Record<string, unknown>;
-    const transactionAvailable = Boolean(legacy.dispatch_rpc || legacy.assign_wrapper);
+    const transactionAvailable = Boolean(legacy.ok && legacy.dispatch_rpc);
     return {
       ok: transactionAvailable,
-      transaction_rpc: transactionAvailable,
+      transaction_rpc: Boolean(legacy.dispatch_rpc),
       runtime_rpc: false,
       candidates_rpc: false,
       assignment_history_table: Boolean(legacy.assignment_history_table),
