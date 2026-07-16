@@ -14,6 +14,7 @@ export type DispatchRuntimeHealth = {
   candidates_rpc?: boolean;
   runtime_execute_grant?: boolean;
   candidates_execute_grant?: boolean;
+  anonymous_candidates_blocked?: boolean;
   history_select_grant?: boolean;
   orders_assignment_metadata?: boolean;
 };
@@ -78,7 +79,7 @@ export async function fetchDispatchRuntimeHealth(): Promise<DispatchRuntimeHealt
 
 export async function fetchDispatchCandidates(orderId?: string | null): Promise<DispatchCandidate[]> {
   const db = client();
-  const { data, error } = await db.rpc("admin_dispatch_candidates", {
+  const { data, error } = await db.rpc("admin_dispatch_candidates_secure", {
     p_order_id: orderId || null,
   });
   if (error) throw new Error(error.message);
@@ -158,7 +159,7 @@ export function dispatchRuntimeErrorMessage(error: unknown, isArabic: boolean) {
     [/driver_required/i, "اختر مندوبًا قبل تنفيذ التعيين.", "Select a driver before assigning."],
     [/order_required|order_not_found/i, "الطلب غير موجود في قاعدة البيانات.", "The order was not found."],
     [/not_authorized|permission|row-level security/i, "جلسة الإدارة الحالية لا تملك صلاحية التوزيع. أعد تسجيل الدخول بحساب الإدارة.", "The current admin session lacks dispatch permission. Sign in again as admin."],
-    [/admin_dispatch_order_runtime|admin_dispatch_order|PGRST202|schema cache|function .* does not exist/i, "خدمة التوزيع لم تُكتشف بعد بواسطة Supabase API. طبّق ملف التشغيل النهائي ثم انتظر ثوانٍ وأعد المحاولة.", "Supabase API has not discovered the dispatch service yet. Apply the final runtime migration, wait a few seconds, then retry."],
+    [/admin_dispatch_candidates_secure|admin_dispatch_order_runtime|admin_dispatch_order|PGRST202|schema cache|function .* does not exist/i, "خدمة التوزيع لم تُكتشف بعد بواسطة Supabase API. طبّق ملفي التشغيل النهائيين ثم انتظر ثوانٍ وأعد المحاولة.", "Supabase API has not discovered the dispatch service yet. Apply both final runtime migrations, wait a few seconds, then retry."],
   ];
   const match = messages.find(([pattern]) => pattern.test(raw));
   return match ? (isArabic ? match[1] : match[2]) : raw;
