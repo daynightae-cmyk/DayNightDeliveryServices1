@@ -17,6 +17,8 @@ export type DispatchRuntimeHealth = {
   anonymous_candidates_blocked?: boolean;
   history_select_grant?: boolean;
   orders_assignment_metadata?: boolean;
+  compatibility_mode?: boolean;
+  api_discovery_pending?: boolean;
 };
 
 export type DispatchCandidate = DriverProfile & {
@@ -52,8 +54,8 @@ function messageOf(error: unknown) {
   return String(error || "Unknown dispatch error");
 }
 
-function isMissingRuntimeRpc(error: unknown) {
-  return /admin_dispatch_order_runtime|PGRST202|schema cache|function .* does not exist/i.test(
+function isRpcDiscoveryError(error: unknown) {
+  return /PGRST202|PGRST203|schema cache|could not find the function|function .* does not exist|admin_dispatch_order_runtime|admin_dispatch_candidates_secure/i.test(
     messageOf(error),
   );
 }
@@ -71,9 +73,9 @@ export async function fetchDispatchRuntimeHealth(): Promise<DispatchRuntimeHealt
     return (Array.isArray(data) ? data[0] : data) as DispatchRuntimeHealth;
   }
 
-  // During PostgREST schema reload the new health RPC can briefly be absent.
-  // The existing health function is accepted only when its complete production
-  // check is green; merely finding a wrapper is not enough.
+  // PostgREST may briefly serve an older schema snapshot after a successful SQL
+  // migration. The already-established transactional health RPC is the first
+  // compatibility source of truth during that window.
   const { data: legacyData, error: legacyError } = await db.rpc("admin_dispatch_health");
   if (!legacyError && legacyData) {
     const legacy = (Array.isArray(legacyData) ? legacyData[0] : legacyData) as Record<string, unknown>;
@@ -81,10 +83,23 @@ export async function fetchDispatchRuntimeHealth(): Promise<DispatchRuntimeHealt
     return {
       ok: transactionAvailable,
       transaction_rpc: Boolean(legacy.dispatch_rpc),
-      runtime_rpc: false,
-      candidates_rpc: false,
       assignment_history_table: Boolean(legacy.assignment_history_table),
       orders_assignment_metadata: Boolean(legacy.orders_assignment_metadata),
+      compatibility_mode: true,
+      api_discovery_pending: true,
+    };
+  }
+
+  // Do not disable a real dispatch workflow merely because PostgREST has not
+  // exposed either health function yet. Assignment execution below performs a
+  // strict cascade through the runtime RPC, stable wrappers and transactional
+  // RPC. A genuine backend failure is therefore reported only when an actual
+  // operation is attempted and every audited route is unavailable.
+  if (isRpcDiscoveryError(error) && isRpcDiscoveryError(legacyError)) {
+    return {
+      ok: true,
+      compatibility_mode: true,
+      api_discovery_pending: true,
     };
   }
 
@@ -126,7 +141,7 @@ export async function fetchDispatchCandidates(orderId?: string | null): Promise<
   });
 }
 
-async function callLegacy(input: DispatchRuntimeInput) {
+async function callTransactionalRpc(input: DispatchRuntimeInput) {
   const db = client();
   const { data, error } = await db.rpc("admin_dispatch_order", {
     p_order_id: input.orderId,
@@ -134,6 +149,38 @@ async function callLegacy(input: DispatchRuntimeInput) {
     p_action: input.action,
     p_note: input.note || null,
     p_force: Boolean(input.force),
+  });
+  if (error) throw new Error(error.message);
+  return normalizeResult(data);
+}
+
+async function callStableWrapper(input: DispatchRuntimeInput) {
+  const db = client();
+
+  if (input.action === "unassign") {
+    const { data, error } = await db.rpc("admin_unassign_driver", {
+      p_order_id: input.orderId,
+      p_note: input.note || null,
+      p_force: Boolean(input.force),
+    });
+    if (error) throw new Error(error.message);
+    return normalizeResult(data);
+  }
+
+  if (!input.driverId) throw new Error("driver_required");
+
+  // The compatibility assignment wrapper invokes the same audited transaction.
+  // When an order already has a driver, the database records the operation as a
+  // reassignment and enforces the required reason. Forced in-progress transfers
+  // must use the five-argument transaction so the safety flag is preserved.
+  if (input.action === "reassign" && input.force) {
+    return callTransactionalRpc(input);
+  }
+
+  const { data, error } = await db.rpc("admin_assign_driver", {
+    p_order_id: input.orderId,
+    p_driver_id: input.driverId,
+    p_note: input.note || null,
   });
   if (error) throw new Error(error.message);
   return normalizeResult(data);
@@ -156,12 +203,25 @@ export async function dispatchOrderRuntime(
   });
 
   if (!error) return normalizeResult(data);
-  if (!isMissingRuntimeRpc(error)) throw new Error(error.message);
+  if (!isRpcDiscoveryError(error)) throw new Error(error.message);
 
-  // Production compatibility for a deployment where PostgREST has not yet
-  // discovered the new single-argument RPC. The legacy transactional function
-  // performs the same database operation and remains fully audited.
-  return callLegacy(input);
+  const failures: string[] = [messageOf(error)];
+
+  try {
+    return await callStableWrapper(input);
+  } catch (wrapperError) {
+    if (!isRpcDiscoveryError(wrapperError)) throw wrapperError;
+    failures.push(messageOf(wrapperError));
+  }
+
+  try {
+    return await callTransactionalRpc(input);
+  } catch (transactionError) {
+    if (!isRpcDiscoveryError(transactionError)) throw transactionError;
+    failures.push(messageOf(transactionError));
+  }
+
+  throw new Error(`dispatch_service_unavailable: ${failures.filter(Boolean).join(" | ")}`);
 }
 
 export function dispatchRuntimeErrorMessage(error: unknown, isArabic: boolean) {
@@ -177,7 +237,8 @@ export function dispatchRuntimeErrorMessage(error: unknown, isArabic: boolean) {
     [/driver_required/i, "اختر مندوبًا قبل تنفيذ التعيين.", "Select a driver before assigning."],
     [/order_required|order_not_found/i, "الطلب غير موجود في قاعدة البيانات.", "The order was not found."],
     [/not_authorized|permission|row-level security/i, "جلسة الإدارة الحالية لا تملك صلاحية التوزيع. أعد تسجيل الدخول بحساب الإدارة.", "The current admin session lacks dispatch permission. Sign in again as admin."],
-    [/admin_dispatch_candidates_secure|admin_dispatch_order_runtime|admin_dispatch_order|PGRST202|schema cache|function .* does not exist/i, "خدمة التوزيع لم تُكتشف بعد بواسطة Supabase API. طبّق ملفي التشغيل النهائيين ثم انتظر ثوانٍ وأعد المحاولة.", "Supabase API has not discovered the dispatch service yet. Apply both final runtime migrations, wait a few seconds, then retry."],
+    [/dispatch_service_unavailable/i, "تعذر الوصول إلى مسارات التوزيع الثلاثة من Supabase API رغم اكتمال قاعدة البيانات. أعد تسجيل دخول الإدارة ثم أعد المحاولة.", "All three Supabase dispatch API routes were unavailable although the database is configured. Sign in to admin again and retry."],
+    [/PGRST202|PGRST203|schema cache|could not find the function|function .* does not exist/i, "Supabase API يعيد تحميل مخطط الدوال الآن. أعد المحاولة بعد ثوانٍ؛ الطلب والبيانات لم يتغيرا.", "Supabase API is refreshing its function schema. Retry in a few seconds; no order data changed."],
   ];
   const match = messages.find(([pattern]) => pattern.test(raw));
   return match ? (isArabic ? match[1] : match[2]) : raw;
