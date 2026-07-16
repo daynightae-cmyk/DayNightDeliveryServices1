@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo } from "react";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import "../../styles/dn-driver-map-avatar-fix.css";
 import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
 
 const UAE_CENTER: [number, number] = [24.4539, 54.3773];
