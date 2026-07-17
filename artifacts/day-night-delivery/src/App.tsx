@@ -30,6 +30,7 @@ import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
 import Footer from "./components/Footer";
+import { DNOfficialCursor } from "./components/ui/DNOfficialCursor";
 import "./lib/adminUiPolish";
 import "./styles/dn-admin-real-map-hotfix.css";
 import "./styles/dn-admin-day-polish.css";
@@ -165,7 +166,7 @@ function AppContent() {
       className={`min-h-screen flex flex-col justify-between antialiased leading-normal selection:bg-brand-gold/30 ${isLight ? "text-[#071A33]" : "text-white"}`}
       style={{ backgroundColor: isLight ? "#EDF3FF" : "#071A33", transition: "background-color 0.45s ease" }}
     >
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}>
+      <div className={`dn-official-shell-frame fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}>
         <div className={`dn-official-topbar text-[11px] py-2 px-4 sm:px-8 border-b flex flex-col sm:flex-row items-center justify-between gap-2 font-bold ${isLight ? "bg-[#E0EAFA]/80 border-[#071A33]/10 text-[#071A33]/80" : "bg-brand-cool/90 border-white/10 text-white"}`}>
           <div className={`flex flex-wrap items-center justify-center gap-2 sm:gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
             <span className="text-brand-gold font-mono tracking-wider">{companyMeta.sloganEn}</span>
@@ -196,20 +197,20 @@ function AppContent() {
               </div>
             </Link>
 
-            <nav className="hidden lg:flex flex-1 min-w-0 items-center justify-start gap-0.5 xl:gap-1 text-[10px] xl:text-[11px] font-semibold max-w-none mx-2 overflow-x-auto no-scrollbar scroll-smooth">
+            <nav className="dn-official-nav hidden lg:flex flex-1 min-w-0 items-center justify-start gap-0.5 xl:gap-1 text-[10px] xl:text-[11px] font-semibold max-w-none mx-2 overflow-x-auto no-scrollbar scroll-smooth">
               {navLinks.map((link) => {
                 const isActive = currentPath === link.path;
                 return <Link id={`nav_link_${link.key}`} key={link.key} to={link.path} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className={`px-2 xl:px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${isActive ? "bg-brand-blue text-white font-extrabold shadow-md shadow-brand-blue/25" : isLight ? "text-[#071A33]/70 hover:text-[#071A33] hover:bg-[#071A33]/5" : "text-white/70 hover:text-white hover:bg-white/5"}`}>{link.label}</Link>;
               })}
             </nav>
 
-            <div className="hidden md:flex items-center gap-2 shrink-0">
+            <div className="dn-official-header-actions hidden md:flex items-center gap-2 shrink-0">
               <Link id="desktop_admin_portal_link" to="/auth" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60" : "border-white/20 text-white/80 hover:border-brand-gold/50"}`}>{adminLabel}</Link>
               <Link id="desktop_customer_portal_link" to="/customer" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-gold/50 bg-brand-gold/10 text-brand-gold font-bold rounded-lg text-[11px] transition-all hover:bg-brand-gold hover:text-brand-deep">{customerLabel}</Link>
               <Link id="desktop_driver_portal_link" to="/driver" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-sky/40 bg-brand-sky/10 text-brand-sky font-bold rounded-lg text-[11px] transition-all hover:bg-brand-sky hover:text-brand-deep">{driverLabel}</Link>
               <Link id="desktop_merchant_portal_link" to="/merchant" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-gold/50 bg-gradient-to-r from-brand-gold to-[#F5B700] text-brand-deep font-black rounded-lg text-[11px] transition-all hover:shadow-lg hover:shadow-brand-gold/20">{merchantLabel}</Link>
               <Link to="/tracking" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60" : "border-white/20 text-white/80 hover:border-brand-gold/50"}`}>{t.header.trackBtn}</Link>
-              <Link id="header_cta_btn" to="/request" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="btn-gold px-4 py-2.5 rounded-lg text-[11px] leading-none cursor-pointer">{t.header.requestBtn}</Link>
+              <Link id="header_cta_btn" to="/request" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="dn-header-primary-cta btn-gold px-4 py-2.5 rounded-lg text-[11px] leading-none cursor-pointer">{t.header.requestBtn}</Link>
             </div>
 
             <button id="mobile_menu_trigger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className={`lg:hidden p-2 transition-colors ${isLight ? "text-[#071A33]/80 hover:text-[#071A33]" : "text-white/80 hover:text-white"}`} aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}>{mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}</button>
@@ -254,7 +255,7 @@ function AppContent() {
         </header>
       </div>
 
-      <div className="h-[108px] sm:h-[118px] lg:h-[164px]" aria-hidden="true" />
+      <div className="h-[108px] sm:h-[118px] lg:h-[156px]" aria-hidden="true" />
 
       <main className="flex-1 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
         <Suspense fallback={<div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}><div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" /></div>}>
@@ -308,6 +309,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <DNOfficialCursor />
       {showSplash && <Splash onComplete={() => setShowSplash(false)} />}
       <AppContent />
     </BrowserRouter>
