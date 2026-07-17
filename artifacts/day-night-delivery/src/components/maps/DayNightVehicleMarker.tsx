@@ -7,6 +7,7 @@ import {
   calculateBearing,
   easeOutCubic,
   normalizeBearing,
+  shortestBearingDelta,
   vehicleSizeForZoom,
   type LatLngTuple,
 } from "./VehicleAnimations";
@@ -52,7 +53,7 @@ export function createDayNightVehicleIcon({
 }) {
   const resolvedState = selected ? "selected" : state;
   const safeLabel = escapeAttribute(label);
-  const safeBearing = normalizeBearing(bearing);
+  const safeBearing = Number.isFinite(bearing) ? bearing : 0;
 
   return L.divIcon({
     className: "dn-official-vehicle-leaflet-icon",
@@ -97,6 +98,17 @@ function useSmoothPosition(target: LatLngTuple, enabled: boolean) {
   return position;
 }
 
+function useContinuousBearing(targetBearing: number) {
+  const renderedBearingRef = useRef<number | null>(null);
+  const normalizedTarget = normalizeBearing(targetBearing);
+  if (renderedBearingRef.current === null) {
+    renderedBearingRef.current = normalizedTarget;
+  } else {
+    renderedBearingRef.current += shortestBearingDelta(renderedBearingRef.current, normalizedTarget);
+  }
+  return renderedBearingRef.current;
+}
+
 export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
   position,
   bearing,
@@ -121,7 +133,8 @@ export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
   }, [map]);
 
   const resolvedSize = size || vehicleSizeForZoom(zoom, navigationMode);
-  const resolvedBearing = bearing == null ? calculateBearing(previousTargetRef.current, position) : normalizeBearing(bearing);
+  const targetBearing = bearing == null ? calculateBearing(previousTargetRef.current, position) : normalizeBearing(bearing);
+  const resolvedBearing = useContinuousBearing(targetBearing);
   const smoothPosition = useSmoothPosition(position, animate);
 
   useEffect(() => {
