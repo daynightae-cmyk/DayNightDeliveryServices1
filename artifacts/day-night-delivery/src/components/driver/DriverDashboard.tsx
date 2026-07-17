@@ -110,7 +110,9 @@ export default function DriverDashboard({
   const [shiftBusy, setShiftBusy] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now());
   const gps = useDriverLocation(driver.id, currentOrderId, shiftStarted, isArabic);
-  const name = driver.full_name || driver.name || profile.full_name || "DAY NIGHT Driver";
+  const name = driver.full_name || driver.name || profile.full_name || (isArabic ? "مندوب DAY NIGHT" : "DAY NIGHT Driver");
+  const vehicleLabel = driver.vehicle_type || (isArabic ? "مركبة غير مسجلة" : "Vehicle not registered");
+  const plateLabel = driver.vehicle_plate || (isArabic ? "بدون لوحة مسجلة" : "No plate registered");
   const accuracy = gps.position?.coords.accuracy;
   const completion = profileCompletion(profile, driver);
   const licenseDays = daysUntil(driver.license_expiry);
@@ -215,7 +217,7 @@ export default function DriverDashboard({
           <div>
             <small>DAY NIGHT DELIVERY SERVICES</small>
             <h1>{name}</h1>
-            <p>{driver.vehicle_type || "Toyota Rush"} · {driver.vehicle_plate || (isArabic ? "بدون لوحة مسجلة" : "No plate registered")}</p>
+            <p>{vehicleLabel} · {plateLabel}</p>
           </div>
         </div>
         <div className="dn-driver-top-actions">
@@ -236,7 +238,7 @@ export default function DriverDashboard({
             <h2>{shiftStarted ? (isArabic ? "أنت متصل بمركز العمليات" : "Connected to operations") : (isArabic ? "الوردية متوقفة" : "Shift is offline")}</h2>
             <p>
               {shiftStarted
-                ? isArabic ? "يتم إرسال موقع GPS الحقيقي وحالة الجهاز تلقائيًا." : "Real GPS and device health are syncing automatically."
+                ? isArabic ? "يتم تحديث الموقع وحالة الجهاز تلقائيًا أثناء الوردية." : "Location and device health are syncing automatically during the shift."
                 : isArabic ? "استأنف الوردية لإعادة التتبع والمهام المباشرة." : "Resume the shift to reactivate tracking and dispatch."}
             </p>
           </div>
@@ -263,7 +265,7 @@ export default function DriverDashboard({
         <article><Route /><small>{isArabic ? "طلبات نشطة" : "Active orders"}</small><strong>{activeOrders.length}</strong></article>
         <article><CheckCircle2 /><small>{isArabic ? "تم اليوم" : "Delivered today"}</small><strong>{deliveredToday}</strong></article>
         <article><Banknote /><small>{isArabic ? "تحصيل نشط" : "Active COD"}</small><strong>{activeCod.toFixed(2)} <em>AED</em></strong></article>
-        <article><Navigation /><small>{isArabic ? "دقة GPS" : "GPS accuracy"}</small><strong>{accuracy != null ? `${Math.round(accuracy)}m` : "—"}</strong><em>{accuracyLabel(accuracy, isArabic)}</em></article>
+        <article><Navigation /><small>{isArabic ? "دقة الموقع" : "Location accuracy"}</small><strong>{accuracy != null ? `${Math.round(accuracy)}m` : "—"}</strong><em>{accuracyLabel(accuracy, isArabic)}</em></article>
       </div>
 
       <section className="dn-driver-device-health">
@@ -275,14 +277,14 @@ export default function DriverDashboard({
 
       <section className="dn-driver-live-strip dn-driver-live-strip-v2">
         <span className={gps.permission === "granted" && shiftStarted ? "is-online" : "is-offline"}>
-          <Wifi /> {gps.permission === "granted" && shiftStarted ? (isArabic ? "GPS مباشر" : "Live GPS") : (isArabic ? "GPS يحتاج إذنًا" : "GPS permission required")}
+          <Wifi /> {gps.permission === "granted" && shiftStarted ? (isArabic ? "الموقع مفعّل" : "Location active") : (isArabic ? "الموقع يحتاج إذنًا" : "Location permission required")}
         </span>
         <span><Clock3 /> {isArabic ? "آخر مزامنة" : "Last sync"}: {lastSyncLabel}</span>
         {gps.position && <span><Crosshair /> {gps.position.coords.latitude.toFixed(6)}, {gps.position.coords.longitude.toFixed(6)}</span>}
         {gps.sending && <span>{isArabic ? "جارٍ إرسال الموقع..." : "Syncing location..."}</span>}
         {gps.permission !== "granted" && shiftStarted && (
           <button type="button" className="dn-driver-gps-retry" onClick={() => gps.requestLocation()}>
-            <Crosshair /> {isArabic ? "تفعيل GPS الآن" : "Enable GPS now"}
+            <Crosshair /> {isArabic ? "تفعيل الموقع الآن" : "Enable location"}
           </button>
         )}
       </section>
@@ -341,7 +343,7 @@ export default function DriverDashboard({
         <div className="dn-driver-section-heading">
           <div>
             <h2>{tab === "active" ? (isArabic ? "الطلبات المسندة الآن" : "Current assigned orders") : tab === "history" ? (isArabic ? "آخر الطلبات المغلقة" : "Recent closed orders") : (isArabic ? "ملف المندوب الكامل" : "Complete driver profile")}</h2>
-            <p>{tab === "active" ? (isArabic ? "غيّر الحالة فقط حسب سير المهمة الفعلي." : "Update status only as the real delivery progresses.") : tab === "history" ? (isArabic ? "طلبات تم تسليمها أو إغلاقها مؤخرًا." : "Recently delivered, returned or closed orders.") : (isArabic ? "صورتك وبياناتك تظهر مباشرة في لوحة الإدارة والخريطة." : "Your photo and details appear immediately in admin and on the live map.")}</p>
+            <p>{tab === "active" ? (isArabic ? "غيّر الحالة فقط حسب سير المهمة." : "Update status only as the delivery progresses.") : tab === "history" ? (isArabic ? "طلبات تم تسليمها أو إغلاقها مؤخرًا." : "Recently delivered, returned or closed orders.") : (isArabic ? "صورتك وبياناتك تظهر في لوحة العمليات والخريطة." : "Your photo and details appear in operations and on the map.")}</p>
           </div>
           {tab !== "profile" && <button type="button" className="dn-driver-icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw className={loading ? "animate-spin" : ""} /></button>}
         </div>
