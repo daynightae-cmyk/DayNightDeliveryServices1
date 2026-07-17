@@ -113,7 +113,7 @@ export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
   const previousTargetRef = useRef<LatLngTuple>(position);
   const [zoom, setZoom] = useState(12);
   const map = useMapEvents({
-    zoomend: () => setZoom(map.getZoom()),
+    zoomend: (event) => setZoom(event.target.getZoom()),
   });
 
   useEffect(() => {
