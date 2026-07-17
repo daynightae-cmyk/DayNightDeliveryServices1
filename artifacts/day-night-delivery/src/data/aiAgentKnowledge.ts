@@ -289,7 +289,7 @@ export const chatKnowledgeEntries = [
   {
     keys: ["faq", "question", "policy", "terms", "privacy", "الأسئلة", "سياسة", "شروط"],
     en: "Frequently Asked Questions: /faq\nService Policy: /policy\nPrivacy: /privacy\nTerms: /terms",
-    ar: "الأسئلة الشائعة: /faq\nسياسة الخدمة: /policy\nالخصوصية: /privacy\nالشروط"
+    ar: "الأسئلة الشائعة: /faq\nسياسة الخدمة: /policy\nالخصوصية: /privacy\nالشروط: /terms"
   },
 
   /* ─── Packaging ─── */
