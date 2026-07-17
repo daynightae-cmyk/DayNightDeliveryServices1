@@ -136,7 +136,8 @@ export default function Services({ onNavigate }: ServicesProps) {
   return (
     <div className="space-y-10" dir={isArabic ? "rtl" : "ltr"}>
       <section className="dn-finish-surface rounded-[2.6rem] p-6 text-center sm:p-10">
-        <span className="inline-flex rounded-full border border-brand-gold/25 bg-brand-gold/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-brand-gold">
+        <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-brand-gold">
+          <ShieldCheck className="h-4 w-4" />
           {isArabic ? "حلول تشغيل متكاملة" : "Integrated Operations Services"}
         </span>
         <h1 className="mx-auto mt-5 max-w-4xl text-3xl font-black leading-tight text-white sm:text-5xl">
