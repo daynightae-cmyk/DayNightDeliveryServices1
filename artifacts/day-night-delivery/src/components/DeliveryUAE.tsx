@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, MapPin, BadgeCheck, CheckCircle, Calculator, PackageCheck, Truck, MessageSquare, Navigation } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
@@ -30,18 +30,13 @@ export default function DeliveryUAE() {
   const [searchQuery, setSearchTerm] = useState("");
   const [pickupArea, setPickupArea] = useState("Abu Dhabi");
   const [deliveryArea, setDeliveryArea] = useState("Dubai");
-  const [orderCount, setOrderCount] = useState<number | string>(1);
-
   const cityRoutes = coverageAreas.filter((area) => area.zoneType !== "extended");
   const specialRoutes = coverageAreas.filter((area) => area.zoneType === "extended");
   const allRoutes = [...cityRoutes, ...specialRoutes];
   const pickup = allRoutes.find((area) => area.nameEn === pickupArea) || cityRoutes[0];
   const delivery = allRoutes.find((area) => area.nameEn === deliveryArea) || cityRoutes[1] || cityRoutes[0];
-  const normalizedOrderCount = Math.max(1, Math.ceil(Number(orderCount) || 1));
   const unitPrice = Math.max(areaPrice(pickup.zoneType), areaPrice(delivery.zoneType));
-  const totalPrice = unitPrice * normalizedOrderCount;
-
-  const examples = useMemo(() => [1, 2, 3, 5].map((count) => ({ count, total: count * unitPrice })), [unitPrice]);
+  const totalPrice = unitPrice;
 
   const filteredRoutes = allRoutes.filter((area) => {
     const q = searchQuery.toLowerCase();
@@ -53,24 +48,22 @@ export default function DeliveryUAE() {
       <section className="text-center max-w-3xl mx-auto space-y-4">
         <span className="bg-brand-blue/15 border border-brand-blue/35 text-brand-blue text-xs px-3.5 py-1 rounded-full font-bold uppercase tracking-widest inline-block">{lp.title}</span>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">{isArabic ? "الشحن المحلي داخل الإمارات" : "Local Shipping Across the UAE"}</h2>
-        <p className="text-white/60 text-sm leading-7">{isArabic ? "اختر منطقة الاستلام ومنطقة التسليم وعدد الطلبات ليظهر السعر فوراً. المسارات الأساسية 30 درهم للطلب، والمسارات الخاصة 50 درهم للطلب." : "Choose pickup area, delivery area, and order count to see the total instantly. Standard routes are 30 AED per order; special routes are 50 AED per order."}</p>
+        <p className="text-white/60 text-sm leading-7">{isArabic ? "اختر منطقة الاستلام ومنطقة التسليم ليظهر سعر الطلبية الواحدة فوراً. المسارات الأساسية 30 درهم للطلب، والمسارات الخاصة 50 درهم للطلب." : "Choose pickup area and delivery area to see the single-order price instantly. Standard routes are 30 AED per order; special routes are 50 AED per order."}</p>
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="dn-card-premium rounded-3xl p-5 sm:p-6">
           <div className="mb-5 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
-            <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse text-right" : "text-left"}`}><Calculator className="h-8 w-8 text-brand-gold" /><div><h3 className="text-xl font-black text-white">{isArabic ? "حاسبة الشحن المحلي" : "Local shipping calculator"}</h3><p className="text-xs font-bold text-white/45">{isArabic ? "مناطق واضحة + عدد الطلبات" : "Clear areas + order count"}</p></div></div>
+            <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse text-right" : "text-left"}`}><Calculator className="h-8 w-8 text-brand-gold" /><div><h3 className="text-xl font-black text-white">{isArabic ? "حاسبة الشحن المحلي" : "Local shipping calculator"}</h3><p className="text-xs font-bold text-white/45">{isArabic ? "مناطق واضحة وسعر فوري" : "Clear areas and instant price"}</p></div></div>
             <span className="rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[10px] font-black text-brand-gold">DAY NIGHT</span>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة الاستلام" : "Pickup area"}</span><select value={pickupArea} onChange={(e) => setPickupArea(e.target.value)} className="dn-input"><optgroup label={isArabic ? "المسارات الأساسية — 30 درهم" : "Standard routes — 30 AED"}>{cityRoutes.map((area) => <option key={area.id} value={area.nameEn}>{areaLabel(area, isArabic)}</option>)}</optgroup><optgroup label={isArabic ? "المسارات الخاصة — 50 درهم" : "Special routes — 50 AED"}>{specialRoutes.map((area) => <option key={area.id} value={area.nameEn}>{areaLabel(area, isArabic)}</option>)}</optgroup></select></label>
             <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة التسليم" : "Delivery area"}</span><select value={deliveryArea} onChange={(e) => setDeliveryArea(e.target.value)} className="dn-input"><optgroup label={isArabic ? "المسارات الأساسية — 30 درهم" : "Standard routes — 30 AED"}>{cityRoutes.map((area) => <option key={area.id} value={area.nameEn}>{areaLabel(area, isArabic)}</option>)}</optgroup><optgroup label={isArabic ? "المسارات الخاصة — 50 درهم" : "Special routes — 50 AED"}>{specialRoutes.map((area) => <option key={area.id} value={area.nameEn}>{areaLabel(area, isArabic)}</option>)}</optgroup></select></label>
-            <label className="space-y-1.5 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبات" : "Order count"}</span><input value={orderCount} onChange={(e) => setOrderCount(e.target.value)} className="dn-input" type="number" min="1" step="1" dir="ltr" /></label>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-brand-gold/25 bg-brand-deep/75 p-5 text-center"><p className="text-xs font-black text-white/50">{isArabic ? "الإجمالي المحلي" : "Local total"}</p><p className="mt-2 text-4xl font-black text-brand-gold" dir="ltr">{totalPrice.toFixed(2)} AED</p><p className="mt-2 text-xs font-bold text-white/45">{isArabic ? `${normalizedOrderCount} طلب × ${unitPrice} درهم` : `${normalizedOrderCount} order(s) × ${unitPrice} AED`}</p></div>
-          <div className="mt-4 grid grid-cols-2 gap-2">{examples.map((item) => <div key={item.count} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-center"><p className="text-xs font-bold text-white/55">{isArabic ? `${item.count} طلب` : `${item.count} order(s)`}</p><p className="mt-1 font-mono text-lg font-black text-brand-gold">{item.total} AED</p></div>)}</div>
+          <div className="mt-5 rounded-2xl border border-brand-gold/25 bg-brand-deep/75 p-5 text-center"><p className="text-xs font-black text-white/50">{isArabic ? "سعر الطلبية الواحدة" : "Single-order price"}</p><p className="mt-2 text-4xl font-black text-brand-gold" dir="ltr">{totalPrice.toFixed(2)} AED</p><p className="mt-2 text-xs font-bold text-white/45">{isArabic ? `${unitPrice} درهم للطلب` : `${unitPrice} AED per order`}</p></div>
           <div className="mt-5 flex flex-wrap gap-2"><Link to="/request" className="dn-btn dn-btn-primary dn-btn-md flex-1"><Truck className="h-4 w-4" />{isArabic ? "اطلب توصيل" : "Request delivery"}</Link><a href={companyMeta.whatsappUrl} target="_blank" rel="noopener noreferrer" className="dn-btn dn-btn-whatsapp dn-btn-md flex-1"><MessageSquare className="h-4 w-4" />WhatsApp</a></div>
         </div>
 
