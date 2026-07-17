@@ -14,11 +14,36 @@ interface AuthLoginScreenProps {
   onSubmit: () => void;
   onForgotPassword: () => void;
   onToggleLanguage: () => void;
+  onBackToSite: () => void;
 }
 
 const text = {
-  ar: { toggle: "English", eyebrow: "DAY NIGHT DELIVERY SERVICES", title: "تسجيل الدخول", sub: "أدخل بيانات الإدارة للمتابعة", email: "البريد الإلكتروني", password: "كلمة المرور", remember: "تذكرني", forgot: "نسيت كلمة المرور؟", submit: "دخول", wait: "جاري التحقق..." },
-  en: { toggle: "العربية", eyebrow: "DAY NIGHT DELIVERY SERVICES", title: "Admin Sign In", sub: "Enter admin credentials to continue", email: "Email", password: "Password", remember: "Remember me", forgot: "Forgot password?", submit: "Sign in", wait: "Checking..." },
+  ar: {
+    toggle: "English",
+    back: "العودة للموقع",
+    eyebrow: "DAY NIGHT DELIVERY SERVICES",
+    title: "تسجيل الدخول",
+    sub: "أدخل بيانات الإدارة للمتابعة إلى لوحة التشغيل.",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    remember: "تذكرني",
+    forgot: "نسيت كلمة المرور؟",
+    submit: "دخول",
+    wait: "جاري التحقق...",
+  },
+  en: {
+    toggle: "العربية",
+    back: "Back to website",
+    eyebrow: "DAY NIGHT DELIVERY SERVICES",
+    title: "Admin Sign In",
+    sub: "Enter admin credentials to continue to operations.",
+    email: "Email",
+    password: "Password",
+    remember: "Remember me",
+    forgot: "Forgot password?",
+    submit: "Sign in",
+    wait: "Checking...",
+  },
 } as const;
 
 export default function AuthLoginScreen(props: AuthLoginScreenProps) {
@@ -32,7 +57,10 @@ export default function AuthLoginScreen(props: AuthLoginScreenProps) {
 
   return (
     <section className="auth-clean auth-clean--login" dir={isArabic ? "rtl" : "ltr"}>
-      <button type="button" className="auth-clean__language" onClick={props.onToggleLanguage}>{t.toggle}</button>
+      <div className="auth-clean__top-actions">
+        <button type="button" className="auth-clean__home" onClick={props.onBackToSite}>{t.back}</button>
+        <button type="button" className="auth-clean__language" onClick={props.onToggleLanguage}>{t.toggle}</button>
+      </div>
       <main className="auth-clean__card" aria-labelledby="auth-clean-title">
         <p className="auth-clean__eyebrow">{t.eyebrow}</p>
         <h1 className="auth-clean__card-title" id="auth-clean-title">{t.title}</h1>
