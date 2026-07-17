@@ -1,50 +1,20 @@
 import { Fragment, useEffect, useMemo } from "react";
-import L from "leaflet";
-import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "../../styles/dn-driver-map-avatar-fix.css";
 import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
+import DayNightVehicleMarker, { type DayNightVehicleState } from "../maps/DayNightVehicleMarker";
+import VehicleTrail from "../maps/VehicleTrail";
+import { calculateBearing, type LatLngTuple } from "../maps/VehicleAnimations";
 
 const UAE_CENTER: [number, number] = [24.4539, 54.3773];
 
 const colors = {
-  online: "#22c55e",
-  idle: "#f4c430",
+  online: "#0B5FFF",
+  idle: "#D4AF37",
   offline: "#94a3b8",
-  problem: "#ef4444",
+  problem: "#f59e0b",
 };
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "'": "&#39;",
-    '"': "&quot;",
-  }[character] || character));
-}
-
-function markerIcon(driver: AdminDriverRow, selected: boolean) {
-  const color = colors[driver.presence];
-  const initials = String(driver.full_name || driver.name || "DN")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-  const accessibleName = escapeHtml(driver.full_name || driver.name || "Driver");
-  const content = driver.avatar_url
-    ? `<span class="dn-driver-map-avatar-frame"><img src="${escapeHtml(driver.avatar_url)}" alt="${accessibleName}" width="52" height="52" decoding="async" /></span>`
-    : `<span class="dn-driver-map-avatar-frame is-initials"><b>${escapeHtml(initials)}</b></span>`;
-
-  return L.divIcon({
-    className: "dn-driver-map-marker-shell",
-    html: `<span class="dn-driver-map-marker ${selected ? "is-selected" : ""}" style="--marker:${color}">${content}<i aria-hidden="true"></i></span>`,
-    iconSize: [58, 66],
-    iconAnchor: [29, 60],
-    popupAnchor: [0, -54],
-  });
-}
 
 function FitMap({ drivers, selectedId }: { drivers: AdminDriverRow[]; selectedId?: string | null }) {
   const map = useMap();
@@ -63,6 +33,22 @@ function FitMap({ drivers, selectedId }: { drivers: AdminDriverRow[]; selectedId
   return null;
 }
 
+function vehicleState(driver: AdminDriverRow, selected: boolean): DayNightVehicleState {
+  if (selected) return "selected";
+  if (driver.presence === "offline") return "offline";
+  if (driver.presence === "problem") return "emergency";
+  if (driver.presence === "idle") return "stopped";
+  return "driving";
+}
+
+function vehicleBearing(driver: AdminDriverRow) {
+  const trail = Array.isArray(driver.trail) ? driver.trail : [];
+  if (trail.length < 2) return 0;
+  const previous = trail[trail.length - 2];
+  const current = trail[trail.length - 1];
+  return calculateBearing([previous.lat, previous.lng], [current.lat, current.lng]);
+}
+
 export default function DriverLiveMap({
   drivers,
   isArabic,
@@ -76,6 +62,10 @@ export default function DriverLiveMap({
 }) {
   const visibleDrivers = useMemo(() => drivers.filter((driver) => driver.location), [drivers]);
   const selected = drivers.find((driver) => driver.id === selectedId);
+  const selectedTrail = useMemo<LatLngTuple[]>(
+    () => selected?.trail?.map((point) => [point.lat, point.lng]) || [],
+    [selected?.trail],
+  );
 
   return (
     <div className="dn-driver-map-wrap">
@@ -88,25 +78,29 @@ export default function DriverLiveMap({
         {visibleDrivers.map((driver) => {
           const location = driver.location!;
           const selectedDriver = driver.id === selectedId;
+          const label = driver.full_name || driver.name || "DAY NIGHT Driver";
           return (
             <Fragment key={driver.id}>
               {selectedDriver && Number(location.accuracy || 0) > 0 && (
                 <Circle
                   center={[location.lat, location.lng]}
                   radius={Math.max(5, Number(location.accuracy || 0))}
-                  pathOptions={{ color: colors[driver.presence], fillColor: colors[driver.presence], fillOpacity: 0.13, weight: 2 }}
+                  pathOptions={{ color: colors[driver.presence], fillColor: colors[driver.presence], fillOpacity: 0.1, weight: 2 }}
                 />
               )}
-              <Marker
+              <DayNightVehicleMarker
                 position={[location.lat, location.lng]}
-                icon={markerIcon(driver, selectedDriver)}
+                bearing={vehicleBearing(driver)}
+                state={vehicleState(driver, selectedDriver)}
+                selected={selectedDriver}
+                label={`${label} — DAY NIGHT Toyota Rush`}
                 eventHandlers={{ click: () => onSelect?.(driver.id) }}
               >
                 <Popup>
                   <div className="dn-driver-map-popup" dir={isArabic ? "rtl" : "ltr"}>
                     <div className="dn-driver-map-popup-head">
                       {driver.avatar_url ? <img src={driver.avatar_url} alt={driver.full_name || "Driver"} width={44} height={44} /> : null}
-                      <section><strong>{driver.full_name || driver.name || driver.id}</strong><small>{driver.vehicle_type || "—"} · {driver.vehicle_plate || "—"}</small></section>
+                      <section><strong>{label}</strong><small>{driver.vehicle_type || "Toyota Rush"} · {driver.vehicle_plate || "—"}</small></section>
                     </div>
                     <span>{isArabic ? "الحالة" : "Status"}: {driver.presence}</span>
                     <span>{isArabic ? "الطلبات النشطة" : "Active orders"}: {driver.active_orders}</span>
@@ -118,21 +112,16 @@ export default function DriverLiveMap({
                     </a>
                   </div>
                 </Popup>
-              </Marker>
+              </DayNightVehicleMarker>
             </Fragment>
           );
         })}
-        {selected && selected.trail.length > 1 && (
-          <Polyline
-            positions={selected.trail.map((point) => [point.lat, point.lng])}
-            pathOptions={{ color: "#f4c430", weight: 4, opacity: 0.8 }}
-          />
-        )}
+        <VehicleTrail positions={selectedTrail} selected />
       </MapContainer>
       {visibleDrivers.length === 0 && (
         <div className="dn-driver-map-empty">
           <strong>{isArabic ? "لا توجد إحداثيات GPS حقيقية بعد" : "No real GPS coordinates yet"}</strong>
-          <span>{isArabic ? "لن يظهر أي Marker وهمي. يظهر المندوب فور السماح بالموقع بعد تسجيل الدخول." : "No fake marker is rendered. A driver appears immediately after granting location access."}</span>
+          <span>{isArabic ? "لا تظهر أي مركبة وهمية. تظهر سيارة DAY NIGHT فور السماح بالموقع بعد تسجيل الدخول." : "No fake vehicle is rendered. The DAY NIGHT vehicle appears after location access is granted."}</span>
         </div>
       )}
     </div>
