@@ -15,7 +15,7 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
 
   const load = useCallback(async () => {
     if (!supabase) {
-      setError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured.");
+      setError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       setLoading(false);
       return;
     }
@@ -73,7 +73,7 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
       <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
         <div className="dn-driver-state-card dn-driver-state-error">
           <AlertTriangle className="h-9 w-9" />
-          <h1>{isArabic ? "تعذر فتح قسم المندوب" : "Driver portal is not ready"}</h1>
+          <h1>{isArabic ? "تعذر فتح قسم المندوب" : "Driver workspace unavailable"}</h1>
           <p>{error}</p>
           <div className="dn-driver-state-actions">
             <button type="button" onClick={() => void load()}>
@@ -95,8 +95,8 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
       <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
         <div className="dn-driver-state-card dn-driver-state-error">
           <AlertTriangle className="h-9 w-9" />
-          <h1>{isArabic ? "ملف الحساب العام غير موجود" : "Public account profile is missing"}</h1>
-          <p>{isArabic ? "حساب الدخول صحيح، لكن سجل profiles المطلوب للتشغيل غير موجود." : "Authentication succeeded, but the required profiles record is missing."}</p>
+          <h1>{isArabic ? "الحساب بانتظار التفعيل" : "Account pending activation"}</h1>
+          <p>{isArabic ? "تواصل مع الإدارة لتفعيل صلاحية الدخول إلى قسم المندوب." : "Contact operations to activate driver access for this account."}</p>
           <div className="dn-driver-state-actions">
             <button type="button" onClick={() => void load()}><RefreshCw className="h-4 w-4" />{isArabic ? "إعادة الفحص" : "Check again"}</button>
             <button type="button" onClick={() => void signOut()}><LogOut className="h-4 w-4" />{isArabic ? "تسجيل الخروج" : "Sign out"}</button>
@@ -112,7 +112,7 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
         <div className="dn-driver-state-card dn-driver-state-error">
           <AlertTriangle className="h-9 w-9" />
           <h1>{isArabic ? "هذا القسم مخصص للمندوبين فقط" : "Drivers only"}</h1>
-          <p>{isArabic ? "الحساب الحالي لا يحمل صلاحية مندوب." : "The current account does not have the driver role."}</p>
+          <p>{isArabic ? "الحساب الحالي لا يحمل صلاحية مندوب." : "The current account does not have driver access."}</p>
           <button type="button" onClick={() => void signOut()}>
             <LogOut className="h-4 w-4" />
             {isArabic ? "تسجيل الخروج" : "Sign out"}
@@ -127,8 +127,8 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
       <section className="dn-driver-shell" dir={isArabic ? "rtl" : "ltr"}>
         <div className="dn-driver-state-card dn-driver-state-warning">
           <AlertTriangle className="h-9 w-9" />
-          <h1>{isArabic ? "ملف المندوب غير مفعل" : "Driver profile is inactive"}</h1>
-          <p>{isArabic ? "فعّل ملف المندوب من لوحة الإدارة ثم أعد المحاولة." : "Activate the driver profile from the admin dashboard, then retry."}</p>
+          <h1>{isArabic ? "ملف المندوب بانتظار التفعيل" : "Driver profile pending activation"}</h1>
+          <p>{isArabic ? "تواصل مع الإدارة لتفعيل ملف المندوب ثم أعد المحاولة." : "Contact operations to activate the driver profile, then retry."}</p>
           <div className="dn-driver-state-actions">
             <button type="button" onClick={() => void load()}>
               <RefreshCw className="h-4 w-4" />

@@ -290,30 +290,36 @@ export function dispatchErrorMessage(error: unknown, isArabic: boolean) {
     [/force_required_for_in_progress_reassign/i, "الطلب بدأ تنفيذه؛ فعّل النقل الاضطراري بعد التأكد من استلام المندوب الجديد.", "This order is already in progress. Enable forced transfer after confirming the handoff."],
     [/force_required_for_in_progress_unassign/i, "الطلب بدأ تنفيذه؛ فعّل الإلغاء الاضطراري لإعادته إلى المراجعة.", "This order is already in progress. Enable forced unassignment to return it to review."],
     [/active_driver_not_found/i, "المندوب غير موجود أو حسابه غير نشط.", "The driver does not exist or is inactive."],
-    [/order_not_found/i, "الطلب غير موجود في قاعدة البيانات.", "The order was not found."],
+    [/order_not_found/i, "تعذر العثور على الطلب.", "The order was not found."],
     [/not_authorized|permission|row-level security/i, "حساب الإدارة لا يملك صلاحية التوزيع المطلوبة.", "The admin account lacks dispatch permission."],
-    [/admin_dispatch_order|schema cache|function .* does not exist/i, "طبّق Migration مركز توزيع الطلبات في Supabase أولاً.", "Apply the order dispatch migration in Supabase first."],
+    [/admin_dispatch_order|schema cache|function .* does not exist/i, "مركز التوزيع يحتاج تفعيل إعدادات التشغيل.", "The dispatch center needs its operations settings activated."],
   ];
   const match = messages.find(([pattern]) => pattern.test(raw));
-  return match ? (isArabic ? match[1] : match[2]) : raw;
+  if (match) return isArabic ? match[1] : match[2];
+  return isArabic ? "تعذر تنفيذ العملية حالياً. أعد المحاولة أو تواصل مع الدعم." : "The operation could not be completed right now. Please retry or contact support.";
 }
 
 export function driverErrorMessage(error: unknown, isArabic: boolean) {
   const raw = messageOf(error);
   if (/permissions policy|disabled in this document/i.test(raw)) {
     return isArabic
-      ? "المتصفح منع GPS بسبب سياسة الموقع. حدّث الصفحة بعد اكتمال نشر إعدادات Vercel الجديدة."
-      : "The browser blocked GPS through the site permissions policy. Refresh after the new Vercel deployment is ready.";
+      ? "تعذر تشغيل الموقع من المتصفح الحالي. حدّث الصفحة أو اسمح بالموقع من إعدادات المتصفح."
+      : "Location access is blocked in this browser. Refresh the page or allow location access in browser settings.";
   }
   if (/driver_setup_required|driver profile/i.test(raw)) {
     return isArabic
-      ? "حساب الدخول موجود، لكن ملف تشغيل المندوب غير مكتمل في قاعدة البيانات."
-      : "The login account exists, but the operational driver profile is not provisioned.";
+      ? "حسابك بانتظار استكمال ملف المندوب من الإدارة."
+      : "Your account is waiting for driver profile activation by operations.";
   }
   if (/not_authorized|permission|row-level security/i.test(raw)) {
     return isArabic
-      ? "صلاحيات حساب المندوب غير مكتملة. يجب تطبيق Migration قسم المندوب النهائي."
-      : "Driver permissions are incomplete. Apply the final driver operations migration.";
+      ? "صلاحيات الحساب تحتاج تفعيل من الإدارة."
+      : "This account needs access to be activated by operations.";
   }
-  return raw;
+  if (/supabase|database|schema|function|migration|jwt|fetch|network/i.test(raw)) {
+    return isArabic
+      ? "تعذر تحديث البيانات حالياً. أعد المحاولة أو تواصل مع الدعم."
+      : "We could not refresh the data right now. Please retry or contact support.";
+  }
+  return isArabic ? "تعذر إكمال الطلب حالياً. أعد المحاولة." : "The request could not be completed right now. Please retry.";
 }

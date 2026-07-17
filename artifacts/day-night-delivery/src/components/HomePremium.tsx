@@ -49,8 +49,8 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
       label: isArabic ? "بوابة التاجر" : "Merchant portal",
       title: isArabic ? "مركز التاجر للطلبيات والتتبع" : "Merchant command center",
       body: isArabic
-        ? "دخول آمن للتاجر يعرض بيانات التاجر وطلبياته وخريطته من قاعدة البيانات الحقيقية فقط."
-        : "Secure merchant access for real merchant profile, orders, and map data from the production database only.",
+        ? "دخول آمن يعرض حساب التاجر وطلبياته وخريطته عند توفر بيانات مرتبطة بالحساب."
+        : "Secure merchant access for account details, orders, and map activity linked to the signed-in account.",
       cta: isArabic ? "فتح بوابة التاجر" : "Open merchant portal",
       tab: "merchant",
       tone: "gold",
@@ -59,10 +59,10 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
       key: "driver",
       icon: Navigation,
       label: isArabic ? "بوابة المندوب" : "Driver portal",
-      title: isArabic ? "وردية المندوب و GPS والمهام" : "Driver shift, GPS, and jobs",
+      title: isArabic ? "وردية المندوب والموقع والمهام" : "Driver shift, location, and jobs",
       body: isArabic
-        ? "مساحة تشغيل للمندوب لبدء الوردية، إرسال GPS الحقيقي، وإدارة الطلبات المسندة فقط."
-        : "Driver workspace for shifts, real GPS sync, and assigned order operations only.",
+        ? "مساحة تشغيل للمندوب لبدء الوردية، تحديث الموقع، وإدارة الطلبات المسندة له."
+        : "Driver workspace for shifts, location updates, and assigned order operations.",
       cta: isArabic ? "فتح بوابة المندوب" : "Open driver portal",
       tab: "driver",
       tone: "blue",
@@ -149,12 +149,12 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(212,175,55,0.16),transparent_22rem),radial-gradient(circle_at_90%_10%,rgba(43,184,255,0.14),transparent_25rem)]" />
         <div className="relative z-10 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <DNBadge tone="gold"><ShieldCheck className="h-3.5 w-3.5" /> {isArabic ? "بوابات تشغيل حقيقية" : "Real operations portals"}</DNBadge>
+            <DNBadge tone="gold"><ShieldCheck className="h-3.5 w-3.5" /> {isArabic ? "بوابات التشغيل" : "Operations portals"}</DNBadge>
             <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">{isArabic ? "إدارة التاجر والمندوب من الواجهة الرئيسية" : "Merchant and driver access from the main site"}</h2>
             <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-white/58">
               {isArabic
-                ? "هذه البوابات لا تعرض بيانات تجريبية؛ عند الدخول تظهر السجلات المرتبطة بالحساب من Supabase فقط."
-                : "These portals do not show demo data; after sign-in they render only Supabase records linked to the account."}
+                ? "كل بوابة تعرض محتوى الحساب بعد تسجيل الدخول، وتبقى مرتبطة بسير الطلبات والتتبع والتحصيل."
+                : "Each portal shows account content after sign-in and stays connected to orders, tracking, and collections."}
             </p>
           </div>
           <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/40 bg-white object-contain p-1" />

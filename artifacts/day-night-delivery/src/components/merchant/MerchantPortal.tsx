@@ -13,8 +13,10 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageCircle,
   PackageCheck,
   Phone,
+  PlusCircle,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -29,7 +31,6 @@ import type { Merchant, Order } from "../../types";
 type SupabaseClient = NonNullable<typeof supabase>;
 type MerchantRecord = Merchant & Record<string, any>;
 type MerchantOrder = Order & Record<string, any>;
-
 type PortalTab = "overview" | "orders" | "tracking" | "account";
 
 const closedStatuses = new Set(["delivered", "cancelled", "returned", "failed"]);
@@ -60,9 +61,9 @@ function normalizeStatus(value?: unknown) {
 
 function statusLabel(status: string, isArabic: boolean) {
   const labels: Record<string, { ar: string; en: string }> = {
-    pending: { ar: "قيد الاستلام", en: "Pending" },
+    pending: { ar: "بانتظار التأكيد", en: "Pending" },
     confirmed: { ar: "مؤكد", en: "Confirmed" },
-    assigned: { ar: "تم الإسناد", en: "Assigned" },
+    assigned: { ar: "مع المندوب", en: "With driver" },
     accepted: { ar: "قبله المندوب", en: "Accepted" },
     picked_up: { ar: "تم الاستلام", en: "Picked up" },
     in_transit: { ar: "في الطريق", en: "In transit" },
@@ -70,7 +71,7 @@ function statusLabel(status: string, isArabic: boolean) {
     delivered: { ar: "تم التسليم", en: "Delivered" },
     cancelled: { ar: "ملغي", en: "Cancelled" },
     returned: { ar: "راجع", en: "Returned" },
-    failed: { ar: "متعثر", en: "Failed" },
+    failed: { ar: "متعثر", en: "Issue" },
   };
   return isArabic ? labels[status]?.ar || status : labels[status]?.en || status;
 }
@@ -91,13 +92,12 @@ function formatDate(value: unknown, isArabic: boolean) {
 }
 
 function merchantTitle(merchant?: MerchantRecord | null) {
-  return clean(merchant?.trade_name) || clean(merchant?.owner_name) || clean(merchant?.merchant_code) || "";
+  return clean(merchant?.trade_name) || clean(merchant?.owner_name) || clean(merchant?.merchant_code) || "DAY NIGHT Merchant";
 }
 
 function initials(value: string) {
   const parts = clean(value).split(/\s+/).filter(Boolean).slice(0, 2);
-  const letters = parts.map((part) => part[0]?.toUpperCase()).join("");
-  return letters || "DN";
+  return parts.map((part) => part[0]?.toUpperCase()).join("") || "DN";
 }
 
 function orderReference(order: MerchantOrder) {
@@ -129,8 +129,21 @@ function userIdentity(user: User) {
   const email = clean(user.email || meta.email).toLowerCase();
   const phone = clean(user.phone || meta.phone || meta.phone_number || meta.mobile || meta.mobile_number);
   const phoneDigits = digits(phone);
-  const name = clean(meta.full_name || meta.name || email || phone);
-  return { email, phone, phoneDigits, name };
+  return { email, phone, phoneDigits };
+}
+
+function portalErrorMessage(error: unknown, isArabic: boolean) {
+  const raw = error instanceof Error ? error.message : String(error || "");
+  if (/invalid login|credentials|password|email/i.test(raw)) {
+    return isArabic ? "بيانات الدخول غير صحيحة." : "The sign-in details are not correct.";
+  }
+  if (/not_authenticated|jwt|session/i.test(raw)) {
+    return isArabic ? "انتهت الجلسة. سجّل الدخول مرة أخرى." : "Your session expired. Please sign in again.";
+  }
+  if (/phone|sms|otp/i.test(raw)) {
+    return isArabic ? "تعذر إكمال تحقق الهاتف حالياً." : "Phone verification is unavailable right now.";
+  }
+  return isArabic ? "تعذر تحديث البيانات حالياً. حاول مرة أخرى أو تواصل مع الدعم." : "We could not refresh the workspace right now. Please retry or contact support.";
 }
 
 async function queryMerchantsBy(client: SupabaseClient, column: string, value: string, mode: "eq" | "ilike" = "eq") {
@@ -218,9 +231,7 @@ function coordinatesFor(order: MerchantOrder) {
   for (const [latKey, lngKey] of pairs) {
     const lat = Number(order[latKey]);
     const lng = Number(order[lngKey]);
-    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-      return { lat, lng };
-    }
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
   }
 
   return null;
@@ -322,15 +333,14 @@ export default function MerchantPortal() {
       setOrders(resolvedOrders);
 
       const meaningfulErrors = Array.from(new Set(errors.filter(Boolean))).filter((message) => !/does not exist|schema cache/i.test(message));
-      if (!resolvedMerchants.length && meaningfulErrors.length) setDataError(meaningfulErrors[0]);
-      else if (resolvedMerchants.length && !resolvedOrders.length && meaningfulErrors.length) setDataError(meaningfulErrors[0]);
+      if (!resolvedMerchants.length && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
+      else if (resolvedMerchants.length && !resolvedOrders.length && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || "Unknown merchant portal error");
-      setDataError(message);
+      setDataError(portalErrorMessage(error, isArabic));
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  }, [isArabic]);
 
   useEffect(() => {
     if (user) void loadMerchantData(user);
@@ -356,7 +366,7 @@ export default function MerchantPortal() {
   async function signInWithPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) {
-      setAuthError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured.");
+      setAuthError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       return;
     }
 
@@ -364,7 +374,7 @@ export default function MerchantPortal() {
     setAuthError("");
     setAuthNotice("");
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-    if (error) setAuthError(isArabic ? "تعذر تسجيل الدخول. راجع البريد وكلمة المرور." : error.message);
+    if (error) setAuthError(portalErrorMessage(error, isArabic));
     setAuthBusy(false);
   }
 
@@ -374,7 +384,7 @@ export default function MerchantPortal() {
     setAuthError("");
     const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
     if (error) {
-      setAuthError(isArabic ? "تعذر فتح تسجيل الدخول عبر Google." : error.message);
+      setAuthError(isArabic ? "تعذر فتح الدخول عبر Google حالياً." : "Google sign-in is unavailable right now.");
       setAuthBusy(false);
     }
   }
@@ -393,8 +403,8 @@ export default function MerchantPortal() {
       email: email.trim().toLowerCase(),
       options: { emailRedirectTo: redirectTo() },
     });
-    if (error) setAuthError(isArabic ? "تعذر إرسال رابط الدخول." : error.message);
-    else setAuthNotice(isArabic ? "تم إرسال رابط دخول آمن إلى بريد التاجر." : "A secure sign-in link was sent to the merchant email.");
+    if (error) setAuthError(portalErrorMessage(error, isArabic));
+    else setAuthNotice(isArabic ? "تم إرسال رابط الدخول إلى بريد التاجر." : "A sign-in link was sent to the merchant email.");
     setAuthBusy(false);
   }
 
@@ -409,8 +419,8 @@ export default function MerchantPortal() {
     setAuthError("");
     setAuthNotice("");
     const { error } = await supabase.auth.signInWithOtp({ phone: phone.trim() });
-    if (error) setAuthError(isArabic ? "تعذر إرسال رمز الهاتف. تأكد أن Phone Auth مفعّل في Supabase." : error.message);
-    else setAuthNotice(isArabic ? "تم إرسال رمز التحقق إلى هاتف التاجر." : "The verification code was sent to the merchant phone.");
+    if (error) setAuthError(portalErrorMessage(error, isArabic));
+    else setAuthNotice(isArabic ? "تم إرسال رمز التحقق إلى الهاتف." : "The verification code was sent to the phone.");
     setAuthBusy(false);
   }
 
@@ -424,7 +434,7 @@ export default function MerchantPortal() {
     setAuthBusy(true);
     setAuthError("");
     const { error } = await supabase.auth.verifyOtp({ phone: phone.trim(), token: phoneOtp.trim(), type: "sms" });
-    if (error) setAuthError(isArabic ? "رمز الهاتف غير صحيح أو انتهت صلاحيته." : error.message);
+    if (error) setAuthError(portalErrorMessage(error, isArabic));
     setAuthBusy(false);
   }
 
@@ -437,7 +447,6 @@ export default function MerchantPortal() {
 
   const currentMerchant = merchants[0] || null;
   const currentMerchantName = merchantTitle(currentMerchant);
-  const identity = user ? userIdentity(user) : null;
   const activeOrders = useMemo(() => orders.filter((order) => activeStatuses.has(normalizeStatus(order.status)) || !closedStatuses.has(normalizeStatus(order.status))), [orders]);
   const deliveredOrders = useMemo(() => orders.filter((order) => normalizeStatus(order.status) === "delivered"), [orders]);
   const codTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderCod(order)), 0), [orders]);
@@ -449,9 +458,15 @@ export default function MerchantPortal() {
 
   const kpis = [
     { icon: PackageCheck, value: orders.length, label: isArabic ? "كل الطلبات" : "Total orders" },
-    { icon: Truck, value: activeOrders.length, label: isArabic ? "نشطة الآن" : "Active now" },
+    { icon: Truck, value: activeOrders.length, label: isArabic ? "قيد التنفيذ" : "In progress" },
     { icon: CheckCircle2, value: deliveredOrders.length, label: isArabic ? "تم تسليمها" : "Delivered" },
-    { icon: Banknote, value: money(codTotal), label: isArabic ? "تحصيل COD" : "COD total" },
+    { icon: Banknote, value: money(codTotal), label: isArabic ? "تحصيل نقدي" : "Cash collection" },
+  ];
+
+  const quickActions = [
+    { href: "/request", icon: PlusCircle, label: isArabic ? "طلب جديد" : "New order" },
+    { href: "/tracking", icon: MapPin, label: isArabic ? "تتبع شحنة" : "Track shipment" },
+    { href: companyMeta.whatsappUrl, icon: MessageCircle, label: isArabic ? "الدعم" : "Support", external: true },
   ];
 
   if (authLoading) {
@@ -459,7 +474,7 @@ export default function MerchantPortal() {
       <section className="grid min-h-[65vh] place-items-center" dir={isArabic ? "rtl" : "ltr"}>
         <div className="rounded-[2rem] border border-brand-gold/25 bg-[#031226] px-8 py-7 text-center shadow-2xl shadow-black/30">
           <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-brand-gold" />
-          <p className="font-black text-white">{isArabic ? "جاري فحص دخول التاجر..." : "Checking merchant session..."}</p>
+          <p className="font-black text-white">{isArabic ? "جاري تجهيز بوابة التاجر..." : "Preparing merchant portal..."}</p>
         </div>
       </section>
     );
@@ -477,18 +492,18 @@ export default function MerchantPortal() {
                 <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/45 bg-white object-contain p-1 shadow-xl shadow-brand-gold/10" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT</p>
-                  <h1 className="text-3xl font-black text-white sm:text-5xl">{isArabic ? "بوابة التاجر الفاخرة" : "Premium Merchant Portal"}</h1>
+                  <h1 className="text-3xl font-black text-white sm:text-5xl">{isArabic ? "بوابة التاجر" : "Merchant Portal"}</h1>
                 </div>
               </div>
               <p className="max-w-2xl text-sm font-bold leading-8 text-white/65">
                 {isArabic
-                  ? "دخول آمن للتاجر عبر Google أو البريد أو الهاتف، ثم تظهر الطلبات الحقيقية المرتبطة بسجل التاجر فقط: لا بيانات وهمية ولا أرقام تجريبية."
-                  : "Secure merchant access through Google, email, or phone. The dashboard shows only real orders linked to the merchant record: no fake data and no demo placeholders."}
+                  ? "مساحة أنيقة لإدارة الطلبات، متابعة التحصيل، ومراقبة مسار الشحنات المرتبطة بحسابك التجاري."
+                  : "A refined workspace for orders, collections, and shipment progress linked to your merchant account."}
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><Store className="mb-3 h-5 w-5 text-brand-gold" /><strong className="block text-white">{isArabic ? "ملف تاجر حقيقي" : "Real merchant profile"}</strong></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><MapPin className="mb-3 h-5 w-5 text-brand-sky" /><strong className="block text-white">{isArabic ? "تتبع ومواقع" : "Tracking & map"}</strong></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><ShieldCheck className="mb-3 h-5 w-5 text-emerald-300" /><strong className="block text-white">{isArabic ? "صلاحيات آمنة" : "Secure access"}</strong></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><Store className="mb-3 h-5 w-5 text-brand-gold" /><strong className="block text-white">{isArabic ? "حساب تجاري" : "Merchant account"}</strong></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><PackageCheck className="mb-3 h-5 w-5 text-brand-sky" /><strong className="block text-white">{isArabic ? "طلبياتك" : "Your orders"}</strong></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><ShieldCheck className="mb-3 h-5 w-5 text-emerald-300" /><strong className="block text-white">{isArabic ? "دخول آمن" : "Secure access"}</strong></div>
               </div>
             </div>
 
@@ -497,13 +512,13 @@ export default function MerchantPortal() {
                 <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-gold text-brand-deep shadow-lg shadow-brand-gold/20"><Building2 className="h-6 w-6" /></span>
                 <div>
                   <h2 className="text-xl font-black text-white">{isArabic ? "دخول التاجر" : "Merchant sign in"}</h2>
-                  <p className="text-xs font-bold text-white/55">{isArabic ? "استخدم نفس بيانات التاجر المحفوظة في Supabase." : "Use the merchant identity saved in Supabase."}</p>
+                  <p className="text-xs font-bold text-white/55">{isArabic ? "استخدم بريدك أو هاتفك المسجل لدى الشركة." : "Use your registered merchant email or phone."}</p>
                 </div>
               </div>
 
               <form onSubmit={signInWithPassword} className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "بريد التاجر" : "Merchant email"}</span>
+                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
                   <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#071A33]/80 px-4 py-3 text-sm font-bold text-white outline-none ring-brand-gold/30 focus:ring-4" />
                 </label>
                 <label className="block">
@@ -523,14 +538,14 @@ export default function MerchantPortal() {
 
               <div className="mt-4 rounded-2xl border border-white/10 bg-[#071A33]/60 p-4">
                 <label className="block">
-                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "هاتف التاجر" : "Merchant phone"}</span>
+                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "رقم الهاتف" : "Phone number"}</span>
                   <input type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#031226] px-4 py-3 text-sm font-bold text-white outline-none ring-brand-sky/30 focus:ring-4" />
                 </label>
                 <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                   <input type="text" inputMode="numeric" value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value)} aria-label={isArabic ? "رمز الهاتف" : "Phone code"} className="rounded-2xl border border-white/10 bg-[#031226] px-4 py-3 text-sm font-bold text-white outline-none ring-brand-sky/30 focus:ring-4" />
                   <button type="button" disabled={authBusy || !phone.trim()} onClick={() => void sendPhoneOtp()} className="rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-3 text-xs font-black text-brand-gold disabled:opacity-50"><Phone className="mr-1 inline h-4 w-4" />{isArabic ? "إرسال الرمز" : "Send code"}</button>
                 </div>
-                <button type="button" disabled={authBusy || !phoneOtp.trim()} onClick={() => void verifyPhoneOtp()} className="mt-2 w-full rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200 disabled:opacity-50">{isArabic ? "تأكيد رمز الهاتف" : "Verify phone code"}</button>
+                <button type="button" disabled={authBusy || !phoneOtp.trim()} onClick={() => void verifyPhoneOtp()} className="mt-2 w-full rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200 disabled:opacity-50">{isArabic ? "تأكيد الرمز" : "Verify code"}</button>
               </div>
 
               {authError && <p className="mt-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{authError}</p>}
@@ -547,7 +562,7 @@ export default function MerchantPortal() {
       <section className="grid min-h-[65vh] place-items-center" dir={isArabic ? "rtl" : "ltr"}>
         <div className="rounded-[2rem] border border-brand-gold/25 bg-[#031226] px-8 py-7 text-center shadow-2xl shadow-black/30">
           <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-brand-gold" />
-          <p className="font-black text-white">{isArabic ? "جاري تحميل بيانات التاجر الحقيقية..." : "Loading real merchant data..."}</p>
+          <p className="font-black text-white">{isArabic ? "جاري تجهيز لوحة التاجر..." : "Preparing merchant dashboard..."}</p>
         </div>
       </section>
     );
@@ -558,18 +573,16 @@ export default function MerchantPortal() {
       <section className="space-y-5" dir={isArabic ? "rtl" : "ltr"}>
         <div className="rounded-[2rem] border border-amber-300/30 bg-[#031226] p-7 shadow-2xl shadow-black/30">
           <AlertTriangle className="mb-4 h-10 w-10 text-brand-gold" />
-          <h1 className="text-3xl font-black text-white">{isArabic ? "لم يتم ربط هذا الحساب بتاجر" : "This account is not linked to a merchant"}</h1>
+          <h1 className="text-3xl font-black text-white">{isArabic ? "الحساب بانتظار التفعيل" : "Account pending activation"}</h1>
           <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-white/62">
             {isArabic
-              ? "الدخول صحيح، لكن لا يوجد سجل في جدول merchants يطابق بريد أو هاتف هذا الحساب. اربط التاجر بالبريد/الهاتف أو طبّق Migration بوابة التاجر ثم أعد الفحص."
-              : "Sign-in succeeded, but no merchants row matches this account email or phone. Link the merchant record by email/phone or apply the merchant portal migration, then retry."}
+              ? "لم نجد ملفاً تجارياً مرتبطاً بهذا الدخول. تواصل مع فريق DAY NIGHT لتفعيل الوصول إلى لوحة التاجر."
+              : "We could not find a merchant profile for this sign-in. Contact DAY NIGHT to activate merchant access."}
           </p>
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-xs font-bold text-white/65" dir="ltr">
-            email: {identity?.email || "—"} · phone: {identity?.phone || "—"}
-          </div>
           {dataError && <p className="mt-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{dataError}</p>}
           <div className="mt-5 flex flex-wrap gap-3">
             <button type="button" onClick={() => void loadMerchantData(user)} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/35 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"><RefreshCw className="h-4 w-4" />{isArabic ? "إعادة الفحص" : "Retry"}</button>
+            <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200"><MessageCircle className="h-4 w-4" />{isArabic ? "تواصل مع الدعم" : "Contact support"}</a>
             <button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75"><LogOut className="h-4 w-4" />{isArabic ? "تسجيل الخروج" : "Sign out"}</button>
           </div>
         </div>
@@ -585,21 +598,19 @@ export default function MerchantPortal() {
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-[1.6rem] border border-brand-gold/45 bg-white/95 shadow-2xl shadow-brand-gold/10">
-              {currentMerchant.logo_url ? (
-                <img src={currentMerchant.logo_url} alt={currentMerchantName} className="h-full w-full object-contain p-2" />
-              ) : (
-                <span className="text-2xl font-black text-[#071A33]">{initials(currentMerchantName)}</span>
-              )}
+              {currentMerchant.logo_url ? <img src={currentMerchant.logo_url} alt={currentMerchantName} className="h-full w-full object-contain p-2" /> : <span className="text-2xl font-black text-[#071A33]">{initials(currentMerchantName)}</span>}
             </div>
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[11px] font-black text-brand-gold"><Sparkles className="h-3.5 w-3.5" /> {isArabic ? "مركز التاجر الحقيقي" : "Real merchant command center"}</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[11px] font-black text-brand-gold"><Sparkles className="h-3.5 w-3.5" /> {isArabic ? "لوحة التاجر" : "Merchant dashboard"}</span>
               <h1 className="mt-3 text-3xl font-black text-white sm:text-5xl">{currentMerchantName}</h1>
               <p className="mt-2 text-sm font-bold text-white/58">{clean(currentMerchant.merchant_code) || clean(currentMerchant.email) || clean(currentMerchant.phone)}</p>
-              {!currentMerchant.logo_url && <p className="mt-2 text-xs font-bold text-brand-gold/80">{isArabic ? "لا يوجد شعار محفوظ للتاجر؛ المعروض رمز مستخرج من اسمه الحقيقي." : "No merchant logo is saved; the shown mark is generated from the real merchant name."}</p>}
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={() => void loadMerchantData(user)} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/35 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"><RefreshCw className={`h-4 w-4 ${dataLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث البيانات" : "Refresh data"}</button>
+            {quickActions.map(({ href, icon: Icon, label, external }) => (
+              <a key={label} href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75 hover:border-brand-gold/40 hover:text-brand-gold"><Icon className="h-4 w-4" />{label}</a>
+            ))}
+            <button type="button" onClick={() => void loadMerchantData(user)} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/35 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"><RefreshCw className={`h-4 w-4 ${dataLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث" : "Refresh"}</button>
             <button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75"><LogOut className="h-4 w-4" />{isArabic ? "خروج" : "Sign out"}</button>
           </div>
         </div>
@@ -621,8 +632,8 @@ export default function MerchantPortal() {
         {([
           ["overview", isArabic ? "الرئيسية" : "Overview", Store],
           ["orders", isArabic ? "الطلبيات" : "Orders", PackageCheck],
-          ["tracking", isArabic ? "الخريطة والتتبع" : "Map & tracking", MapPin],
-          ["account", isArabic ? "حساب التاجر" : "Merchant account", Building2],
+          ["tracking", isArabic ? "الخريطة" : "Map", MapPin],
+          ["account", isArabic ? "الحساب" : "Account", Building2],
         ] as const).map(([value, label, Icon]) => (
           <button key={value} type="button" onClick={() => setTab(value)} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-black transition ${tab === value ? "bg-brand-gold text-brand-deep" : "text-white/62 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{label}</button>
         ))}
@@ -632,7 +643,7 @@ export default function MerchantPortal() {
         <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
             <header className="mb-5 flex items-center justify-between gap-3">
-              <div><p className="text-xs font-black text-brand-gold">{isArabic ? "آخر طلب" : "Latest order"}</p><h2 className="text-2xl font-black text-white">{latestOrder ? orderReference(latestOrder) : isArabic ? "لا توجد طلبات بعد" : "No orders yet"}</h2></div>
+              <div><p className="text-xs font-black text-brand-gold">{isArabic ? "آخر طلب" : "Latest order"}</p><h2 className="text-2xl font-black text-white">{latestOrder ? orderReference(latestOrder) : isArabic ? "لا توجد طلبيات حالياً" : "No orders yet"}</h2></div>
               <Clock3 className="h-7 w-7 text-brand-sky" />
             </header>
             {latestOrder ? (
@@ -641,9 +652,10 @@ export default function MerchantPortal() {
                 <p>{isArabic ? "من" : "From"}: {clean(latestOrder.sender_city) || "—"}</p>
                 <p>{isArabic ? "إلى" : "To"}: {clean(latestOrder.receiver_city) || "—"}</p>
                 <p>{isArabic ? "آخر تحديث" : "Last update"}: {formatDate(latestOrder.updated_at || latestOrder.created_at, isArabic)}</p>
+                <a href={`/tracking?code=${encodeURIComponent(orderReference(latestOrder))}`} className="inline-flex items-center gap-2 rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "فتح التتبع" : "Open tracking"}</a>
               </div>
             ) : (
-              <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "ستظهر هنا الطلبات الحقيقية فور ربطها بسجل التاجر في جدول orders." : "Real orders appear here as soon as they are linked to the merchant record in orders."}</p>
+              <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "عند تسجيل طلبات جديدة ستظهر هنا مباشرة مع حالتها وتفاصيلها." : "New orders will appear here with their status and details."}</p>
             )}
           </article>
 
@@ -651,7 +663,7 @@ export default function MerchantPortal() {
             <header className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-brand-gold">{isArabic ? "الملخص المالي" : "Financial summary"}</p><h2 className="text-2xl font-black text-white">{money(revenueTotal)}</h2></div><Banknote className="h-7 w-7 text-brand-gold" /></header>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-xs font-bold text-white/50">{isArabic ? "قيمة الطلبات" : "Order value"}</span><strong className="mt-2 block text-xl font-black text-white" dir="ltr">{money(revenueTotal)}</strong></div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-xs font-bold text-white/50">{isArabic ? "تحصيل نقدي" : "Cash collection"}</span><strong className="mt-2 block text-xl font-black text-white" dir="ltr">{money(codTotal)}</strong></div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-xs font-bold text-white/50">{isArabic ? "التحصيل" : "Collection"}</span><strong className="mt-2 block text-xl font-black text-white" dir="ltr">{money(codTotal)}</strong></div>
             </div>
           </article>
         </div>
@@ -659,7 +671,7 @@ export default function MerchantPortal() {
 
       {tab === "orders" && (
         <div className="space-y-3">
-          {orders.length === 0 && <div className="rounded-[2rem] border border-white/10 bg-[#031226] p-8 text-center"><PackageCheck className="mx-auto mb-4 h-9 w-9 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "لا توجد طلبيات مرتبطة" : "No linked orders"}</h2><p className="mt-2 text-sm font-bold text-white/58">{isArabic ? "لا يتم عرض أي بيانات إلا من جدول orders الحقيقي." : "Only real rows from the orders table are displayed."}</p></div>}
+          {orders.length === 0 && <div className="rounded-[2rem] border border-white/10 bg-[#031226] p-8 text-center"><PackageCheck className="mx-auto mb-4 h-9 w-9 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "لا توجد طلبيات حالياً" : "No orders yet"}</h2><p className="mt-2 text-sm font-bold text-white/58">{isArabic ? "أنشئ طلباً جديداً أو تواصل مع فريق العمليات للمساعدة." : "Create a new order or contact operations for assistance."}</p></div>}
           {orders.map((order) => {
             const status = normalizeStatus(order.status);
             const reference = orderReference(order);
@@ -677,7 +689,7 @@ export default function MerchantPortal() {
                     <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><span className="text-[11px] font-black text-white/45">{isArabic ? "المندوب" : "Driver"}</span><p className="mt-1 text-xs font-bold text-white/75">{clean(order.driver_name) || clean(order.assigned_driver_name) || "—"}</p></div>
                   </div>
                 </div>
-                {reference && <a href={`/tracking?code=${encodeURIComponent(reference)}`} className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "فتح التتبع العام" : "Open public tracking"}</a>}
+                {reference && <a href={`/tracking?code=${encodeURIComponent(reference)}`} className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "متابعة الطلب" : "Track order"}</a>}
               </article>
             );
           })}
@@ -687,10 +699,10 @@ export default function MerchantPortal() {
       {tab === "tracking" && (
         <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#031226] shadow-xl shadow-black/20">
-            {mapSrc ? <iframe title="Merchant order map" src={mapSrc} className="h-[420px] w-full border-0" loading="lazy" /> : <div className="grid h-[420px] place-items-center p-8 text-center"><MapPin className="mb-4 h-10 w-10 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "لا توجد إحداثيات حية محفوظة" : "No saved live coordinates"}</h2><p className="mt-2 max-w-md text-sm font-bold leading-7 text-white/58">{isArabic ? "الخريطة تظهر فقط عندما يحتوي الطلب الحقيقي على receiver_lat/receiver_lng أو أي حقول إحداثيات مدعومة." : "The map appears only when a real order has receiver_lat/receiver_lng or supported coordinate fields."}</p></div>}
+            {mapSrc ? <iframe title="Merchant order map" src={mapSrc} className="h-[420px] w-full border-0" loading="lazy" /> : <div className="grid h-[420px] place-items-center p-8 text-center"><MapPin className="mb-4 h-10 w-10 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "الخريطة بانتظار أول موقع" : "Map awaiting first location"}</h2><p className="mt-2 max-w-md text-sm font-bold leading-7 text-white/58">{isArabic ? "ستظهر الخريطة عند توفر موقع تسليم محفوظ للطلب." : "The map appears when an order has a saved delivery location."}</p></div>}
           </article>
           <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-            <h2 className="text-2xl font-black text-white">{isArabic ? "طلبات قابلة للتتبع" : "Trackable orders"}</h2>
+            <h2 className="text-2xl font-black text-white">{isArabic ? "طلبيات على الخريطة" : "Orders on map"}</h2>
             <div className="mt-5 space-y-3">
               {orders.filter((order) => coordinatesFor(order)).slice(0, 8).map((order) => (
                 <div key={orderReference(order)} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
@@ -698,7 +710,7 @@ export default function MerchantPortal() {
                   <span className="mt-1 block text-xs font-bold text-white/55">{clean(order.receiver_city) || clean(order.receiver_address) || "—"}</span>
                 </div>
               ))}
-              {orders.filter((order) => coordinatesFor(order)).length === 0 && <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "لا توجد طلبات بإحداثيات محفوظة حالياً." : "No orders have saved coordinates right now."}</p>}
+              {orders.filter((order) => coordinatesFor(order)).length === 0 && <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "لا توجد مواقع محفوظة للطلبات حالياً." : "No saved order locations right now."}</p>}
             </div>
           </article>
         </div>
@@ -706,7 +718,7 @@ export default function MerchantPortal() {
 
       {tab === "account" && (
         <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-          <h2 className="text-2xl font-black text-white">{isArabic ? "بيانات التاجر" : "Merchant account"}</h2>
+          <h2 className="text-2xl font-black text-white">{isArabic ? "بيانات الحساب" : "Account details"}</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[
               [isArabic ? "الكود" : "Code", currentMerchant.merchant_code],
