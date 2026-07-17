@@ -489,7 +489,7 @@ export default function MerchantPortal() {
           <div className="relative z-10 grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
               <div className="mb-5 flex items-center gap-3">
-                <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/45 bg-white object-contain p-1 shadow-xl shadow-brand-gold/10" />
+                <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border border-brand-gold/55 bg-brand-deep object-cover shadow-xl shadow-brand-gold/10 ring-1 ring-white/10" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT</p>
                   <h1 className="text-3xl font-black text-white sm:text-5xl">{isArabic ? "بوابة التاجر" : "Merchant Portal"}</h1>
