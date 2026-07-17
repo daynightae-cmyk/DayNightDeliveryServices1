@@ -6,6 +6,7 @@
 import { motion } from "motion/react";
 import { BadgeCheck, Sparkles, Instagram, Code, HeartHandshake, RefreshCw } from "lucide-react";
 import { businessContent } from "../data/businessContent";
+import companyMeta from "../data/companyMeta";
 
 interface ECommerceProps {
   onNavigate: (tab: string) => void;
@@ -42,12 +43,13 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
       title_en: "Corporate Premium",
       desc_ar: "عقود شهرية، توصيلات يومية منتظمة وتسهيلات متكاملة للشركات الكبيرة والمستودعات.",
       desc_en: "Bulk handling, priority drivers, scheduled returns, and optimized accounts setup.",
-      features_ar: ["دعم مخصص على مدار الساعة", "مدير حساب لوجستي حصري للمتجر", "توصيلات وعينات يومية منتظمة", "بوابة تتبع موحدة لكافة شحنات العمال"],
+      features_ar: ["دعم مخصص على مدار الساعة", "مدير حساب لوجستي حصري للمتجر", "توصيلات وعينات يومية منتظمة", "بوابة تتبع موحدة لكافة طلبات المتجر"],
       price_ar: "عقود سنوية / شهرية"
     }
   ];
 
   const ecommerceFeatures = businessContent.ecommerce.features;
+  const merchantWhatsappText = encodeURIComponent("السلام عليكم، أنا صاحب متجر إلكتروني وأريد التعاقد على أسعار توصيل خاصة");
 
   return (
     <div className="space-y-12 text-right">
@@ -78,7 +80,7 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
         <h3 className="text-xl font-bold text-white border-b border-white/10 pb-3">نخدم وندعم المتاجر والشركات المتخصصة</h3>
         <div className="flex flex-wrap justify-center gap-3">
           {platforms.map((p, idx) => (
-            <div id={`platform_${idx}`} key={idx} className="bg-brand-cool/30 border border-white/10 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-white">
+            <div id={`platform_${idx}`} key={p.name} className="bg-brand-cool/30 border border-white/10 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-white">
               {p.icon}
               <span>{p.name}</span>
             </div>
@@ -150,7 +152,7 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <a
             id="merchant_cta_wa"
-            href="https://wa.me/971568757331?text=السلام%20عليكم،%20أنا%20صاحب%20متجر%20إلكتروني%20وأريد%20التعاقد%2520على%2520أسعار%2520توصيل%2520خاصة"
+            href={`https://wa.me/${companyMeta.whatsappNumber}?text=${merchantWhatsappText}`}
             target="_blank"
             rel="noopener noreferrer"
             referrerPolicy="no-referrer"
@@ -160,7 +162,7 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
           </a>
           <a
             id="ecommerce_whatsapp_catalog"
-            href="https://wa.me/c/971568757331"
+            href={companyMeta.whatsappCatalog}
             target="_blank"
             rel="noopener noreferrer"
             className="px-8 py-3.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs sm:text-sm hover:scale-103 transition-transform inline-block cursor-pointer"
