@@ -156,8 +156,8 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
 
         <div className="dn-official-hero-kicker relative z-10 mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className={`flex items-center gap-3 ${isArabic ? "sm:flex-row-reverse" : ""}`}>
-            <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl border border-brand-gold/35 bg-white shadow-lg shadow-brand-gold/10">
-              <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" className="h-full w-full object-contain p-1" />
+            <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-brand-gold/60 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,.22),rgba(7,26,51,.92)_54%,rgba(0,87,184,.38))] p-[2px] shadow-[0_0_26px_rgba(212,175,55,.18)] ring-1 ring-white/10">
+              <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" className="h-full w-full rounded-full object-cover" />
             </span>
             <div className={isArabic ? "text-right" : "text-left"}>
               <p className="text-[11px] font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT OFFICIAL SERVICES</p>
@@ -266,7 +266,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
                 : "Clear access for merchant, driver, customer, and admin workspaces, each connected to orders and tracking according to account permissions and available data."}
             </p>
           </div>
-          <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/40 bg-white object-contain p-1" />
+          <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border border-brand-gold/55 bg-brand-deep object-cover shadow-[0_0_30px_rgba(212,175,55,.16)] ring-1 ring-white/10" />
         </div>
         <div className="relative z-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {portalCards.map(({ key, icon: Icon, label, title, body, cta, tab, tone }) => (
