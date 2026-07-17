@@ -31,6 +31,8 @@ import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
 import Footer from "./components/Footer";
 import { DNOfficialCursor } from "./components/ui/DNOfficialCursor";
+import { DNRouteErrorBoundary } from "./components/ui/DNRouteErrorBoundary";
+import { isRecoverableRouteLoadError, recoverRouteLoadFailure } from "./lib/routeLoadRecovery";
 import "./lib/adminUiPolish";
 import "./styles/dn-admin-real-map-hotfix.css";
 import "./styles/dn-admin-day-polish.css";
@@ -92,6 +94,27 @@ function AppContent() {
   useEffect(() => {
     trackPageLoad(location.pathname || "/");
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      if (!isRecoverableRouteLoadError(event.error || event.message)) return;
+      event.preventDefault();
+      recoverRouteLoadFailure();
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (!isRecoverableRouteLoadError(event.reason)) return;
+      event.preventDefault();
+      recoverRouteLoadFailure();
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
 
   function handleNavigate(tab: string, trackingId?: string) {
     setMobileMenuOpen(false);
@@ -258,8 +281,9 @@ function AppContent() {
       <div className="h-[108px] sm:h-[118px] lg:h-[156px]" aria-hidden="true" />
 
       <main className="flex-1 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
-        <Suspense fallback={<div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}><div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" /></div>}>
-          <Routes>
+        <DNRouteErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}><div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" /></div>}>
+            <Routes>
             <Route path="/" element={<Home onNavigate={handleNavigate} />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/services" element={<Services onNavigate={handleNavigate} />} />
@@ -289,8 +313,9 @@ function AppContent() {
             <Route path="/update-password" element={<CustomerDashboard />} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </DNRouteErrorBoundary>
       </main>
 
       {!mobileMenuOpen && <FloatingWhatsApp />}
