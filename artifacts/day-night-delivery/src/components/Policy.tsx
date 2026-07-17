@@ -58,7 +58,7 @@ export default function Policy() {
     doc.rect(0, 282, 210, 15, "F");
     doc.setTextColor(212, 175, 55);
     doc.setFontSize(7);
-    doc.text("Creating by Eng Sadek Elgazar", 105, 291, { align: "center" });
+    doc.text("DAY NIGHT DELIVERY SERVICES", 105, 291, { align: "center" });
     doc.save(`DayNight_${type}_${isArabic ? "AR" : "EN"}.pdf`);
   }
 
