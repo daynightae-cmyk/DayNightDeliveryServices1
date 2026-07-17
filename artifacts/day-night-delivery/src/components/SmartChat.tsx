@@ -37,12 +37,10 @@ function isSpecialRoute(input: string) {
 
 function localQuote(input: string, isArabic: boolean) {
   if (!hasAny(input, ["local", "uae", "delivery", "order", "price", "cost", "سعر", "محلي", "توصيل", "طلب", "طلبات", "الإمارات", "الامارات", "داخل دبي", "أبوظبي"])) return null;
-  const count = Math.max(1, Math.ceil(firstNumber(input, 1)));
   const unit = isSpecialRoute(input) ? SPECIAL_ROUTE_PRICE : CITY_ROUTE_PRICE;
-  const total = count * unit;
   return isArabic
-    ? `تقدير DAY NIGHT داخل الإمارات:\n${count} طلبية × ${unit} درهم = ${total} درهم.\n\nالمناطق الرئيسية: 30 درهم للطلبية.\nالمناطق الممتدة: 50 درهم للطلبية.\n\nيمكنك إنشاء الطلب الآن من صفحة اطلب توصيل أو فتح صفحة الأسعار.`
-    : `DAY NIGHT UAE estimate:\n${count} order(s) × ${unit} AED = ${total} AED.\n\nMain areas: 30 AED per order.\nExtended areas: 50 AED per order.\n\nYou can create the order now from Request Delivery or open Pricing.`;
+    ? `تقدير DAY NIGHT داخل الإمارات للطلبية الواحدة: ${unit} درهم.\n\nالمناطق الرئيسية: 30 درهم للطلبية.\nالمناطق الممتدة: 50 درهم للطلبية.\n\nكل أوردر محلي يمثل طلبية واحدة، ويمكنك إنشاء الطلب من صفحة اطلب توصيل أو فتح صفحة الأسعار.`
+    : `DAY NIGHT UAE estimate for one local order: ${unit} AED.\n\nMain areas: 30 AED per order.\nExtended areas: 50 AED per order.\n\nEach local order is calculated as one delivery request. You can create it from Request Delivery or open Pricing.`;
 }
 
 function internationalQuote(input: string, isArabic: boolean) {
@@ -74,12 +72,12 @@ function operationsAnswer(input: string, isArabic: boolean) {
 
 function contextForPath(pathname: string): PageAssist {
   if (pathname.includes("tracking")) return { titleAr: "مساعد التتبع", titleEn: "Tracking assistant", promptAr: "أدخل رقم الفاتورة أو التتبع أو الهاتف، وسأساعدك في قراءة الحالة والخريطة وخطوات الدعم.", promptEn: "Enter invoice, tracking, or phone and I will help read the status, map, and support options.", quickAr: ["كيف أتتبع بالهاتف؟", "لم تظهر الشحنة", "افتح واتساب للدعم"], quickEn: ["Track by phone", "Shipment not found", "Open WhatsApp support"] };
-  if (pathname.includes("pricing")) return { titleAr: "مساعد الأسعار", titleEn: "Pricing assistant", promptAr: "اكتب عدد الطلبيات المحلية أو وزن الشحن الدولي وسأعطيك تقديراً فورياً.", promptEn: "Send local order count or international weight and I will estimate the price.", quickAr: ["احسب 4 طلبات محلي", "5 كيلو السعودية", "فرق المحلي والدولي"], quickEn: ["Calculate 4 local orders", "5 kg to Saudi", "Local vs international"] };
+  if (pathname.includes("pricing")) return { titleAr: "مساعد الأسعار", titleEn: "Pricing assistant", promptAr: "اكتب مسار التوصيل المحلي أو وزن الشحن الدولي وسأعطيك تقديراً فورياً.", promptEn: "Send a local route or international weight and I will estimate the price.", quickAr: ["دبي إلى أبوظبي", "5 كيلو السعودية", "فرق المحلي والدولي"], quickEn: ["Dubai to Abu Dhabi", "5 kg to Saudi", "Local vs international"] };
   if (pathname.includes("request")) return { titleAr: "مساعد إنشاء الطلب", titleEn: "Order assistant", promptAr: "أرشدك خطوة بخطوة في بيانات المرسل والمستلم ومحتوى الشحنة وCOD.", promptEn: "I can guide sender, receiver, shipment content, COD and payment steps.", quickAr: ["ما البيانات المطلوبة؟", "كيف أضيف COD؟", "محتوى الشحنة حر؟"], quickEn: ["Required fields", "How to add COD", "Free shipment description"] };
-  if (pathname.includes("uae-delivery")) return { titleAr: "مساعد الشحن المحلي", titleEn: "Local shipping assistant", promptAr: "اسألني عن أي مدينة أو عدد طلبيات داخل الإمارات وسأحسب السعر فوراً.", promptEn: "Ask about any UAE city or order count and I will estimate instantly.", quickAr: ["دبي إلى أبوظبي", "العين كم؟", "3 طلبات محلي"], quickEn: ["Dubai to Abu Dhabi", "Al Ain price", "3 local orders"] };
+  if (pathname.includes("uae-delivery")) return { titleAr: "مساعد الشحن المحلي", titleEn: "Local shipping assistant", promptAr: "اسألني عن أي مسار داخل الإمارات وسأحسب سعر الطلبية الواحدة فوراً.", promptEn: "Ask about any UAE route and I will estimate one local order instantly.", quickAr: ["دبي إلى أبوظبي", "العين كم؟", "سعر طلب محلي"], quickEn: ["Dubai to Abu Dhabi", "Al Ain price", "Local order price"] };
   if (pathname.includes("international")) return { titleAr: "مساعد الشحن الدولي", titleEn: "International assistant", promptAr: "الخليج يبدأ من 95 درهم، والعالمي يبدأ من 190 درهم. اكتب الوجهة والوزن.", promptEn: "GCC starts from 95 AED and worldwide from 190 AED. Send destination and weight.", quickAr: ["5 كيلو السعودية", "2 كيلو أمريكا", "أسعار الخليج"], quickEn: ["5 kg Saudi", "2 kg USA", "GCC prices"] };
   if (pathname.includes("corporate") || pathname.includes("ecommerce")) return { titleAr: "مساعد التجار", titleEn: "Merchant assistant", promptAr: "أساعدك في حسابات التجار، عقود الشركات، COD، والكوبونات/الباركود.", promptEn: "I can help with merchant accounts, corporate contracts, COD and coupon/barcode orders.", quickAr: ["فتح حساب تاجر", "تعاقد شركات", "طلبات بالكوبون"], quickEn: ["Merchant account", "Corporate contract", "Coupon orders"] };
-  return { titleAr: "مساعدك الذكي", titleEn: "Smart assistant", promptAr: "اسألني عن السعر، التتبع، طلب توصيل، COD، أو حساب تاجر.", promptEn: "Ask about pricing, tracking, delivery requests, COD, or merchant accounts.", quickAr: ["احسب 3 طلبات", "تتبع برقم الهاتف", "شحن 4 كيلو السعودية"], quickEn: ["Calculate 3 orders", "Track by phone", "4 kg to Saudi"] };
+  return { titleAr: "مساعدك الذكي", titleEn: "Smart assistant", promptAr: "اسألني عن السعر، التتبع، طلب توصيل، COD، أو حساب تاجر.", promptEn: "Ask about pricing, tracking, delivery requests, COD, or merchant accounts.", quickAr: ["احسب سعر محلي", "تتبع برقم الهاتف", "شحن 4 كيلو السعودية"], quickEn: ["Calculate local price", "Track by phone", "4 kg to Saudi"] };
 }
 
 async function askLiveAi(message: string): Promise<string | null> {
@@ -96,8 +94,8 @@ async function askLiveAi(message: string): Promise<string | null> {
 
 function fallbackAnswer(input: string, isArabic: boolean) {
   return isArabic
-    ? `أنا مساعد DAY NIGHT الذكي. أقدر أساعدك في الأسعار، التتبع، إنشاء الطلبات، COD، وحسابات التجار.\n\nجرّب: "احسب 3 طلبات" أو "شحن 4 كيلو السعودية" أو "تتبع برقم الهاتف".`
-    : `I am the DAY NIGHT smart assistant. I can help with pricing, tracking, booking, COD, and merchant accounts.\n\nTry: "calculate 3 orders", "4 kg to Saudi", or "track by phone".`;
+    ? `أنا مساعد DAY NIGHT الذكي. أقدر أساعدك في الأسعار، التتبع، إنشاء الطلبات، COD، وحسابات التجار.\n\nجرّب: "احسب سعر محلي" أو "شحن 4 كيلو السعودية" أو "تتبع برقم الهاتف".`
+    : `I am the DAY NIGHT smart assistant. I can help with pricing, tracking, booking, COD, and merchant accounts.\n\nTry: "calculate local price", "4 kg to Saudi", or "track by phone".`;
 }
 
 export default function SmartChat() {
