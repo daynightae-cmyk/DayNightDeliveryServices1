@@ -8,6 +8,8 @@ import { translations } from "../../data/translations";
 import { useAppContext } from "../../lib/AppContext";
 import { supabase } from "../../supabase";
 import type { Order } from "../../types";
+import DayNightVehicleMarker from "../maps/DayNightVehicleMarker";
+import { calculateBearing } from "../maps/VehicleAnimations";
 
 type LatLngTuple = [number, number];
 type MapMode = "standard" | "satellite" | "terrain";
@@ -66,13 +68,6 @@ const destinationIcon = L.divIcon({
   html: `<div class="dn-marker-core"><span></span></div>`,
   iconSize: [34, 34],
   iconAnchor: [17, 17],
-});
-
-const driverIcon = L.divIcon({
-  className: "dn-live-map-driver",
-  html: `<div class="dn-driver-pulse"><span>DN</span></div>`,
-  iconSize: [48, 48],
-  iconAnchor: [24, 24],
 });
 
 function normalizeKey(value?: string | null) {
@@ -209,6 +204,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   const hasLiveDriver = driverLat !== null && driverLng !== null;
   const driverPos: LatLngTuple = hasLiveDriver && driverLat !== null && driverLng !== null ? [driverLat, driverLng] : interpolate(pickupPos, destPos, progressFromStatus(getString(activeOrder, ["status"])));
   const fitPoints = [pickupPos, driverPos, destPos];
+  const vehicleBearing = calculateBearing(hasLiveDriver ? driverPos : pickupPos, destPos);
 
   const routeWaypoints = useMemo(() => {
     const points = hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos];
@@ -329,14 +325,19 @@ export default function TrackingMap({ order }: TrackingMapProps) {
           </Popup>
         </Marker>
 
-        <Marker position={driverPos} icon={driverIcon}>
+        <DayNightVehicleMarker
+          position={driverPos}
+          bearing={vehicleBearing}
+          state={hasLiveDriver ? "driving" : "assignment"}
+          label={isArabic ? "سيارة DAY NIGHT على مسار الشحنة" : "DAY NIGHT vehicle on shipment route"}
+        >
           <Popup>
             <div className={`text-xs font-bold font-sans ${isArabic ? "text-right" : "text-left"}`}>
               <p className="text-brand-gold uppercase">DAY NIGHT</p>
               <p>{hasLiveDriver ? (isArabic ? "موقع المندوب المباشر" : "Live courier location") : (isArabic ? "موقع الشحنة التقديري" : "Estimated shipment position")}</p>
             </div>
           </Popup>
-        </Marker>
+        </DayNightVehicleMarker>
 
         <Marker position={destPos} icon={destinationIcon}>
           <Popup>
