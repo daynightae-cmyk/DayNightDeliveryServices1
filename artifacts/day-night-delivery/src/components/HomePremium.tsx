@@ -47,7 +47,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
       key: "merchant",
       icon: Store,
       label: isArabic ? "بوابة التاجر" : "Merchant portal",
-      title: isArabic ? "مركز التاجر للطلبيات والتتبع" : "Merchant command center",
+      title: isArabic ? "إدارة الطلبات والتحصيل" : "Orders and collections",
       body: isArabic
         ? "دخول آمن يعرض حساب التاجر وطلبياته وخريطته عند توفر بيانات مرتبطة بالحساب."
         : "Secure merchant access for account details, orders, and map activity linked to the signed-in account.",
@@ -59,13 +59,37 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
       key: "driver",
       icon: Navigation,
       label: isArabic ? "بوابة المندوب" : "Driver portal",
-      title: isArabic ? "وردية المندوب والموقع والمهام" : "Driver shift, location, and jobs",
+      title: isArabic ? "الوردية والموقع والمهام" : "Shift, location, and jobs",
       body: isArabic
         ? "مساحة تشغيل للمندوب لبدء الوردية، تحديث الموقع، وإدارة الطلبات المسندة له."
         : "Driver workspace for shifts, location updates, and assigned order operations.",
       cta: isArabic ? "فتح بوابة المندوب" : "Open driver portal",
       tab: "driver",
       tone: "blue",
+    },
+    {
+      key: "customer",
+      icon: Package,
+      label: isArabic ? "حساب العميل" : "Customer account",
+      title: isArabic ? "طلبات العميل والتتبع" : "Customer orders and tracking",
+      body: isArabic
+        ? "مساحة العميل لمراجعة الطلبات ومتابعة الشحنات المرتبطة بالحساب."
+        : "Customer workspace for order review and account-linked shipment tracking.",
+      cta: isArabic ? "فتح حسابي" : "Open my account",
+      tab: "customer",
+      tone: "blue",
+    },
+    {
+      key: "admin",
+      icon: ShieldCheck,
+      label: isArabic ? "لوحة الإدارة" : "Admin portal",
+      title: isArabic ? "مركز التحكم التشغيلي" : "Operations command center",
+      body: isArabic
+        ? "دخول الإدارة لمتابعة الطلبات، الإسناد، التتبع، والتحكم في التشغيل."
+        : "Admin access for orders, assignment, tracking, and operations control.",
+      cta: isArabic ? "فتح لوحة الإدارة" : "Open admin portal",
+      tab: "auth",
+      tone: "gold",
     },
   ];
 
@@ -145,30 +169,27 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
         </div>
       </section>
 
-      <section className="relative overflow-hidden rounded-[2.1rem] border border-brand-gold/20 bg-[#031226] p-5 shadow-2xl shadow-black/25 sm:p-7 lg:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(212,175,55,0.16),transparent_22rem),radial-gradient(circle_at_90%_10%,rgba(43,184,255,0.14),transparent_25rem)]" />
+      <section className="dn-finish-surface rounded-[2.1rem] p-5 sm:p-7 lg:p-8">
         <div className="relative z-10 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <DNBadge tone="gold"><ShieldCheck className="h-3.5 w-3.5" /> {isArabic ? "بوابات التشغيل" : "Operations portals"}</DNBadge>
-            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">{isArabic ? "إدارة التاجر والمندوب من الواجهة الرئيسية" : "Merchant and driver access from the main site"}</h2>
+            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">{isArabic ? "كل البوابات من الواجهة الرئيسية" : "Every portal from the main site"}</h2>
             <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-white/58">
               {isArabic
-                ? "كل بوابة تعرض محتوى الحساب بعد تسجيل الدخول، وتبقى مرتبطة بسير الطلبات والتتبع والتحصيل."
-                : "Each portal shows account content after sign-in and stays connected to orders, tracking, and collections."}
+                ? "وصول واضح للتاجر والمندوب والعميل والإدارة، مع بقاء كل مساحة مرتبطة بالطلبات والتتبع حسب الصلاحية والبيانات المتاحة."
+                : "Clear access for merchant, driver, customer, and admin workspaces, each connected to orders and tracking according to account permissions and available data."}
             </p>
           </div>
           <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/40 bg-white object-contain p-1" />
         </div>
-        <div className="relative z-10 grid gap-4 lg:grid-cols-2">
+        <div className="relative z-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {portalCards.map(({ key, icon: Icon, label, title, body, cta, tab, tone }) => (
-            <article key={key} className={`group overflow-hidden rounded-[1.8rem] border p-5 transition hover:-translate-y-0.5 hover:shadow-2xl ${tone === "gold" ? "border-brand-gold/25 bg-brand-gold/[0.07] hover:shadow-brand-gold/10" : "border-brand-sky/25 bg-brand-sky/[0.07] hover:shadow-brand-sky/10"}`}>
-              <div className="flex items-start gap-4">
+            <article key={key} className={`group flex min-h-full flex-col justify-between overflow-hidden rounded-[1.8rem] border p-5 transition hover:-translate-y-0.5 hover:shadow-2xl ${tone === "gold" ? "border-brand-gold/25 bg-brand-gold/[0.07] hover:shadow-brand-gold/10" : "border-brand-sky/25 bg-brand-sky/[0.07] hover:shadow-brand-sky/10"}`}>
+              <div>
                 <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${tone === "gold" ? "bg-brand-gold text-brand-deep" : "bg-brand-sky text-brand-deep"}`}><Icon className="h-7 w-7" /></span>
-                <div>
-                  <p className={`text-xs font-black uppercase tracking-[0.22em] ${tone === "gold" ? "text-brand-gold" : "text-brand-sky"}`}>{label}</p>
-                  <h3 className="mt-2 text-2xl font-black text-white">{title}</h3>
-                  <p className="mt-3 text-sm font-bold leading-7 text-white/58">{body}</p>
-                </div>
+                <p className={`mt-4 text-xs font-black uppercase tracking-[0.22em] ${tone === "gold" ? "text-brand-gold" : "text-brand-sky"}`}>{label}</p>
+                <h3 className="mt-2 text-xl font-black text-white">{title}</h3>
+                <p className="mt-3 text-sm font-bold leading-7 text-white/58">{body}</p>
               </div>
               <button type="button" onClick={() => onNavigate(tab)} className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition ${tone === "gold" ? "bg-brand-gold text-brand-deep hover:brightness-110" : "bg-brand-sky text-brand-deep hover:brightness-110"}`}>
                 {cta}
