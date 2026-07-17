@@ -138,6 +138,16 @@ function AppContent() {
   const customerLabel = isArabic ? "حسابي" : "My Account";
   const driverLabel = isArabic ? "المندوب" : "Driver";
   const merchantLabel = isArabic ? "التاجر" : "Merchant";
+
+  const officialServiceLinks = [
+    { key: "request", tab: "request", code: "01", label: isArabic ? "طلب توصيل" : "Request Delivery", body: isArabic ? "بدء طلب جديد" : "Start a new order", accent: "gold" },
+    { key: "track", tab: "tracking", code: "02", label: isArabic ? "تتبع الشحنة" : "Track Shipment", body: isArabic ? "برقم التتبع أو الهاتف" : "By code or phone", accent: "sky" },
+    { key: "pricing", tab: "pricing", code: "03", label: isArabic ? "الأسعار والحاسبات" : "Prices & Calculators", body: isArabic ? "حساب محلي ودولي" : "Local and global rates", accent: "gold" },
+    { key: "merchant", tab: "merchant", code: "04", label: merchantLabel, body: isArabic ? "طلبات وتحصيل وخريطة" : "Orders, COD, and map", accent: "gold" },
+    { key: "driver", tab: "driver", code: "05", label: driverLabel, body: isArabic ? "وردية ومهام وموقع" : "Shift, jobs, and location", accent: "sky" },
+    { key: "customer", tab: "customer", code: "06", label: customerLabel, body: isArabic ? "طلبات العميل" : "Customer orders", accent: "sky" },
+  ];
+
   const currentPath = location.pathname;
 
   if (location.pathname === "/auth") {
@@ -156,7 +166,7 @@ function AppContent() {
       style={{ backgroundColor: isLight ? "#EDF3FF" : "#071A33", transition: "background-color 0.45s ease" }}
     >
       <div className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}>
-        <div className={`text-[11px] py-2 px-4 sm:px-8 border-b flex flex-col sm:flex-row items-center justify-between gap-2 font-bold ${isLight ? "bg-[#E0EAFA]/80 border-[#071A33]/10 text-[#071A33]/80" : "bg-brand-cool/90 border-white/10 text-white"}`}>
+        <div className={`dn-official-topbar text-[11px] py-2 px-4 sm:px-8 border-b flex flex-col sm:flex-row items-center justify-between gap-2 font-bold ${isLight ? "bg-[#E0EAFA]/80 border-[#071A33]/10 text-[#071A33]/80" : "bg-brand-cool/90 border-white/10 text-white"}`}>
           <div className={`flex flex-wrap items-center justify-center gap-2 sm:gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
             <span className="text-brand-gold font-mono tracking-wider">{companyMeta.sloganEn}</span>
             <span className={isLight ? "text-[#071A33]/20" : "text-white/20"}>|</span>
@@ -176,9 +186,9 @@ function AppContent() {
           </div>
         </div>
 
-        <header className={`backdrop-blur-xl border-b transition-all duration-200 ${isLight ? "bg-white/90 border-[#071A33]/10 shadow-sm" : "bg-[#071A33]/90 border-white/10"}`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between gap-4">
-            <Link to="/" className="flex items-center gap-2.5 cursor-pointer shrink-0 select-none" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+        <header className={`dn-official-header backdrop-blur-xl border-b transition-all duration-200 ${isLight ? "bg-white/90 border-[#071A33]/10 shadow-sm" : "bg-[#071A33]/90 border-white/10"}`}>
+          <div className="dn-official-header-row max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between gap-4">
+            <Link to="/" className="dn-official-brand flex items-center gap-2.5 cursor-pointer shrink-0 select-none" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
               <div className="w-11 h-11 rounded-full overflow-hidden border border-brand-gold/40 shadow-sm shrink-0"><img src={LOGO_IMAGE_URL} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT DELIVERY SERVICES" className="w-full h-full object-contain" /></div>
               <div>
                 <h1 className={`text-sm sm:text-base font-extrabold leading-none uppercase tracking-tight ${isLight ? "text-[#071A33]" : "text-white"}`}>DAY NIGHT <span className="text-brand-gold text-[10px] font-semibold">DELIVERY</span></h1>
@@ -205,6 +215,25 @@ function AppContent() {
             <button id="mobile_menu_trigger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className={`lg:hidden p-2 transition-colors ${isLight ? "text-[#071A33]/80 hover:text-[#071A33]" : "text-white/80 hover:text-white"}`} aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}>{mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}</button>
           </div>
 
+          <div className={`dn-official-service-strip hidden lg:block border-t ${isLight ? "border-[#071A33]/10" : "border-white/10"}`}>
+            <div className={`mx-auto flex max-w-7xl items-stretch gap-2 px-4 py-2 sm:px-6 lg:px-8 ${isArabic ? "flex-row-reverse" : ""}`}>
+              {officialServiceLinks.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleNavigate(item.tab)}
+                  className={`dn-official-service-chip ${item.accent === "gold" ? "dn-official-service-chip--gold" : "dn-official-service-chip--sky"} ${isArabic ? "text-right" : "text-left"}`}
+                >
+                  <span className="dn-official-service-chip__code">{item.code}</span>
+                  <span className="dn-official-service-chip__copy">
+                    <span className="dn-official-service-chip__label">{item.label}</span>
+                    <span className="dn-official-service-chip__body">{item.body}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {mobileMenuOpen && (
             <div className={`lg:hidden border-t py-4 px-4 space-y-1 max-h-[72vh] overflow-y-auto ${isLight ? "bg-white/95 border-[#071A33]/10" : "bg-brand-cool/95 border-white/10"}`}>
               {navLinks.map((link) => {
@@ -225,7 +254,7 @@ function AppContent() {
         </header>
       </div>
 
-      <div className="h-[108px] sm:h-[118px]" aria-hidden="true" />
+      <div className="h-[108px] sm:h-[118px] lg:h-[164px]" aria-hidden="true" />
 
       <main className="flex-1 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto relative z-10">
         <Suspense fallback={<div className={`text-center py-16 ${isLight ? "text-[#071A33]/50" : "text-white/50"}`}><div className="inline-block w-8 h-8 border-2 border-brand-gold/30 border-t-brand-gold rounded-full animate-spin" /></div>}>
