@@ -3,13 +3,15 @@
 
 :root {
   --dn-shell-max: min(1880px, calc(100vw - clamp(18px, 2.4vw, 56px)));
+  --dn-content-max: min(1320px, 100%);
   --dn-glass-border: rgba(255, 255, 255, 0.12);
   --dn-gold-line: rgba(246, 201, 74, 0.32);
   --dn-sky-line: rgba(43, 184, 255, 0.26);
 }
 
 #root main.max-w-7xl,
-#root header > div.max-w-7xl {
+#root header > div.max-w-7xl,
+#root footer > div.max-w-7xl {
   width: 100%;
   max-width: var(--dn-shell-max) !important;
 }
@@ -34,6 +36,12 @@
   width: 100%;
 }
 
+#root main.max-w-7xl > div.max-w-4xl,
+#root main.max-w-7xl > div.max-w-md,
+#root main.max-w-7xl > section.max-w-4xl {
+  max-width: var(--dn-content-max) !important;
+}
+
 #root main.max-w-7xl :where(section, article, aside, form) {
   text-wrap: pretty;
 }
@@ -44,13 +52,43 @@
   outline-offset: 3px;
 }
 
+.dn-finish-surface {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--dn-glass-border);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(246, 201, 74, 0.11), transparent 22rem),
+    radial-gradient(circle at 92% 8%, rgba(43, 184, 255, 0.12), transparent 26rem),
+    rgba(3, 18, 38, 0.82);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.24);
+}
+
+.dn-finish-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.dn-finish-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(246, 201, 74, 0.38);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+.dn-page-width-comfort {
+  max-width: min(1320px, 100%) !important;
+}
+
 @media (min-width: 1280px) {
   #root main.max-w-7xl {
     padding-left: clamp(1.4rem, 2vw, 2.5rem) !important;
     padding-right: clamp(1.4rem, 2vw, 2.5rem) !important;
   }
 
-  #root header > div.max-w-7xl {
+  #root header > div.max-w-7xl,
+  #root footer > div.max-w-7xl {
     padding-left: clamp(1.2rem, 2vw, 2.2rem) !important;
     padding-right: clamp(1.2rem, 2vw, 2.2rem) !important;
   }
@@ -76,6 +114,10 @@
   #root main.max-w-7xl {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
+  }
+
+  #root main.max-w-7xl :where(section, article) {
+    border-radius: 1.45rem;
   }
 }
 
