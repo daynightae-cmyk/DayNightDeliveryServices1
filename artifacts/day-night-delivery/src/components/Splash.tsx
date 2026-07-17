@@ -55,7 +55,7 @@ export default function Splash({ onComplete }: SplashProps) {
             {isArabic ? "دخول الموقع" : "Enter Site"}
           </button>
           <div className="relative z-10 mx-auto flex w-[min(90vw,420px)] flex-col items-center rounded-[2rem] border border-brand-gold/25 bg-[#061225]/78 p-8 text-center shadow-2xl backdrop-blur-2xl">
-            <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-28 w-28 rounded-full border-2 border-brand-gold/50 bg-white object-contain p-1 shadow-[0_0_55px_rgba(245,183,0,.22)]" draggable={false} />
+            <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-28 w-28 rounded-full border-2 border-brand-gold/60 bg-brand-deep object-cover shadow-[0_0_55px_rgba(245,183,0,.22)] ring-1 ring-white/10" draggable={false} />
             <h1 className="mt-5 text-2xl font-black tracking-tight">DAY NIGHT</h1>
             <p className="mt-1 text-sm font-black tracking-[0.25em] text-brand-gold">DELIVERY SERVICES</p>
             <p className="mt-4 text-xs font-bold text-white/62">{isArabic ? "تجهيز تجربة التوصيل الاحترافية" : "Preparing your premium delivery experience"}</p>

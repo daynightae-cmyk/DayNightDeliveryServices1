@@ -40,8 +40,8 @@ export default function AboutUs() {
         <div className="grid items-center gap-10 lg:grid-cols-[1fr_0.95fr]">
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-4">
-              <div className="h-16 w-16 overflow-hidden rounded-2xl border-2 border-brand-gold/40 bg-white shadow-xl shadow-brand-gold/10">
-                <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT DELIVERY SERVICES" className="h-full w-full object-contain p-1" />
+              <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-brand-gold/55 bg-brand-deep shadow-xl shadow-brand-gold/10 ring-1 ring-white/10">
+                <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT DELIVERY SERVICES" className="h-full w-full rounded-full object-cover" />
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-brand-gold">
                 <BadgeCheck className="h-4 w-4 shrink-0" />

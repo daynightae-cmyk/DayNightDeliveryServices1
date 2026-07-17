@@ -72,7 +72,7 @@ export default function CustomerDashboardLuxury() {
         <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
             <div className="mb-5 flex items-center gap-3">
-              <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border-2 border-brand-gold/55 bg-white object-contain shadow-xl shadow-brand-sky/10" />
+              <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border-2 border-brand-gold/55 bg-brand-deep object-cover shadow-xl shadow-brand-sky/10 ring-1 ring-white/10" />
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT</p>
                 <p className="text-sm font-black text-white/78">{isArabic ? "مركز العملاء الذكي" : "Smart Customer Center"}</p>
