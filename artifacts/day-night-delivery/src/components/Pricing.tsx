@@ -27,12 +27,14 @@ export default function Pricing() {
   const specialRoutes = coverageAreas.filter((a) => a.zoneType === "extended");
   const domestic = useMemo(() => calculateDomesticPrice({ pickupCity: domesticPickupCity, deliveryCity: domesticDeliveryCity, serviceType: LOCAL_SERVICE, weight: domesticWeight, pieces: 1 }), [domesticPickupCity, domesticDeliveryCity, domesticWeight]);
   const international = useMemo(() => calculateInternationalPrice({ countryCode: internationalDestination, weight: internationalWeight }), [internationalDestination, internationalWeight]);
+  const europeRate = internationalDestinations.find((destination) => destination.region === "Europe") || internationalDestinations.find((destination) => destination.countryCode === "WORLD")!;
+  const northAmericaRate = internationalDestinations.find((destination) => destination.region === "North America") || internationalDestinations.find((destination) => destination.countryCode === "WORLD")!;
   const statCards = [
     [isArabic ? "مسار محلي أساسي" : "Standard local route", domesticPricing.main.total, isArabic ? "للطلبية الواحدة" : "per single order", "gold"],
     [isArabic ? "مسار محلي خاص" : "Special local route", domesticPricing.extended.total, isArabic ? "للطلبية الواحدة" : "per single order", "green"],
     [tp.gccFirstKg, internationalPricing.gcc.firstKg, tp.thenPerKg.replace("{rate}", String(internationalPricing.gcc.additionalKg)), "gold"],
-    [isArabic ? "أوروبا" : "Europe", internationalPricing.europe.firstKg, tp.thenPerKg.replace("{rate}", String(internationalPricing.europe.additionalKg)), "blue"],
-    [isArabic ? "أمريكا وكندا" : "USA & Canada", internationalPricing.usaCanada.firstKg, tp.thenPerKg.replace("{rate}", String(internationalPricing.usaCanada.additionalKg)), "neutral"],
+    [isArabic ? "أوروبا" : "Europe", europeRate.firstKg, tp.thenPerKg.replace("{rate}", String(europeRate.additionalKg)), "blue"],
+    [isArabic ? "أمريكا وكندا" : "USA & Canada", northAmericaRate.firstKg, tp.thenPerKg.replace("{rate}", String(northAmericaRate.additionalKg)), "neutral"],
   ] as const;
   const dest = internationalDestinations.find((d) => d.countryCode === internationalDestination) || internationalDestinations[0];
 
