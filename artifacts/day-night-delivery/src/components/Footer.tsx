@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { Mail, MapPin, Phone, ExternalLink, ChevronRight, ChevronLeft, Shield, Code2 } from "lucide-react";
+import { Mail, MapPin, Phone, ExternalLink, ChevronRight, ChevronLeft, Shield, Code2, Navigation, Store, UserRound, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
@@ -36,12 +36,18 @@ export default function Footer() {
     { label: isArabic ? "خدمات QR الذكية" : "QR Services", path: "/qr" },
   ];
 
+  const portalLinks = [
+    { label: isArabic ? "بوابة التاجر" : "Merchant Portal", path: "/merchant", Icon: Store },
+    { label: isArabic ? "بوابة المندوب" : "Driver Portal", path: "/driver", Icon: Navigation },
+    { label: isArabic ? "حساب العميل" : "Customer Account", path: "/customer", Icon: UserRound },
+    { label: isArabic ? "لوحة الإدارة" : "Admin Portal", path: "/auth", Icon: Settings },
+  ];
+
   const supportLinks = [
     { label: isArabic ? "الأسعار والحاسبة" : "Pricing & Calculator", path: "/pricing", route: true },
     { label: isArabic ? "سياسة الخدمة" : "Service Policy", path: "/policy", route: true },
     { label: isArabic ? "سياسة الخصوصية" : "Privacy Policy", path: "/privacy", route: true },
     { label: isArabic ? "الشروط والأحكام" : "Terms & Conditions", path: "/terms", route: true },
-    { label: isArabic ? "لوحة الإدارة" : "Admin Portal", path: "/auth", route: true },
     { label: "WhatsApp", path: companyMeta.whatsappUrl, route: false },
     { label: companyMeta.email, path: `mailto:${companyMeta.email}`, route: false },
   ];
@@ -63,9 +69,10 @@ export default function Footer() {
           <p className={`max-w-3xl mx-auto mt-4 text-sm leading-7 ${isLight ? "text-brand-deep/65" : "text-white/55"}`}>{tf.description}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-8">
           <div>{columnTitle(companyLinksTitle)}<div className="space-y-3">{companyLinks.map((item) => <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link>)}</div></div>
           <div>{columnTitle(tf.services)}<div className="space-y-3">{serviceLinks.map((item) => <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link>)}</div></div>
+          <div>{columnTitle(isArabic ? "بوابات التشغيل" : "Operations Portals")}<div className="space-y-3">{portalLinks.map(({ path, label, Icon }) => <Link key={path} to={path} className={linkClass}><Icon className="w-4 h-4 text-brand-gold" />{label}</Link>)}</div></div>
           <div>{columnTitle(tf.support)}<div className="space-y-3">{supportLinks.map((item) => item.route ? <Link key={item.path} to={item.path} className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</Link> : <a key={item.path} href={item.path} target="_blank" rel="noopener noreferrer" className={linkClass}><Arrow className="w-3 h-3 text-brand-gold" />{item.label}</a>)}</div></div>
           <div>
             {columnTitle(tf.contact)}
@@ -93,7 +100,7 @@ export default function Footer() {
 
         <div className={`mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs ${isLight ? "border-brand-deep/10 text-brand-deep/50" : "border-white/10 text-white/40"}`}>
           <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-brand-gold" />{rightsText}</div>
-          <motion.div whileHover={{ scale: 1.02 }} className="flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-2 text-brand-gold font-black"><Code2 className="w-4 h-4" />Creating by Eng Sadek Elgazar</motion.div>
+          <motion.div whileHover={{ scale: 1.02 }} className="flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-2 text-brand-gold font-black"><Code2 className="w-4 h-4" />{isArabic ? "منصة تشغيل DAY NIGHT الرقمية" : "DAY NIGHT Digital Operations Platform"}</motion.div>
         </div>
       </div>
     </footer>
