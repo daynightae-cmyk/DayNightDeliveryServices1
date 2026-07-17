@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { BadgeCheck, Calculator, ClipboardCheck, MapPin, MessageCircle, Package, ShieldCheck, Truck, Zap } from "lucide-react";
+import { BadgeCheck, Calculator, ClipboardCheck, MapPin, MessageCircle, Navigation, Package, ShieldCheck, Store, Truck, Zap } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import { translations } from "../data/translations";
 import { cities, getQuickEstimate } from "../data/pricingEstimate";
@@ -40,6 +40,33 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
     { icon: Calculator, value: "30 AED", title: isArabic ? "سعر الطلبيات المحلية" : "Local order pricing", body: isArabic ? "تسعير واضح ومباشر" : "Clear and direct pricing" },
     { icon: MapPin, value: "7+", title: isArabic ? "إمارات مغطاة" : "Emirates covered", body: isArabic ? "تغطية شاملة" : "Full UAE coverage" },
     { icon: ShieldCheck, value: "100%", title: isArabic ? "أمان وثقة" : "Safe and trusted", body: isArabic ? "فريق محترف" : "Professional team" },
+  ];
+
+  const portalCards = [
+    {
+      key: "merchant",
+      icon: Store,
+      label: isArabic ? "بوابة التاجر" : "Merchant portal",
+      title: isArabic ? "مركز التاجر للطلبيات والتتبع" : "Merchant command center",
+      body: isArabic
+        ? "دخول آمن للتاجر يعرض بيانات التاجر وطلبياته وخريطته من قاعدة البيانات الحقيقية فقط."
+        : "Secure merchant access for real merchant profile, orders, and map data from the production database only.",
+      cta: isArabic ? "فتح بوابة التاجر" : "Open merchant portal",
+      tab: "merchant",
+      tone: "gold",
+    },
+    {
+      key: "driver",
+      icon: Navigation,
+      label: isArabic ? "بوابة المندوب" : "Driver portal",
+      title: isArabic ? "وردية المندوب و GPS والمهام" : "Driver shift, GPS, and jobs",
+      body: isArabic
+        ? "مساحة تشغيل للمندوب لبدء الوردية، إرسال GPS الحقيقي، وإدارة الطلبات المسندة فقط."
+        : "Driver workspace for shifts, real GPS sync, and assigned order operations only.",
+      cta: isArabic ? "فتح بوابة المندوب" : "Open driver portal",
+      tab: "driver",
+      tone: "blue",
+    },
   ];
 
   return (
@@ -117,6 +144,40 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
           ))}
         </div>
       </section>
+
+      <section className="relative overflow-hidden rounded-[2.1rem] border border-brand-gold/20 bg-[#031226] p-5 shadow-2xl shadow-black/25 sm:p-7 lg:p-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(212,175,55,0.16),transparent_22rem),radial-gradient(circle_at_90%_10%,rgba(43,184,255,0.14),transparent_25rem)]" />
+        <div className="relative z-10 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <DNBadge tone="gold"><ShieldCheck className="h-3.5 w-3.5" /> {isArabic ? "بوابات تشغيل حقيقية" : "Real operations portals"}</DNBadge>
+            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">{isArabic ? "إدارة التاجر والمندوب من الواجهة الرئيسية" : "Merchant and driver access from the main site"}</h2>
+            <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-white/58">
+              {isArabic
+                ? "هذه البوابات لا تعرض بيانات تجريبية؛ عند الدخول تظهر السجلات المرتبطة بالحساب من Supabase فقط."
+                : "These portals do not show demo data; after sign-in they render only Supabase records linked to the account."}
+            </p>
+          </div>
+          <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-2xl border border-brand-gold/40 bg-white object-contain p-1" />
+        </div>
+        <div className="relative z-10 grid gap-4 lg:grid-cols-2">
+          {portalCards.map(({ key, icon: Icon, label, title, body, cta, tab, tone }) => (
+            <article key={key} className={`group overflow-hidden rounded-[1.8rem] border p-5 transition hover:-translate-y-0.5 hover:shadow-2xl ${tone === "gold" ? "border-brand-gold/25 bg-brand-gold/[0.07] hover:shadow-brand-gold/10" : "border-brand-sky/25 bg-brand-sky/[0.07] hover:shadow-brand-sky/10"}`}>
+              <div className="flex items-start gap-4">
+                <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${tone === "gold" ? "bg-brand-gold text-brand-deep" : "bg-brand-sky text-brand-deep"}`}><Icon className="h-7 w-7" /></span>
+                <div>
+                  <p className={`text-xs font-black uppercase tracking-[0.22em] ${tone === "gold" ? "text-brand-gold" : "text-brand-sky"}`}>{label}</p>
+                  <h3 className="mt-2 text-2xl font-black text-white">{title}</h3>
+                  <p className="mt-3 text-sm font-bold leading-7 text-white/58">{body}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => onNavigate(tab)} className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition ${tone === "gold" ? "bg-brand-gold text-brand-deep hover:brightness-110" : "bg-brand-sky text-brand-deep hover:brightness-110"}`}>
+                {cta}
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <WorldClock />
       <UAEInteractiveMap />
       <TestimonialCarousel />
