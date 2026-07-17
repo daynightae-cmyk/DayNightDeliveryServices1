@@ -65,13 +65,12 @@ function resolveDomesticZone(input: DomesticPriceInput) {
 
 export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult {
   const billableWeight = normalizeWeight(input.weight);
-  const localOrderCount = normalizePieces(input.pieces);
   const zone = resolveDomesticZone(input);
   const unitPrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
-  const subtotal = unitPrice * localOrderCount;
+  const subtotal = unitPrice;
   const total = Number(subtotal.toFixed(2));
   const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
-  const requiresCustomQuote = localOrderCount > 200;
+  const requiresCustomQuote = false;
 
   return {
     subtotal,
@@ -82,7 +81,7 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
     requiresCustomQuote,
     breakdown: [
       `${category}: ${formatAED(unitPrice)}`,
-      `Local orders: ${localOrderCount} x ${formatAED(unitPrice)}`
+      `Single local order: ${formatAED(unitPrice)}`
     ],
     notes: requiresCustomQuote
       ? "High local order quantity may require operations confirmation before pickup."
@@ -128,10 +127,10 @@ export function calculateInternationalPrice(inputOrDestination: InternationalPri
   };
 }
 
-export function calculateLocalPrice(cityArOrEn: string, weightKg: number): PricingResult {
+export function calculateLocalPrice(cityArOrEn: string, _weightKg: number): PricingResult {
   return calculateDomesticPrice({
     deliveryCity: cityArOrEn,
-    pieces: Math.max(1, Math.ceil(Number(weightKg) || 1)),
+    pieces: 1,
     serviceType: "standard"
   });
 }
