@@ -216,7 +216,7 @@ export const translations = {
       pickupPoint: "Pickup Point",
       destinationPoint: "Destination Point",
       estimatedRoute: "Estimated route",
-      gpsSoon: "Live GPS connection coming soon"
+      gpsSoon: "Live GPS appears when courier coordinates are available"
     },
     testimonials: {
       title: "Trusted by UAE Business Partners",
@@ -475,7 +475,7 @@ export const translations = {
       pickupPoint: "نقطة الاستلام",
       destinationPoint: "نقطة التسليم",
       estimatedRoute: "المسار التقديري",
-      gpsSoon: "الربط المباشر مع GPS قريبًا"
+      gpsSoon: "يظهر التتبع الحي عند توفر إحداثيات المندوب"
     },
     testimonials: {
       title: "موثوقون لدى شركاء الأعمال في الإمارات",
