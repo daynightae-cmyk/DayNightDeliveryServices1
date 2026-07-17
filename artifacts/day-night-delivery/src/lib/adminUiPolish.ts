@@ -40,6 +40,10 @@ type DeckSnapshot = {
   refreshedAt: Date;
 };
 
+function isAdminMounted() {
+  return Boolean(document.querySelector(".dn-admin-fullscreen"));
+}
+
 function isArabicAdmin() {
   return document.querySelector(".dn-admin-fullscreen")?.getAttribute("dir") !== "ltr";
 }
@@ -73,10 +77,13 @@ function activeMerchants(merchants: Merchant[]) {
 }
 
 function replaceVisibleText(root: ParentNode = document.body) {
+  if (!isAdminMounted()) return;
+
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
+      if (!parent.closest(".dn-admin-fullscreen")) return NodeFilter.FILTER_REJECT;
       if (["SCRIPT", "STYLE", "TEXTAREA", "INPUT"].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
       if (parent.closest(`#${DECK_ID}`)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
@@ -96,6 +103,7 @@ function replaceVisibleText(root: ParentNode = document.body) {
 }
 
 function ensureDeck() {
+  if (!isAdminMounted()) return null;
   const host = document.querySelector(".dn-admin-content-full") || document.querySelector(".dn-admin-fullscreen");
   if (!host) return null;
 
@@ -115,6 +123,7 @@ function ensureDeck() {
 }
 
 function loadingDeck() {
+  if (!isAdminMounted()) return;
   const isArabic = isArabicAdmin();
   const deck = ensureDeck();
   if (!deck || deck.getAttribute(POLISHED_ATTR) === "ready") return;
@@ -129,6 +138,7 @@ function loadingDeck() {
 }
 
 function renderDeck(snapshot: DeckSnapshot) {
+  if (!isAdminMounted()) return;
   const deck = ensureDeck();
   if (!deck) return;
 
@@ -186,6 +196,7 @@ function renderDeck(snapshot: DeckSnapshot) {
 }
 
 async function refreshExecutiveDeck() {
+  if (!isAdminMounted()) return;
   loadingDeck();
   const [ordersResult, merchantsResult, financeResult] = await Promise.allSettled([
     fetchAdminOrders(),
@@ -203,9 +214,11 @@ async function refreshExecutiveDeck() {
 
 function startAdminPolish() {
   if (typeof document === "undefined") return;
-  replaceVisibleText();
-  ensureDeck();
-  void refreshExecutiveDeck();
+  if (isAdminMounted()) {
+    replaceVisibleText();
+    ensureDeck();
+    void refreshExecutiveDeck();
+  }
 
   let queued = false;
   const observer = new MutationObserver(() => {
@@ -213,13 +226,17 @@ function startAdminPolish() {
     queued = true;
     window.requestAnimationFrame(() => {
       queued = false;
+      if (!isAdminMounted()) return;
       replaceVisibleText();
-      ensureDeck();
+      const deck = ensureDeck();
+      if (deck && deck.getAttribute(POLISHED_ATTR) !== "ready") void refreshExecutiveDeck();
     });
   });
 
   observer.observe(document.body, { childList: true, characterData: true, subtree: true });
-  window.setInterval(() => void refreshExecutiveDeck(), 60_000);
+  window.setInterval(() => {
+    if (isAdminMounted()) void refreshExecutiveDeck();
+  }, 60_000);
 }
 
 if (typeof window !== "undefined") {
