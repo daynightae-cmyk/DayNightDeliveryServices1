@@ -64,14 +64,14 @@ function unassignedOrders(orders: Order[]) {
   return orders.filter((order) => {
     const status = normalizeOrderStatus(order);
     if (["delivered", "cancelled", "returned"].includes(status)) return false;
-    const row = order as Record<string, unknown>;
+    const row = order as unknown as Record<string, unknown>;
     return !row.driver_id && !row.assigned_driver_id && !row.driver_name;
   }).length;
 }
 
 function activeMerchants(merchants: Merchant[]) {
   return merchants.filter((merchant) => {
-    const status = String((merchant as Record<string, unknown>).status || "active").toLowerCase();
+    const status = String((merchant as unknown as Record<string, unknown>).status || "active").toLowerCase();
     return !["deleted", "archived", "blocked", "suspended"].includes(status);
   }).length;
 }
@@ -150,7 +150,7 @@ function renderDeck(snapshot: DeckSnapshot) {
   const merchants = activeMerchants(snapshot.merchants);
   const attention = stats.review + stats.postponed + stats.returned + unassigned;
   const deliveryRate = snapshot.orders.length ? Math.round((delivered / snapshot.orders.length) * 100) : 0;
-  const codPending = Number(snapshot.financeSummary?.cod_pending ?? snapshot.orders.reduce((sum, order) => sum + Number((order as Record<string, unknown>).cod_amount || 0), 0));
+  const codPending = Number(snapshot.financeSummary?.cod_pending ?? snapshot.orders.reduce((sum, order) => sum + Number((order as unknown as Record<string, unknown>).cod_amount || 0), 0));
   const syncLabel = snapshot.refreshedAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", { hour: "2-digit", minute: "2-digit" });
 
   const cards = isArabic

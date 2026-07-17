@@ -75,11 +75,9 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
       `${category}: ${formatAED(unitPrice)}`,
       `Single local order: ${formatAED(unitPrice)}`
     ],
-    notes: requiresCustomQuote
-      ? "High local order quantity may require operations confirmation before pickup."
-      : zone === "extended"
-        ? "Special UAE route price. Local delivery is charged per order, not per kilogram."
-        : "UAE city route price. Local delivery is charged per order, not per kilogram."
+    notes: zone === "extended"
+      ? "Special UAE route price. Local delivery is charged per order, not per kilogram."
+      : "UAE city route price. Local delivery is charged per order, not per kilogram."
   };
 }
 
