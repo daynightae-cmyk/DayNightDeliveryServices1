@@ -43,14 +43,6 @@ function normalizeWeight(weight: number | string | null | undefined) {
   return Math.max(1, Math.ceil(parsed));
 }
 
-function normalizePieces(pieces: number | string | null | undefined) {
-  const parsed = Number(pieces);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 1;
-  }
-  return Math.max(1, Math.ceil(parsed));
-}
-
 export function formatAED(amount: number) {
   return `${Number(amount).toFixed(2)} AED`;
 }
