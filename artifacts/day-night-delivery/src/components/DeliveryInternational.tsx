@@ -167,9 +167,9 @@ export default function DeliveryInternational() {
             <div className="divide-y divide-white/5 font-sans text-sm">
               {destinations.map((destination) => (
                 <div key={destination.countryCode} className="py-2.5 flex justify-between gap-4 items-center">
-                  <div className="text-white/50 font-mono text-xs" dir="ltr">
-                    <p>{isArabic ? "First" : "First"}: <span className="font-bold text-brand-gold font-mono">{formatAED(destination.firstKg)}</span></p>
-                    <p className="text-[10px] text-white/30">{isArabic ? "Extra" : "Additional"}: <span className="font-semibold font-mono">{formatAED(destination.additionalKg)}</span></p>
+                  <div className="text-white/50 font-mono text-xs" dir={isArabic ? "rtl" : "ltr"}>
+                    <p>{isArabic ? "أول كيلو" : "First"}: <span className="font-bold text-brand-gold font-mono" dir="ltr">{formatAED(destination.firstKg)}</span></p>
+                    <p className="text-[10px] text-white/30">{isArabic ? "إضافي" : "Additional"}: <span className="font-semibold font-mono" dir="ltr">{formatAED(destination.additionalKg)}</span></p>
                   </div>
                   <span className="text-white font-bold">{isArabic ? destination.countryNameAr : destination.countryNameEn}</span>
                 </div>
