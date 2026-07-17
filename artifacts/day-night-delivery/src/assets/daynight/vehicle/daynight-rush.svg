@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">DAY NIGHT Toyota Rush</title>
+  <desc id="desc">Premium white DAY NIGHT branded Toyota Rush viewed from above.</desc>
+  <defs>
+    <linearGradient id="body" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#f7fbff"/>
+      <stop offset="1" stop-color="#dce7f4"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#153763"/>
+      <stop offset="1" stop-color="#06162f"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" x2="1">
+      <stop offset="0" stop-color="#0B5FFF"/>
+      <stop offset="1" stop-color="#083A9B"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0" stop-color="#F4D36B"/>
+      <stop offset="0.55" stop-color="#D4AF37"/>
+      <stop offset="1" stop-color="#9A7415"/>
+    </linearGradient>
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#000814" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <g filter="url(#softShadow)" transform="rotate(12 80 80)">
+    <ellipse cx="80" cy="86" rx="47" ry="61" fill="#000814" opacity=".18"/>
+    <path d="M54 18C44 22 38 34 36 49L31 108c-1 15 9 28 24 32 17 5 33 5 50 0 15-4 25-17 24-32l-5-59c-2-15-8-27-18-31-15-6-37-6-52 0Z" fill="url(#body)" stroke="#cbd8e8" stroke-width="2.2"/>
+    <path d="M52 28c8-8 48-8 56 0l8 26H44l8-26Z" fill="url(#glass)" stroke="#25456d" stroke-width="2"/>
+    <path d="M43 59h74l3 40H40l3-40Z" fill="#ffffff"/>
+    <path d="M46 61h68l2 15H44l2-15Z" fill="#edf4fb"/>
+    <path d="M43 82h74" stroke="#dbe5f0" stroke-width="2"/>
+    <path d="M46 105h68l-7 25c-14 5-40 5-54 0l-7-25Z" fill="url(#glass)" stroke="#25456d" stroke-width="2"/>
+    <path d="M43 67c18 4 41 4 74-3l1 8c-30 8-54 9-76 5l1-10Z" fill="url(#blue)"/>
+    <path d="M42 80c26 6 49 4 76-7l1 5c-27 13-53 16-78 9l1-7Z" fill="url(#gold)"/>
+    <path d="M42 91c22 7 49 7 77-2v8c-29 9-56 10-79 3l2-9Z" fill="url(#blue)"/>
+    <rect x="70" y="31" width="20" height="10" rx="5" fill="#0B5FFF" opacity=".88"/>
+    <circle cx="80" cy="68" r="15" fill="#ffffff" stroke="#D4AF37" stroke-width="2.5"/>
+    <path d="M80 56c-7 0-12 5-12 12 0 9 12 18 12 18s12-9 12-18c0-7-5-12-12-12Zm0 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z" fill="#083A9B"/>
+    <path d="M61 116h38" stroke="#0B5FFF" stroke-width="5" stroke-linecap="round"/>
+    <path d="M67 124h26" stroke="#D4AF37" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M35 50h8M117 50h8M33 108h9M118 108h9" stroke="#101c2e" stroke-width="8" stroke-linecap="round"/>
+    <path d="M42 28 33 39M118 28l9 11M42 132l-9-11M118 132l9-11" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+  </g>
+</svg>
