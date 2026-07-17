@@ -20,7 +20,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
     setNotice("");
 
     if (!supabase) {
-      setError(isArabic ? "إعداد Supabase غير متاح." : "Supabase is not configured.");
+      setError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       setBusy(false);
       return;
     }
@@ -31,7 +31,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
     });
 
     if (authError) {
-      setError(isArabic ? "بيانات الدخول غير صحيحة أو الحساب غير مفعل." : authError.message);
+      setError(isArabic ? "بيانات الدخول غير صحيحة أو الحساب غير مفعل." : "The sign-in details are not correct or the account is not active.");
     }
     setBusy(false);
   }
@@ -46,7 +46,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
       options: { redirectTo: redirectTo() },
     });
     if (authError) {
-      setError(isArabic ? "تعذر فتح تسجيل الدخول عبر Google." : authError.message);
+      setError(isArabic ? "تعذر فتح تسجيل الدخول عبر Google حالياً." : "Google sign-in is unavailable right now.");
       setBusy(false);
     }
   }
@@ -66,7 +66,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
       options: { emailRedirectTo: redirectTo() },
     });
 
-    if (authError) setError(isArabic ? "تعذر إرسال رابط الدخول." : authError.message);
+    if (authError) setError(isArabic ? "تعذر إرسال رابط الدخول حالياً." : "The sign-in link could not be sent right now.");
     else setNotice(isArabic ? "تم إرسال رابط دخول آمن إلى بريد المندوب." : "A secure sign-in link was sent to the driver email.");
     setBusy(false);
   }
@@ -81,13 +81,13 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
           <div>
             <small>DAY NIGHT DELIVERY SERVICES</small>
             <h1>{isArabic ? "بوابة المندوب" : "Driver Operations Portal"}</h1>
-            <p>{isArabic ? "طلباتك، موقعك الحي، وحالة التوصيل من هاتفك." : "Assigned orders, live GPS and delivery status from your phone."}</p>
+            <p>{isArabic ? "طلباتك، موقعك الحي، وحالة التوصيل من هاتفك." : "Assigned orders, live location, and delivery status from your phone."}</p>
           </div>
         </div>
 
         <div className="dn-driver-login-security">
           <ShieldCheck className="h-5 w-5" />
-          <span>{isArabic ? "الدخول محمي بحساب Supabase المعتمد" : "Protected by approved Supabase authentication"}</span>
+          <span>{isArabic ? "دخول آمن ومشفّر لحساب المندوب" : "Secure encrypted driver access"}</span>
         </div>
 
         <form onSubmit={submit} className="dn-driver-login-form">
@@ -138,7 +138,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
 
         <p className="dn-driver-login-note">
           <Navigation className="inline h-4 w-4" /> {isArabic
-            ? "بعد الدخول اضغط بدء الوردية واسمح للموقع حتى تظهر حركتك للإدارة."
+            ? "بعد الدخول اضغط بدء الوردية واسمح بالموقع حتى تظهر حركتك للإدارة."
             : "After login, start your shift and allow location access so operations can follow your route."}
         </p>
       </div>
