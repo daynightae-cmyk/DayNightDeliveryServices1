@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, MapPin, Navigation, RefreshCw, Radar, Store, Truck } from "lucide-react";
 import { fetchPublicLiveOperationsMap } from "../../supabase";
 import localAssets, { withRemoteFallback } from "../../data/localAssets";
@@ -92,7 +92,7 @@ export default function UAEInteractiveMap() {
   const [updatedAt, setUpdatedAt] = useState(() => new Date());
   const [now, setNow] = useState(Date.now());
 
-  async function refreshMap() {
+  const refreshMap = useCallback(async () => {
     setUpdatedAt(new Date());
 
     try {
@@ -113,8 +113,8 @@ export default function UAEInteractiveMap() {
       setSignalCount(Number(payload.driver_count ?? 0));
       setMode(safeRows.length ? "تشغيل متصل" : "لا توجد مسارات نشطة الآن");
 
-      const first = safeRows.find((row) => clean(row.tracking_ref) && clean(row.sender_city) && clean(row.receiver_city));
-      setSelected(first ? `${clean(first.tracking_ref)}-0` : "");
+      const firstIndex = safeRows.findIndex((row) => clean(row.tracking_ref) && clean(row.sender_city) && clean(row.receiver_city));
+      setSelected(firstIndex >= 0 ? `${clean(safeRows[firstIndex].tracking_ref)}-${firstIndex}` : "");
     } catch (error) {
       console.error("[DAY NIGHT public operations map]", error);
       setRows([]);
@@ -123,7 +123,7 @@ export default function UAEInteractiveMap() {
       setMode("التحديث غير متاح مؤقتاً");
       setSelected("");
     }
-  }
+  }, []);
 
   useEffect(() => {
     void refreshMap();
@@ -133,7 +133,7 @@ export default function UAEInteractiveMap() {
       window.clearInterval(pulse);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [refreshMap]);
 
   const routes = useMemo<RouteItem[]>(() => rows.slice(0, 10).flatMap((row, index) => {
     const code = clean(row.tracking_ref);
@@ -217,7 +217,7 @@ export default function UAEInteractiveMap() {
 
           {!hasRoutes && (
             <div className="absolute inset-0 z-[12] grid place-items-center p-5">
-              <div className="max-w-md rounded-[28px] border border-white/12 bg-[#061225]/82 p-6 text-center shadow-2xl shadow-black/35 backdrop-blur-xl">
+              <div className="max-w-md rounded-[28px] border border-white/10 bg-[#061225]/82 p-6 text-center shadow-2xl shadow-black/35 backdrop-blur-xl">
                 <Radar className="mx-auto mb-4 h-10 w-10 text-[#f5b700]" />
                 <h3 className="text-2xl font-black text-white">لا توجد مسارات نشطة الآن</h3>
                 <p className="mt-3 text-sm font-bold leading-7 text-white/62">عند توفر طلبات مرتبطة بالتتبع ستظهر الحركة على الخريطة مباشرة.</p>
