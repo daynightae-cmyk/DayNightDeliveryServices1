@@ -137,6 +137,11 @@
   color: transparent !important;
 }
 
+/* AdminLiveOperationsMap still has iconAnchor [27,44]. Shift only that legacy artwork so its visual center stays on the GPS coordinate. */
+.dn-live-map-driver > .dn-vehicle-marker {
+  transform: translateY(17px) translateZ(0) !important;
+}
+
 .dn-live-map-driver > .dn-driver-pulse::before,
 .dn-live-map-driver > .dn-vehicle-marker::before,
 .dn-driver-map-marker-shell .dn-driver-map-marker::before {
@@ -198,6 +203,10 @@
     min-height: 48px !important;
     max-width: 48px !important;
     max-height: 48px !important;
+  }
+
+  .dn-live-map-driver > .dn-vehicle-marker {
+    transform: translateY(20px) translateZ(0) !important;
   }
 }
 
