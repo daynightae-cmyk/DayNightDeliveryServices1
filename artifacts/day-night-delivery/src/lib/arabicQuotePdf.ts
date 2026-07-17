@@ -137,7 +137,7 @@ function footer(doc: jsPDF) {
   doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
   doc.rect(0, h - 58, 595.28, 58, "F");
   write(doc, `${companyMeta.displayWebsite} - ${companyMeta.email} - ${companyMeta.phone}`, 297.64, h - 32, { size: 10, color: GOLD, align: "center" });
-  write(doc, "Creating by Eng Sadek Elgazar", 297.64, h - 14, { size: 8, color: WHITE, align: "center" });
+  write(doc, "DAY NIGHT DELIVERY SERVICES", 297.64, h - 14, { size: 8, color: WHITE, align: "center" });
 }
 
 export async function exportArabicQuotePdfImage(input: ArabicQuotePdfInput) {
@@ -176,8 +176,8 @@ export function exportArabicDomesticQuotePdf(data: ArabicDomesticQuoteData) {
     fileName: `DayNight_عرض_محلي_${data.pickupCity}_to_${data.deliveryCity}.pdf`,
     title: "عرض سعر التوصيل المحلي",
     sections: [
-      { title: "بيانات الشحنة", rows: [["مدينة الاستلام", data.pickupCity], ["مدينة التسليم", data.deliveryCity], ["نوع الخدمة", data.service === "express" ? "سريع" : "قياسي"], ["الوزن", `${data.weight} kg`], ["عدد القطع", String(data.pieces)], ["تاريخ العرض", arDate()]] },
-      { title: "تفاصيل السعر", rows: [["رسوم التوصيل الأساسية", `${data.basePrice.toFixed(2)} AED`], ["رسوم الخدمة السريعة", data.expressCharge > 0 ? `+${data.expressCharge.toFixed(2)} AED` : "مشمول"], ["رسوم القطع الإضافية", data.extraPiecesCharge > 0 ? `+${data.extraPiecesCharge.toFixed(2)} AED` : "مشمول"]] },
+      { title: "بيانات الطلب المحلي", rows: [["مدينة الاستلام", data.pickupCity], ["مدينة التسليم", data.deliveryCity], ["نوع الخدمة", data.service === "express" ? "سريع" : "قياسي"], ["تاريخ العرض", arDate()]] },
+      { title: "تفاصيل السعر", rows: [["رسوم التوصيل", `${data.basePrice.toFixed(2)} AED`], ["رسوم الخدمة السريعة", data.expressCharge > 0 ? `+${data.expressCharge.toFixed(2)} AED` : "غير مضافة"]] },
     ],
     totalLabel: "إجمالي رسوم التوصيل",
     totalValue: `${data.total.toFixed(2)} AED`,

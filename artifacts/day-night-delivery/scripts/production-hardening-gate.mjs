@@ -68,6 +68,7 @@ if (fs.existsSync(aiKnowledgePath)) {
   const knowledge = read(aiKnowledgePath);
   assert(!knowledge.includes("31.50") && !knowledge.includes("52.50"), "AI agent knowledge uses correct pricing");
   assert(knowledge.includes("30 AED") || knowledge.includes("30 درهم"), "AI agent knowledge has correct domestic price");
+  assert(!knowledge.includes("Each extra piece") && !knowledge.includes("لكل قطعة إضافية") && !knowledge.includes("القطعة الأولى"), "AI agent knowledge treats UAE local delivery as one order");
   assert(knowledge.includes("95") && knowledge.includes("45"), "AI agent knowledge has GCC pricing");
   assert(knowledge.includes("190") && knowledge.includes("90"), "AI agent knowledge has worldwide pricing");
   assert(knowledge.includes("COD") || knowledge.includes("cod"), "AI agent knowledge covers COD");
@@ -89,7 +90,7 @@ if (fs.existsSync(pricingEnginePath)) {
     const engine = read(pricingEnginePath);
     assert(engine.includes("calculateDomesticPrice"), "Pricing engine exports calculateDomesticPrice");
     assert(engine.includes("calculateInternationalPrice"), "Pricing engine exports calculateInternationalPrice");
-    assert(engine.includes("extraPieceCharge") || engine.includes("pieces") || engine.includes("piece"), "Pricing engine handles pieces");
+    assert(engine.includes("Single local order") && engine.includes("pieces: 1"), "Pricing engine treats UAE local delivery as one order");
     assert(engine.includes("expressSurcharge") || engine.includes("express"), "Pricing engine handles express surcharge");
     assert(engine.includes("breakdown"), "Pricing engine returns breakdown array");
   } catch (e) {
@@ -102,7 +103,8 @@ const pricingTsxPath = path.join(src, "components", "Pricing.tsx");
 if (fs.existsSync(pricingTsxPath)) {
   const px = read(pricingTsxPath);
   assert(px.includes("domesticWeight") && px.includes("internationalWeight"), "Pricing.tsx uses isolated weight state per calculator");
-  assert(px.includes("domesticPieces"), "Pricing.tsx has pieces input for domestic calculator");
+  assert(!px.includes("domesticPieces"), "Pricing.tsx has no order quantity field for domestic calculator");
+  assert(px.includes("pieces: 1"), "Pricing.tsx prices domestic calculator as one local order");
   assert(!px.includes("const [weight,") && !px.includes("const [weight ,"), "Pricing.tsx does NOT use shared weight state");
 }
 
@@ -173,7 +175,7 @@ if (fs.existsSync(footerPath)) {
   assert(footer.includes("/request"), "Footer links to request delivery");
   assert(footer.includes("/tracking"), "Footer links to tracking");
   assert(footer.includes("/qr") || footer.includes("qr"), "Footer links to QR Services");
-  assert(footer.includes("Sadek") || footer.includes("sadek") || footer.includes("Elgazar"), "Footer credit exists");
+  assert(!footer.includes("Sadek") && !footer.includes("sadek") && !footer.includes("Elgazar"), "Footer has no third-party developer credit");
 }
 
 /* ── Turnstile captcha ── */

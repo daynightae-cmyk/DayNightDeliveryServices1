@@ -18,12 +18,12 @@ export const aiAgentKnowledge = {
     maps: companyMeta.mapUrl
   },
   prices: {
-    domesticMain: "Main UAE cities: 30 AED (1st piece). Each extra piece +5 AED.",
-    domesticMainAr: "المناطق الرئيسية: 30 درهم للقطعة الأولى، كل قطعة إضافية +5 درهم.",
-    domesticExtended: "Extended UAE areas (Al Ain, Western Region): 50 AED (1st piece). Each extra piece +5 AED.",
-    domesticExtendedAr: "المناطق الممتدة (العين، المنطقة الغربية): 50 درهم للقطعة الأولى، كل قطعة إضافية +5 درهم.",
-    alAin: "Al Ain: extended area — 50 AED base + 5 AED per extra piece.",
-    westernRegion: "Western Region / Al Dhafra / Ruwais: extended area — 50 AED base + 5 AED per extra piece.",
+    domesticMain: "Main UAE city routes: 30 AED per local order.",
+    domesticMainAr: "المناطق الرئيسية داخل الإمارات: 30 درهم للطلب المحلي الواحد.",
+    domesticExtended: "Special UAE routes such as Al Ain and Western Region: 50 AED per local order.",
+    domesticExtendedAr: "المسارات الخاصة داخل الإمارات مثل العين والمنطقة الغربية: 50 درهم للطلب المحلي الواحد.",
+    alAin: "Al Ain: special UAE route — 50 AED per local order.",
+    westernRegion: "Western Region / Al Dhafra / Ruwais: special UAE route — 50 AED per local order.",
     express: "Express surcharge: +15 AED on top of base price.",
     gcc: "GCC shipping: 95 AED for first kg, +45 AED per additional kg.",
     gccExamples: "GCC examples: 1kg=95 AED | 2kg=140 AED | 3kg=185 AED | 5kg=275 AED",
@@ -64,7 +64,7 @@ export const aiAgentKnowledge = {
     howTo: "Visit /request, fill sender details (Step 1), receiver details (Step 2), package info and payment (Step 3), then submit.",
     howToAr: "زر /request، أدخل بيانات المرسل (الخطوة 1)، بيانات المستلم (الخطوة 2)، معلومات الطرد والدفع (الخطوة 3)، ثم أرسل.",
     trackingNumber: "Tracking number is generated immediately after successful order submission.",
-    largeOrders: "Orders with 20+ pieces or 50+ kg require operational confirmation before pickup.",
+    largeOrders: "Large, unusually heavy, or bulk corporate dispatches require operational confirmation before pickup.",
     codNote: "COD amount is separate from the delivery fee. Enter the amount to collect from the customer."
   },
   policies: {
@@ -76,7 +76,7 @@ export const aiAgentKnowledge = {
     deliveryTime: "UAE: same-day or next-day (varies by area and pickup time). GCC: 2–5 business days. International: 5–15 business days.",
     refund: "Cancellation before pickup may qualify for refund review. Contact support with tracking number.",
     invoice: "Invoice PDF available after order confirmation from tracking page or admin portal.",
-    customQuote: "Shipments with 20+ pieces or 50+ kg, or bulk corporate orders, require a custom quote via WhatsApp."
+    customQuote: "Heavy shipments, multi-stop work, or bulk corporate orders require a custom quote via WhatsApp."
   },
   businessInfo: {
     registrationUAE: "Registered and operating in the UAE.",
@@ -99,15 +99,15 @@ export const chatKnowledgeEntries = [
   /* ─── Local pricing ─── */
   {
     keys: ["price", "pricing", "cost", "سعر", "أسعار", "تكلفة", "كم", "how much", "كلفة", "رسوم", "تعرفة", "fee", "charge", "rate"],
-    en: "UAE Main areas (Abu Dhabi, Dubai, Sharjah, etc.): 30 AED for first piece + 5 AED each additional piece.\nUAE Extended areas (Al Ain, Western Region): 50 AED + 5 AED per extra piece.\nExpress service: +15 AED.\nCOD: separate from delivery fee.\n\nSee full calculator at /pricing",
-    ar: "المناطق الرئيسية (أبوظبي، دبي، الشارقة...): 30 درهم للقطعة الأولى + 5 درهم لكل قطعة إضافية.\nالمناطق الممتدة (العين، المنطقة الغربية): 50 درهم + 5 درهم لكل قطعة.\nالخدمة السريعة: +15 درهم.\nمبلغ COD: منفصل تماماً عن رسوم التوصيل.\n\nاحسب سعرك على /pricing"
+    en: "UAE main routes (Abu Dhabi, Dubai, Sharjah, etc.): 30 AED per local order.\nSpecial UAE routes (Al Ain, Western Region): 50 AED per local order.\nExpress service: +15 AED when selected.\nCOD: separate from delivery fee.\n\nSee full calculator at /pricing",
+    ar: "المسارات الرئيسية داخل الإمارات (أبوظبي، دبي، الشارقة...): 30 درهم للطلب المحلي الواحد.\nالمسارات الخاصة (العين، المنطقة الغربية): 50 درهم للطلب المحلي الواحد.\nالخدمة السريعة: +15 درهم عند اختيارها.\nمبلغ COD: منفصل تماماً عن رسوم التوصيل.\n\nاحسب سعرك على /pricing"
   },
 
-  /* ─── Pieces pricing ─── */
+  /* ─── Local order quantity ─── */
   {
     keys: ["piece", "pieces", "قطع", "قطعة", "extra piece", "additional piece", "7 pieces", "multiple"],
-    en: "Pricing is per delivery, not per kg.\nFirst piece included in base price (30 or 50 AED).\nEach additional piece: +5 AED.\nExample: 7 pieces to Dubai = 30 + 6×5 = 60 AED.",
-    ar: "السعر لكل عملية توصيل، وليس لكل كيلو.\nالقطعة الأولى مشمولة في السعر الأساسي (30 أو 50 درهم).\nكل قطعة إضافية: +5 درهم.\nمثال: 7 قطع إلى دبي = 30 + 6×5 = 60 درهم."
+    en: "For UAE local delivery, one booking is treated as one local order. The public local calculator does not use an order-quantity field. For bulk collections, multi-stop work, or unusual handling, contact WhatsApp for an operations quote.",
+    ar: "في التوصيل المحلي داخل الإمارات، كل حجز يُعامل كطلب محلي واحد. الحاسبة المحلية لا تستخدم حقل عدد الطلبيات. للشحنات الكبيرة أو الأعمال متعددة التوقفات أو أي معالجة خاصة، تواصل عبر واتساب للحصول على عرض تشغيلي."
   },
 
   /* ─── Express ─── */
@@ -121,14 +121,14 @@ export const chatKnowledgeEntries = [
   {
     keys: ["al ain", "العين", "عين", "al-ain"],
     en: aiAgentKnowledge.prices.alAin,
-    ar: "العين: منطقة ممتدة — 50 درهم للقطعة الأولى + 5 درهم لكل قطعة إضافية."
+    ar: "العين: مسار خاص داخل الإمارات — 50 درهم للطلب المحلي الواحد."
   },
 
   /* ─── Western Region ─── */
   {
     keys: ["western", "dhafra", "الظفرة", "غرب", "رويس", "ruwais", "liwa", "ليوا", "ghayathi", "غياثي", "sila", "السيلة", "western region", "المنطقة الغربية"],
     en: aiAgentKnowledge.prices.westernRegion,
-    ar: "المنطقة الغربية / الظفرة / الرويس / ليوا: منطقة ممتدة — 50 درهم + 5 درهم لكل قطعة إضافية."
+    ar: "المنطقة الغربية / الظفرة / الرويس / ليوا: مسار خاص داخل الإمارات — 50 درهم للطلب المحلي الواحد."
   },
 
   /* ─── COD ─── */
@@ -169,8 +169,8 @@ export const chatKnowledgeEntries = [
   /* ─── Request delivery ─── */
   {
     keys: ["request", "book", "order", "send", "طلب", "احجز", "أطلب", "إرسال", "توصيل", "أرسل", "ابعث"],
-    en: "To request delivery:\n1. Go to /request\n2. Step 1: Enter sender details (name, phone, city, address)\n3. Step 2: Enter receiver details\n4. Step 3: Package info, weight, pieces, service type, payment\n5. Submit → get tracking number immediately\n\nNote: 20+ pieces or 50+ kg requires operational confirmation.",
-    ar: "لطلب توصيل:\n1. اذهب إلى /request\n2. الخطوة 1: بيانات المرسل (اسم، هاتف، مدينة، عنوان)\n3. الخطوة 2: بيانات المستلم\n4. الخطوة 3: معلومات الطرد والوزن والقطع ونوع الخدمة والدفع\n5. إرسال ← تحصل على رقم التتبع فوراً\n\nملاحظة: 20+ قطعة أو 50+ كيلو يحتاج تأكيداً تشغيلياً."
+    en: "To request delivery:\n1. Go to /request\n2. Step 1: Enter sender details (name, phone, city, address)\n3. Step 2: Enter receiver details\n4. Step 3: Package details, service type, and payment\n5. Submit → get tracking number immediately\n\nLarge or special-handling shipments require operational confirmation.",
+    ar: "لطلب توصيل:\n1. اذهب إلى /request\n2. الخطوة 1: بيانات المرسل (اسم، هاتف، مدينة، عنوان)\n3. الخطوة 2: بيانات المستلم\n4. الخطوة 3: بيانات الطرد ونوع الخدمة والدفع\n5. إرسال ← تحصل على رقم التتبع فوراً\n\nالشحنات الكبيرة أو التي تحتاج معالجة خاصة تتطلب تأكيداً تشغيلياً."
   },
 
   /* ─── WhatsApp ─── */
@@ -260,8 +260,8 @@ export const chatKnowledgeEntries = [
   /* ─── Pricing page ─── */
   {
     keys: ["calculate", "calculator", "estimate", "حاسبة", "احسب", "تقدير", "كلكيوليتور"],
-    en: "Use the pricing calculators at /pricing:\n• UAE Delivery Calculator: enter cities, service, weight, pieces → instant price\n• International Calculator: enter destination and weight → instant price",
-    ar: "استخدم حاسبات الأسعار على /pricing:\n• حاسبة التوصيل المحلي: أدخل المدن والخدمة والوزن والقطع ← سعر فوري\n• الحاسبة الدولية: أدخل الوجهة والوزن ← سعر فوري"
+    en: "Use the pricing calculators at /pricing:\n• UAE Delivery Calculator: choose pickup and delivery areas → instant local order price\n• International Calculator: enter destination and weight → instant price",
+    ar: "استخدم حاسبات الأسعار على /pricing:\n• حاسبة التوصيل المحلي: اختر منطقة الاستلام والتسليم ← سعر فوري للطلب المحلي\n• الحاسبة الدولية: أدخل الوجهة والوزن ← سعر فوري"
   },
 
   /* ─── Social / QR ─── */
