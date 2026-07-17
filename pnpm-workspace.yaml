@@ -160,6 +160,7 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
 
+# Required by pnpm's build-script approval gate in CI/Vercel.
 allowBuilds:
   core-js: true
   esbuild: true
