@@ -8,7 +8,7 @@ import TestimonialCarousel from "./home/TestimonialCarousel";
 import UAEInteractiveMap from "./home/UAEInteractiveMap";
 import WorldClock from "./home/WorldClock";
 import Premium3DIcon from "./ui/Premium3DIcon";
-import { DNBadge, DNButton, DNCard, DNInput, DNSelect } from "./ui/DNDesignSystem";
+import { DNBadge, DNButton, DNCard, DNSelect } from "./ui/DNDesignSystem";
 import companyMeta from "../data/companyMeta";
 import localAssets, { withRemoteFallback } from "../data/localAssets";
 
@@ -22,12 +22,9 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
   const isArabic = language === "ar";
   const [estimateFrom, setEstimateFrom] = useState(cities[1]);
   const [estimateTo, setEstimateTo] = useState(cities[0]);
-  const [orderCount, setOrderCount] = useState<number | string>("1");
-
   const baseEstimate = getQuickEstimate(estimateFrom, estimateTo);
-  const normalizedOrderCount = Math.max(1, Math.ceil(Number(orderCount) || 1));
   const totalEstimate = baseEstimate
-    ? { min: baseEstimate.min * normalizedOrderCount, max: baseEstimate.max * normalizedOrderCount }
+    ? { min: baseEstimate.min, max: baseEstimate.max }
     : null;
 
   function formatAedRange(min: number, max: number) {
@@ -206,8 +203,8 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
                   <DNBadge tone="blue"><Calculator className="h-3.5 w-3.5" /> {isArabic ? "احسب توصيلك المحلي" : "Local UAE estimate"}</DNBadge>
                   <p className="mt-3 text-sm font-bold leading-7 text-white/55">
                     {isArabic
-                      ? "احسب تكلفة التوصيل داخل الإمارات خلال ثوانٍ حسب مدينة الاستلام ومدينة التسليم وعدد الطلبيات."
-                      : "Estimate UAE delivery in seconds by pickup city, delivery city, and order count."}
+                      ? "احسب تكلفة التوصيل داخل الإمارات خلال ثوانٍ حسب مدينة الاستلام ومدينة التسليم."
+                      : "Estimate one UAE delivery order in seconds by pickup city and delivery city."}
                   </p>
                 </div>
                 <Premium3DIcon icon={Package} color="gold" size="md" animate />
@@ -215,14 +212,13 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="space-y-1"><span className="text-xs font-black text-white/50">{isArabic ? "من" : "From"}</span><DNSelect value={estimateFrom} onChange={(e) => setEstimateFrom(e.target.value)}>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</DNSelect></label>
                 <label className="space-y-1"><span className="text-xs font-black text-white/50">{isArabic ? "إلى" : "To"}</span><DNSelect value={estimateTo} onChange={(e) => setEstimateTo(e.target.value)}>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</DNSelect></label>
-                <label className="space-y-1 sm:col-span-2"><span className="text-xs font-black text-white/50">{isArabic ? "عدد الطلبيات" : "Number of orders"}</span><DNInput type="number" value={orderCount} min="1" step="1" onChange={(e) => setOrderCount(e.target.value)} dir="ltr" /></label>
               </div>
               <div className="mt-5 rounded-2xl border border-brand-gold/35 bg-[#020914]/62 p-5 text-center">
                 <p className="text-xs font-black text-white/52">{isArabic ? "إجمالي السعر التقديري" : "Estimated total"}</p>
                 <p className="mt-2 text-4xl font-black text-brand-gold" dir="ltr">{totalEstimate ? formatAedRange(totalEstimate.min, totalEstimate.max) : "---"}</p>
                 <p className="mt-2 text-[11px] font-bold text-white/38">
                   {baseEstimate
-                    ? (isArabic ? `${normalizedOrderCount} طلبية × ${baseEstimate.base} درهم` : `${normalizedOrderCount} order(s) × ${baseEstimate.base} AED`)
+                    ? (isArabic ? `${baseEstimate.base} درهم للطلبية الواحدة` : `${baseEstimate.base} AED per order`)
                     : (isArabic ? "اختر مدينة الاستلام والتسليم." : "Select pickup and delivery cities.")}
                 </p>
               </div>
