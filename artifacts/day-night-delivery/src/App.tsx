@@ -51,6 +51,7 @@ const Policy = lazy(() => import("./components/Policy"));
 const Privacy = lazy(() => import("./components/Privacy"));
 const QR = lazy(() => import("./components/QR"));
 const DriverPortal = lazy(() => import("./components/driver/DriverPortal"));
+const MerchantPortal = lazy(() => import("./components/merchant/MerchantPortal"));
 const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGalleryV2"));
 const AdminPanel = lazy(() => import("./components/AdminPanelLuxury"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboardLuxury"));
@@ -113,6 +114,8 @@ function AppContent() {
     else if (tab === "auth") navigate("/auth");
     else if (tab === "admin") navigate("/admin");
     else if (tab === "customer") navigate("/customer");
+    else if (tab === "driver") navigate("/driver");
+    else if (tab === "merchant") navigate("/merchant");
   }
 
   const navLinks = [
@@ -133,6 +136,8 @@ function AppContent() {
 
   const adminLabel = isArabic ? "لوحة الإدارة" : "Admin Portal";
   const customerLabel = isArabic ? "حسابي" : "My Account";
+  const driverLabel = isArabic ? "المندوب" : "Driver";
+  const merchantLabel = isArabic ? "التاجر" : "Merchant";
   const currentPath = location.pathname;
 
   if (location.pathname === "/auth") {
@@ -158,14 +163,16 @@ function AppContent() {
             <span className={isLight ? "text-[#071A33]/70" : "text-white/70"}>{companyMeta.sloganAr}</span>
             <span className="rounded-full border border-brand-gold/25 bg-brand-gold/10 px-2 py-0.5 text-[10px] font-black text-brand-gold">{isArabic ? "المحلي بالطلبية لا بالكيلو" : "Local: by order, not kg"}</span>
           </div>
-          <div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
+          <div className={`flex flex-wrap items-center justify-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}>
             <ThemeToggle />
             <button onClick={toggleLanguage} className={`cursor-pointer uppercase tracking-wider px-2 py-0.5 rounded border text-xs font-bold transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/70 hover:text-[#9A6F00]" : "border-white/20 text-white/80 hover:text-brand-gold"}`}>
               {language === "ar" ? "EN" : "عربي"}
             </button>
             <a href={`tel:${companyMeta.phone}`} className="flex items-center gap-1 hover:text-brand-gold" dir="ltr"><PhoneCall className="w-3.5 h-3.5 text-brand-gold" />{companyMeta.phone}</a>
-            <Link id="top_admin_portal_link" to="/auth" className="hidden md:inline text-[10px] font-black text-white/55 hover:text-brand-gold transition-colors">{adminLabel}</Link>
+            <Link id="top_admin_portal_link" to="/auth" className={`hidden md:inline text-[10px] font-black transition-colors ${isLight ? "text-[#071A33]/55 hover:text-[#9A6F00]" : "text-white/55 hover:text-brand-gold"}`}>{adminLabel}</Link>
             <Link id="top_customer_portal_link" to="/customer" className="hidden md:inline text-[10px] font-black text-brand-gold hover:text-white transition-colors">{customerLabel}</Link>
+            <Link id="top_driver_portal_link" to="/driver" className={`hidden md:inline text-[10px] font-black transition-colors ${isLight ? "text-[#071A33]/55 hover:text-[#0057B8]" : "text-white/55 hover:text-brand-sky"}`}>{driverLabel}</Link>
+            <Link id="top_merchant_portal_link" to="/merchant" className="hidden md:inline text-[10px] font-black text-brand-gold hover:text-white transition-colors">{merchantLabel}</Link>
           </div>
         </div>
 
@@ -189,6 +196,8 @@ function AppContent() {
             <div className="hidden md:flex items-center gap-2 shrink-0">
               <Link id="desktop_admin_portal_link" to="/auth" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60" : "border-white/20 text-white/80 hover:border-brand-gold/50"}`}>{adminLabel}</Link>
               <Link id="desktop_customer_portal_link" to="/customer" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-gold/50 bg-brand-gold/10 text-brand-gold font-bold rounded-lg text-[11px] transition-all hover:bg-brand-gold hover:text-brand-deep">{customerLabel}</Link>
+              <Link id="desktop_driver_portal_link" to="/driver" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-sky/40 bg-brand-sky/10 text-brand-sky font-bold rounded-lg text-[11px] transition-all hover:bg-brand-sky hover:text-brand-deep">{driverLabel}</Link>
+              <Link id="desktop_merchant_portal_link" to="/merchant" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="px-3 py-2 border border-brand-gold/50 bg-gradient-to-r from-brand-gold to-[#F5B700] text-brand-deep font-black rounded-lg text-[11px] transition-all hover:shadow-lg hover:shadow-brand-gold/20">{merchantLabel}</Link>
               <Link to="/tracking" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className={`px-3 py-2 border font-bold rounded-lg text-[11px] transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/70 hover:border-brand-gold/60" : "border-white/20 text-white/80 hover:border-brand-gold/50"}`}>{t.header.trackBtn}</Link>
               <Link id="header_cta_btn" to="/request" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="btn-gold px-4 py-2.5 rounded-lg text-[11px] leading-none cursor-pointer">{t.header.requestBtn}</Link>
             </div>
@@ -203,6 +212,8 @@ function AppContent() {
                 return <Link id={`mobile_nav_link_${link.key}`} key={link.key} to={link.path} onClick={() => { setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }} className={`w-full block p-3 rounded-xl text-xs font-bold transition-all ${isArabic ? "text-right" : "text-left"} ${isActive ? "bg-brand-blue text-white" : isLight ? "text-[#071A33]/75 hover:bg-[#071A33]/5" : "text-white/75 hover:bg-white/5"}`}>{link.label}</Link>;
               })}
               <div className="pt-2 space-y-2">
+                <Link id="mobile_merchant_portal_link" to="/merchant" onClick={() => setMobileMenuOpen(false)} className="w-full block py-3 border border-brand-gold/60 bg-gradient-to-r from-brand-gold to-[#F5B700] text-brand-deep font-black rounded-xl text-center text-xs transition-all">{merchantLabel}</Link>
+                <Link id="mobile_driver_portal_link" to="/driver" onClick={() => setMobileMenuOpen(false)} className="w-full block py-3 border border-brand-sky/45 bg-brand-sky/10 text-brand-sky font-extrabold rounded-xl text-center text-xs transition-all">{driverLabel}</Link>
                 <Link id="mobile_customer_portal_link" to="/customer" onClick={() => setMobileMenuOpen(false)} className="w-full block py-3 border border-brand-gold/50 bg-brand-gold/10 text-brand-gold font-extrabold rounded-xl text-center text-xs transition-all">{customerLabel}</Link>
                 <Link id="mobile_admin_portal_link" to="/auth" onClick={() => setMobileMenuOpen(false)} className="w-full block py-3 border border-brand-gold/50 text-brand-gold bg-brand-gold/10 font-extrabold rounded-xl text-center text-xs transition-all">{adminLabel}</Link>
                 <Link to="/tracking" onClick={() => setMobileMenuOpen(false)} className={`w-full block py-3 border font-bold rounded-xl text-center text-xs transition-all ${isLight ? "border-[#071A33]/20 text-[#071A33]/75" : "border-white/20 text-white"}`}>{t.header.trackBtn}</Link>
@@ -243,6 +254,7 @@ function AppContent() {
             <Route path="/gallery" element={<UltimateGalleryV2 />} />
             <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
             <Route path="/driver" element={<DriverPortal />} />
+            <Route path="/merchant" element={<MerchantPortal />} />
             <Route path="/customer" element={<CustomerDashboard />} />
             <Route path="/update-password" element={<CustomerDashboard />} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
