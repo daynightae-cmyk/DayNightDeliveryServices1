@@ -76,7 +76,7 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
       <div className="dn-driver-login-card">
         <div className="dn-driver-login-brand">
           <span className="dn-driver-login-icon">
-            <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-full w-full rounded-2xl bg-white object-contain p-1" />
+            <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-full w-full rounded-full bg-brand-deep object-cover ring-1 ring-brand-gold/35" />
           </span>
           <div>
             <small>DAY NIGHT DELIVERY SERVICES</small>
