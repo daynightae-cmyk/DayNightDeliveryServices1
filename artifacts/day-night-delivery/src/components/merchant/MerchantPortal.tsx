@@ -565,7 +565,7 @@ export default function MerchantPortal() {
               : "Sign-in succeeded, but no merchants row matches this account email or phone. Link the merchant record by email/phone or apply the merchant portal migration, then retry."}
           </p>
           <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-xs font-bold text-white/65" dir="ltr">
-            {identity?.email || "no-email"} · {identity?.phone || "no-phone"}
+            email: {identity?.email || "—"} · phone: {identity?.phone || "—"}
           </div>
           {dataError && <p className="mt-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{dataError}</p>}
           <div className="mt-5 flex flex-wrap gap-3">
