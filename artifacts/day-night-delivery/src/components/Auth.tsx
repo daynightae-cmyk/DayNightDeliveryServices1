@@ -21,13 +21,13 @@ const copy = {
   ar: {
     invalid: "بيانات الدخول غير صحيحة أو غير مخولة.",
     adminOnly: "هذه البوابة مخصصة للإدارة فقط.",
-    unavailable: "خدمة الدخول غير متاحة حالياً. تأكد من إعدادات Supabase.",
+    unavailable: "خدمة الدخول غير متاحة حالياً.",
     generic: "حدث خطأ أثناء تسجيل الدخول.",
   },
   en: {
     invalid: "Invalid or unauthorized login details.",
     adminOnly: "This portal is for administrators only.",
-    unavailable: "Login service is currently unavailable. Check Supabase config.",
+    unavailable: "Login service is currently unavailable.",
     generic: "An error occurred during login.",
   },
 } as const;
@@ -43,6 +43,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function handleBackToSite() {
+    window.location.assign("/");
+  }
 
   async function handleSubmit() {
     setErrorMessage("");
@@ -93,7 +97,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   }
 
   if (stage === "intro") {
-    return <AuthIntroScreen language={authLanguage} onEnter={() => setStage("login")} onToggleLanguage={toggleLanguage} />;
+    return <AuthIntroScreen language={authLanguage} onEnter={() => setStage("login")} onToggleLanguage={toggleLanguage} onBackToSite={handleBackToSite} />;
   }
 
   if (stage === "loading") {
@@ -114,6 +118,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       onSubmit={handleSubmit}
       onForgotPassword={() => { window.location.href = `mailto:${companyMeta.email}`; }}
       onToggleLanguage={toggleLanguage}
+      onBackToSite={handleBackToSite}
     />
   );
 }
