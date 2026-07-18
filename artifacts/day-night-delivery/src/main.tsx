@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { AppProvider } from './lib/AppContext.tsx';
 import { reportError } from './lib/monitoring';
+import { initializeDayNightNativeRuntime } from './lib/nativeAndroidRuntime';
 import './index.css';
 import './styles/dn-premium.css';
 import './styles/dn-ui-fixes.css';
@@ -13,6 +14,7 @@ import './styles/dn-admin-approved-reference.css';
 import './styles/dn-map-tile-fallback-guard.css';
 import './styles/dn-site-unification.css';
 import './styles/dn-vehicle-marker-system.css';
+import './styles/dn-native-android.css';
 
 const FALLBACK_LOGO = 'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png';
 
@@ -21,6 +23,8 @@ function isMapTileImage(img: HTMLImageElement) {
 }
 
 if (typeof window !== 'undefined') {
+  initializeDayNightNativeRuntime();
+
   window.addEventListener('error', (event) => {
     const target = event.target as HTMLElement | null;
     if (target?.tagName === 'IMG') {
