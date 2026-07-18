@@ -10,7 +10,8 @@
     "web:typecheck": "pnpm --dir artifacts/day-night-delivery run typecheck",
     "web:gate": "pnpm --dir artifacts/day-night-delivery run production:gate",
     "web:build": "pnpm --dir artifacts/day-night-delivery run build",
-    "web:validate": "pnpm run web:typecheck && pnpm run web:gate && pnpm run web:build"
+    "web:validate": "pnpm run web:typecheck && pnpm run web:gate && pnpm run web:build",
+    "merchant:provision": "node scripts/provision-official-merchant.mjs"
   },
   "private": true,
   "devDependencies": {
