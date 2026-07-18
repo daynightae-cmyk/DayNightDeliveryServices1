@@ -1,4 +1,4 @@
-name: DAY NIGHT Admin Android APK
+name: DAY NIGHT Android APK
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
       - "artifacts/day-night-delivery/src/styles/dn-native-android.css"
       - "artifacts/day-night-delivery/src/main.tsx"
+      - "artifacts/day-night-delivery/public/assets/daynight/logo.png"
       - "mobile/day-night-admin-android/**"
       - ".github/workflows/day-night-admin-android.yml"
   push:
@@ -16,6 +17,7 @@ on:
       - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
       - "artifacts/day-night-delivery/src/styles/dn-native-android.css"
       - "artifacts/day-night-delivery/src/main.tsx"
+      - "artifacts/day-night-delivery/public/assets/daynight/logo.png"
       - "mobile/day-night-admin-android/**"
       - ".github/workflows/day-night-admin-android.yml"
 
@@ -23,12 +25,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: day-night-admin-android-${{ github.ref }}
+  group: day-night-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build full DAY NIGHT Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -77,7 +79,7 @@ jobs:
         working-directory: mobile/day-night-admin-android
         run: npm install --no-audit --no-fund
 
-      - name: Generate and configure native Android project
+      - name: Generate full app and install official logo
         working-directory: mobile/day-night-admin-android
         run: npm run android:generate
 
@@ -98,12 +100,11 @@ jobs:
           UNSIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-unsigned.apk"
           ALIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-aligned.apk"
           SIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-signed.apk"
-          KEYSTORE="$RUNNER_TEMP/day-night-admin-release.jks"
+          KEYSTORE="$RUNNER_TEMP/day-night-release.jks"
           BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
 
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
-
           "$BUILD_TOOLS/zipalign" -p -f 4 "$UNSIGNED" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" sign \
             --ks "$KEYSTORE" \
@@ -115,7 +116,6 @@ jobs:
             --v3-signing-enabled true \
             --out "$SIGNED" \
             "$ALIGNED"
-
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED"
           "$BUILD_TOOLS/zipalign" -c -v 4 "$SIGNED"
           rm -f "$ALIGNED" "$KEYSTORE"
@@ -124,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Admin-Android-Gradle-Diagnostics
+          name: DAY-NIGHT-Android-Gradle-Diagnostics
           path: |
             mobile/day-night-admin-android/gradle-build.log
             mobile/day-night-admin-android/android/app/build/reports/**
@@ -140,14 +140,14 @@ jobs:
           OUTPUT="mobile/day-night-admin-android/output"
           mkdir -p "$OUTPUT"
 
-          cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-debug.apk"
+          cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.0-Internal.apk"
 
           SIGNING_MODE="unsigned-release"
-          RELEASE_FILE="DAY-NIGHT-Admin-Android-release-unsigned.apk"
+          RELEASE_FILE="DAY-NIGHT-Android-v1.1.0-release-unsigned.apk"
           if [[ -f "$SOURCE/release/app-release-signed.apk" ]]; then
-            cp "$SOURCE/release/app-release-signed.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-v1.0.0.apk"
+            cp "$SOURCE/release/app-release-signed.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.0.apk"
             SIGNING_MODE="permanent-company-key"
-            RELEASE_FILE="DAY-NIGHT-Admin-Android-v1.0.0.apk"
+            RELEASE_FILE="DAY-NIGHT-Android-v1.1.0.apk"
           else
             cp "$SOURCE/release/app-release-unsigned.apk" "$OUTPUT/$RELEASE_FILE"
           fi
@@ -158,22 +158,22 @@ jobs:
           )
 
           cat > "$OUTPUT/BUILD-REPORT.txt" <<REPORT
-          DAY NIGHT Admin Android
-          =======================
+          DAY NIGHT Android — Full Application
+          ====================================
           Repository: $GITHUB_REPOSITORY
           Commit: $GITHUB_SHA
           Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-          App ID: ae.daynight.admin
-          Version: 1.0.0 (10000)
+          Package ID: ae.daynight.admin
+          Visible name: DAY NIGHT
+          Version: 1.1.0 (10100)
           Capacitor: 8.0.0
           Minimum Android: API 24
           Target Android: API 36
-          Production portal: https://daynightae.com/auth
+          Production portal: https://daynightae.com/
+          Update model: live production shell with automatic deployment checks
+          Launcher icon: official DAY NIGHT company logo
           Signing mode: $SIGNING_MODE
           Release file: $RELEASE_FILE
-
-          DAY-NIGHT-Admin-Android-debug.apk is installable for internal testing.
-          When the four protected signing secrets are configured, the workflow also emits the permanently signed DAY-NIGHT-Admin-Android-v1.0.0.apk release.
           REPORT
 
           ls -lh "$OUTPUT"
@@ -181,7 +181,7 @@ jobs:
       - name: Upload Android APK package
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Admin-Android-APK
+          name: DAY-NIGHT-Android-v1.1.0
           path: mobile/day-night-admin-android/output/*
           if-no-files-found: error
           retention-days: 30

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>DAY NIGHT — اتصال غير متاح</title>
+  <style>
+    :root{color-scheme:dark;font-family:Segoe UI,Tahoma,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:30px;background:radial-gradient(circle at 50% 8%,#0c3b70 0,#071a33 40%,#020b17 100%);color:#fff}
+    main{width:min(92vw,520px);text-align:center;padding:42px 34px;border-radius:34px;border:1px solid rgba(212,175,55,.38);background:rgba(4,18,38,.9);box-shadow:0 32px 90px rgba(0,0,0,.55)}
+    img{display:block;width:148px;height:148px;object-fit:contain;margin:0 auto 24px;border-radius:30px;background:#fff;box-shadow:0 0 0 5px rgba(212,175,55,.2),0 18px 50px rgba(0,0,0,.45)}
+    h1{font-size:34px;margin:0 0 12px;letter-spacing:.03em}
+    p{font-size:17px;line-height:1.9;margin:0;color:rgba(255,255,255,.75);font-weight:650}
+    button{margin-top:26px;border:0;border-radius:999px;padding:15px 34px;background:linear-gradient(135deg,#ffd94e,#d4af37);color:#071a33;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 12px 30px rgba(212,175,55,.24)}
+    small{display:block;margin-top:22px;color:rgba(255,255,255,.42)}
+  </style>
+</head>
+<body>
+  <main>
+    <img src="build/logo.png" alt="DAY NIGHT" />
+    <h1>DAY NIGHT</h1>
+    <p>تعذر الاتصال بالمنصة الحية مؤقتًا.<br/>تأكد من الإنترنت، وسيحاول التطبيق الاتصال تلقائيًا.</p>
+    <button onclick="location.reload()">إعادة المحاولة الآن</button>
+    <small>داي نايت لخدمات التوصيل والشحن</small>
+  </main>
+</body>
+</html>

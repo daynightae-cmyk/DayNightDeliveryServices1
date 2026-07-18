@@ -1,0 +1,94 @@
+name: DAY NIGHT Windows Live Installer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "desktop/day-night-live/**"
+      - "artifacts/day-night-delivery/public/assets/daynight/logo.png"
+      - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
+      - ".github/workflows/day-night-windows-live.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "desktop/day-night-live/**"
+      - "artifacts/day-night-delivery/public/assets/daynight/logo.png"
+      - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
+      - ".github/workflows/day-night-windows-live.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: day-night-windows-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-live:
+    name: Build DAY NIGHT live Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install official DAY NIGHT logo
+        shell: pwsh
+        run: |
+          $target = "desktop/day-night-live/build"
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item -LiteralPath "artifacts/day-night-delivery/public/assets/daynight/logo.png" -Destination "$target/icon.png" -Force
+          Copy-Item -LiteralPath "artifacts/day-night-delivery/public/assets/daynight/logo.png" -Destination "$target/logo.png" -Force
+
+      - name: Install desktop dependencies
+        working-directory: desktop/day-night-live
+        run: npm install --no-audit --no-fund
+
+      - name: Build NSIS upgrade installer
+        working-directory: desktop/day-night-live
+        run: npm run dist:win
+
+      - name: Verify live installer output
+        shell: pwsh
+        run: |
+          $release = "desktop/day-night-live/release"
+          $setup = Get-ChildItem -LiteralPath $release -Filter "DAY-NIGHT-Live-Setup-*.exe" -File | Select-Object -First 1
+          if (-not $setup) { throw "DAY NIGHT live installer was not generated." }
+          $hash = Get-FileHash -LiteralPath $setup.FullName -Algorithm SHA256
+          @(
+            "DAY NIGHT Windows Live Shell"
+            "============================"
+            "Repository: $env:GITHUB_REPOSITORY"
+            "Commit: $env:GITHUB_SHA"
+            "Version: 1.1.0"
+            "Application ID: com.daynight.delivery.admin"
+            "Visible product name: DAY NIGHT"
+            "Production portal: https://daynightae.com/"
+            "Update model: every web deployment appears automatically"
+            "Installer: $($setup.Name)"
+            "SHA-256: $($hash.Hash)"
+          ) | Set-Content -LiteralPath "$release/BUILD-REPORT.txt" -Encoding UTF8
+          $hash.Hash + "  " + $setup.Name | Set-Content -LiteralPath "$release/SHA256SUMS.txt" -Encoding ASCII
+          Get-ChildItem -LiteralPath $release
+
+      - name: Upload Windows live installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Windows-Live-v1.1.0
+          path: |
+            desktop/day-night-live/release/DAY-NIGHT-Live-Setup-*.exe
+            desktop/day-night-live/release/BUILD-REPORT.txt
+            desktop/day-night-live/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
