@@ -118,9 +118,19 @@ await write(
     <color name="colorPrimary">#071A33</color>
     <color name="colorPrimaryDark">#020B17</color>
     <color name="colorAccent">#D4AF37</color>
-    <color name="ic_launcher_background">#FFFFFF</color>
     <color name="day_night_gold">#D4AF37</color>
     <color name="day_night_sky">#18A8E8</color>
+</resources>
+`,
+);
+
+// Capacitor creates this resource. Overwrite that exact file instead of declaring
+// the same color in colors.xml, which would create a duplicate Android resource.
+await write(
+  resolve(resRoot, "values", "ic_launcher_background.xml"),
+  `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
 `,
 );
