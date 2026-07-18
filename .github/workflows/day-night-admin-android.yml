@@ -78,9 +78,23 @@ jobs:
 
       - name: Build installable debug APK and unsigned release APK
         working-directory: mobile/day-night-admin-android/android
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+          ./gradlew --no-daemon --stacktrace --console=plain assembleDebug assembleRelease 2>&1 | tee ../gradle-build.log
+
+      - name: Upload Gradle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Admin-Android-Gradle-Diagnostics
+          path: |
+            mobile/day-night-admin-android/gradle-build.log
+            mobile/day-night-admin-android/android/app/build/reports/**
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
 
       - name: Prepare distribution files
         shell: bash
