@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { AppProvider } from './lib/AppContext.tsx';
 import { reportError } from './lib/monitoring';
 import { initializeDayNightNativeRuntime } from './lib/nativeAndroidRuntime';
+import { initializeLiveDeploymentWatcher } from './lib/liveDeploymentRuntime';
 import './index.css';
 import './styles/dn-premium.css';
 import './styles/dn-ui-fixes.css';
@@ -24,6 +25,7 @@ function isMapTileImage(img: HTMLImageElement) {
 
 if (typeof window !== 'undefined') {
   initializeDayNightNativeRuntime();
+  initializeLiveDeploymentWatcher();
 
   window.addEventListener('error', (event) => {
     const target = event.target as HTMLElement | null;
