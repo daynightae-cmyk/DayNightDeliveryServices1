@@ -53,18 +53,26 @@ Workflow:
 .github/workflows/day-night-admin-android.yml
 ```
 
-It builds and uploads:
+It always builds and uploads:
 
 - `DAY-NIGHT-Admin-Android-debug.apk` — installable internal APK.
-- `DAY-NIGHT-Admin-Android-release-unsigned.apk` — release binary awaiting permanent signing.
+- `DAY-NIGHT-Admin-Android-release-unsigned.apk` when no company signing key has been configured.
 - `SHA256SUMS.txt`.
 - Android build report.
+
+When all four protected signing secrets are configured, the same workflow securely emits:
+
+```text
+DAY-NIGHT-Admin-Android-v1.0.0.apk
+```
+
+The permanent key is decoded only inside the temporary GitHub runner, used by Android `apksigner` with v1/v2/v3 signatures, verified, and deleted before the job ends. The keystore and passwords are never uploaded as artifacts.
 
 ## Permanent release signing
 
 A production APK/AAB must use one permanent private keystore. Never commit the keystore or passwords to GitHub.
 
-Repository Actions secrets supported by the workflow:
+Repository Actions secrets used by the workflow:
 
 ```text
 ANDROID_KEYSTORE_BASE64
@@ -73,7 +81,21 @@ ANDROID_KEY_ALIAS
 ANDROID_KEY_PASSWORD
 ```
 
-`ANDROID_KEYSTORE_BASE64` is the base64 representation of the permanent `.jks` file. Once configured, the workflow can be extended to sign release APK/AAB artifacts using the same key for all upgrades.
+`ANDROID_KEYSTORE_BASE64` is the base64 representation of the permanent `.jks` file. Every future update must use this exact keystore and alias.
+
+Windows PowerShell conversion example:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('D:\secure\DAY-NIGHT-Admin-Android-Release.jks')) | Set-Clipboard
+```
+
+Add the resulting value and the three credential values under:
+
+```text
+GitHub repository → Settings → Secrets and variables → Actions
+```
+
+After the secrets are present, run the `DAY NIGHT Admin Android APK` workflow. The uploaded artifact will contain the permanently signed release APK.
 
 ## Deep links
 
