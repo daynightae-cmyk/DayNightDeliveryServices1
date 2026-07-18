@@ -1,0 +1,127 @@
+name: DAY NIGHT Admin Android APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-native-android.css"
+      - "artifacts/day-night-delivery/src/main.tsx"
+      - "mobile/day-night-admin-android/**"
+      - ".github/workflows/day-night-admin-android.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "artifacts/day-night-delivery/src/lib/nativeAndroidRuntime.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-native-android.css"
+      - "artifacts/day-night-delivery/src/main.tsx"
+      - "mobile/day-night-admin-android/**"
+      - ".github/workflows/day-night-admin-android.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: day-night-admin-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+          run_install: false
+
+      - name: Install web workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check DAY NIGHT web application
+        run: pnpm run web:typecheck
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install Capacitor wrapper dependencies
+        working-directory: mobile/day-night-admin-android
+        run: npm install --no-audit --no-fund
+
+      - name: Generate and configure native Android project
+        working-directory: mobile/day-night-admin-android
+        run: npm run android:generate
+
+      - name: Build installable debug APK and unsigned release APK
+        working-directory: mobile/day-night-admin-android/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+
+      - name: Prepare distribution files
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="mobile/day-night-admin-android/android/app/build/outputs/apk"
+          OUTPUT="mobile/day-night-admin-android/output"
+          mkdir -p "$OUTPUT"
+
+          cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-debug.apk"
+          cp "$SOURCE/release/app-release-unsigned.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-release-unsigned.apk"
+
+          (
+            cd "$OUTPUT"
+            sha256sum *.apk > SHA256SUMS.txt
+          )
+
+          cat > "$OUTPUT/BUILD-REPORT.txt" <<REPORT
+          DAY NIGHT Admin Android
+          =======================
+          Repository: $GITHUB_REPOSITORY
+          Commit: $GITHUB_SHA
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          App ID: ae.daynight.admin
+          Version: 1.0.0 (10000)
+          Capacitor: 8.0.0
+          Minimum Android: API 24
+          Target Android: API 36
+          Production portal: https://daynightae.com/auth
+
+          Install DAY-NIGHT-Admin-Android-debug.apk for internal testing.
+          The release APK is intentionally unsigned until a permanent private company keystore is configured.
+          REPORT
+
+          ls -lh "$OUTPUT"
+
+      - name: Upload Android APK package
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Admin-Android-APK
+          path: mobile/day-night-admin-android/output/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
