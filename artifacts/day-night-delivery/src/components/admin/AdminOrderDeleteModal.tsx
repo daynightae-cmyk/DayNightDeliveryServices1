@@ -30,7 +30,6 @@ export default function AdminOrderDeleteModal({
   isArabic,
   open,
   onClose,
-  onDeleted,
 }: Props) {
   const startedReference = useRef("");
   const [busy, setBusy] = useState(false);
@@ -63,7 +62,6 @@ export default function AdminOrderDeleteModal({
           }),
         );
 
-        await onDeleted?.(result.reference);
         onClose();
 
         // Reload from the authoritative Supabase snapshot so every live installed
@@ -79,7 +77,7 @@ export default function AdminOrderDeleteModal({
         );
       }
     })();
-  }, [isArabic, onClose, onDeleted, open, order, retryToken]);
+  }, [isArabic, onClose, open, order, retryToken]);
 
   if (!open || !order) return null;
 
