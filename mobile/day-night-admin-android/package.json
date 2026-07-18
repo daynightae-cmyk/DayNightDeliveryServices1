@@ -1,9 +1,9 @@
 {
-  "name": "day-night-admin-android",
-  "version": "1.0.0",
+  "name": "day-night-android",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Native Android wrapper and APK build pipeline for DAY NIGHT Admin.",
+  "description": "Native Android live shell for the complete DAY NIGHT delivery platform.",
   "scripts": {
     "prepare:wrapper": "node scripts/prepare-wrapper.mjs",
     "android:configure": "node scripts/configure-android.mjs",
