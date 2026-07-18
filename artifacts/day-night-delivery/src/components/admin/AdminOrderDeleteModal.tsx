@@ -76,6 +76,7 @@ export default function AdminOrderDeleteModal({
   }, [isArabic, order]);
 
   if (!open || !order) return null;
+  const currentOrder = order;
 
   async function confirmDelete() {
     if (blockReason) return setError(blockReason);
@@ -90,7 +91,7 @@ export default function AdminOrderDeleteModal({
     setBusy(true);
     setError("");
     try {
-      const result = await deleteOpsOrder(order, reason);
+      const result = await deleteOpsOrder(currentOrder, reason);
       if (!result.deleted) throw new Error("delete_not_confirmed");
       await onDeleted?.(result.reference);
       window.dispatchEvent(new CustomEvent("dn-admin-orders-updated"));
