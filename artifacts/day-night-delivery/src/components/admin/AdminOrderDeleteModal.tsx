@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
-import { deleteOpsOrder, opsErrorDetail } from "../../lib/adminOperationsData";
+import { AlertTriangle, Loader2, RefreshCw, Trash2, X } from "lucide-react";
+import { deleteAdminOrderImmediately } from "../../lib/adminOrderDeleteData";
 import type { Order } from "../../types";
 
 type Props = {
@@ -21,19 +21,21 @@ const orderReference = (order: Order) =>
 /**
  * One-click admin deletion.
  *
- * Opening this component starts the real Supabase deletion immediately. The admin is
- * no longer asked to type a reason or press a second confirmation button. The RPC
- * still receives a fixed internal audit reason so deletion records remain traceable.
+ * No reason field, no second confirmation, and no raw database/schema message is
+ * ever shown to the operator. Compatibility across Supabase migration generations
+ * is handled by the deletion data layer.
  */
 export default function AdminOrderDeleteModal({
   order,
   isArabic,
   open,
   onClose,
+  onDeleted,
 }: Props) {
   const startedReference = useRef("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (!open || !order) {
@@ -44,17 +46,15 @@ export default function AdminOrderDeleteModal({
     }
 
     const reference = String(orderReference(order));
-    if (startedReference.current === reference) return;
-    startedReference.current = reference;
+    const attemptKey = `${reference}:${retryToken}`;
+    if (startedReference.current === attemptKey) return;
+    startedReference.current = attemptKey;
     setBusy(true);
     setError("");
 
     void (async () => {
       try {
-        const result = await deleteOpsOrder(
-          order,
-          "Direct one-click deletion from DAY NIGHT admin orders table",
-        );
+        const result = await deleteAdminOrderImmediately(order);
         if (!result.deleted) throw new Error("delete_not_confirmed");
 
         window.dispatchEvent(
@@ -63,22 +63,23 @@ export default function AdminOrderDeleteModal({
           }),
         );
 
+        await onDeleted?.(result.reference);
         onClose();
 
-        // A reload guarantees every installed live shell, browser tab, and cached
-        // admin workspace immediately receives the authoritative Supabase snapshot.
+        // Reload from the authoritative Supabase snapshot so every live installed
+        // shell immediately reflects the deletion without retaining a stale row.
         window.setTimeout(() => window.location.reload(), 80);
       } catch (cause) {
-        const detail = opsErrorDetail(cause);
+        console.error("DAY NIGHT order deletion failed", cause);
         setBusy(false);
         setError(
           isArabic
-            ? `تعذر حذف الطلب.${detail ? ` ${detail}` : ""}`
-            : `The order could not be deleted.${detail ? ` ${detail}` : ""}`,
+            ? "تعذر الحذف الآن. اضغط إعادة المحاولة."
+            : "Deletion could not be completed. Press retry.",
         );
       }
     })();
-  }, [isArabic, onClose, open, order]);
+  }, [isArabic, onClose, onDeleted, open, order, retryToken]);
 
   if (!open || !order) return null;
 
@@ -111,7 +112,7 @@ export default function AdminOrderDeleteModal({
       aria-modal="true"
       dir={isArabic ? "rtl" : "ltr"}
     >
-      <section className="dn-admin-action-modal !max-w-xl">
+      <section className="dn-admin-action-modal !max-w-md">
         <header>
           <div>
             <span>{isArabic ? "تعذر الحذف" : "Deletion failed"}</span>
@@ -128,6 +129,17 @@ export default function AdminOrderDeleteModal({
         </div>
 
         <footer>
+          <button
+            type="button"
+            onClick={() => {
+              startedReference.current = "";
+              setRetryToken((value) => value + 1);
+            }}
+            className="inline-flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            {isArabic ? "إعادة المحاولة" : "Retry"}
+          </button>
           <button type="button" onClick={onClose}>
             {isArabic ? "إغلاق" : "Close"}
           </button>
