@@ -1,11 +1,21 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const repositoryRoot = resolve(root, "../..");
 const androidRoot = resolve(root, "android");
 const appRoot = resolve(androidRoot, "app");
 const mainRoot = resolve(appRoot, "src", "main");
 const resRoot = resolve(mainRoot, "res");
+const officialLogo = resolve(
+  repositoryRoot,
+  "artifacts",
+  "day-night-delivery",
+  "public",
+  "assets",
+  "daynight",
+  "logo.png",
+);
 
 async function read(path) {
   return readFile(path, "utf8");
@@ -14,6 +24,11 @@ async function read(path) {
 async function write(path, value) {
   await mkdir(resolve(path, ".."), { recursive: true });
   await writeFile(path, value, "utf8");
+}
+
+async function copy(path, destination) {
+  await mkdir(resolve(destination, ".."), { recursive: true });
+  await copyFile(path, destination);
 }
 
 function ensureIncludes(source, marker, insertion) {
@@ -59,17 +74,18 @@ const deepLinkFilter = `
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="daynightae.com" android:pathPrefix="/auth" />
-                <data android:scheme="https" android:host="daynightae.com" android:pathPrefix="/admin" />
+                <data android:scheme="https" android:host="daynightae.com" />
+                <data android:scheme="https" android:host="www.daynightae.com" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="daynight" android:host="open" />
                 <data android:scheme="daynightadmin" android:host="open" />
             </intent-filter>`;
 
-if (!manifest.includes('android:scheme="daynightadmin"')) {
+if (!manifest.includes('android:scheme="daynight"')) {
   manifest = manifest.replace("        </activity>", `${deepLinkFilter}\n        </activity>`);
 }
 
@@ -102,44 +118,29 @@ await write(
     <color name="colorPrimary">#071A33</color>
     <color name="colorPrimaryDark">#020B17</color>
     <color name="colorAccent">#D4AF37</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
     <color name="day_night_gold">#D4AF37</color>
     <color name="day_night_sky">#18A8E8</color>
 </resources>
 `,
 );
 
+// Use the exact official company logo instead of a generated placeholder/vector.
+await copy(officialLogo, resolve(resRoot, "drawable-nodpi", "day_night_logo.png"));
+await copy(officialLogo, resolve(resRoot, "drawable", "splash.png"));
+
+for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
+  for (const fileName of ["ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"]) {
+    await copy(officialLogo, resolve(resRoot, `mipmap-${density}`, fileName));
+  }
+}
+
 await write(
   resolve(resRoot, "drawable", "ic_launcher_foreground.xml"),
   `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#071A33"
-        android:pathData="M54,8A46,46 0,1 0,54 100A46,46 0,1 0,54 8" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#D4AF37"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:pathData="M24,54A30,30 0,1 0,84 54A30,30 0,1 0,24 54" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M34,35L34,73L49,73C65,73 74,65 74,54C74,43 65,35 49,35Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#D4AF37"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M48,68L61,41L74,68" />
-</vector>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/day_night_logo"
+    android:inset="6%" />
 `,
 );
 
@@ -150,6 +151,7 @@ for (const fileName of ["ic_launcher.xml", "ic_launcher_round.xml"]) {
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
 `,
   );
@@ -158,17 +160,17 @@ for (const fileName of ["ic_launcher.xml", "ic_launcher_round.xml"]) {
 const stringsPath = resolve(resRoot, "values", "strings.xml");
 let strings = await read(stringsPath);
 strings = strings
-  .replace(/<string name="app_name">[\s\S]*?<\/string>/, '<string name="app_name">DAY NIGHT Admin</string>')
-  .replace(/<string name="title_activity_main">[\s\S]*?<\/string>/, '<string name="title_activity_main">DAY NIGHT Admin</string>');
+  .replace(/<string name="app_name">[\s\S]*?<\/string>/, '<string name="app_name">DAY NIGHT</string>')
+  .replace(/<string name="title_activity_main">[\s\S]*?<\/string>/, '<string name="title_activity_main">DAY NIGHT</string>');
 await write(stringsPath, strings);
 
 const gradlePath = resolve(appRoot, "build.gradle");
 let gradle = await read(gradlePath);
 gradle = gradle
-  .replace(/versionCode\s*=\s*\d+/, "versionCode = 10000")
-  .replace(/versionCode\s+\d+/, "versionCode 10000")
-  .replace(/versionName\s*=\s*["'][^"']+["']/, 'versionName = "1.0.0"')
-  .replace(/versionName\s+["'][^"']+["']/, 'versionName "1.0.0"');
+  .replace(/versionCode\s*=\s*\d+/, "versionCode = 10100")
+  .replace(/versionCode\s+\d+/, "versionCode 10100")
+  .replace(/versionName\s*=\s*["'][^"']+["']/, 'versionName = "1.1.0"')
+  .replace(/versionName\s+["'][^"']+["']/, 'versionName "1.1.0"');
 await write(gradlePath, gradle);
 
 const variablesPath = resolve(androidRoot, "variables.gradle");
@@ -179,4 +181,4 @@ variables = variables
   .replace(/targetSdkVersion\s*=\s*\d+/, "targetSdkVersion = 36");
 await write(variablesPath, variables);
 
-console.log("DAY NIGHT Android project configured and hardened.");
+console.log("DAY NIGHT Android full application configured with the official logo.");
