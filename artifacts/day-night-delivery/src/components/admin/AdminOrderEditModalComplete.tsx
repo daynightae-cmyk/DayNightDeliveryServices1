@@ -130,6 +130,8 @@ export default function AdminOrderEditModalComplete({
   );
 
   if (!open || !order || !form) return null;
+  const currentOrder = order;
+  const currentForm = form;
 
   function setField<K extends keyof OpsOrderInput>(key: K, value: OpsOrderInput[K]) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
@@ -159,9 +161,9 @@ export default function AdminOrderEditModalComplete({
   function validate() {
     const missing = [
       !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !clean(form.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
-      !clean(form.receiver_name) ? (isArabic ? "اسم المستلم" : "receiver name") : "",
-      !clean(form.receiver_phone) ? (isArabic ? "هاتف المستلم" : "receiver phone") : "",
+      !clean(currentForm.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
+      !clean(currentForm.receiver_name) ? (isArabic ? "اسم المستلم" : "receiver name") : "",
+      !clean(currentForm.receiver_phone) ? (isArabic ? "هاتف المستلم" : "receiver phone") : "",
     ].filter(Boolean);
 
     if (missing.length) {
@@ -170,14 +172,14 @@ export default function AdminOrderEditModalComplete({
         : `Required core fields: ${missing.join(", ")}`;
     }
     if (
-      form.price_mode === "manual" &&
-      (form.manual_delivery_price === "" ||
-        !Number.isFinite(Number(form.manual_delivery_price)) ||
-        Number(form.manual_delivery_price) < 0)
+      currentForm.price_mode === "manual" &&
+      (currentForm.manual_delivery_price === "" ||
+        !Number.isFinite(Number(currentForm.manual_delivery_price)) ||
+        Number(currentForm.manual_delivery_price) < 0)
     ) {
       return isArabic ? "أدخل سعراً يدوياً صحيحاً." : "Enter a valid manual price.";
     }
-    if (form.payment_method === "cod" && Number(form.cod_amount || 0) <= 0) {
+    if (currentForm.payment_method === "cod" && Number(currentForm.cod_amount || 0) <= 0) {
       return isArabic ? "مبلغ التحصيل مطلوب عند اختيار COD." : "COD amount is required.";
     }
     return "";
@@ -192,17 +194,17 @@ export default function AdminOrderEditModalComplete({
     setMessage("");
     setError("");
     try {
-      const originalPackage = clean(order.package_description || order.package_type);
-      const packageValue = clean(form.package_description || form.package_type) || originalPackage;
+      const originalPackage = clean(currentOrder.package_description || currentOrder.package_type);
+      const packageValue = clean(currentForm.package_description || currentForm.package_type) || originalPackage;
       const result = await updateOpsOrder({
-        ...form,
-        coupon_number: clean(form.coupon_number),
+        ...currentForm,
+        coupon_number: clean(currentForm.coupon_number),
         merchant: selectedMerchant,
-        receiver_address: clean(form.receiver_address),
-        delivery_street: clean(form.delivery_street),
+        receiver_address: clean(currentForm.receiver_address),
+        delivery_street: clean(currentForm.delivery_street),
         package_type: packageValue,
         package_description: packageValue,
-        order,
+        order: currentOrder,
         edit_reason: clean(editReason) || (isArabic ? "تعديل من لوحة الإدارة" : "Updated from admin panel"),
       });
       setMessage(
