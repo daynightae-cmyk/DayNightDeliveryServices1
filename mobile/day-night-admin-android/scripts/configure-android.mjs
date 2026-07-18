@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -60,6 +60,20 @@ manifest = manifest.replace(
     if (!/android:allowBackup=/.test(next)) next += '\n        android:allowBackup="false"';
     if (!/android:fullBackupContent=/.test(next)) next += '\n        android:fullBackupContent="false"';
     if (!/android:networkSecurityConfig=/.test(next)) next += '\n        android:networkSecurityConfig="@xml/network_security_config"';
+
+    // Explicitly use bitmap launcher resources. Do not allow Android 13/Samsung
+    // themed-icon monochrome rendering to replace the official colored company logo.
+    if (/android:icon="[^"]*"/.test(next)) {
+      next = next.replace(/android:icon="[^"]*"/, 'android:icon="@mipmap/ic_launcher"');
+    } else {
+      next += '\n        android:icon="@mipmap/ic_launcher"';
+    }
+    if (/android:roundIcon="[^"]*"/.test(next)) {
+      next = next.replace(/android:roundIcon="[^"]*"/, 'android:roundIcon="@mipmap/ic_launcher_round"');
+    } else {
+      next += '\n        android:roundIcon="@mipmap/ic_launcher_round"';
+    }
+
     return `<application${next}>`;
   },
 );
@@ -124,47 +138,38 @@ await write(
 `,
 );
 
-// Capacitor creates this resource. Overwrite that exact file instead of declaring
-// the same color in colors.xml, which would create a duplicate Android resource.
 await write(
   resolve(resRoot, "values", "ic_launcher_background.xml"),
   `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#071A33</color>
 </resources>
 `,
 );
 
-// Use the exact official company logo instead of a generated placeholder/vector.
+// Use the exact official company logo for the launcher and splash.
 await copy(officialLogo, resolve(resRoot, "drawable-nodpi", "day_night_logo.png"));
 await copy(officialLogo, resolve(resRoot, "drawable", "splash.png"));
 
 for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
-  for (const fileName of ["ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"]) {
-    await copy(officialLogo, resolve(resRoot, `mipmap-${density}`, fileName));
-  }
+  await copy(officialLogo, resolve(resRoot, `mipmap-${density}`, "ic_launcher.png"));
+  await copy(officialLogo, resolve(resRoot, `mipmap-${density}`, "ic_launcher_round.png"));
+
+  // Remove unused generated foregrounds so they cannot be selected by launchers.
+  await rm(resolve(resRoot, `mipmap-${density}`, "ic_launcher_foreground.png"), { force: true });
 }
 
-await write(
+// Critical Samsung/Android 13 fix:
+// remove adaptive and monochrome icon XML resources. The previous <monochrome>
+// entry treated the opaque white logo canvas as a solid white mask, which is why
+// the launcher displayed a blank white icon even though the colored PNG existed.
+for (const path of [
+  resolve(resRoot, "mipmap-anydpi-v26", "ic_launcher.xml"),
+  resolve(resRoot, "mipmap-anydpi-v26", "ic_launcher_round.xml"),
   resolve(resRoot, "drawable", "ic_launcher_foreground.xml"),
-  `<?xml version="1.0" encoding="utf-8"?>
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/day_night_logo"
-    android:inset="6%" />
-`,
-);
-
-for (const fileName of ["ic_launcher.xml", "ic_launcher_round.xml"]) {
-  await write(
-    resolve(resRoot, "mipmap-anydpi-v26", fileName),
-    `<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
-</adaptive-icon>
-`,
-  );
+  resolve(resRoot, "drawable-v24", "ic_launcher_foreground.xml"),
+]) {
+  await rm(path, { force: true });
 }
 
 const stringsPath = resolve(resRoot, "values", "strings.xml");
@@ -177,10 +182,10 @@ await write(stringsPath, strings);
 const gradlePath = resolve(appRoot, "build.gradle");
 let gradle = await read(gradlePath);
 gradle = gradle
-  .replace(/versionCode\s*=\s*\d+/, "versionCode = 10100")
-  .replace(/versionCode\s+\d+/, "versionCode 10100")
-  .replace(/versionName\s*=\s*["'][^"']+["']/, 'versionName = "1.1.0"')
-  .replace(/versionName\s+["'][^"']+["']/, 'versionName "1.1.0"');
+  .replace(/versionCode\s*=\s*\d+/, "versionCode = 10101")
+  .replace(/versionCode\s+\d+/, "versionCode 10101")
+  .replace(/versionName\s*=\s*["'][^"']+["']/, 'versionName = "1.1.1"')
+  .replace(/versionName\s+["'][^"']+["']/, 'versionName "1.1.1"');
 await write(gradlePath, gradle);
 
 const variablesPath = resolve(androidRoot, "variables.gradle");
@@ -191,4 +196,4 @@ variables = variables
   .replace(/targetSdkVersion\s*=\s*\d+/, "targetSdkVersion = 36");
 await write(variablesPath, variables);
 
-console.log("DAY NIGHT Android full application configured with the official logo.");
+console.log("DAY NIGHT Android configured with forced full-color legacy launcher icons; themed monochrome icons disabled.");
