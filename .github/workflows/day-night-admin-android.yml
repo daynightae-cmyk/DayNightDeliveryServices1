@@ -79,7 +79,7 @@ jobs:
         working-directory: mobile/day-night-admin-android
         run: npm install --no-audit --no-fund
 
-      - name: Generate full app and install official logo
+      - name: Generate full app and force official full-color logo
         working-directory: mobile/day-night-admin-android
         run: npm run android:generate
 
@@ -90,6 +90,48 @@ jobs:
           set -o pipefail
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace --console=plain assembleDebug assembleRelease 2>&1 | tee ../gradle-build.log
+
+      - name: Verify launcher icon is colored logo and not themed monochrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="mobile/day-night-admin-android/android/app/build/outputs/apk/debug/app-debug.apk"
+          OFFICIAL="artifacts/day-night-delivery/public/assets/daynight/logo.png"
+          LIST="$RUNNER_TEMP/apk-files.txt"
+          EXTRACTED="$RUNNER_TEMP/ic_launcher.png"
+
+          unzip -Z1 "$APK" | sort > "$LIST"
+
+          if grep -Eq '^res/mipmap-anydpi-v26/ic_launcher(_round)?\.xml$' "$LIST"; then
+            echo "ERROR: adaptive/themed launcher XML is still present."
+            exit 1
+          fi
+
+          if grep -Eq 'ic_launcher_foreground|monochrome' "$LIST"; then
+            echo "ERROR: themed foreground resources are still present."
+            exit 1
+          fi
+
+          ICON_PATH="$(grep -E '^res/mipmap-xxxhdpi[^/]*/ic_launcher\.png$' "$LIST" | head -n 1)"
+          if [[ -z "$ICON_PATH" ]]; then
+            echo "ERROR: xxxhdpi launcher PNG not found."
+            exit 1
+          fi
+
+          unzip -p "$APK" "$ICON_PATH" > "$EXTRACTED"
+          OFFICIAL_HASH="$(sha256sum "$OFFICIAL" | awk '{print $1}')"
+          APK_ICON_HASH="$(sha256sum "$EXTRACTED" | awk '{print $1}')"
+
+          echo "Official logo SHA-256: $OFFICIAL_HASH"
+          echo "APK icon SHA-256:      $APK_ICON_HASH"
+
+          if [[ "$OFFICIAL_HASH" != "$APK_ICON_HASH" ]]; then
+            echo "ERROR: APK launcher icon is not the exact official logo."
+            exit 1
+          fi
+
+          file "$EXTRACTED"
+          echo "PASS: APK uses exact full-color official PNG with no adaptive monochrome icon."
 
       - name: Sign release APK with permanent company key
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
@@ -140,14 +182,14 @@ jobs:
           OUTPUT="mobile/day-night-admin-android/output"
           mkdir -p "$OUTPUT"
 
-          cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.0-Internal.apk"
+          cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.1-Internal.apk"
 
           SIGNING_MODE="unsigned-release"
-          RELEASE_FILE="DAY-NIGHT-Android-v1.1.0-release-unsigned.apk"
+          RELEASE_FILE="DAY-NIGHT-Android-v1.1.1-release-unsigned.apk"
           if [[ -f "$SOURCE/release/app-release-signed.apk" ]]; then
-            cp "$SOURCE/release/app-release-signed.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.0.apk"
+            cp "$SOURCE/release/app-release-signed.apk" "$OUTPUT/DAY-NIGHT-Android-v1.1.1.apk"
             SIGNING_MODE="permanent-company-key"
-            RELEASE_FILE="DAY-NIGHT-Android-v1.1.0.apk"
+            RELEASE_FILE="DAY-NIGHT-Android-v1.1.1.apk"
           else
             cp "$SOURCE/release/app-release-unsigned.apk" "$OUTPUT/$RELEASE_FILE"
           fi
@@ -158,20 +200,20 @@ jobs:
           )
 
           cat > "$OUTPUT/BUILD-REPORT.txt" <<REPORT
-          DAY NIGHT Android — Full Application
-          ====================================
+          DAY NIGHT Android — Samsung Launcher Icon Hotfix
+          =================================================
           Repository: $GITHUB_REPOSITORY
           Commit: $GITHUB_SHA
           Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           Package ID: ae.daynight.admin
           Visible name: DAY NIGHT
-          Version: 1.1.0 (10100)
+          Version: 1.1.1 (10101)
           Capacitor: 8.0.0
           Minimum Android: API 24
           Target Android: API 36
           Production portal: https://daynightae.com/
           Update model: live production shell with automatic deployment checks
-          Launcher icon: official DAY NIGHT company logo
+          Launcher icon mode: exact official full-color PNG; adaptive monochrome resources removed
           Signing mode: $SIGNING_MODE
           Release file: $RELEASE_FILE
           REPORT
@@ -181,7 +223,7 @@ jobs:
       - name: Upload Android APK package
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Android-v1.1.0
+          name: DAY-NIGHT-Android-v1.1.1
           path: mobile/day-night-admin-android/output/*
           if-no-files-found: error
           retention-days: 30
