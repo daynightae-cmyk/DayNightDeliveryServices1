@@ -2,8 +2,10 @@
 -- Admin CRUD visibility and required/optional field hardening.
 --
 -- Goals:
---   * coupon number is mandatory for authenticated admin/support order writes
+--   * coupon number is mandatory for authenticated admin/support order creation
+--     and for admin edits that touch the order identity/core receiver fields
 --   * coupon numbers cannot be duplicated for the same merchant
+--   * status-only updates on historical coupon-less orders remain possible
 --   * historical/public orders are not globally forced to have a coupon number
 --   * existing safe order deletion runtime remains authoritative
 
@@ -24,6 +26,9 @@ declare
   v_coupon text := nullif(btrim(to_jsonb(new) ->> 'coupon_number'), '');
   v_source text := lower(coalesce(to_jsonb(new) ->> 'source_channel', ''));
   v_admin_write boolean := false;
+  v_policy_write boolean := false;
+  v_core_changed boolean := false;
+  v_identity_changed boolean := false;
 begin
   if auth.uid() is not null then
     begin
@@ -33,13 +38,36 @@ begin
     end;
   end if;
 
-  if v_admin_write or v_source in ('admin_operations', 'admin', 'admin_coupon_photo') then
-    if v_coupon is null then
-      raise exception 'coupon_number_required_for_admin_order';
-    end if;
+  v_policy_write :=
+    v_admin_write
+    or v_source in ('admin_operations', 'admin', 'admin_coupon_photo');
+
+  if tg_op = 'INSERT' then
+    v_core_changed := true;
+    v_identity_changed := true;
+  else
+    v_identity_changed :=
+      new.merchant_id is distinct from old.merchant_id
+      or coalesce(to_jsonb(new) ->> 'coupon_number', '')
+        is distinct from coalesce(to_jsonb(old) ->> 'coupon_number', '');
+
+    v_core_changed :=
+      v_identity_changed
+      or coalesce(to_jsonb(new) ->> 'receiver_name', '')
+        is distinct from coalesce(to_jsonb(old) ->> 'receiver_name', '')
+      or coalesce(to_jsonb(new) ->> 'receiver_phone', '')
+        is distinct from coalesce(to_jsonb(old) ->> 'receiver_phone', '');
   end if;
 
-  if v_coupon is not null and new.merchant_id is not null then
+  -- Do not block status/driver/finance-only updates on legacy rows that predate
+  -- the mandatory coupon policy. The next real admin edit must supply a coupon.
+  if v_policy_write and v_core_changed and v_coupon is null then
+    raise exception 'coupon_number_required_for_admin_order';
+  end if;
+
+  -- Only re-check uniqueness when the merchant/coupon identity is created or
+  -- changed. This prevents unrelated status updates from failing on legacy data.
+  if v_identity_changed and v_coupon is not null and new.merchant_id is not null then
     if exists (
       select 1
       from public.orders o
@@ -93,7 +121,8 @@ as $$
         and not tgisinternal
     ),
     'coupon_lookup_index', to_regclass('public.idx_orders_merchant_coupon_lookup')::text,
-    'deletion_audit_table', to_regclass('public.admin_order_deletion_log')::text
+    'deletion_audit_table', to_regclass('public.admin_order_deletion_log')::text,
+    'legacy_status_updates_preserved', true
   );
 $$;
 
