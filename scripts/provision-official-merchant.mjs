@@ -1,6 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim().replace(/\/$/, "");
 const SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 const MERCHANT_PASSWORD = String(process.env.MERCHANT_BOOTSTRAP_PASSWORD || "");
 const MERCHANT_EMAIL = "merchant@daynightae.com";
@@ -16,52 +14,66 @@ if (MERCHANT_PASSWORD.length < 12) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const commonHeaders = {
+  apikey: SERVICE_ROLE_KEY,
+  Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+  "Content-Type": "application/json",
+};
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...commonHeaders, ...(options.headers || {}) },
+  });
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!response.ok) {
+    const message = data?.msg || data?.message || data?.error_description || data?.error || `${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+  return data;
+}
 
 async function findUserByEmail(email) {
   for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 100 });
-    if (error) throw error;
-    const user = data.users.find((item) => String(item.email || "").toLowerCase() === email);
+    const payload = await requestJson(`${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=100`);
+    const users = Array.isArray(payload?.users) ? payload.users : [];
+    const user = users.find((item) => String(item.email || "").toLowerCase() === email);
     if (user) return user;
-    if (data.users.length < 100) break;
+    if (users.length < 100) break;
   }
   return null;
 }
 
-async function provision() {
-  let user = await findUserByEmail(MERCHANT_EMAIL);
+async function provisionAuthUser() {
+  const existing = await findUserByEmail(MERCHANT_EMAIL);
+  const payload = {
+    email: MERCHANT_EMAIL,
+    password: MERCHANT_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      ...(existing?.user_metadata || {}),
+      role: "merchant",
+      account_type: "merchant",
+      full_name: "DAY NIGHT Merchant",
+    },
+  };
 
-  if (user) {
-    const { data, error } = await supabase.auth.admin.updateUserById(user.id, {
-      password: MERCHANT_PASSWORD,
-      email_confirm: true,
-      user_metadata: {
-        ...(user.user_metadata || {}),
-        role: "merchant",
-        account_type: "merchant",
-        full_name: "DAY NIGHT Merchant",
-      },
+  if (existing) {
+    return requestJson(`${SUPABASE_URL}/auth/v1/admin/users/${existing.id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
     });
-    if (error) throw error;
-    user = data.user;
-  } else {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: MERCHANT_EMAIL,
-      password: MERCHANT_PASSWORD,
-      email_confirm: true,
-      user_metadata: {
-        role: "merchant",
-        account_type: "merchant",
-        full_name: "DAY NIGHT Merchant",
-      },
-    });
-    if (error) throw error;
-    user = data.user;
   }
 
+  return requestJson(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function provisionMerchantRow(userId) {
   const merchantPayload = {
     merchant_code: MERCHANT_CODE,
     trade_name: "DAY NIGHT Merchant",
@@ -77,17 +89,23 @@ async function provision() {
     default_payment_method: "sender_pays",
     status: "active",
     notes: "Official DAY NIGHT merchant portal account",
-    user_id: user.id,
+    user_id: userId,
     updated_at: new Date().toISOString(),
   };
 
-  const { data: merchant, error: merchantError } = await supabase
-    .from("merchants")
-    .upsert(merchantPayload, { onConflict: "merchant_code" })
-    .select("id, merchant_code, trade_name, email, status, user_id")
-    .single();
+  const data = await requestJson(`${SUPABASE_URL}/rest/v1/merchants?on_conflict=merchant_code&select=id,merchant_code,trade_name,email,status,user_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(merchantPayload),
+  });
 
-  if (merchantError) throw merchantError;
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function provision() {
+  const user = await provisionAuthUser();
+  if (!user?.id) throw new Error("Supabase Auth did not return a user id.");
+  const merchant = await provisionMerchantRow(user.id);
 
   console.log(JSON.stringify({
     ok: true,
