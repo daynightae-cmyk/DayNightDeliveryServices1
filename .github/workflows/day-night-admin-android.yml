@@ -31,6 +31,11 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -84,6 +89,37 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace --console=plain assembleDebug assembleRelease 2>&1 | tee ../gradle-build.log
 
+      - name: Sign release APK with permanent company key
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="mobile/day-night-admin-android"
+          UNSIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-aligned.apk"
+          SIGNED="$ROOT/android/app/build/outputs/apk/release/app-release-signed.apk"
+          KEYSTORE="$RUNNER_TEMP/day-night-admin-release.jks"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$UNSIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass "env:ANDROID_KEYSTORE_PASSWORD" \
+            --key-pass "env:ANDROID_KEY_PASSWORD" \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "$SIGNED" \
+            "$ALIGNED"
+
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED"
+          "$BUILD_TOOLS/zipalign" -c -v 4 "$SIGNED"
+          rm -f "$ALIGNED" "$KEYSTORE"
+
       - name: Upload Gradle diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,7 +141,16 @@ jobs:
           mkdir -p "$OUTPUT"
 
           cp "$SOURCE/debug/app-debug.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-debug.apk"
-          cp "$SOURCE/release/app-release-unsigned.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-release-unsigned.apk"
+
+          SIGNING_MODE="unsigned-release"
+          RELEASE_FILE="DAY-NIGHT-Admin-Android-release-unsigned.apk"
+          if [[ -f "$SOURCE/release/app-release-signed.apk" ]]; then
+            cp "$SOURCE/release/app-release-signed.apk" "$OUTPUT/DAY-NIGHT-Admin-Android-v1.0.0.apk"
+            SIGNING_MODE="permanent-company-key"
+            RELEASE_FILE="DAY-NIGHT-Admin-Android-v1.0.0.apk"
+          else
+            cp "$SOURCE/release/app-release-unsigned.apk" "$OUTPUT/$RELEASE_FILE"
+          fi
 
           (
             cd "$OUTPUT"
@@ -124,9 +169,11 @@ jobs:
           Minimum Android: API 24
           Target Android: API 36
           Production portal: https://daynightae.com/auth
+          Signing mode: $SIGNING_MODE
+          Release file: $RELEASE_FILE
 
-          Install DAY-NIGHT-Admin-Android-debug.apk for internal testing.
-          The release APK is intentionally unsigned until a permanent private company keystore is configured.
+          DAY-NIGHT-Admin-Android-debug.apk is installable for internal testing.
+          When the four protected signing secrets are configured, the workflow also emits the permanently signed DAY-NIGHT-Admin-Android-v1.0.0.apk release.
           REPORT
 
           ls -lh "$OUTPUT"
