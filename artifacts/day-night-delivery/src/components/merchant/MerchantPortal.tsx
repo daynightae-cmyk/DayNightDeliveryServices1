@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   Globe2,
+  Image as ImageIcon,
   Loader2,
   LockKeyhole,
   LogOut,
@@ -15,17 +16,21 @@ import {
   MapPin,
   MessageCircle,
   PackageCheck,
+  Pencil,
   Phone,
   PlusCircle,
   RefreshCw,
+  Save,
   ShieldCheck,
   Sparkles,
   Store,
   Truck,
+  X,
 } from "lucide-react";
 import { supabase } from "../../supabase";
 import { useAppContext } from "../../lib/AppContext";
 import companyMeta from "../../data/companyMeta";
+import { UAE_LOCATIONS, getAreasForEmirate } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
 
 type SupabaseClient = NonNullable<typeof supabase>;
@@ -33,8 +38,38 @@ type MerchantRecord = Merchant & Record<string, any>;
 type MerchantOrder = Order & Record<string, any>;
 type PortalTab = "overview" | "orders" | "tracking" | "account";
 
+type MerchantProfileForm = {
+  trade_name: string;
+  owner_name: string;
+  phone: string;
+  alt_phone: string;
+  emirate: string;
+  city: string;
+  address: string;
+  pickup_address: string;
+  logo_url: string;
+  license_number: string;
+  trn: string;
+  notes: string;
+};
+
 const closedStatuses = new Set(["delivered", "cancelled", "returned", "failed"]);
 const activeStatuses = new Set(["pending", "confirmed", "assigned", "accepted", "picked_up", "in_transit", "out_for_delivery"]);
+
+const emptyProfile: MerchantProfileForm = {
+  trade_name: "",
+  owner_name: "",
+  phone: "",
+  alt_phone: "",
+  emirate: "Abu Dhabi",
+  city: "Mussafah",
+  address: "",
+  pickup_address: "",
+  logo_url: "",
+  license_number: "",
+  trn: "",
+  notes: "",
+};
 
 function clean(value?: unknown) {
   return String(value || "").trim();
@@ -79,7 +114,9 @@ function statusLabel(status: string, isArabic: boolean) {
 function statusTone(status: string) {
   if (status === "delivered") return "border-emerald-400/35 bg-emerald-400/10 text-emerald-200";
   if (status === "cancelled" || status === "returned" || status === "failed") return "border-rose-400/35 bg-rose-400/10 text-rose-200";
-  if (status === "assigned" || status === "accepted" || status === "picked_up" || status === "in_transit" || status === "out_for_delivery") return "border-brand-sky/35 bg-brand-sky/10 text-brand-sky";
+  if (status === "assigned" || status === "accepted" || status === "picked_up" || status === "in_transit" || status === "out_for_delivery") {
+    return "border-brand-sky/35 bg-brand-sky/10 text-brand-sky";
+  }
   return "border-brand-gold/35 bg-brand-gold/10 text-brand-gold";
 }
 
@@ -132,6 +169,24 @@ function userIdentity(user: User) {
   return { email, phone, phoneDigits };
 }
 
+function profileFromMerchant(merchant?: MerchantRecord | null): MerchantProfileForm {
+  if (!merchant) return emptyProfile;
+  return {
+    trade_name: clean(merchant.trade_name),
+    owner_name: clean(merchant.owner_name),
+    phone: clean(merchant.phone),
+    alt_phone: clean(merchant.alt_phone),
+    emirate: clean(merchant.emirate) || "Abu Dhabi",
+    city: clean(merchant.city) || "Mussafah",
+    address: clean(merchant.address),
+    pickup_address: clean(merchant.pickup_address),
+    logo_url: clean(merchant.logo_url),
+    license_number: clean(merchant.license_number),
+    trn: clean(merchant.trn || merchant.tax_number),
+    notes: clean(merchant.notes),
+  };
+}
+
 function portalErrorMessage(error: unknown, isArabic: boolean) {
   const raw = error instanceof Error ? error.message : String(error || "");
   if (/invalid login|credentials|password|email/i.test(raw)) {
@@ -140,10 +195,16 @@ function portalErrorMessage(error: unknown, isArabic: boolean) {
   if (/not_authenticated|jwt|session/i.test(raw)) {
     return isArabic ? "انتهت الجلسة. سجّل الدخول مرة أخرى." : "Your session expired. Please sign in again.";
   }
+  if (/merchant_profile_not_found|merchant_record_missing/i.test(raw)) {
+    return isArabic ? "لم يتم العثور على ملف التاجر المرتبط بهذا الحساب." : "No merchant profile is linked to this account.";
+  }
+  if (/invalid_logo_url/i.test(raw)) {
+    return isArabic ? "رابط الشعار يجب أن يبدأ بـ https:// أو يُترك فارغًا." : "The logo URL must start with https:// or remain empty.";
+  }
   if (/phone|sms|otp/i.test(raw)) {
     return isArabic ? "تعذر إكمال تحقق الهاتف حالياً." : "Phone verification is unavailable right now.";
   }
-  return isArabic ? "تعذر تحديث البيانات حالياً. حاول مرة أخرى أو تواصل مع الدعم." : "We could not refresh the workspace right now. Please retry or contact support.";
+  return isArabic ? "تعذر تحديث البيانات حالياً. حاول مرة أخرى أو تواصل مع الدعم." : "We could not update the data right now. Please retry or contact support.";
 }
 
 async function queryMerchantsBy(client: SupabaseClient, column: string, value: string, mode: "eq" | "ilike" = "eq") {
@@ -237,6 +298,9 @@ function coordinatesFor(order: MerchantOrder) {
   return null;
 }
 
+const inputClass = "w-full rounded-2xl border border-white/10 bg-[#071A33]/80 px-4 py-3 text-sm font-bold text-white outline-none ring-brand-gold/30 transition placeholder:text-white/28 focus:border-brand-gold/45 focus:ring-4";
+const labelClass = "mb-2 block text-xs font-black text-white/72";
+
 export default function MerchantPortal() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
@@ -254,6 +318,11 @@ export default function MerchantPortal() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
   const [tab, setTab] = useState<PortalTab>("overview");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState<MerchantProfileForm>(emptyProfile);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileNotice, setProfileNotice] = useState("");
 
   const redirectTo = useCallback(() => `${window.location.origin}/merchant`, []);
 
@@ -292,12 +361,23 @@ export default function MerchantPortal() {
     let resolvedOrders: MerchantOrder[] = [];
 
     try {
-      const merchantRpc = await client.rpc("merchant_get_session_profile");
+      let merchantRpc = await client.rpc("merchant_get_session_profile");
       if (!merchantRpc.error) {
         const payload = merchantRpc.data as any;
         if (Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
       } else {
         errors.push(merchantRpc.error.message);
+      }
+
+      if (!resolvedMerchants.length) {
+        const claim = await client.rpc("merchant_claim_approved_account");
+        if (!claim.error) {
+          merchantRpc = await client.rpc("merchant_get_session_profile");
+          const payload = merchantRpc.data as any;
+          if (!merchantRpc.error && Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
+        } else if (!/merchant_account_not_approved/i.test(claim.error.message)) {
+          errors.push(claim.error.message);
+        }
       }
 
       if (resolvedMerchants.length) {
@@ -348,6 +428,7 @@ export default function MerchantPortal() {
       setMerchants([]);
       setOrders([]);
       setDataError("");
+      setEditingProfile(false);
     }
   }, [user, loadMerchantData]);
 
@@ -356,6 +437,7 @@ export default function MerchantPortal() {
     const channel = supabase
       .channel(`merchant-portal-orders-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => void loadMerchantData(user))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "merchants" }, () => void loadMerchantData(user))
       .subscribe();
 
     return () => {
@@ -443,10 +525,82 @@ export default function MerchantPortal() {
     setUser(null);
     setMerchants([]);
     setOrders([]);
+    setEditingProfile(false);
   }
 
   const currentMerchant = merchants[0] || null;
   const currentMerchantName = merchantTitle(currentMerchant);
+
+  useEffect(() => {
+    if (!currentMerchant || editingProfile) return;
+    setProfileForm(profileFromMerchant(currentMerchant));
+  }, [currentMerchant, editingProfile]);
+
+  function beginProfileEdit() {
+    setProfileForm(profileFromMerchant(currentMerchant));
+    setProfileError("");
+    setProfileNotice("");
+    setEditingProfile(true);
+    setTab("account");
+  }
+
+  function cancelProfileEdit() {
+    setProfileForm(profileFromMerchant(currentMerchant));
+    setProfileError("");
+    setEditingProfile(false);
+  }
+
+  function updateProfileField<K extends keyof MerchantProfileForm>(key: K, value: MerchantProfileForm[K]) {
+    setProfileForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function saveMerchantProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user || !currentMerchant) return;
+
+    const tradeName = clean(profileForm.trade_name);
+    const merchantPhone = clean(profileForm.phone);
+    if (!tradeName || !merchantPhone) {
+      setProfileError(isArabic ? "اسم النشاط ورقم الهاتف حقول إلزامية." : "Business name and phone are required.");
+      return;
+    }
+    if (profileForm.logo_url && !/^https:\/\//i.test(profileForm.logo_url)) {
+      setProfileError(isArabic ? "رابط الشعار يجب أن يبدأ بـ https:// أو يُترك فارغًا." : "Logo URL must start with https:// or remain empty.");
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError("");
+    setProfileNotice("");
+
+    try {
+      const { data, error } = await supabase.rpc("merchant_update_own_profile", {
+        p_updates: {
+          ...profileForm,
+          trade_name: tradeName,
+          phone: merchantPhone,
+        },
+      });
+      if (error) throw error;
+
+      const payload = data as any;
+      const updatedMerchant = payload?.merchant as MerchantRecord | undefined;
+      if (updatedMerchant?.id) {
+        setMerchants((rows) => [updatedMerchant, ...rows.filter((row) => clean(row.id) !== clean(updatedMerchant.id))]);
+        setProfileForm(profileFromMerchant(updatedMerchant));
+      } else {
+        await loadMerchantData(user);
+      }
+
+      setProfileNotice(isArabic ? "تم حفظ بيانات التاجر بنجاح." : "Merchant details were saved successfully.");
+      setEditingProfile(false);
+    } catch (error) {
+      setProfileError(portalErrorMessage(error, isArabic));
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
   const activeOrders = useMemo(() => orders.filter((order) => activeStatuses.has(normalizeStatus(order.status)) || !closedStatuses.has(normalizeStatus(order.status))), [orders]);
   const deliveredOrders = useMemo(() => orders.filter((order) => normalizeStatus(order.status) === "delivered"), [orders]);
   const codTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderCod(order)), 0), [orders]);
@@ -455,6 +609,7 @@ export default function MerchantPortal() {
   const mappedOrder = orders.find((order) => coordinatesFor(order));
   const mappedCoords = mappedOrder ? coordinatesFor(mappedOrder) : null;
   const mapSrc = mappedCoords ? `https://maps.google.com/maps?q=${mappedCoords.lat},${mappedCoords.lng}&z=13&output=embed` : "";
+  const profileAreas = getAreasForEmirate(profileForm.emirate);
 
   const kpis = [
     { icon: PackageCheck, value: orders.length, label: isArabic ? "كل الطلبات" : "Total orders" },
@@ -497,8 +652,8 @@ export default function MerchantPortal() {
               </div>
               <p className="max-w-2xl text-sm font-bold leading-8 text-white/65">
                 {isArabic
-                  ? "مساحة أنيقة لإدارة الطلبات، متابعة التحصيل، ومراقبة مسار الشحنات المرتبطة بحسابك التجاري."
-                  : "A refined workspace for orders, collections, and shipment progress linked to your merchant account."}
+                  ? "مساحة أنيقة لإدارة الطلبات، متابعة التحصيل، ومراقبة مسار الشحنات وتحديث بيانات نشاطك التجاري."
+                  : "A refined workspace for orders, collections, shipment progress, and your merchant business profile."}
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><Store className="mb-3 h-5 w-5 text-brand-gold" /><strong className="block text-white">{isArabic ? "حساب تجاري" : "Merchant account"}</strong></div>
@@ -518,12 +673,12 @@ export default function MerchantPortal() {
 
               <form onSubmit={signInWithPassword} className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
-                  <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#071A33]/80 px-4 py-3 text-sm font-bold text-white outline-none ring-brand-gold/30 focus:ring-4" />
+                  <span className={labelClass}>{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
+                  <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "كلمة المرور" : "Password"}</span>
-                  <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#071A33]/80 px-4 py-3 text-sm font-bold text-white outline-none ring-brand-gold/30 focus:ring-4" />
+                  <span className={labelClass}>{isArabic ? "كلمة المرور" : "Password"}</span>
+                  <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} />
                 </label>
                 <button type="submit" disabled={authBusy || !email.trim() || !password} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-sm font-black text-brand-deep shadow-xl shadow-brand-gold/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                   {authBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
@@ -538,11 +693,11 @@ export default function MerchantPortal() {
 
               <div className="mt-4 rounded-2xl border border-white/10 bg-[#071A33]/60 p-4">
                 <label className="block">
-                  <span className="mb-2 block text-xs font-black text-white/75">{isArabic ? "رقم الهاتف" : "Phone number"}</span>
-                  <input type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#031226] px-4 py-3 text-sm font-bold text-white outline-none ring-brand-sky/30 focus:ring-4" />
+                  <span className={labelClass}>{isArabic ? "رقم الهاتف" : "Phone number"}</span>
+                  <input type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className={inputClass} />
                 </label>
                 <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <input type="text" inputMode="numeric" value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value)} aria-label={isArabic ? "رمز الهاتف" : "Phone code"} className="rounded-2xl border border-white/10 bg-[#031226] px-4 py-3 text-sm font-bold text-white outline-none ring-brand-sky/30 focus:ring-4" />
+                  <input type="text" inputMode="numeric" value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value)} aria-label={isArabic ? "رمز الهاتف" : "Phone code"} className={inputClass} />
                   <button type="button" disabled={authBusy || !phone.trim()} onClick={() => void sendPhoneOtp()} className="rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-3 text-xs font-black text-brand-gold disabled:opacity-50"><Phone className="mr-1 inline h-4 w-4" />{isArabic ? "إرسال الرمز" : "Send code"}</button>
                 </div>
                 <button type="button" disabled={authBusy || !phoneOtp.trim()} onClick={() => void verifyPhoneOtp()} className="mt-2 w-full rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200 disabled:opacity-50">{isArabic ? "تأكيد الرمز" : "Verify code"}</button>
@@ -717,27 +872,147 @@ export default function MerchantPortal() {
       )}
 
       {tab === "account" && (
-        <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-          <h2 className="text-2xl font-black text-white">{isArabic ? "بيانات الحساب" : "Account details"}</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              [isArabic ? "الكود" : "Code", currentMerchant.merchant_code],
-              [isArabic ? "المالك" : "Owner", currentMerchant.owner_name],
-              [isArabic ? "البريد" : "Email", currentMerchant.email],
-              [isArabic ? "الهاتف" : "Phone", currentMerchant.phone],
-              [isArabic ? "الإمارة" : "Emirate", currentMerchant.emirate],
-              [isArabic ? "العنوان" : "Address", currentMerchant.pickup_address || currentMerchant.address],
-              [isArabic ? "الحالة" : "Status", currentMerchant.status],
-              [isArabic ? "دورة التسوية" : "Settlement", currentMerchant.settlement_cycle],
-              [isArabic ? "آخر تحديث" : "Updated", formatDate(currentMerchant.updated_at || currentMerchant.created_at, isArabic)],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-                <span className="text-[11px] font-black text-white/45">{label}</span>
-                <p className="mt-2 break-words text-sm font-bold text-white/80">{clean(value) || "—"}</p>
+        <div className="space-y-5">
+          <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#031226] shadow-xl shadow-black/20">
+            <header className="flex flex-col gap-4 border-b border-white/10 bg-[linear-gradient(110deg,rgba(212,175,55,0.14),rgba(24,168,232,0.08),transparent)] p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-brand-gold">{isArabic ? "إدارة الملف التجاري" : "Merchant profile management"}</p>
+                <h2 className="mt-2 text-2xl font-black text-white">{isArabic ? "بيانات الحساب والنشاط" : "Account and business details"}</h2>
+                <p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-white/55">{isArabic ? "حدّث اسم النشاط، وسائل التواصل، العنوان، موقع الاستلام، الشعار والبيانات القانونية. الحقول الأمنية والمالية الأساسية تبقى تحت إدارة الشركة." : "Update business identity, contacts, addresses, pickup point, logo, and legal details. Core security and settlement controls remain company-managed."}</p>
               </div>
-            ))}
-          </div>
-        </article>
+              {!editingProfile ? (
+                <button type="button" onClick={beginProfileEdit} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-xs font-black text-brand-deep shadow-xl shadow-brand-gold/15"><Pencil className="h-4 w-4" />{isArabic ? "تعديل البيانات" : "Edit details"}</button>
+              ) : (
+                <button type="button" onClick={cancelProfileEdit} disabled={profileSaving} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-5 py-3 text-xs font-black text-white/70 disabled:opacity-50"><X className="h-4 w-4" />{isArabic ? "إلغاء" : "Cancel"}</button>
+              )}
+            </header>
+
+            {profileNotice && <div className="mx-6 mt-5 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-bold text-emerald-100">{profileNotice}</div>}
+            {profileError && <div className="mx-6 mt-5 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{profileError}</div>}
+
+            {!editingProfile ? (
+              <div className="p-6">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    [isArabic ? "اسم النشاط" : "Business name", currentMerchant.trade_name],
+                    [isArabic ? "الكود" : "Code", currentMerchant.merchant_code],
+                    [isArabic ? "المالك" : "Owner", currentMerchant.owner_name],
+                    [isArabic ? "البريد" : "Email", currentMerchant.email],
+                    [isArabic ? "الهاتف" : "Phone", currentMerchant.phone],
+                    [isArabic ? "هاتف بديل" : "Alternate phone", currentMerchant.alt_phone],
+                    [isArabic ? "الإمارة" : "Emirate", currentMerchant.emirate],
+                    [isArabic ? "المنطقة" : "Area", currentMerchant.city],
+                    [isArabic ? "العنوان" : "Address", currentMerchant.address],
+                    [isArabic ? "عنوان الاستلام" : "Pickup address", currentMerchant.pickup_address],
+                    [isArabic ? "رقم الرخصة" : "License number", currentMerchant.license_number],
+                    [isArabic ? "الرقم الضريبي" : "TRN", currentMerchant.trn || currentMerchant.tax_number],
+                    [isArabic ? "الحالة" : "Status", currentMerchant.status],
+                    [isArabic ? "دورة التسوية" : "Settlement", currentMerchant.settlement_cycle],
+                    [isArabic ? "آخر تحديث" : "Updated", formatDate(currentMerchant.updated_at || currentMerchant.created_at, isArabic)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                      <span className="text-[11px] font-black text-white/45">{label}</span>
+                      <p className="mt-2 break-words text-sm font-bold text-white/80">{clean(value) || "—"}</p>
+                    </div>
+                  ))}
+                </div>
+                {clean(currentMerchant.notes) && <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-[11px] font-black text-white/45">{isArabic ? "ملاحظات النشاط" : "Business notes"}</span><p className="mt-2 whitespace-pre-wrap text-sm font-bold leading-7 text-white/78">{clean(currentMerchant.notes)}</p></div>}
+              </div>
+            ) : (
+              <form onSubmit={saveMerchantProfile} className="p-6">
+                <div className="mb-6 grid gap-4 rounded-[1.6rem] border border-brand-gold/20 bg-brand-gold/[0.055] p-4 sm:grid-cols-[auto_1fr] sm:items-center">
+                  <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-[1.5rem] border border-brand-gold/35 bg-white/95">
+                    {profileForm.logo_url ? <img src={profileForm.logo_url} alt="" className="h-full w-full object-contain p-2" /> : <ImageIcon className="h-9 w-9 text-[#071A33]/45" />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">{isArabic ? "شعار النشاط" : "Business logo"}</h3>
+                    <p className="mt-1 text-xs font-bold leading-6 text-white/50">{isArabic ? "استخدم رابط صورة آمن يبدأ بـ https://. سيظهر الشعار فور الحفظ في رأس لوحة التاجر." : "Use a secure image URL beginning with https://. The logo appears in the merchant dashboard after saving."}</p>
+                    <input type="url" value={profileForm.logo_url} onChange={(event) => updateProfileField("logo_url", event.target.value)} placeholder="https://..." className={`${inputClass} mt-3`} dir="ltr" />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "اسم النشاط التجاري *" : "Business name *"}</span>
+                    <input value={profileForm.trade_name} onChange={(event) => updateProfileField("trade_name", event.target.value)} maxLength={160} required className={inputClass} />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "اسم المالك أو المسؤول" : "Owner or manager name"}</span>
+                    <input value={profileForm.owner_name} onChange={(event) => updateProfileField("owner_name", event.target.value)} maxLength={160} className={inputClass} />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "رقم الهاتف *" : "Phone number *"}</span>
+                    <input type="tel" value={profileForm.phone} onChange={(event) => updateProfileField("phone", event.target.value)} maxLength={40} required className={inputClass} dir="ltr" />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "رقم هاتف بديل" : "Alternate phone"}</span>
+                    <input type="tel" value={profileForm.alt_phone} onChange={(event) => updateProfileField("alt_phone", event.target.value)} maxLength={40} className={inputClass} dir="ltr" />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "الإمارة" : "Emirate"}</span>
+                    <select
+                      value={profileForm.emirate}
+                      onChange={(event) => {
+                        const emirate = event.target.value;
+                        const areas = getAreasForEmirate(emirate);
+                        setProfileForm((current) => ({ ...current, emirate, city: areas.some((area) => area.value === current.city) ? current.city : areas[0]?.value || "" }));
+                      }}
+                      className={inputClass}
+                    >
+                      {UAE_LOCATIONS.map((location) => <option key={location.value} value={location.value}>{isArabic ? location.ar : location.en}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "المنطقة" : "Area"}</span>
+                    <select value={profileForm.city} onChange={(event) => updateProfileField("city", event.target.value)} className={inputClass}>
+                      {profileAreas.map((area) => <option key={area.value} value={area.value}>{isArabic ? area.ar : area.en}</option>)}
+                    </select>
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className={labelClass}>{isArabic ? "العنوان التجاري" : "Business address"}</span>
+                    <input value={profileForm.address} onChange={(event) => updateProfileField("address", event.target.value)} maxLength={500} className={inputClass} />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className={labelClass}>{isArabic ? "عنوان استلام الطلبيات" : "Order pickup address"}</span>
+                    <input value={profileForm.pickup_address} onChange={(event) => updateProfileField("pickup_address", event.target.value)} maxLength={500} className={inputClass} />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "رقم الرخصة التجارية" : "Trade license number"}</span>
+                    <input value={profileForm.license_number} onChange={(event) => updateProfileField("license_number", event.target.value)} maxLength={120} className={inputClass} dir="ltr" />
+                  </label>
+                  <label className="block">
+                    <span className={labelClass}>{isArabic ? "الرقم الضريبي TRN" : "Tax registration number"}</span>
+                    <input value={profileForm.trn} onChange={(event) => updateProfileField("trn", event.target.value)} maxLength={120} className={inputClass} dir="ltr" />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className={labelClass}>{isArabic ? "ملاحظات النشاط" : "Business notes"}</span>
+                    <textarea value={profileForm.notes} onChange={(event) => updateProfileField("notes", event.target.value)} maxLength={1200} rows={4} className={inputClass} />
+                  </label>
+                </div>
+
+                <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    [isArabic ? "البريد المسجل" : "Registered email", currentMerchant.email],
+                    [isArabic ? "كود التاجر" : "Merchant code", currentMerchant.merchant_code],
+                    [isArabic ? "الحالة" : "Status", currentMerchant.status],
+                    [isArabic ? "دورة التسوية" : "Settlement cycle", currentMerchant.settlement_cycle],
+                  ].map(([label, value]) => (
+                    <div key={label}><span className="text-[10px] font-black text-white/40">{label}</span><p className="mt-1 break-words text-xs font-bold text-white/70">{clean(value) || "—"}</p></div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs font-bold leading-6 text-white/42">{isArabic ? "لأمان الحساب لا يمكن للتاجر تغيير البريد، الكود، الحالة، العمولة أو دورة التسوية من هذه الصفحة. يتم تعديلها من الإدارة." : "For account security, email, code, status, commission, and settlement settings remain admin-managed."}</p>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button type="submit" disabled={profileSaving} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-2xl bg-brand-gold px-6 py-3 text-sm font-black text-brand-deep shadow-xl shadow-brand-gold/15 disabled:cursor-not-allowed disabled:opacity-55">
+                    {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {isArabic ? "حفظ التعديلات" : "Save changes"}
+                  </button>
+                  <button type="button" onClick={cancelProfileEdit} disabled={profileSaving} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-6 py-3 text-sm font-black text-white/70 disabled:opacity-50"><X className="h-4 w-4" />{isArabic ? "إلغاء" : "Cancel"}</button>
+                </div>
+              </form>
+            )}
+          </article>
+        </div>
       )}
     </section>
   );
