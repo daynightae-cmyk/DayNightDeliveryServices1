@@ -15,7 +15,6 @@ let retryTimer = null;
 
 app.setName("DAY NIGHT");
 app.setAppUserModelId(PRODUCT_APP_ID);
-app.commandLine.appendSwitch("disable-features", "OutOfBlinkCors");
 
 function isAllowedUrl(rawUrl) {
   try {
@@ -58,7 +57,6 @@ async function loadProduction({ force = false } = {}) {
 
   try {
     await mainWindow.loadURL(url.toString(), {
-      userAgent: `${mainWindow.webContents.getUserAgent()} DAY-NIGHT-WINDOWS-LIVE/1.1.0`,
       extraHeaders: [
         "Cache-Control: no-cache, no-store, must-revalidate",
         "Pragma: no-cache",
@@ -81,8 +79,7 @@ async function loadOffline(error) {
 }
 
 async function checkForLiveDeployment() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (!mainWindow.isVisible()) return;
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
 
   try {
     const nextSignature = await fetchProductionSignature();
@@ -193,6 +190,8 @@ async function createWindow() {
       spellcheck: false,
     },
   });
+
+  mainWindow.webContents.setUserAgent(`${mainWindow.webContents.getUserAgent()} DAY-NIGHT-WINDOWS-LIVE/1.1.0`);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedUrl(url)) {
