@@ -4,6 +4,7 @@ import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
 
 export type OpsDataSource = "rpc" | "db";
+export type OpsPriceMode = "system" | "manual";
 
 export type OpsMerchantInput = {
   trade_name: string;
@@ -55,10 +56,26 @@ export type OpsOrderInput = {
   cod_amount?: number | string | null;
   notes?: string;
   status?: string;
+  price_mode?: OpsPriceMode;
+  manual_delivery_price?: number | string | null;
+};
+
+export type OpsOrderUpdateInput = OpsOrderInput & {
+  order: Order;
+  edit_reason?: string;
 };
 
 export type OpsCreateResult<T> = { row: T; source: OpsDataSource };
-export type OpsSnapshot = { merchants: Merchant[]; orders: Order[]; source: OpsDataSource };
+export type OpsDeleteResult = {
+  deleted: boolean;
+  reference: string;
+  source: "rpc";
+};
+export type OpsSnapshot = {
+  merchants: Merchant[];
+  orders: Order[];
+  source: OpsDataSource;
+};
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -69,107 +86,250 @@ function numberValue(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function optionalPositiveNumber(value: unknown) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function removeEmptyUndefined<T extends Record<string, unknown>>(payload: T): T {
   return Object.fromEntries(
-    Object.entries(payload).filter(([, value]) => value !== undefined && value !== ""),
+    Object.entries(payload).filter(
+      ([, value]) => value !== undefined && value !== "",
+    ),
   ) as T;
 }
 
 function merchantCode(seed?: string) {
-  const suffix = clean(seed).replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 4) || "SHOP";
+  const suffix =
+    clean(seed)
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 4) || "SHOP";
   const serial = Date.now().toString(36).toUpperCase().slice(-5);
   return `DN-MER-${suffix}-${serial}`;
 }
 
-function composeLocationAddress(parts: Array<string | undefined | null>) {
+function composeLocationAddress(
+  parts: Array<string | undefined | null>,
+) {
   return parts.map(clean).filter(Boolean).join(" - ");
 }
 
+export function opsErrorDetail(error: unknown) {
+  const record = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    dbDetail?: string;
+  };
+  return [record?.dbDetail, record?.message, record?.details, record?.hint]
+    .map(clean)
+    .filter(Boolean)
+    .filter((value, index, all) => all.indexOf(value) === index)
+    .join(" | ");
+}
+
 function operationsError(error: unknown, fallback: string) {
-  const detail = String((error as { message?: string })?.message || error || "");
+  const detail = opsErrorDetail(error);
   if (detail) console.warn("Admin operations DB detail:", detail);
   const wrapped = new Error(fallback) as Error & { dbDetail?: string };
   wrapped.dbDetail = detail;
   return wrapped;
 }
 
-async function rpcOne<T>(fn: string, args: Record<string, unknown>): Promise<T | null> {
+async function rpcOne<T>(
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<T | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc(fn, args);
   if (error) {
-    console.warn(`${fn} unavailable, using compatibility fallback when possible:`, error.message);
+    console.warn(
+      `${fn} unavailable, using compatibility fallback when possible:`,
+      error.message,
+    );
     return null;
   }
   if (Array.isArray(data)) return (data[0] || null) as T | null;
   return (data || null) as T | null;
 }
 
+async function rpcRequired<T>(
+  fn: string,
+  args: Record<string, unknown>,
+  fallback: string,
+): Promise<T> {
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for order operations.",
+    );
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw operationsError(error, fallback);
+  if (Array.isArray(data)) {
+    if (!data[0]) throw operationsError(null, fallback);
+    return data[0] as T;
+  }
+  if (!data) throw operationsError(null, fallback);
+  return data as T;
+}
+
+export function getOpsOrderReference(order: Order) {
+  return clean(
+    order.id ||
+      order.tracking_number ||
+      order.invoice_number ||
+      order.coupon_number,
+  );
+}
+
 async function findCreatedOrder(reference: string): Promise<Order | null> {
   if (!supabase || !reference) return null;
-  for (const column of ["tracking_number", "invoice_number", "coupon_number", "id"]) {
-    const { data, error } = await supabase.from("orders").select("*").eq(column, reference).limit(1);
+  for (const column of [
+    "tracking_number",
+    "invoice_number",
+    "coupon_number",
+    "id",
+  ]) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq(column, reference)
+      .limit(1);
     if (!error && data?.[0]) return data[0] as Order;
   }
   return null;
 }
 
-async function attachMerchantToCreatedOrder(reference: string, merchant: Merchant | null, input: OpsOrderInput) {
+async function attachMerchantToCreatedOrder(
+  reference: string,
+  merchant: Merchant | null,
+  input: OpsOrderInput,
+) {
   if (!supabase || !reference) return;
   const patch = removeEmptyUndefined({
     merchant_id: merchant?.id || clean(input.merchant_id) || undefined,
-    merchant_name: clean(merchant?.trade_name || input.merchant_name) || undefined,
-    merchant_code: clean(merchant?.merchant_code || input.merchant_code) || undefined,
+    merchant_name:
+      clean(merchant?.trade_name || input.merchant_name) || undefined,
+    merchant_code:
+      clean(merchant?.merchant_code || input.merchant_code) || undefined,
     updated_at: new Date().toISOString(),
   });
   if (!Object.keys(patch).some((key) => key !== "updated_at")) return;
 
-  for (const column of ["tracking_number", "invoice_number", "coupon_number", "id"]) {
-    const { data, error } = await supabase.from("orders").update(patch).eq(column, reference).select("*").limit(1);
+  for (const column of [
+    "tracking_number",
+    "invoice_number",
+    "coupon_number",
+    "id",
+  ]) {
+    const { data, error } = await supabase
+      .from("orders")
+      .update(patch)
+      .eq(column, reference)
+      .select("*")
+      .limit(1);
     if (!error && data?.[0]) return;
   }
 }
 
 function normalizeInitialOrderStatus(status: unknown) {
-  const normalized = clean(status).toLowerCase().replace(/[\s-]+/g, "_");
-  if (["pending", "confirmed", "assigned", "picked_up", "in_transit", "delivered", "cancelled", "returned"].includes(normalized)) {
+  const normalized = clean(status)
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (
+    [
+      "pending",
+      "confirmed",
+      "assigned",
+      "picked_up",
+      "in_transit",
+      "delivered",
+      "cancelled",
+      "returned",
+    ].includes(normalized)
+  ) {
     return normalized;
   }
   return "pending";
 }
 
+function normalizedPaymentMethod(value: unknown) {
+  const normalized = clean(value || "merchant_pays").toLowerCase();
+  if (normalized === "merchant_pays") return "sender_pays";
+  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) {
+    return normalized;
+  }
+  return "sender_pays";
+}
+
 export async function fetchOpsMerchants(): Promise<Merchant[]> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for merchant operations.",
+    );
   const { data, error } = await supabase
     .from("merchants")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) throw operationsError(error, "Merchants table is not ready. Apply the admin operations migration.");
+  if (error)
+    throw operationsError(
+      error,
+      "Merchants table is not ready. Apply the admin operations migration.",
+    );
   return (data || []) as Merchant[];
 }
 
 export async function fetchOpsOrders(limit = 1000): Promise<Order[]> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for order operations.");
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for order operations.",
+    );
   const { data, error } = await supabase
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (error) throw operationsError(error, "Orders table is not ready. Apply the admin operations migration.");
+  if (error)
+    throw operationsError(
+      error,
+      "Orders table is not ready. Apply the admin operations migration.",
+    );
   return (data || []) as Order[];
 }
 
 export async function fetchOpsSnapshot(): Promise<OpsSnapshot> {
-  const [merchants, orders] = await Promise.all([fetchOpsMerchants(), fetchOpsOrders()]);
+  const [merchants, orders] = await Promise.all([
+    fetchOpsMerchants(),
+    fetchOpsOrders(),
+  ]);
   return { merchants, orders, source: "db" };
 }
 
-export async function createOpsMerchant(input: OpsMerchantInput): Promise<OpsCreateResult<Merchant>> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
+export async function createOpsMerchant(
+  input: OpsMerchantInput,
+): Promise<OpsCreateResult<Merchant>> {
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for merchant operations.",
+    );
   const now = new Date().toISOString();
   const emirate = clean(input.emirate || "Abu Dhabi");
   const area = clean(input.area || input.city || emirate);
-  const address = composeLocationAddress([area, input.street_details, input.address]);
-  const pickupAddress = composeLocationAddress([area, input.street_details, input.pickup_address || input.address]);
+  const address = composeLocationAddress([
+    area,
+    input.street_details,
+    input.address,
+  ]);
+  const pickupAddress = composeLocationAddress([
+    area,
+    input.street_details,
+    input.pickup_address || input.address,
+  ]);
   const payload = removeEmptyUndefined({
     merchant_code: merchantCode(input.trade_name),
     trade_name: clean(input.trade_name),
@@ -188,143 +348,313 @@ export async function createOpsMerchant(input: OpsMerchantInput): Promise<OpsCre
     bank_name: clean(input.bank_name),
     iban: clean(input.iban),
     settlement_cycle: clean(input.settlement_cycle || "weekly"),
-    commission_type: clean(input.commission_type || "fixed_delivery_fee"),
-    default_payment_method: clean(input.default_payment_method || "merchant_pays"),
+    commission_type: clean(
+      input.commission_type || "fixed_delivery_fee",
+    ),
+    default_payment_method: clean(
+      input.default_payment_method || "merchant_pays",
+    ),
     notes: clean(input.notes),
     status: clean(input.status || "active"),
     created_at: now,
     updated_at: now,
   });
 
-  const rpcMerchant = await rpcOne<Merchant>("admin_create_merchant", { p_merchant: payload });
+  const rpcMerchant = await rpcOne<Merchant>("admin_create_merchant", {
+    p_merchant: payload,
+  });
   if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };
 
-  const { data, error } = await supabase.from("merchants").insert(payload).select("*").single();
-  if (error) throw operationsError(error, "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.");
+  const { data, error } = await supabase
+    .from("merchants")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error)
+    throw operationsError(
+      error,
+      "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.",
+    );
   return { row: data as Merchant, source: "db" };
 }
 
-export async function updateOpsMerchantStatus(merchantId: string, status: string): Promise<OpsCreateResult<Merchant>> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
-  const patch = { status: clean(status), updated_at: new Date().toISOString() };
-  const rpcMerchant = await rpcOne<Merchant>("admin_update_merchant", { p_merchant_id: merchantId, p_patch: patch });
+export async function updateOpsMerchantStatus(
+  merchantId: string,
+  status: string,
+): Promise<OpsCreateResult<Merchant>> {
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for merchant operations.",
+    );
+  const patch = {
+    status: clean(status),
+    updated_at: new Date().toISOString(),
+  };
+  const rpcMerchant = await rpcOne<Merchant>("admin_update_merchant", {
+    p_merchant_id: merchantId,
+    p_patch: patch,
+  });
   if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };
-  const { data, error } = await supabase.from("merchants").update(patch).eq("id", merchantId).select("*").single();
-  if (error) throw operationsError(error, "Could not update merchant status. Confirm admin/support RLS access.");
+  const { data, error } = await supabase
+    .from("merchants")
+    .update(patch)
+    .eq("id", merchantId)
+    .select("*")
+    .single();
+  if (error)
+    throw operationsError(
+      error,
+      "Could not update merchant status. Confirm admin/support RLS access.",
+    );
   return { row: data as Merchant, source: "db" };
 }
 
-export async function deleteOpsMerchant(merchantId: string): Promise<OpsCreateResult<Merchant>> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for merchant operations.");
+export async function deleteOpsMerchant(
+  merchantId: string,
+): Promise<OpsCreateResult<Merchant>> {
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for merchant operations.",
+    );
 
   const { count, error: countError } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
     .eq("merchant_id", merchantId);
 
-  if (countError) throw operationsError(countError, "Could not verify linked orders before deleting this merchant.");
+  if (countError)
+    throw operationsError(
+      countError,
+      "Could not verify linked orders before deleting this merchant.",
+    );
   if ((count || 0) > 0) {
-    throw new Error("Cannot delete this merchant because orders are directly linked by merchant_id. Pause or review the merchant instead.");
+    throw new Error(
+      "Cannot delete this merchant because orders are directly linked by merchant_id. Pause or review the merchant instead.",
+    );
   }
 
-  const rpcDeleted = await rpcOne<Merchant>("admin_delete_merchant", { p_merchant_id: merchantId });
+  const rpcDeleted = await rpcOne<Merchant>("admin_delete_merchant", {
+    p_merchant_id: merchantId,
+  });
   if (rpcDeleted?.id) return { row: rpcDeleted, source: "rpc" };
 
-  const { data, error } = await supabase.from("merchants").delete().eq("id", merchantId).select("*").single();
-  if (error) throw operationsError(error, "Could not delete merchant. Confirm admin/support RLS access and that no linked orders exist.");
+  const { data, error } = await supabase
+    .from("merchants")
+    .delete()
+    .eq("id", merchantId)
+    .select("*")
+    .single();
+  if (error)
+    throw operationsError(
+      error,
+      "Could not delete merchant. Confirm admin/support RLS access and that no linked orders exist.",
+    );
   return { row: data as Merchant, source: "db" };
 }
 
-export function calculateOpsOrderPrice(input: OpsOrderInput) {
-  const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
+function systemOrderPrice(input: OpsOrderInput) {
   if (input.shipping_scope === "international") {
-    const intl = calculateInternationalPrice({ destination: input.destination_country || "WORLD", weight: numberValue(input.weight, 1) });
+    const intl = calculateInternationalPrice({
+      destination: input.destination_country || "WORLD",
+      weight: Math.max(1, numberValue(input.weight, 1)),
+    });
     return {
       unitPrice: intl.total,
-      total: Number((intl.total * count).toFixed(2)),
-      breakdown: [...intl.breakdown, `Admin operation count: ${count} x ${intl.total.toFixed(2)} AED`],
+      total: Number(intl.total.toFixed(2)),
+      breakdown: intl.breakdown,
       pricingCategory: intl.pricingCategory,
     };
   }
-  const local = calculateDomesticPrice({ pickupCity: input.pickup_city, deliveryCity: input.delivery_city, pieces: count, serviceType: "standard" });
+
+  const local = calculateDomesticPrice({
+    pickupCity: input.pickup_city,
+    deliveryCity: input.delivery_city,
+    pieces: 1,
+    serviceType: "standard",
+  });
   return {
-    unitPrice: count > 0 ? Number((local.total / count).toFixed(2)) : local.total,
-    total: local.total,
+    unitPrice: Number(local.total.toFixed(2)),
+    total: Number(local.total.toFixed(2)),
     breakdown: local.breakdown,
     pricingCategory: local.pricingCategory,
   };
 }
 
-function collectionAmountForPayment(paymentMethod: string, rawAmount: unknown) {
-  return paymentMethod === "cod" ? Math.max(0, numberValue(rawAmount, 0)) : 0;
+export function calculateOpsOrderPrice(input: OpsOrderInput) {
+  const system = systemOrderPrice(input);
+  const manual = optionalPositiveNumber(input.manual_delivery_price);
+  if (input.price_mode === "manual" && manual !== null) {
+    return {
+      unitPrice: Number(manual.toFixed(2)),
+      total: Number(manual.toFixed(2)),
+      systemTotal: system.total,
+      breakdown: [
+        `Manual admin price: ${manual.toFixed(2)} AED`,
+        `System reference: ${system.total.toFixed(2)} AED`,
+      ],
+      pricingCategory: "manual_admin",
+      priceSource: "manual" as const,
+    };
+  }
+
+  return {
+    ...system,
+    systemTotal: system.total,
+    priceSource: "system" as const,
+  };
 }
 
-function merchantNetForPayment(paymentMethod: string, collectionAmount: number, deliveryFee: number) {
+function collectionAmountForPayment(
+  paymentMethod: string,
+  rawAmount: unknown,
+) {
+  return paymentMethod === "cod"
+    ? Math.max(0, numberValue(rawAmount, 0))
+    : 0;
+}
+
+function merchantNetForPayment(
+  paymentMethod: string,
+  collectionAmount: number,
+  deliveryFee: number,
+) {
   if (paymentMethod === "receiver_pays") return 0;
-  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") return Number((collectionAmount - deliveryFee).toFixed(2));
-  if (paymentMethod === "cod") return Number((collectionAmount - deliveryFee).toFixed(2));
   return Number((collectionAmount - deliveryFee).toFixed(2));
 }
 
 function paymentMethodArabic(paymentMethod: string) {
   if (paymentMethod === "cod") return "تحصيل عند التسليم";
-  if (paymentMethod === "receiver_pays") return "المستلم يدفع رسوم التوصيل";
-  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") return "التاجر يتحمل رسوم التوصيل";
+  if (paymentMethod === "receiver_pays")
+    return "المستلم يدفع رسوم التوصيل";
+  if (
+    paymentMethod === "merchant_pays" ||
+    paymentMethod === "sender_pays"
+  )
+    return "التاجر يتحمل رسوم التوصيل";
   return paymentMethod;
 }
 
 export function calculateMerchantStatementNet(input: OpsOrderInput) {
   const pricing = calculateOpsOrderPrice(input);
-  const paymentMethod = clean(input.payment_method || "merchant_pays");
-  const collectionAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
+  const paymentMethod = clean(
+    input.payment_method || "merchant_pays",
+  );
+  const collectionAmount = collectionAmountForPayment(
+    paymentMethod,
+    input.cod_amount,
+  );
   const deliveryFee = pricing.total;
   return {
     deliveryFee,
     collectionAmount,
-    merchantNet: merchantNetForPayment(paymentMethod, collectionAmount, deliveryFee),
+    merchantNet: merchantNetForPayment(
+      paymentMethod,
+      collectionAmount,
+      deliveryFee,
+    ),
     paymentMethod,
   };
 }
 
-export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateResult<Order>> {
-  if (!supabase) throw operationsError(null, "Supabase is not configured for order operations.");
-  const merchant = input.merchant || null;
-  const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
-  const pricing = calculateOpsOrderPrice({ ...input, order_count: count });
-  const createdAt = new Date().toISOString();
-  const trackingSeed = clean(input.coupon_number) || `${merchant?.merchant_code || "ADMIN"}-${Date.now().toString(36)}`;
-  const trackingNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
-  const senderName = clean(merchant?.trade_name || input.merchant_name || "DAY NIGHT Merchant");
+function buildOrderPayload(
+  input: OpsOrderInput,
+  merchant: Merchant | null,
+  trackingNumber: string,
+  createdAt: string,
+) {
+  const count = Math.max(
+    1,
+    Math.ceil(numberValue(input.order_count, 1)),
+  );
+  const pricing = calculateOpsOrderPrice({
+    ...input,
+    order_count: count,
+  });
+  const senderName = clean(
+    merchant?.trade_name ||
+      input.merchant_name ||
+      "DAY NIGHT Merchant",
+  );
   const senderPhone = clean(merchant?.phone || "971568757331");
-  const pickupEmirate = clean(input.pickup_city || merchant?.emirate || "Abu Dhabi");
+  const pickupEmirate = clean(
+    input.pickup_city || merchant?.emirate || "Abu Dhabi",
+  );
   const merchantArea = clean(merchant?.city);
-  const pickupArea = clean(input.pickup_area || (merchantArea && merchantArea !== pickupEmirate ? merchantArea : ""));
+  const pickupArea = clean(
+    input.pickup_area ||
+      (merchantArea && merchantArea !== pickupEmirate
+        ? merchantArea
+        : ""),
+  );
   const senderAddress = composeLocationAddress([
     pickupArea,
     input.pickup_street,
-    merchant?.pickup_address || merchant?.address || pickupEmirate,
+    merchant?.pickup_address ||
+      merchant?.address ||
+      pickupEmirate,
   ]);
-  const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "merchant_pays");
+  const uiPaymentMethod = clean(
+    input.payment_method ||
+      merchant?.default_payment_method ||
+      "merchant_pays",
+  );
+  const paymentMethod = normalizedPaymentMethod(uiPaymentMethod);
   const isInternational = input.shipping_scope === "international";
   const deliveryEmirate = clean(input.delivery_city || "Dubai");
-  const receiverCity = isInternational ? clean(input.destination_country || deliveryEmirate || "WORLD") : deliveryEmirate;
-  const receiverAddress = composeLocationAddress([input.delivery_area, input.delivery_street, input.receiver_address || receiverCity]);
-  const description = clean(input.package_description || input.package_type || "Admin shipment");
-  const codAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
+  const receiverCity = isInternational
+    ? clean(
+        input.destination_country || deliveryEmirate || "WORLD",
+      )
+    : deliveryEmirate;
+  const receiverAddress = composeLocationAddress([
+    input.delivery_area,
+    input.delivery_street,
+    input.receiver_address || receiverCity,
+  ]);
+  const description = clean(
+    input.package_description ||
+      input.package_type ||
+      "Shipment",
+  );
+  const codAmount = collectionAmountForPayment(
+    uiPaymentMethod,
+    input.cod_amount,
+  );
   const deliveryFee = pricing.total;
-  const merchantNet = merchantNetForPayment(paymentMethod, codAmount, deliveryFee);
+  const merchantNet = merchantNetForPayment(
+    uiPaymentMethod,
+    codAmount,
+    deliveryFee,
+  );
   const requestedStatus = clean(input.status || "pending");
-  const safeInitialStatus = normalizeInitialOrderStatus(requestedStatus);
-  const reviewNote = requestedStatus !== safeInitialStatus ? `Requested workflow status: ${requestedStatus}` : "";
-  const settlementNote = `Payment: ${paymentMethodArabic(paymentMethod)} | Collection ${codAmount.toFixed(2)} AED | Delivery fee ${deliveryFee.toFixed(2)} AED | Merchant statement net ${merchantNet.toFixed(2)} AED`;
+  const safeInitialStatus =
+    normalizeInitialOrderStatus(requestedStatus);
+  const reviewNote =
+    requestedStatus !== safeInitialStatus
+      ? `Requested workflow status: ${requestedStatus}`
+      : "";
+  const priceNote =
+    pricing.priceSource === "manual"
+      ? `Manual admin delivery price ${deliveryFee.toFixed(2)} AED; system reference ${pricing.systemTotal.toFixed(2)} AED`
+      : `System delivery price ${deliveryFee.toFixed(2)} AED`;
+  const settlementNote = `Payment: ${paymentMethodArabic(
+    uiPaymentMethod,
+  )} | Collection ${codAmount.toFixed(
+    2,
+  )} AED | Delivery fee ${deliveryFee.toFixed(
+    2,
+  )} AED | Merchant statement net ${merchantNet.toFixed(2)} AED`;
 
-  const payload = removeEmptyUndefined({
+  return removeEmptyUndefined({
     tracking_number: trackingNumber,
     invoice_number: trackingNumber,
     coupon_number: clean(input.coupon_number),
     merchant_id: merchant?.id || clean(input.merchant_id) || null,
     merchant_name: senderName,
-    merchant_code: merchant?.merchant_code || clean(input.merchant_code),
+    merchant_code:
+      merchant?.merchant_code || clean(input.merchant_code),
     order_count: count,
     shipping_scope: input.shipping_scope,
     destination_country: isInternational ? receiverCity : null,
@@ -340,7 +670,7 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     receiver_address: receiverAddress,
     package_type: description,
     package_description: description,
-    weight: Math.max(1, numberValue(input.weight, 1)),
+    weight: Math.max(0.1, numberValue(input.weight, 1)),
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
@@ -352,20 +682,74 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     total_price: deliveryFee,
     amount: deliveryFee,
     price: deliveryFee,
+    manual_delivery_price:
+      pricing.priceSource === "manual" ? deliveryFee : null,
+    price_source: pricing.priceSource,
     currency: "AED",
-    notes: [clean(input.notes), reviewNote, settlementNote].filter(Boolean).join(" | ") || "Created from admin operations section",
+    notes:
+      [clean(input.notes), reviewNote, priceNote, settlementNote]
+        .filter(Boolean)
+        .join(" | ") ||
+      "Created from admin operations section",
     status: safeInitialStatus,
-    status_history: [{ status: safeInitialStatus, date: createdAt, note: [reviewNote, settlementNote].filter(Boolean).join(" | ") }],
+    status_history: [
+      {
+        status: safeInitialStatus,
+        date: createdAt,
+        note: [reviewNote, priceNote, settlementNote]
+          .filter(Boolean)
+          .join(" | "),
+      },
+    ],
     created_at: createdAt,
     updated_at: createdAt,
   });
+}
 
-  const rpcOrder = await rpcOne<Order>("admin_create_coupon_order", { p_order: payload });
-  if (rpcOrder?.id || rpcOrder?.tracking_number || rpcOrder?.invoice_number) return { row: rpcOrder, source: "rpc" };
+export async function createOpsOrder(
+  input: OpsOrderInput,
+): Promise<OpsCreateResult<Order>> {
+  if (!supabase)
+    throw operationsError(
+      null,
+      "Supabase is not configured for order operations.",
+    );
+  const merchant = input.merchant || null;
+  const createdAt = new Date().toISOString();
+  const trackingSeed =
+    clean(input.coupon_number) ||
+    `${merchant?.merchant_code || "ADMIN"}-${Date.now().toString(
+      36,
+    )}`;
+  const trackingNumber = createDayNightInvoiceNumber(
+    trackingSeed,
+    new Date(createdAt),
+  );
+  const payload = buildOrderPayload(
+    input,
+    merchant,
+    trackingNumber,
+    createdAt,
+  );
+
+  const rpcOrder = await rpcOne<Order>(
+    "admin_create_coupon_order",
+    { p_order: payload },
+  );
+  if (
+    rpcOrder?.id ||
+    rpcOrder?.tracking_number ||
+    rpcOrder?.invoice_number
+  )
+    return { row: rpcOrder, source: "rpc" };
 
   const publicReference = await createPublicOrder(payload);
   if (publicReference) {
-    await attachMerchantToCreatedOrder(publicReference, merchant, input);
+    await attachMerchantToCreatedOrder(
+      publicReference,
+      merchant,
+      input,
+    );
     const created = await findCreatedOrder(publicReference);
     if (created) return { row: created, source: "rpc" };
     return {
@@ -379,7 +763,101 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     };
   }
 
-  const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
-  if (error) throw operationsError(error, "Could not create order through the admin or public production routes. Confirm the signed-in admin role and database order-creation permissions.");
+  const { data, error } = await supabase
+    .from("orders")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error)
+    throw operationsError(
+      error,
+      "Could not create order through the admin or public production routes.",
+    );
   return { row: data as Order, source: "db" };
+}
+
+export async function updateOpsOrder(
+  input: OpsOrderUpdateInput,
+): Promise<OpsCreateResult<Order>> {
+  const reference = getOpsOrderReference(input.order);
+  if (!reference)
+    throw operationsError(null, "Order reference is missing.");
+
+  const merchant =
+    input.merchant ||
+    ({
+      id: input.merchant_id || input.order.merchant_id || "",
+      trade_name:
+        input.merchant_name ||
+        input.order.merchant_name ||
+        input.order.sender_name ||
+        "",
+      merchant_code:
+        input.merchant_code || input.order.merchant_code,
+      phone: input.order.sender_phone || "",
+      emirate: input.pickup_city || input.order.sender_city,
+      city: input.pickup_area,
+      address: input.order.sender_address,
+      pickup_address: input.pickup_street,
+    } as Merchant);
+
+  const patch = buildOrderPayload(
+    input,
+    merchant,
+    input.order.tracking_number ||
+      input.order.invoice_number ||
+      reference,
+    input.order.created_at || new Date().toISOString(),
+  );
+
+  delete (patch as Record<string, unknown>).created_at;
+  delete (patch as Record<string, unknown>).tracking_number;
+  delete (patch as Record<string, unknown>).invoice_number;
+  delete (patch as Record<string, unknown>).status_history;
+  delete (patch as Record<string, unknown>).status;
+
+  const row = await rpcRequired<Order>(
+    "admin_update_order_runtime",
+    {
+      p_payload: {
+        reference,
+        patch,
+        reason:
+          clean(input.edit_reason) ||
+          "Updated from admin flexible order editor",
+      },
+    },
+    "Could not update this order. Apply the flexible-order migration and confirm admin permissions.",
+  );
+
+  return { row, source: "rpc" };
+}
+
+export async function deleteOpsOrder(
+  order: Order,
+  reason: string,
+): Promise<OpsDeleteResult> {
+  const reference = getOpsOrderReference(order);
+  if (!reference)
+    throw operationsError(null, "Order reference is missing.");
+
+  const result = await rpcRequired<{
+    deleted?: boolean;
+    reference?: string;
+  }>(
+    "admin_delete_order_runtime",
+    {
+      p_payload: {
+        reference,
+        reason: clean(reason) || "Deleted from admin order manager",
+      },
+    },
+    "Could not delete this order. Only safe, unassigned orders can be deleted.",
+  );
+
+  return {
+    deleted: Boolean(result.deleted),
+    reference: clean(result.reference || reference),
+    source: "rpc",
+  };
 }
