@@ -39,7 +39,7 @@ for (const permission of permissions) {
 
 manifest = manifest.replace(
   /<application\b([^>]*)>/,
-  (full, attrs) => {
+  (_full, attrs) => {
     let next = attrs;
     if (!/android:usesCleartextTraffic=/.test(next)) next += '\n        android:usesCleartextTraffic="false"';
     if (!/android:allowBackup=/.test(next)) next += '\n        android:allowBackup="false"';
@@ -144,18 +144,9 @@ await write(
 `,
 );
 
-for (const densityDir of ["mipmap-anydpi-v26", "mipmap-anydpi"]) {
+for (const fileName of ["ic_launcher.xml", "ic_launcher_round.xml"]) {
   await write(
-    resolve(resRoot, densityDir, "ic_launcher.xml"),
-    `<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-</adaptive-icon>
-`,
-  );
-  await write(
-    resolve(resRoot, densityDir, "ic_launcher_round.xml"),
+    resolve(resRoot, "mipmap-anydpi-v26", fileName),
     `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
