@@ -1,0 +1,61 @@
+{
+  "appId": "ae.daynight.admin",
+  "appName": "DAY NIGHT Admin",
+  "webDir": "www",
+  "loggingBehavior": "debug",
+  "appendUserAgent": " DAY-NIGHT-ADMIN-ANDROID/1.0.0",
+  "backgroundColor": "#071A33",
+  "zoomEnabled": false,
+  "initialFocus": true,
+  "android": {
+    "backgroundColor": "#071A33",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "minWebViewVersion": 83,
+    "resolveServiceWorkerRequests": true
+  },
+  "server": {
+    "url": "https://daynightae.com/auth",
+    "cleartext": false,
+    "allowNavigation": [
+      "daynightae.com",
+      "www.daynightae.com"
+    ],
+    "errorPath": "offline.html"
+  },
+  "includePlugins": [
+    "@capacitor/app",
+    "@capacitor/browser",
+    "@capacitor/haptics",
+    "@capacitor/keyboard",
+    "@capacitor/splash-screen",
+    "@capacitor/status-bar"
+  ],
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "LIGHT",
+      "hidden": false
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": false,
+      "launchFadeOutDuration": 350,
+      "backgroundColor": "#071A33",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#071A33",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    }
+  }
+}
