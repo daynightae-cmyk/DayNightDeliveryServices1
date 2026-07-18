@@ -1,1 +1,1 @@
-export { default } from "./AdminNewOrderFlexible";
+export { default } from "./AdminNewOrderComplete";
