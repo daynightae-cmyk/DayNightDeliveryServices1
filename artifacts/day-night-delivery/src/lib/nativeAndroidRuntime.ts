@@ -27,7 +27,9 @@ const SAFE_NATIVE_PATHS = [
   "/request",
   "/request-delivery",
   "/pricing",
+  "/qr",
 ];
+const UPDATE_CHECK_INTERVAL_MS = 120_000;
 
 function plugin(name: string): NativePlugin | undefined {
   return window.Capacitor?.Plugins?.[name];
@@ -40,11 +42,24 @@ function isNativeAndroid() {
   return typeof bridge.getPlatform !== "function" || bridge.getPlatform() === "android";
 }
 
+function isWindowsLiveShell() {
+  return /DAY-NIGHT-WINDOWS-LIVE\//i.test(navigator.userAgent);
+}
+
+function isInstalledShell() {
+  return isNativeAndroid() || isWindowsLiveShell() || /DAY-NIGHT-ANDROID\//i.test(navigator.userAgent);
+}
+
+function isAllowedInternalPath(path: string) {
+  if (path === "/" || path === "") return true;
+  return SAFE_NATIVE_PATHS.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`),
+  );
+}
+
 function navigateInsideApp(path: string) {
   const safePath = path.startsWith("/") ? path : `/${path}`;
-  if (!SAFE_NATIVE_PATHS.some((prefix) => safePath === prefix || safePath.startsWith(`${prefix}/`) || safePath.startsWith(`${prefix}?`))) {
-    return;
-  }
+  if (!isAllowedInternalPath(safePath)) return;
 
   window.history.pushState({}, "", safePath);
   window.dispatchEvent(new PopStateEvent("popstate"));
@@ -53,10 +68,10 @@ function navigateInsideApp(path: string) {
 
 function pathFromAppUrl(rawUrl: string) {
   try {
-    if (rawUrl.startsWith("daynightadmin://")) {
-      const withoutScheme = rawUrl.replace(/^daynightadmin:\/\//i, "");
+    if (/^daynight(admin)?:\/\//i.test(rawUrl)) {
+      const withoutScheme = rawUrl.replace(/^daynight(admin)?:\/\//i, "");
       const slash = withoutScheme.indexOf("/");
-      return slash >= 0 ? `/${withoutScheme.slice(slash + 1)}` : "/auth";
+      return slash >= 0 ? `/${withoutScheme.slice(slash + 1)}` : "/";
     }
 
     const url = new URL(rawUrl);
@@ -105,17 +120,96 @@ function ensureConnectivityBanner() {
   if (online) window.setTimeout(() => banner?.classList.remove("is-online"), 1800);
 }
 
+function assetSignature(documentLike: Document) {
+  const assets = [
+    ...Array.from(documentLike.querySelectorAll<HTMLScriptElement>("script[src]")).map((node) => node.src),
+    ...Array.from(documentLike.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]')).map((node) => node.href),
+  ]
+    .map((value) => {
+      try {
+        const url = new URL(value, window.location.origin);
+        return `${url.pathname}${url.search}`;
+      } catch {
+        return value;
+      }
+    })
+    .sort();
+
+  return assets.join("|");
+}
+
+function showUpdatingBanner() {
+  let banner = document.getElementById("dn-live-update-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "dn-live-update-banner";
+    banner.className = "dn-native-connectivity is-online";
+    document.body.appendChild(banner);
+  }
+  banner.textContent = document.documentElement.dir === "rtl" ? "جاري تحميل أحدث إصدار من DAY NIGHT…" : "Loading the latest DAY NIGHT update…";
+}
+
+function startLiveDeploymentWatcher() {
+  let checking = false;
+  const initialSignature = assetSignature(document);
+
+  const check = async () => {
+    if (checking || !navigator.onLine || document.visibilityState === "hidden") return;
+    checking = true;
+
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set("__dn_update_check", Date.now().toString());
+      const response = await fetch(currentUrl.toString(), {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+        headers: { "X-DAY-NIGHT-UPDATE-CHECK": "1" },
+      });
+      if (!response.ok) return;
+
+      const html = await response.text();
+      const nextDocument = new DOMParser().parseFromString(html, "text/html");
+      const nextSignature = assetSignature(nextDocument);
+      if (!nextSignature || nextSignature === initialSignature) return;
+
+      const reloadKey = `dn-live-reload:${nextSignature}`;
+      if (sessionStorage.getItem(reloadKey) === "1") return;
+      sessionStorage.setItem(reloadKey, "1");
+      showUpdatingBanner();
+
+      window.setTimeout(() => {
+        const target = new URL(window.location.href);
+        target.searchParams.delete("__dn_update_check");
+        target.searchParams.set("__dn_live", Date.now().toString());
+        window.location.replace(target.toString());
+      }, 450);
+    } catch {
+      // Keep the currently loaded production view if an update check is unavailable.
+    } finally {
+      checking = false;
+    }
+  };
+
+  window.setInterval(() => void check(), UPDATE_CHECK_INTERVAL_MS);
+  window.addEventListener("focus", () => void check());
+  window.addEventListener("online", () => void check());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void check();
+  });
+}
+
 export function initializeDayNightNativeRuntime() {
   if (typeof window === "undefined" || window.__DAY_NIGHT_NATIVE_RUNTIME__) return;
   window.__DAY_NIGHT_NATIVE_RUNTIME__ = true;
 
-  if (!isNativeAndroid()) return;
+  if (!isInstalledShell()) return;
 
-  document.documentElement.classList.add("dn-native-android");
+  document.documentElement.classList.add("dn-native-android", "dn-installed-live-shell");
   document.body?.classList.add("dn-native-android-body");
 
-  if (window.location.pathname === "/" || window.location.pathname === "/index.html") {
-    window.history.replaceState({}, "", "/auth");
+  if (window.location.pathname === "/index.html") {
+    window.history.replaceState({}, "", "/");
   }
 
   const App = plugin("App");
@@ -131,7 +225,7 @@ export function initializeDayNightNativeRuntime() {
   void Keyboard?.setResizeMode?.({ mode: "body" });
 
   const hideSplash = () => {
-    window.setTimeout(() => void SplashScreen?.hide?.({ fadeOutDuration: 350 }), 350);
+    window.setTimeout(() => void SplashScreen?.hide?.({ fadeOutDuration: 300 }), 300);
   };
   if (document.readyState === "complete") hideSplash();
   else window.addEventListener("load", hideSplash, { once: true });
@@ -185,18 +279,20 @@ export function initializeDayNightNativeRuntime() {
       const url = new URL(anchor.href, window.location.href);
       if (INTERNAL_HOSTS.has(url.hostname)) return;
 
-      if (url.protocol === "http:" || url.protocol === "https:") {
+      if ((url.protocol === "http:" || url.protocol === "https:") && Browser) {
         event.preventDefault();
-        void Browser?.open?.({ url: url.toString(), presentationStyle: "popover" });
+        void Browser.open?.({ url: url.toString(), presentationStyle: "popover" });
       }
     } catch {
-      // tel:, mailto:, sms:, and WhatsApp intents are left to Android/WebView.
+      // tel:, mailto:, sms:, and WhatsApp intents are left to the installed shell.
     }
   });
 
   window.addEventListener("offline", ensureConnectivityBanner);
   window.addEventListener("online", ensureConnectivityBanner);
   if (!navigator.onLine) ensureConnectivityBanner();
+
+  startLiveDeploymentWatcher();
 }
 
 export {};
