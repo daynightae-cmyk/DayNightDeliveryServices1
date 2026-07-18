@@ -102,7 +102,6 @@ await write(
     <color name="colorPrimary">#071A33</color>
     <color name="colorPrimaryDark">#020B17</color>
     <color name="colorAccent">#D4AF37</color>
-    <color name="ic_launcher_background">#071A33</color>
     <color name="day_night_gold">#D4AF37</color>
     <color name="day_night_sky">#18A8E8</color>
 </resources>
