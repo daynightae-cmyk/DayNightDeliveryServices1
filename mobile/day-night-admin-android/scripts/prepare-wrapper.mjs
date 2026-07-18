@@ -1,9 +1,19 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const repositoryRoot = resolve(root, "../..");
 const www = resolve(root, "www");
 const configPath = resolve(root, "capacitor.config.json");
+const officialLogo = resolve(
+  repositoryRoot,
+  "artifacts",
+  "day-night-delivery",
+  "public",
+  "assets",
+  "daynight",
+  "logo.png",
+);
 
 const config = JSON.parse(await readFile(configPath, "utf8"));
 if (config.appId !== "ae.daynight.admin") throw new Error("Unexpected Android appId.");
@@ -12,6 +22,7 @@ if (config.server?.url !== "https://daynightae.com/") throw new Error("Android w
 if (config.server?.cleartext !== false) throw new Error("Cleartext traffic must remain disabled.");
 
 await mkdir(www, { recursive: true });
+await copyFile(officialLogo, resolve(www, "logo.png"));
 
 const offlinePage = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -34,7 +45,7 @@ const offlinePage = `<!doctype html>
 </head>
 <body>
   <main>
-    <img src="https://daynightae.com/assets/daynight/logo.png" alt="DAY NIGHT" />
+    <img src="logo.png" alt="DAY NIGHT" />
     <h1>DAY NIGHT</h1>
     <p>تعذر الاتصال بمنصة داي نايت الآن.<br/>تأكد من الإنترنت ثم أعد المحاولة.</p>
     <button onclick="location.href='https://daynightae.com/?refresh='+Date.now()">إعادة المحاولة</button>
