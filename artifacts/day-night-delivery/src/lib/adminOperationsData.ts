@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { createPublicOrder, supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
@@ -88,18 +88,53 @@ function composeLocationAddress(parts: Array<string | undefined | null>) {
 function operationsError(error: unknown, fallback: string) {
   const detail = String((error as { message?: string })?.message || error || "");
   if (detail) console.warn("Admin operations DB detail:", detail);
-  return new Error(fallback);
+  const wrapped = new Error(fallback) as Error & { dbDetail?: string };
+  wrapped.dbDetail = detail;
+  return wrapped;
 }
 
 async function rpcOne<T>(fn: string, args: Record<string, unknown>): Promise<T | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc(fn, args);
   if (error) {
-    console.warn(`${fn} unavailable, using direct database operation when possible:`, error.message);
+    console.warn(`${fn} unavailable, using compatibility fallback when possible:`, error.message);
     return null;
   }
   if (Array.isArray(data)) return (data[0] || null) as T | null;
   return (data || null) as T | null;
+}
+
+async function findCreatedOrder(reference: string): Promise<Order | null> {
+  if (!supabase || !reference) return null;
+  for (const column of ["tracking_number", "invoice_number", "coupon_number", "id"]) {
+    const { data, error } = await supabase.from("orders").select("*").eq(column, reference).limit(1);
+    if (!error && data?.[0]) return data[0] as Order;
+  }
+  return null;
+}
+
+async function attachMerchantToCreatedOrder(reference: string, merchant: Merchant | null, input: OpsOrderInput) {
+  if (!supabase || !reference) return;
+  const patch = removeEmptyUndefined({
+    merchant_id: merchant?.id || clean(input.merchant_id) || undefined,
+    merchant_name: clean(merchant?.trade_name || input.merchant_name) || undefined,
+    merchant_code: clean(merchant?.merchant_code || input.merchant_code) || undefined,
+    updated_at: new Date().toISOString(),
+  });
+  if (!Object.keys(patch).some((key) => key !== "updated_at")) return;
+
+  for (const column of ["tracking_number", "invoice_number", "coupon_number", "id"]) {
+    const { data, error } = await supabase.from("orders").update(patch).eq(column, reference).select("*").limit(1);
+    if (!error && data?.[0]) return;
+  }
+}
+
+function normalizeInitialOrderStatus(status: unknown) {
+  const normalized = clean(status).toLowerCase().replace(/[\s-]+/g, "_");
+  if (["pending", "confirmed", "assigned", "picked_up", "in_transit", "delivered", "cancelled", "returned"].includes(normalized)) {
+    return normalized;
+  }
+  return "pending";
 }
 
 export async function fetchOpsMerchants(): Promise<Merchant[]> {
@@ -278,6 +313,9 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
   const codAmount = collectionAmountForPayment(paymentMethod, input.cod_amount);
   const deliveryFee = pricing.total;
   const merchantNet = merchantNetForPayment(paymentMethod, codAmount, deliveryFee);
+  const requestedStatus = clean(input.status || "pending");
+  const safeInitialStatus = normalizeInitialOrderStatus(requestedStatus);
+  const reviewNote = requestedStatus !== safeInitialStatus ? `Requested workflow status: ${requestedStatus}` : "";
   const settlementNote = `Payment: ${paymentMethodArabic(paymentMethod)} | Collection ${codAmount.toFixed(2)} AED | Delivery fee ${deliveryFee.toFixed(2)} AED | Merchant statement net ${merchantNet.toFixed(2)} AED`;
 
   const payload = removeEmptyUndefined({
@@ -308,16 +346,16 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
     payment_method: paymentMethod,
     cod_amount: codAmount,
     delivery_price: deliveryFee,
-    subtotal: codAmount,
+    subtotal: deliveryFee,
     base_price: deliveryFee,
-    total: codAmount,
-    total_price: codAmount,
-    amount: codAmount,
-    price: codAmount,
+    total: deliveryFee,
+    total_price: deliveryFee,
+    amount: deliveryFee,
+    price: deliveryFee,
     currency: "AED",
-    notes: [clean(input.notes), settlementNote].filter(Boolean).join(" | ") || "Created from admin operations section",
-    status: clean(input.status || "pending"),
-    status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: settlementNote }],
+    notes: [clean(input.notes), reviewNote, settlementNote].filter(Boolean).join(" | ") || "Created from admin operations section",
+    status: safeInitialStatus,
+    status_history: [{ status: safeInitialStatus, date: createdAt, note: [reviewNote, settlementNote].filter(Boolean).join(" | ") }],
     created_at: createdAt,
     updated_at: createdAt,
   });
@@ -325,7 +363,23 @@ export async function createOpsOrder(input: OpsOrderInput): Promise<OpsCreateRes
   const rpcOrder = await rpcOne<Order>("admin_create_coupon_order", { p_order: payload });
   if (rpcOrder?.id || rpcOrder?.tracking_number || rpcOrder?.invoice_number) return { row: rpcOrder, source: "rpc" };
 
+  const publicReference = await createPublicOrder(payload);
+  if (publicReference) {
+    await attachMerchantToCreatedOrder(publicReference, merchant, input);
+    const created = await findCreatedOrder(publicReference);
+    if (created) return { row: created, source: "rpc" };
+    return {
+      row: {
+        ...(payload as Record<string, unknown>),
+        id: publicReference,
+        tracking_number: publicReference,
+        invoice_number: trackingNumber,
+      } as Order,
+      source: "rpc",
+    };
+  }
+
   const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
-  if (error) throw operationsError(error, "Could not create order. Apply the admin operations migration and confirm admin/support RLS access.");
+  if (error) throw operationsError(error, "Could not create order through the admin or public production routes. Confirm the signed-in admin role and database order-creation permissions.");
   return { row: data as Order, source: "db" };
 }
