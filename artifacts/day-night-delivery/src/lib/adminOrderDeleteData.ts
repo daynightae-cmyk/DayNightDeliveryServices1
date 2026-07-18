@@ -32,9 +32,8 @@ function normalizeRpcResult(data: unknown): RpcDeleteResult | null {
   return value as RpcDeleteResult;
 }
 
-async function locateOrder(reference: string, supplied: Order) {
+async function fetchOrder(reference: string) {
   if (!supabase) return null;
-  if (supplied.id) return supplied;
 
   for (const column of [
     "tracking_number",
@@ -53,16 +52,15 @@ async function locateOrder(reference: string, supplied: Order) {
   return null;
 }
 
-async function orderStillExists(reference: string, supplied: Order) {
-  const row = await locateOrder(reference, supplied);
-  return Boolean(row);
+async function orderStillExists(reference: string) {
+  return Boolean(await fetchOrder(reference));
 }
 
 async function deleteDirectly(reference: string, supplied: Order) {
   if (!supabase) return null;
 
-  const target = await locateOrder(reference, supplied);
-  const targetId = clean(target?.id || supplied.id);
+  const target = supplied.id ? supplied : await fetchOrder(reference);
+  const targetId = clean(target?.id);
 
   if (targetId) {
     // Compatibility cleanup for installations where order history does not cascade.
@@ -77,7 +75,7 @@ async function deleteDirectly(reference: string, supplied: Order) {
       .eq("id", targetId)
       .select("id");
 
-    if (!error && (data?.length || !(await orderStillExists(reference, supplied)))) {
+    if (!error && (data?.length || !(await orderStillExists(reference)))) {
       return { deleted: true, reference, source: "db" as const };
     }
   }
@@ -89,7 +87,7 @@ async function deleteDirectly(reference: string, supplied: Order) {
       .eq(column, reference)
       .select("id");
 
-    if (!error && (data?.length || !(await orderStillExists(reference, supplied)))) {
+    if (!error && (data?.length || !(await orderStillExists(reference)))) {
       return { deleted: true, reference, source: "db" as const };
     }
   }
@@ -145,7 +143,7 @@ export async function deleteAdminOrderImmediately(
     }
 
     const result = normalizeRpcResult(data);
-    if (result?.deleted || !(await orderStillExists(reference, order))) {
+    if (result?.deleted || !(await orderStillExists(reference))) {
       return {
         deleted: true,
         reference: clean(result?.reference || reference),
