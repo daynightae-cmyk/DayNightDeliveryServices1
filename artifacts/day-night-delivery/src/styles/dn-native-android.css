@@ -1,0 +1,89 @@
+html.dn-native-android {
+  --dn-native-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --dn-native-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --dn-native-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --dn-native-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  background: #071a33;
+  overscroll-behavior: none;
+}
+
+html.dn-native-android,
+html.dn-native-android body,
+html.dn-native-android #root {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+html.dn-native-android body {
+  margin: 0;
+  background: #071a33;
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html.dn-native-android .dn-admin-fullscreen,
+html.dn-native-android .dn-auth-clean-shell,
+html.dn-native-android .min-h-screen {
+  min-height: 100dvh;
+}
+
+html.dn-native-android input,
+html.dn-native-android select,
+html.dn-native-android textarea {
+  font-size: max(16px, 1em);
+}
+
+html.dn-native-android button,
+html.dn-native-android a,
+html.dn-native-android [role="button"] {
+  touch-action: manipulation;
+}
+
+.dn-native-exit-hint,
+.dn-native-connectivity {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + var(--dn-native-safe-bottom, 0px));
+  z-index: 2147483647;
+  max-width: min(88vw, 420px);
+  transform: translate(-50%, 24px);
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  border-radius: 999px;
+  background: rgba(7, 26, 51, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  color: #fff;
+  padding: 11px 18px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.45;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  backdrop-filter: blur(16px);
+}
+
+.dn-native-exit-hint.is-visible,
+.dn-native-connectivity.is-offline,
+.dn-native-connectivity.is-online {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.dn-native-connectivity.is-offline {
+  border-color: rgba(251, 113, 133, 0.52);
+  background: rgba(73, 11, 28, 0.96);
+}
+
+.dn-native-connectivity.is-online {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(3, 63, 51, 0.96);
+}
+
+@media (display-mode: standalone) {
+  html.dn-native-android .dn-admin-fullscreen {
+    padding-bottom: var(--dn-native-safe-bottom, 0px);
+  }
+}
