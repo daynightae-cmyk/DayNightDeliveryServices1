@@ -1,16 +1,61 @@
 {
+  "id": "/",
   "name": "DAY NIGHT DELIVERY SERVICES",
   "short_name": "DAY NIGHT",
-  "description": "UAE delivery and shipping services",
-  "start_url": "/",
+  "description": "التطبيق الرسمي لخدمات DAY NIGHT: طلبات التوصيل، تتبع الشحنات، بوابة التجار والمندوبين وإدارة العمليات داخل دولة الإمارات.",
+  "lang": "ar-AE",
+  "dir": "rtl",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#071A33",
   "theme_color": "#071A33",
+  "categories": ["business", "navigation", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/logo-daynight.png",
+      "sizes": "800x800",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-daynight.png",
+      "sizes": "800x800",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "طلب توصيل جديد",
+      "short_name": "طلب جديد",
+      "description": "بدء طلب توصيل داخل الإمارات أو شحن دولي",
+      "url": "/request?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
+    },
+    {
+      "name": "تتبع شحنة",
+      "short_name": "التتبع",
+      "description": "تتبع الطلب برقم التتبع أو الكوبون",
+      "url": "/tracking?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
+    },
+    {
+      "name": "بوابة التاجر",
+      "short_name": "التاجر",
+      "description": "إدارة طلبات التاجر والتحصيل والملف التجاري",
+      "url": "/merchant?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
+    },
+    {
+      "name": "لوحة الإدارة",
+      "short_name": "الإدارة",
+      "description": "الدخول الآمن إلى مركز عمليات DAY NIGHT",
+      "url": "/auth?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
     }
   ]
 }
