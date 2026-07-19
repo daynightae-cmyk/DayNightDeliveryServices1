@@ -29,25 +29,28 @@ const SAFE_NATIVE_PATHS = [
   "/pricing",
   "/qr",
 ];
-const UPDATE_CHECK_INTERVAL_MS = 120_000;
 
 function plugin(name: string): NativePlugin | undefined {
   return window.Capacitor?.Plugins?.[name];
 }
 
-function isNativeAndroid() {
+function nativePlatform() {
   const bridge = window.Capacitor;
-  if (!bridge) return false;
-  if (typeof bridge.isNativePlatform === "function" && !bridge.isNativePlatform()) return false;
-  return typeof bridge.getPlatform !== "function" || bridge.getPlatform() === "android";
+  if (!bridge) return "";
+  if (typeof bridge.isNativePlatform === "function" && !bridge.isNativePlatform()) return "";
+  return bridge.getPlatform?.() || "native";
 }
 
 function isWindowsLiveShell() {
   return /DAY-NIGHT-WINDOWS-LIVE\//i.test(navigator.userAgent);
 }
 
+function isStandaloneWebApp() {
+  return window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+}
+
 function isInstalledShell() {
-  return isNativeAndroid() || isWindowsLiveShell() || /DAY-NIGHT-ANDROID\//i.test(navigator.userAgent);
+  return Boolean(nativePlatform()) || isWindowsLiveShell() || /DAY-NIGHT-ANDROID\//i.test(navigator.userAgent) || isStandaloneWebApp();
 }
 
 function isAllowedInternalPath(path: string) {
@@ -120,83 +123,18 @@ function ensureConnectivityBanner() {
   if (online) window.setTimeout(() => banner?.classList.remove("is-online"), 1800);
 }
 
-function assetSignature(documentLike: Document) {
-  const assets = [
-    ...Array.from(documentLike.querySelectorAll<HTMLScriptElement>("script[src]")).map((node) => node.src),
-    ...Array.from(documentLike.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]')).map((node) => node.href),
-  ]
-    .map((value) => {
-      try {
-        const url = new URL(value, window.location.origin);
-        return `${url.pathname}${url.search}`;
-      } catch {
-        return value;
-      }
-    })
-    .sort();
+function applyShellClasses(platform: string) {
+  const root = document.documentElement;
+  root.classList.add("dn-native-shell", "dn-installed-live-shell");
 
-  return assets.join("|");
-}
+  if (platform === "android") root.classList.add("dn-native-android", "dn-platform-android");
+  if (platform === "ios") root.classList.add("dn-native-ios", "dn-platform-ios");
+  if (isWindowsLiveShell()) root.classList.add("dn-native-windows");
+  if (isStandaloneWebApp()) root.classList.add("dn-installed-web-app");
 
-function showUpdatingBanner() {
-  let banner = document.getElementById("dn-live-update-banner");
-  if (!banner) {
-    banner = document.createElement("div");
-    banner.id = "dn-live-update-banner";
-    banner.className = "dn-native-connectivity is-online";
-    document.body.appendChild(banner);
-  }
-  banner.textContent = document.documentElement.dir === "rtl" ? "جاري تحميل أحدث إصدار من DAY NIGHT…" : "Loading the latest DAY NIGHT update…";
-}
-
-function startLiveDeploymentWatcher() {
-  let checking = false;
-  const initialSignature = assetSignature(document);
-
-  const check = async () => {
-    if (checking || !navigator.onLine || document.visibilityState === "hidden") return;
-    checking = true;
-
-    try {
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set("__dn_update_check", Date.now().toString());
-      const response = await fetch(currentUrl.toString(), {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",
-        headers: { "X-DAY-NIGHT-UPDATE-CHECK": "1" },
-      });
-      if (!response.ok) return;
-
-      const html = await response.text();
-      const nextDocument = new DOMParser().parseFromString(html, "text/html");
-      const nextSignature = assetSignature(nextDocument);
-      if (!nextSignature || nextSignature === initialSignature) return;
-
-      const reloadKey = `dn-live-reload:${nextSignature}`;
-      if (sessionStorage.getItem(reloadKey) === "1") return;
-      sessionStorage.setItem(reloadKey, "1");
-      showUpdatingBanner();
-
-      window.setTimeout(() => {
-        const target = new URL(window.location.href);
-        target.searchParams.delete("__dn_update_check");
-        target.searchParams.set("__dn_live", Date.now().toString());
-        window.location.replace(target.toString());
-      }, 450);
-    } catch {
-      // Keep the currently loaded production view if an update check is unavailable.
-    } finally {
-      checking = false;
-    }
-  };
-
-  window.setInterval(() => void check(), UPDATE_CHECK_INTERVAL_MS);
-  window.addEventListener("focus", () => void check());
-  window.addEventListener("online", () => void check());
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void check();
-  });
+  document.body?.classList.add("dn-native-shell-body");
+  if (platform === "android") document.body?.classList.add("dn-native-android-body");
+  if (platform === "ios") document.body?.classList.add("dn-native-ios-body");
 }
 
 export function initializeDayNightNativeRuntime() {
@@ -205,8 +143,8 @@ export function initializeDayNightNativeRuntime() {
 
   if (!isInstalledShell()) return;
 
-  document.documentElement.classList.add("dn-native-android", "dn-installed-live-shell");
-  document.body?.classList.add("dn-native-android-body");
+  const platform = nativePlatform();
+  applyShellClasses(platform);
 
   if (window.location.pathname === "/index.html") {
     window.history.replaceState({}, "", "/");
@@ -230,27 +168,33 @@ export function initializeDayNightNativeRuntime() {
   if (document.readyState === "complete") hideSplash();
   else window.addEventListener("load", hideSplash, { once: true });
 
-  let lastBackAt = 0;
-  void App?.addListener?.("backButton", ({ canGoBack }: { canGoBack?: boolean }) => {
-    const protectedRoot = window.location.pathname === "/auth" || window.location.pathname === "/";
-    if (canGoBack && !protectedRoot) {
-      window.history.back();
-      return;
-    }
+  if (platform === "android") {
+    let lastBackAt = 0;
+    void App?.addListener?.("backButton", ({ canGoBack }: { canGoBack?: boolean }) => {
+      const protectedRoot = window.location.pathname === "/auth" || window.location.pathname === "/";
+      if (canGoBack && !protectedRoot) {
+        window.history.back();
+        return;
+      }
 
-    const now = Date.now();
-    if (now - lastBackAt < 1800) {
-      void App?.exitApp?.();
-      return;
-    }
+      const now = Date.now();
+      if (now - lastBackAt < 1800) {
+        void App?.exitApp?.();
+        return;
+      }
 
-    lastBackAt = now;
-    showExitHint();
-  });
+      lastBackAt = now;
+      showExitHint();
+    });
+  }
 
   void App?.addListener?.("appUrlOpen", ({ url }: { url?: string }) => {
     const path = url ? pathFromAppUrl(url) : null;
     if (path) navigateInsideApp(path);
+  });
+
+  void App?.addListener?.("appStateChange", ({ isActive }: { isActive?: boolean }) => {
+    if (isActive) ensureConnectivityBanner();
   });
 
   let lastHapticAt = 0;
@@ -267,32 +211,32 @@ export function initializeDayNightNativeRuntime() {
     { passive: true },
   );
 
-  document.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement | null;
-    const anchor = target?.closest<HTMLAnchorElement>("a[href]");
-    if (!anchor || anchor.hasAttribute("download")) return;
+  if (Browser) {
+    document.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor || anchor.hasAttribute("download")) return;
 
-    const href = anchor.getAttribute("href") || "";
-    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+      const href = anchor.getAttribute("href") || "";
+      if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
 
-    try {
-      const url = new URL(anchor.href, window.location.href);
-      if (INTERNAL_HOSTS.has(url.hostname)) return;
+      try {
+        const url = new URL(anchor.href, window.location.href);
+        if (INTERNAL_HOSTS.has(url.hostname)) return;
 
-      if ((url.protocol === "http:" || url.protocol === "https:") && Browser) {
-        event.preventDefault();
-        void Browser.open?.({ url: url.toString(), presentationStyle: "popover" });
+        if (url.protocol === "http:" || url.protocol === "https:") {
+          event.preventDefault();
+          void Browser.open?.({ url: url.toString(), presentationStyle: platform === "ios" ? "popover" : undefined });
+        }
+      } catch {
+        // tel:, mailto:, sms:, and WhatsApp intents are handled by the operating system.
       }
-    } catch {
-      // tel:, mailto:, sms:, and WhatsApp intents are left to the installed shell.
-    }
-  });
+    });
+  }
 
   window.addEventListener("offline", ensureConnectivityBanner);
   window.addEventListener("online", ensureConnectivityBanner);
   if (!navigator.onLine) ensureConnectivityBanner();
-
-  startLiveDeploymentWatcher();
 }
 
 export {};
