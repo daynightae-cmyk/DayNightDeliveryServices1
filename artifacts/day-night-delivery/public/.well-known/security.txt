@@ -1,0 +1,6 @@
+Contact: mailto:Admin@daynightae.com
+Contact: https://daynightae.com/contact
+Canonical: https://daynightae.com/.well-known/security.txt
+Preferred-Languages: ar, en
+Policy: https://daynightae.com/trust
+Expires: 2027-07-19T23:59:59.000Z
