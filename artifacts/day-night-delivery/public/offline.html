@@ -51,7 +51,7 @@
       p { margin: 14px auto 0; max-width: 420px; color: rgba(255,255,255,.63); font-size: 14px; font-weight: 700; line-height: 2; }
       .en { margin-top: 8px; direction: ltr; font-size: 12px; color: rgba(255,255,255,.42); }
       .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
-      button, a {
+      .action {
         min-height: 48px;
         display: inline-flex;
         align-items: center;
@@ -62,8 +62,8 @@
         font-weight: 900;
         text-decoration: none;
       }
-      button { border: 1px solid #d4af37; background: linear-gradient(135deg, #d4af37, #f6c94a); color: #071a33; cursor: pointer; }
-      a { border: 1px solid rgba(43,184,255,.34); background: rgba(43,184,255,.08); color: #5bcbff; }
+      .action-primary { border: 1px solid #d4af37; background: linear-gradient(135deg, #d4af37, #f6c94a); color: #071a33; }
+      .action-secondary { border: 1px solid rgba(43,184,255,.34); background: rgba(43,184,255,.08); color: #5bcbff; }
       small { display: block; margin-top: 18px; color: rgba(255,255,255,.32); font-size: 10px; line-height: 1.7; }
       @media (max-width: 520px) { main { padding: 26px 20px; border-radius: 26px; } .actions { grid-template-columns: 1fr; } }
     </style>
@@ -76,8 +76,8 @@
       <p>تعذر الوصول إلى البيانات الحية الآن. تحقق من الاتصال ثم أعد المحاولة، وستعود الطلبات والتتبع فورًا.</p>
       <p class="en">The live operations service is temporarily unreachable. Reconnect and retry.</p>
       <div class="actions">
-        <button type="button" onclick="location.reload()">إعادة المحاولة</button>
-        <a href="/">العودة للرئيسية</a>
+        <a class="action action-primary" href="/">إعادة المحاولة</a>
+        <a class="action action-secondary" href="/contact">الدعم والتواصل</a>
       </div>
       <small>قد تظل الواجهة الأساسية متاحة، لكن الطلبات والمواقع والتحصيل تحتاج اتصالًا مباشرًا بقاعدة البيانات.</small>
     </main>
