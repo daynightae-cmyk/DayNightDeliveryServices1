@@ -103,6 +103,30 @@ export interface Order {
   driver_location_updated_at?: string | null;
   live_location_updated_at?: string | null;
   live_location_source?: string | null;
+
+  /** Authoritative order financial breakdown, calculated when the order is created. */
+  goods_value?: number;
+  product_value?: number;
+  merchant_goods_value?: number;
+  delivery_fee?: number;
+  discount_amount?: number;
+  discount?: number;
+  delivery_fee_mode?: "customer_pays" | "deduct_from_merchant" | string;
+  customer_total?: number;
+  collected_amount?: number;
+  merchant_due?: number;
+  company_revenue?: number;
+  financial_posted_at?: string | null;
+  financial_version?: number;
+  manual_delivery_price?: number | string | null;
+  price_source?: "system" | "manual" | string;
+  subtotal?: number;
+  total?: number;
+  total_amount?: number;
+  total_price?: number;
+  amount?: number;
+  currency?: string;
+
   status: string;
   created_at: string;
   updated_at?: string;
