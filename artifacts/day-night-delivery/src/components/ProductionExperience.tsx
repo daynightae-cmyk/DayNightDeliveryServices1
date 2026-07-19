@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
   Command,
@@ -27,6 +26,12 @@ import {
 } from "../lib/pwaRuntime";
 import "../styles/dn-production-experience.css";
 
+declare global {
+  interface Window {
+    __DAY_NIGHT_HISTORY_PATCHED__?: boolean;
+  }
+}
+
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
@@ -46,7 +51,53 @@ type CommandItem = {
 
 const INSTALL_DISMISS_KEY = "dn_install_prompt_dismissed_until";
 const INSTALL_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const LOCATION_CHANGE_EVENT = "daynight:locationchange";
 const PROTECTED_ROUTE_PATTERN = /^\/(admin|auth|driver|merchant|customer|update-password)(\/|$)/;
+
+function installHistoryObserver() {
+  if (window.__DAY_NIGHT_HISTORY_PATCHED__) return;
+  window.__DAY_NIGHT_HISTORY_PATCHED__ = true;
+
+  const originalPushState = window.history.pushState;
+  const originalReplaceState = window.history.replaceState;
+
+  window.history.pushState = function pushState(data: unknown, unused: string, url?: string | URL | null) {
+    originalPushState.call(this, data, unused, url);
+    window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
+  };
+
+  window.history.replaceState = function replaceState(data: unknown, unused: string, url?: string | URL | null) {
+    originalReplaceState.call(this, data, unused, url);
+    window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
+  };
+}
+
+function useCurrentPath() {
+  const [path, setPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    installHistoryObserver();
+    const synchronize = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", synchronize);
+    window.addEventListener(LOCATION_CHANGE_EVENT, synchronize);
+    return () => {
+      window.removeEventListener("popstate", synchronize);
+      window.removeEventListener(LOCATION_CHANGE_EVENT, synchronize);
+    };
+  }, []);
+
+  return path;
+}
+
+function navigateInsideApplication(path: string) {
+  if (window.location.pathname === path) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  window.history.pushState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 function isIosDevice() {
   const userAgent = navigator.userAgent.toLowerCase();
@@ -82,8 +133,7 @@ function suppressInstallPrompt() {
 export default function ProductionExperience() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
-  const location = useLocation();
-  const navigate = useNavigate();
+  const currentPath = useCurrentPath();
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -158,7 +208,7 @@ export default function ProductionExperience() {
   useEffect(() => {
     setPaletteOpen(false);
     setQuery("");
-  }, [location.pathname]);
+  }, [currentPath]);
 
   const commands = useMemo<CommandItem[]>(
     () => [
@@ -250,7 +300,7 @@ export default function ProductionExperience() {
     !installed &&
     !installDismissed &&
     !isNativePlatform() &&
-    !/^\/(admin|auth)(\/|$)/.test(location.pathname) &&
+    !/^\/(admin|auth)(\/|$)/.test(currentPath) &&
     (Boolean(installEvent) || isIosDevice());
 
   async function installApplication() {
@@ -284,14 +334,13 @@ export default function ProductionExperience() {
     setPaletteOpen(false);
     setQuery("");
     if (item.path) {
-      navigate(item.path);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      navigateInsideApplication(item.path);
       return;
     }
     if (item.href) window.open(item.href, "_blank", "noopener,noreferrer");
   }
 
-  const protectedRoute = PROTECTED_ROUTE_PATTERN.test(location.pathname);
+  const protectedRoute = PROTECTED_ROUTE_PATTERN.test(currentPath);
 
   return (
     <>
