@@ -9,7 +9,7 @@
     "build": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs",
     "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "production:gate": "node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs",
+    "production:gate": "node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs",
     "build:spa": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs"
   },
   "devDependencies": {
