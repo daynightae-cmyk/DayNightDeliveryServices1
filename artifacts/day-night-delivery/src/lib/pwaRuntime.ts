@@ -2,10 +2,6 @@ declare global {
   interface Window {
     __DAY_NIGHT_PWA_RUNTIME__?: boolean;
     __DAY_NIGHT_SW_REGISTRATION__?: ServiceWorkerRegistration;
-    Capacitor?: {
-      isNativePlatform?: () => boolean;
-      getPlatform?: () => string;
-    };
   }
 
   interface Navigator {
