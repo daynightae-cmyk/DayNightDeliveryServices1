@@ -287,7 +287,10 @@ export async function fetchFinanceLedgerSnapshot(
         ok: payload.ok !== false,
         source: "rpc",
         generatedAt: clean(payload.generated_at) || emptyBase.generatedAt,
-        period: { from: clean((payload.period as Record<string, unknown> | undefined)?.from) || from, to: clean((payload.period as Record<string, unknown> | undefined)?.to) || to },
+        period: {
+          from: clean((payload.period as Record<string, unknown> | undefined)?.from) || from,
+          to: clean((payload.period as Record<string, unknown> | undefined)?.to) || to,
+        },
         summary,
         settlements,
         accountEntries: rowsFrom(payload.account_entries),
@@ -426,7 +429,21 @@ export async function fetchFinanceHardeningHealth(): Promise<Record<string, unkn
 }
 
 export async function fetchAuthoritativeDailyClosing(date = today()) {
-  return requireRpc<Record<string, unknown>>("admin_daily_closing_snapshot", { p_date: date });
+  const live = await requireRpc<Record<string, unknown>>("admin_daily_closing_snapshot", { p_date: date });
+  if (!supabase) return live;
+
+  const { data: persisted, error } = await supabase
+    .from("admin_daily_closings")
+    .select("status, notes, reviewed_at, reviewed_by, updated_at")
+    .eq("closing_date", date)
+    .maybeSingle();
+
+  if (error) {
+    if (!isMissingSchemaError(error)) console.warn("DAY NIGHT persisted daily closing status read failed.");
+    return live;
+  }
+
+  return persisted ? { ...live, ...persisted, source: "rpc" } : live;
 }
 
 export async function saveAuthoritativeDailyClosing(snapshot: Record<string, unknown>) {
