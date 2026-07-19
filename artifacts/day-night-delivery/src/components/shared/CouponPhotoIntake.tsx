@@ -175,6 +175,7 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
+  const cameraRequestIdRef = useRef(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -198,6 +199,7 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
   useEffect(() => {
     setLiveCameraAvailable(supportsLiveCamera());
     return () => {
+      cameraRequestIdRef.current += 1;
       stopStream(streamRef.current);
       streamRef.current = null;
       if (scanTimerRef.current !== null) window.clearInterval(scanTimerRef.current);
@@ -266,6 +268,8 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
   }
 
   async function startCamera(deviceId?: string, preferredFacing: "environment" | "user" = facingMode) {
+    const requestId = cameraRequestIdRef.current + 1;
+    cameraRequestIdRef.current = requestId;
     setCameraOpen(true);
     setCameraBusy(true);
     setCameraReady(false);
@@ -294,12 +298,28 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
         });
       }
 
+      if (cameraRequestIdRef.current !== requestId) {
+        stopStream(stream);
+        return;
+      }
+
       streamRef.current = stream;
       const video = await waitForVideoElement();
+      if (cameraRequestIdRef.current !== requestId) {
+        stopStream(stream);
+        if (streamRef.current === stream) streamRef.current = null;
+        return;
+      }
       video.srcObject = stream;
       video.muted = true;
       video.playsInline = true;
       await video.play();
+
+      if (cameraRequestIdRef.current !== requestId) {
+        stopStream(stream);
+        if (streamRef.current === stream) streamRef.current = null;
+        return;
+      }
 
       const track = stream.getVideoTracks()[0];
       const settings = track.getSettings();
@@ -317,14 +337,21 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
       }
 
       const devices = (await navigator.mediaDevices.enumerateDevices()).filter((item) => item.kind === "videoinput");
+      if (cameraRequestIdRef.current !== requestId) {
+        stopStream(stream);
+        if (streamRef.current === stream) streamRef.current = null;
+        return;
+      }
       setCameraDevices(devices);
       setCameraReady(true);
       beginLiveBarcodeScan();
     } catch (cause) {
-      releaseCamera();
-      setCameraError(cameraErrorMessage(cause, isArabic));
+      if (cameraRequestIdRef.current === requestId) {
+        releaseCamera();
+        setCameraError(cameraErrorMessage(cause, isArabic));
+      }
     } finally {
-      setCameraBusy(false);
+      if (cameraRequestIdRef.current === requestId) setCameraBusy(false);
     }
   }
 
@@ -342,10 +369,16 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
   }
 
   function closeCamera() {
+    cameraRequestIdRef.current += 1;
     releaseCamera();
     setCameraOpen(false);
     setCameraBusy(false);
     setCameraError("");
+  }
+
+  function openFallbackCamera() {
+    closeCamera();
+    window.setTimeout(() => fallbackCameraRef.current?.click(), 0);
   }
 
   async function switchCamera() {
@@ -461,13 +494,14 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
       });
       const capturedBarcode = liveBarcode;
       const file = new File([blob], `day-night-coupon-${Date.now()}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+      const qualityNotice = quality.brightness < 55
+        ? (isArabic ? "الصورة مظلمة نسبياً؛ شغّل الفلاش أو قرّب الكوبون إذا كانت القراءة ناقصة." : "The image is relatively dark; use the torch or move closer if extraction is incomplete.")
+        : quality.sharpness < 8
+          ? (isArabic ? "الصورة قد تكون مهزوزة؛ أعد التصوير بثبات إذا كانت القراءة ناقصة." : "The image may be blurry; retake steadily if extraction is incomplete.")
+          : "";
       closeCamera();
-      if (quality.brightness < 55) {
-        setNotice(isArabic ? "الصورة مظلمة نسبياً؛ شغّل الفلاش أو قرّب الكوبون إذا كانت القراءة ناقصة." : "The image is relatively dark; use the torch or move closer if extraction is incomplete.");
-      } else if (quality.sharpness < 8) {
-        setNotice(isArabic ? "الصورة قد تكون مهزوزة؛ أعد التصوير بثبات إذا كانت القراءة ناقصة." : "The image may be blurry; retake steadily if extraction is incomplete.");
-      }
       await readImage(file, "camera", capturedBarcode);
+      if (qualityNotice) setNotice(qualityNotice);
     } catch (cause) {
       console.warn("Live coupon capture failed:", cause);
       setCameraError(isArabic ? "تعذر حفظ اللقطة. أعد تشغيل الكاميرا وحاول مجدداً." : "The frame could not be saved. Restart the camera and retry.");
@@ -479,6 +513,7 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
   function handleFile(event: ChangeEvent<HTMLInputElement>, source: "camera" | "upload") {
     const file = event.target.files?.[0];
     event.target.value = "";
+    if (source === "camera" && cameraOpen) closeCamera();
     if (file) void readImage(file, source);
   }
 
@@ -674,7 +709,7 @@ export default function CouponPhotoIntake({ isArabic, mode, onReview, onClear, c
                     <button type="button" onClick={() => void startCamera()} className="rounded-xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep">
                       {isArabic ? "إعادة محاولة الكاميرا" : "Retry live camera"}
                     </button>
-                    <button type="button" onClick={() => fallbackCameraRef.current?.click()} className="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-black text-white">
+                    <button type="button" onClick={openFallbackCamera} className="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-black text-white">
                       {isArabic ? "فتح كاميرا الجهاز الاحتياطية" : "Open device-camera fallback"}
                     </button>
                   </div>
