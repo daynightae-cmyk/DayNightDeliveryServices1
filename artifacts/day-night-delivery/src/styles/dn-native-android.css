@@ -1,4 +1,5 @@
-html.dn-native-android {
+html.dn-native-shell,
+html.dn-installed-web-app {
   --dn-native-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --dn-native-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --dn-native-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
@@ -7,44 +8,66 @@ html.dn-native-android {
   overscroll-behavior: none;
 }
 
-html.dn-native-android,
-html.dn-native-android body,
-html.dn-native-android #root {
+html.dn-native-shell,
+html.dn-native-shell body,
+html.dn-native-shell #root,
+html.dn-installed-web-app,
+html.dn-installed-web-app body,
+html.dn-installed-web-app #root {
   min-height: 100%;
   min-height: 100dvh;
 }
 
-html.dn-native-android body {
+html.dn-native-shell body,
+html.dn-installed-web-app body {
   margin: 0;
   background: #071a33;
   overscroll-behavior-y: contain;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
 }
 
-html.dn-native-android .dn-admin-fullscreen,
-html.dn-native-android .dn-auth-clean-shell,
-html.dn-native-android .min-h-screen {
+html.dn-native-ios body,
+html.dn-installed-web-app.dn-platform-ios body {
+  -webkit-overflow-scrolling: touch;
+}
+
+html.dn-native-shell .dn-admin-fullscreen,
+html.dn-native-shell .dn-auth-clean-shell,
+html.dn-native-shell .min-h-screen,
+html.dn-installed-web-app .dn-admin-fullscreen,
+html.dn-installed-web-app .dn-auth-clean-shell,
+html.dn-installed-web-app .min-h-screen {
   min-height: 100dvh;
 }
 
-html.dn-native-android input,
-html.dn-native-android select,
-html.dn-native-android textarea {
+html.dn-native-shell input,
+html.dn-native-shell select,
+html.dn-native-shell textarea,
+html.dn-installed-web-app input,
+html.dn-installed-web-app select,
+html.dn-installed-web-app textarea {
   font-size: max(16px, 1em);
 }
 
-html.dn-native-android button,
-html.dn-native-android a,
-html.dn-native-android [role="button"] {
+html.dn-native-shell button,
+html.dn-native-shell a,
+html.dn-native-shell [role="button"],
+html.dn-installed-web-app button,
+html.dn-installed-web-app a,
+html.dn-installed-web-app [role="button"] {
   touch-action: manipulation;
+}
+
+html.dn-native-shell .dn-admin-fullscreen,
+html.dn-installed-web-app .dn-admin-fullscreen {
+  padding-bottom: var(--dn-native-safe-bottom, 0px);
 }
 
 .dn-native-exit-hint,
 .dn-native-connectivity {
   position: fixed;
   left: 50%;
-  bottom: calc(20px + var(--dn-native-safe-bottom, 0px));
+  bottom: calc(20px + var(--dn-native-safe-bottom, env(safe-area-inset-bottom, 0px)));
   z-index: 2147483647;
   max-width: min(88vw, 420px);
   transform: translate(-50%, 24px);
@@ -83,7 +106,7 @@ html.dn-native-android [role="button"] {
 }
 
 @media (display-mode: standalone) {
-  html.dn-native-android .dn-admin-fullscreen {
-    padding-bottom: var(--dn-native-safe-bottom, 0px);
+  html.dn-installed-web-app body {
+    padding-inline: var(--dn-native-safe-left, 0px) var(--dn-native-safe-right, 0px);
   }
 }
