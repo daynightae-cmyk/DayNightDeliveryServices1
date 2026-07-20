@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertOctagon,
   BarChart3,
@@ -30,6 +31,7 @@ import {
   XCircle,
 } from "lucide-react";
 import companyMeta from "../../../data/companyMeta";
+import { useAppContext } from "../../../lib/AppContext";
 import { supabase } from "../../../supabase";
 import AdminPanelLuxury from "../../AdminPanelLuxury";
 import type { AdminSectionId } from "../AdminSectionRegistry";
@@ -77,17 +79,20 @@ function hiddenSidebarButtons() {
   return Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-admin-side-nav button"));
 }
 
-function hiddenTopAction(index: number) {
-  return document.querySelectorAll<HTMLButtonElement>(".dn-admin-top-actions button").item(index);
+function hiddenRefreshAction() {
+  return document.querySelectorAll<HTMLButtonElement>(".dn-admin-top-actions button").item(1);
 }
 
 export default function AdminPanelCommandCenter() {
+  const navigateRouter = useNavigate();
+  const { language, toggleLanguage, theme, toggleTheme } = useAppContext();
+  const isArabic = language === "ar";
   const [active, setActive] = useState<AdminSectionId>("dashboard");
-  const [isArabic, setIsArabic] = useState(true);
   const [operatorLabel, setOperatorLabel] = useState("DAY NIGHT Operations Admin");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [khalifaOpen, setKhalifaOpen] = useState(false);
 
   const activeItem = menu.find((item) => item.id === active) ?? menu[0];
   const searchItems = useMemo<AdminCommandSearchItem[]>(
@@ -120,9 +125,6 @@ export default function AdminPanelCommandCenter() {
 
   useEffect(() => {
     const syncFromLegacyPanel = () => {
-      const root = document.querySelector<HTMLElement>(".dn-admin-fullscreen");
-      setIsArabic(root?.getAttribute("dir") !== "ltr");
-
       const buttons = hiddenSidebarButtons();
       const selectedIndex = buttons.findIndex((button) => button.classList.contains("is-active"));
       if (selectedIndex >= 0 && menu[selectedIndex]) setActive(menu[selectedIndex].id);
@@ -131,12 +133,19 @@ export default function AdminPanelCommandCenter() {
       const errorNode = document.querySelector<HTMLElement>(".dn-admin-error-banner");
       setLoading(isLoading);
       setError(errorNode?.textContent?.trim() || "");
-      if (!isLoading && root) setLastSyncAt((current) => current ?? new Date());
+      if (!isLoading && document.querySelector(".dn-admin-fullscreen")) {
+        setLastSyncAt((current) => current ?? new Date());
+      }
     };
 
     syncFromLegacyPanel();
     const observer = new MutationObserver(syncFromLegacyPanel);
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "dir"] });
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class", "dir"],
+    });
     return () => observer.disconnect();
   }, []);
 
@@ -144,12 +153,12 @@ export default function AdminPanelCommandCenter() {
     const index = menu.findIndex((item) => item.id === id);
     const button = hiddenSidebarButtons()[index];
     if (button) button.click();
-    else if (id === "logout") window.location.href = "/auth";
+    else if (id === "logout") navigateRouter("/auth");
     setActive(id);
   };
 
   const refresh = () => {
-    const button = hiddenTopAction(1);
+    const button = hiddenRefreshAction();
     if (button) {
       setLoading(true);
       button.click();
@@ -157,9 +166,15 @@ export default function AdminPanelCommandCenter() {
     }
   };
 
+  const goBack = () => {
+    if (window.history.length > 1) navigateRouter(-1);
+    else navigateRouter("/");
+  };
+
   return (
     <AdminCommandCenterShell
       isArabic={isArabic}
+      theme={theme}
       active={active}
       menu={menu}
       logoUrl={companyMeta.logoUrl}
@@ -173,9 +188,14 @@ export default function AdminPanelCommandCenter() {
       loading={loading}
       error={error}
       searchItems={searchItems}
+      khalifaOpen={khalifaOpen}
       onNavigate={navigate}
       onSearchSelect={(item) => navigate(item.sectionId)}
-      onToggleLanguage={() => hiddenTopAction(0)?.click()}
+      onToggleLanguage={toggleLanguage}
+      onToggleTheme={toggleTheme}
+      onToggleKhalifa={() => setKhalifaOpen((value) => !value)}
+      onBack={goBack}
+      onOpenWebsite={() => navigateRouter("/")}
       onRefresh={refresh}
       notificationSlot={<Bell aria-hidden="true" />}
     >
