@@ -1,0 +1,65 @@
+/* Hard route isolation for DAY NIGHT merchant/driver applications. */
+
+html[data-portal-route="true"],
+html[data-portal-route="true"] body,
+body:has(.dn-merchant-login-v3),
+body:has(.dn-merchant-state-v3),
+body:has(.dn-merchant-shell-v3),
+body:has(.dn-driver-login-page),
+body:has(.dn-driver-shell) {
+  min-height: 100%;
+  margin: 0;
+  background: #071a33;
+}
+
+html[data-portal-route="true"] .dn-splash { display: none !important; }
+
+html[data-portal-route="true"] .dn-official-shell-frame,
+html[data-portal-route="true"] .dn-wa-widget,
+html[data-portal-route="true"] .dn-smart-chat,
+html[data-portal-route="true"] .dn-sticky-mobile-bar,
+body:has(.dn-merchant-login-v3) .dn-official-shell-frame,
+body:has(.dn-merchant-state-v3) .dn-official-shell-frame,
+body:has(.dn-merchant-shell-v3) .dn-official-shell-frame,
+body:has(.dn-driver-login-page) .dn-official-shell-frame,
+body:has(.dn-driver-shell) .dn-official-shell-frame,
+body:has(.dn-merchant-login-v3) .dn-wa-widget,
+body:has(.dn-merchant-state-v3) .dn-wa-widget,
+body:has(.dn-merchant-shell-v3) .dn-wa-widget,
+body:has(.dn-driver-login-page) .dn-wa-widget,
+body:has(.dn-driver-shell) .dn-wa-widget {
+  display: none !important;
+}
+
+html[data-portal-route="true"] #root > div > main,
+body:has(.dn-merchant-login-v3) #root > div > main,
+body:has(.dn-merchant-state-v3) #root > div > main,
+body:has(.dn-merchant-shell-v3) #root > div > main,
+body:has(.dn-driver-login-page) #root > div > main,
+body:has(.dn-driver-shell) #root > div > main {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html[data-portal-route="true"] #root > div > main + *,
+body:has(.dn-merchant-login-v3) #root > div > main + *,
+body:has(.dn-merchant-state-v3) #root > div > main + *,
+body:has(.dn-merchant-shell-v3) #root > div > main + *,
+body:has(.dn-driver-login-page) #root > div > main + *,
+body:has(.dn-driver-shell) #root > div > main + * {
+  display: none !important;
+}
+
+html[data-portal-route="true"] #root > div > .h-\[108px\],
+html[data-portal-route="true"] #root > div > .sm\:h-\[118px\],
+html[data-portal-route="true"] #root > div > .lg\:h-\[156px\] {
+  display: none !important;
+}
+
+html[data-theme="light"][data-portal-route="true"],
+html[data-theme="light"][data-portal-route="true"] body {
+  background: #eef4fc;
+}
