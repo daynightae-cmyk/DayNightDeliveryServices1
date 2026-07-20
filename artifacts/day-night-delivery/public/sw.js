@@ -1,4 +1,4 @@
-const VERSION = "2026.07.19-final-production";
+const VERSION = new URL(self.location.href).searchParams.get("v") || "legacy";
 const APP_SHELL_CACHE = `day-night-shell-${VERSION}`;
 const RUNTIME_CACHE = `day-night-runtime-${VERSION}`;
 const IMAGE_CACHE = `day-night-images-${VERSION}`;
@@ -13,11 +13,14 @@ const APP_SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(APP_SHELL_CACHE).then((cache) =>
-      Promise.allSettled(
-        APP_SHELL.map((url) => cache.add(new Request(url, { cache: "reload" }))),
+    Promise.all([
+      self.skipWaiting(),
+      caches.open(APP_SHELL_CACHE).then((cache) =>
+        Promise.allSettled(
+          APP_SHELL.map((url) => cache.add(new Request(url, { cache: "reload" }))),
+        ),
       ),
-    ),
+    ]),
   );
 });
 
@@ -52,7 +55,7 @@ self.addEventListener("message", (event) => {
 function shouldBypass(request, url) {
   if (request.method !== "GET") return true;
   if (url.origin !== self.location.origin) return true;
-  if (url.pathname === "/sw.js") return true;
+  if (url.pathname === "/sw.js" || url.pathname === "/version.json") return true;
   if (url.searchParams.has("__dn_deployment_check")) return true;
   if (url.searchParams.has("__dn_update_check")) return true;
   if (url.searchParams.has("__dn_live_reload")) return true;
