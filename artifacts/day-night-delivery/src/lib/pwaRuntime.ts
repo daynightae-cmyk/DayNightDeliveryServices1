@@ -1,3 +1,5 @@
+import { DAY_NIGHT_BUILD_ID } from "./buildInfo";
+
 declare global {
   interface Window {
     __DAY_NIGHT_PWA_RUNTIME__?: boolean;
@@ -11,7 +13,7 @@ declare global {
 
 export const DAY_NIGHT_PWA_UPDATE_EVENT = "daynight:pwa-update";
 const RELOAD_KEY = "dn_pwa_controller_reload";
-const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 function isNativeCapacitor() {
   const bridge = window.Capacitor;
@@ -37,13 +39,14 @@ function applyRuntimeClasses() {
   root.classList.add(platformClass());
   root.classList.toggle("dn-installed-web-app", isStandaloneDisplay());
   root.classList.toggle("dn-native-capacitor", isNativeCapacitor());
+  root.dataset.dayNightBuild = DAY_NIGHT_BUILD_ID;
 }
 
 function announceUpdate(registration: ServiceWorkerRegistration) {
   window.__DAY_NIGHT_SW_REGISTRATION__ = registration;
   window.dispatchEvent(
     new CustomEvent(DAY_NIGHT_PWA_UPDATE_EVENT, {
-      detail: { registration },
+      detail: { registration, buildId: DAY_NIGHT_BUILD_ID },
     }),
   );
 }
@@ -52,7 +55,8 @@ async function registerServiceWorker() {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isNativeCapacitor()) return;
 
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js", {
+    const workerUrl = `/sw.js?v=${encodeURIComponent(DAY_NIGHT_BUILD_ID)}`;
+    const registration = await navigator.serviceWorker.register(workerUrl, {
       scope: "/",
       updateViaCache: "none",
     });

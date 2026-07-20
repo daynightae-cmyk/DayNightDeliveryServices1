@@ -51,10 +51,24 @@
       "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
     },
     {
+      "name": "بوابة المندوب",
+      "short_name": "المندوب",
+      "description": "فتح الوردية والمهام والموقع المباشر",
+      "url": "/driver?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
+    },
+    {
       "name": "لوحة الإدارة",
       "short_name": "الإدارة",
       "description": "الدخول الآمن إلى مركز عمليات DAY NIGHT",
       "url": "/auth?source=pwa-shortcut",
+      "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
+    },
+    {
+      "name": "الدعم المباشر",
+      "short_name": "الدعم",
+      "description": "فتح صفحة التواصل والدعم",
+      "url": "/contact?source=pwa-shortcut",
       "icons": [{ "src": "/logo-daynight.png", "sizes": "800x800", "type": "image/png" }]
     }
   ]

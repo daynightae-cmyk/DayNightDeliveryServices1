@@ -37,7 +37,9 @@ if (fs.existsSync(serviceWorkerPath)) {
   const worker = read(serviceWorkerPath);
   assert(worker.includes("networkFirstNavigation"), "Service worker uses network-first navigation");
   assert(worker.includes("SKIP_WAITING"), "Service worker supports controlled updates");
+  assert(worker.includes("new URL(self.location.href).searchParams.get(\"v\")"), "Service-worker caches rotate with the production build id");
   assert(worker.includes("__dn_deployment_check"), "Service worker bypasses live deployment checks");
+  assert(worker.includes("/version.json"), "Service worker bypasses live version metadata");
   assert(worker.includes("url.origin !== self.location.origin"), "Service worker never caches cross-origin API data");
   assert(worker.includes("offline.html"), "Service worker provides a branded offline fallback");
 }
@@ -56,7 +58,7 @@ if (fs.existsSync(indexPath)) {
   assert(index.includes("viewport-fit=cover"), "Index supports iPhone safe areas");
   assert(index.includes("apple-mobile-web-app-capable"), "Index supports iOS Home Screen installation");
   assert(index.includes("apple-touch-icon"), "Index declares the official Apple touch icon");
-  assert(index.includes('application/ld+json'), "Index includes structured organization data");
+  assert(index.includes("application/ld+json"), "Index includes structured organization data");
   assert(index.includes("manifest.webmanifest"), "Index links the production manifest");
 }
 
@@ -71,11 +73,22 @@ if (fs.existsSync(experiencePath)) {
   assert(experience.includes("Add to Home Screen"), "iPhone installation guide exists");
 }
 
+const buildInfoPath = path.join(srcRoot, "lib", "buildInfo.ts");
+assert(fs.existsSync(buildInfoPath), "Build identity module exists");
+
+const deploymentRuntimePath = path.join(srcRoot, "lib", "liveDeploymentRuntime.ts");
+assert(fs.existsSync(deploymentRuntimePath), "Live deployment watcher exists");
+if (fs.existsSync(deploymentRuntimePath)) {
+  const deploymentRuntime = read(deploymentRuntimePath);
+  assert(deploymentRuntime.includes("/version.json"), "Installed apps check immutable production build metadata");
+  assert(deploymentRuntime.includes("scheduleSafeReload"), "Installed apps safely reload to the latest production build");
+}
+
 const pwaRuntimePath = path.join(srcRoot, "lib", "pwaRuntime.ts");
 assert(fs.existsSync(pwaRuntimePath), "PWA runtime exists");
 if (fs.existsSync(pwaRuntimePath)) {
   const runtime = read(pwaRuntimePath);
-  assert(runtime.includes('register("/sw.js"'), "PWA runtime registers the production service worker");
+  assert(runtime.includes("/sw.js?v="), "PWA runtime versions the production service worker");
   assert(runtime.includes('updateViaCache: "none"'), "Service worker update checks bypass stale HTTP cache");
   assert(runtime.includes("isNativeCapacitor"), "PWA registration stays separate from native Capacitor builds");
 }
@@ -93,12 +106,14 @@ if (fs.existsSync(vitePath)) {
   const vite = read(vitePath);
   assert(vite.includes("manualChunks"), "Vite production bundle uses vendor chunking");
   assert(vite.includes("vendor-supabase") && vite.includes("vendor-maps"), "Heavy operational vendors are isolated for caching");
+  assert(vite.includes("version.json") && vite.includes("__DAY_NIGHT_BUILD_ID__"), "Build emits version metadata for live installed-app updates");
 }
 
 const vercelPath = path.join(root, "vercel.json");
 if (fs.existsSync(vercelPath)) {
   const vercel = read(vercelPath);
   assert(vercel.includes("Service-Worker-Allowed"), "Vercel allows root service-worker scope");
+  assert(vercel.includes('"source": "/version.json"'), "Vercel serves build metadata without stale caching");
   assert(vercel.includes("max-age=31536000, immutable"), "Hashed assets receive immutable caching");
   assert(vercel.includes("https://maps.google.com"), "CSP permits the merchant map iframe");
   assert(vercel.includes("media-src") && vercel.includes("files.catbox.moe"), "CSP permits approved operational audio");
@@ -110,7 +125,7 @@ if (fs.existsSync(robotsPath)) {
   assert(robots.includes("Disallow: /merchant"), "Merchant portal is excluded from search indexing");
 }
 
-const securityScan = [manifestPath, serviceWorkerPath, experiencePath, pwaRuntimePath]
+const securityScan = [manifestPath, serviceWorkerPath, experiencePath, pwaRuntimePath, buildInfoPath, deploymentRuntimePath]
   .filter((file) => fs.existsSync(file))
   .map(read)
   .join("\n");
