@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -6,6 +6,34 @@ import path from "path";
 const port = Number(process.env.PORT || 3000);
 const basePath = process.env.BASE_PATH || "/";
 const appRoot = path.resolve(import.meta.dirname);
+const builtAt = new Date().toISOString();
+const buildId =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.GITHUB_SHA ||
+  process.env.DAY_NIGHT_BUILD_ID ||
+  `local-${builtAt.replace(/[-:.TZ]/g, "")}`;
+
+function buildMetadataPlugin(): Plugin {
+  return {
+    name: "day-night-build-metadata",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify(
+          {
+            app: "DAY NIGHT DELIVERY SERVICES",
+            buildId,
+            builtAt,
+          },
+          null,
+          2,
+        ),
+      });
+    },
+  };
+}
 
 function productionManualChunk(id: string) {
   const normalized = id.replace(/\\/g, "/");
@@ -25,7 +53,11 @@ function productionManualChunk(id: string) {
 
 export default defineConfig({
   base: basePath,
-  plugins: [react(), tailwindcss()],
+  define: {
+    __DAY_NIGHT_BUILD_ID__: JSON.stringify(buildId),
+    __DAY_NIGHT_BUILT_AT__: JSON.stringify(builtAt),
+  },
+  plugins: [react(), tailwindcss(), buildMetadataPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(appRoot, "src"),
