@@ -1,0 +1,348 @@
+/* DAY NIGHT — shared merchant/driver portal runtime, themes and notifications */
+
+.dn-portal-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dn-portal-language-button,
+.dn-portal-toolbar .dn-theme-toggle {
+  min-width: 42px;
+  min-height: 42px;
+  border: 1px solid rgba(10, 28, 58, .12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.9);
+  color: #071a33;
+  font-size: 10px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.dn-portal-language-button:hover,
+.dn-portal-toolbar .dn-theme-toggle:hover {
+  border-color: rgba(212,175,55,.5);
+  transform: translateY(-1px);
+}
+
+.dn-portal-notification-layer {
+  position: fixed;
+  z-index: 2147483600;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px;
+  background: rgba(2, 12, 28, .52);
+  backdrop-filter: blur(8px);
+}
+
+[dir="rtl"] .dn-portal-notification-layer { justify-content: flex-start; }
+
+.dn-portal-notification-panel {
+  width: min(430px, 100%);
+  height: min(760px, calc(100dvh - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(212,175,55,.22);
+  border-radius: 28px;
+  background: #fff;
+  color: #071a33;
+  box-shadow: 0 30px 100px rgba(2,18,38,.34);
+}
+
+.dn-portal-notification-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-bottom: 1px solid rgba(10,28,58,.1);
+  background: linear-gradient(135deg,#071a33,#0b4db2);
+  color: #fff;
+}
+
+.dn-portal-notification-panel > header > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.dn-portal-notification-panel > header span,
+.dn-portal-notification-panel > header button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 14px;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+}
+
+.dn-portal-notification-panel > header small {
+  color: #f3d76c;
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .14em;
+}
+
+.dn-portal-notification-panel > header h2 {
+  margin: 2px 0 0;
+  font-size: 19px;
+  font-weight: 1000;
+}
+
+.dn-portal-notification-panel svg { width: 18px; }
+
+.dn-portal-notification-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(10,28,58,.08);
+  background: #f8fafc;
+}
+
+.dn-portal-notification-tools button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(10,28,58,.1);
+  border-radius: 13px;
+  background: #fff;
+  color: #071a33;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.dn-portal-notification-tools button:disabled { opacity: .45; }
+
+.dn-portal-notification-error {
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(239,68,68,.22);
+  border-radius: 13px;
+  background: rgba(239,68,68,.07);
+  color: #b42318;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dn-portal-notification-list {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.dn-portal-notification-list > button {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 8px;
+  padding: 13px;
+  border: 1px solid rgba(10,28,58,.09);
+  border-radius: 17px;
+  background: #fff;
+  color: #071a33;
+  text-align: start;
+}
+
+.dn-portal-notification-list > button.is-unread {
+  border-color: rgba(49,149,247,.25);
+  background: rgba(49,149,247,.06);
+  box-shadow: inset 3px 0 0 #3195f7;
+}
+
+[dir="rtl"] .dn-portal-notification-list > button.is-unread { box-shadow: inset -3px 0 0 #3195f7; }
+
+.dn-portal-notification-list > button.is-read { opacity: .72; }
+
+.dn-portal-notification-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+
+.is-unread .dn-portal-notification-dot { background: #3195f7; box-shadow: 0 0 0 5px rgba(49,149,247,.1); }
+.dn-portal-notification-list > button > div { min-width: 0; }
+.dn-portal-notification-list strong { display: block; font-size: 12px; font-weight: 1000; }
+.dn-portal-notification-list p { margin: 4px 0 0; color: #667085; font-size: 10px; line-height: 1.7; font-weight: 700; }
+.dn-portal-notification-list small { display: flex; align-items: center; gap: 5px; margin-top: 8px; color: #98a2b3; font-size: 8px; font-weight: 800; }
+.dn-portal-notification-list small svg { width: 12px; }
+
+.dn-portal-notification-empty {
+  min-height: 300px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 25px;
+  color: #667085;
+  text-align: center;
+}
+
+.dn-portal-notification-empty > svg { width: 42px; height: 42px; color: #22c55e; }
+.dn-portal-notification-empty strong { color: #071a33; font-size: 14px; font-weight: 1000; }
+.dn-portal-notification-empty p { max-width: 290px; margin: 0; font-size: 10px; line-height: 1.8; }
+
+/* Portal shells are first-class apps, not cards inside the public website. */
+.dn-driver-shell-v3,
+.dn-merchant-shell-v3,
+.dn-driver-login-page,
+.dn-merchant-login-v3,
+.dn-driver-state-card,
+.dn-merchant-state-v3 {
+  font-family: Cairo, Poppins, Inter, system-ui, sans-serif;
+}
+
+.dn-driver-shell-v3,
+.dn-merchant-shell-v3 {
+  width: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Dark portal palette. The existing Figma CSS is the canonical light palette. */
+html[data-theme="dark"] .dn-driver-shell-v3 {
+  --dn3-paper: #0b1d35;
+  --dn3-soft: #0a203d;
+  --dn3-card: #0d2849;
+  --dn3-ink: #f8fbff;
+  --dn3-muted: #a9bad0;
+  --dn3-line: rgba(255,255,255,.12);
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 15% 0,rgba(49,149,247,.2),transparent 30%),
+    radial-gradient(circle at 92% 88%,rgba(212,175,55,.14),transparent 30%),
+    linear-gradient(145deg,#030d1c,#071a33 52%,#0a2c58);
+}
+
+html[data-theme="dark"] .dn-driver-workspace-v3 { background: rgba(0,0,0,.08); }
+html[data-theme="dark"] .dn-driver-topbar-v3,
+html[data-theme="dark"] .dn-driver-command-surface-v3 > article:not(.dn-driver-tracking-card-v3),
+html[data-theme="dark"] .dn-driver-kpi-grid-v3 article,
+html[data-theme="dark"] .dn-driver-operations-grid-v3 > article,
+html[data-theme="dark"] .dn-driver-section-v3,
+html[data-theme="dark"] .dn-driver-profile-chip-v3 {
+  border-color: rgba(255,255,255,.11);
+  background: rgba(10,31,58,.88);
+  color: #f8fbff;
+  box-shadow: 0 18px 42px rgba(0,0,0,.2);
+}
+
+html[data-theme="dark"] .dn-driver-heading-v3 h1,
+html[data-theme="dark"] .dn-driver-profile-chip-v3 strong,
+html[data-theme="dark"] .dn-driver-shell-v3 h2,
+html[data-theme="dark"] .dn-driver-shell-v3 h3,
+html[data-theme="dark"] .dn-driver-kpi-grid-v3 strong,
+html[data-theme="dark"] .dn-driver-icon-button-v3 {
+  color: #f8fbff;
+}
+
+html[data-theme="dark"] .dn-driver-profile-chip-v3 small,
+html[data-theme="dark"] .dn-driver-shell-v3 p,
+html[data-theme="dark"] .dn-driver-shell-v3 small { color: #a9bad0; }
+html[data-theme="dark"] .dn-driver-icon-button-v3,
+html[data-theme="dark"] .dn-portal-language-button,
+html[data-theme="dark"] .dn-portal-toolbar .dn-theme-toggle { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.07); color: #fff; }
+
+html[data-theme="dark"] .dn-merchant-shell-v3 {
+  --m-cream: #071a33;
+  --m-paper: #0d2849;
+  --m-ink: #f8fbff;
+  --m-muted: #a9bad0;
+  --m-line: rgba(255,255,255,.12);
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 12% 0,rgba(212,175,55,.14),transparent 28rem),
+    radial-gradient(circle at 92% 2%,rgba(49,149,247,.18),transparent 30rem),
+    linear-gradient(145deg,#030d1c 0%,#071a33 58%,#0a2c58 100%);
+}
+
+html[data-theme="dark"] .dn-merchant-topbar-v3,
+html[data-theme="dark"] .dn-merchant-kpis-v3 article,
+html[data-theme="dark"] .dn-merchant-overview-grid-v3 > article,
+html[data-theme="dark"] .dn-merchant-services-strip-v3,
+html[data-theme="dark"] .dn-merchant-section-v3,
+html[data-theme="dark"] .dn-merchant-route-v3 article,
+html[data-theme="dark"] .dn-merchant-services-strip-v3 > div > a,
+html[data-theme="dark"] .dn-merchant-services-strip-v3 > div > button {
+  border-color: rgba(255,255,255,.11);
+  background: rgba(10,31,58,.88);
+  color: #f8fbff;
+  box-shadow: 0 16px 38px rgba(0,0,0,.2);
+}
+
+html[data-theme="dark"] .dn-merchant-identity-v3 h1,
+html[data-theme="dark"] .dn-merchant-kpis-v3 strong,
+html[data-theme="dark"] .dn-merchant-overview-grid-v3 h3,
+html[data-theme="dark"] .dn-merchant-section-v3 h2,
+html[data-theme="dark"] .dn-merchant-section-v3 h3,
+html[data-theme="dark"] .dn-merchant-route-v3 strong,
+html[data-theme="dark"] .dn-merchant-services-strip-v3 strong,
+html[data-theme="dark"] .dn-merchant-top-actions-v3 > button {
+  color: #f8fbff;
+}
+
+html[data-theme="dark"] .dn-merchant-identity-v3 p,
+html[data-theme="dark"] .dn-merchant-kpis-v3 small,
+html[data-theme="dark"] .dn-merchant-shell-v3 p,
+html[data-theme="dark"] .dn-merchant-shell-v3 small { color: #a9bad0; }
+html[data-theme="dark"] .dn-merchant-top-actions-v3 > button { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.07); }
+
+html[data-theme="dark"] .dn-portal-notification-panel { background: #081a31; color: #fff; }
+html[data-theme="dark"] .dn-portal-notification-tools,
+html[data-theme="dark"] .dn-portal-notification-tools button,
+html[data-theme="dark"] .dn-portal-notification-list > button { border-color: rgba(255,255,255,.1); background: #0d2849; color: #fff; }
+html[data-theme="dark"] .dn-portal-notification-list > button.is-unread { background: rgba(49,149,247,.13); }
+html[data-theme="dark"] .dn-portal-notification-list p,
+html[data-theme="dark"] .dn-portal-notification-list small,
+html[data-theme="dark"] .dn-portal-notification-empty { color: #a9bad0; }
+html[data-theme="dark"] .dn-portal-notification-empty strong { color: #fff; }
+
+/* Login pages follow the selected appearance. */
+html[data-theme="dark"] .dn-merchant-login-v3,
+html[data-theme="dark"] .dn-merchant-state-v3,
+html[data-theme="dark"] .dn-driver-login-page,
+html[data-theme="dark"] .dn-driver-shell:not(.dn-driver-shell-v3) {
+  background: linear-gradient(145deg,#030d1c,#071a33 55%,#0b4db2);
+  color: #fff;
+}
+
+html[data-theme="dark"] .dn-merchant-login-card-v3,
+html[data-theme="dark"] .dn-driver-login-card,
+html[data-theme="dark"] .dn-driver-state-card {
+  border-color: rgba(255,255,255,.12);
+  background: rgba(8,26,49,.94);
+  color: #fff;
+}
+
+html[data-theme="dark"] .dn-merchant-login-card-v3 h2,
+html[data-theme="dark"] .dn-merchant-login-card-v3 label > span,
+html[data-theme="dark"] .dn-driver-login-card h1,
+html[data-theme="dark"] .dn-driver-login-card label > span { color: #fff; }
+html[data-theme="dark"] .dn-merchant-login-card-v3 p,
+html[data-theme="dark"] .dn-driver-login-card p { color: #a9bad0; }
+html[data-theme="dark"] .dn-merchant-login-card-v3 input,
+html[data-theme="dark"] .dn-driver-login-card input { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; }
+
+@media (max-width: 900px) {
+  .dn-portal-notification-layer { padding: 0; }
+  .dn-portal-notification-panel { width: 100%; height: 100dvh; border-radius: 0; }
+  .dn-driver-shell-v3,
+  .dn-merchant-shell-v3 { min-height: 100dvh; }
+  .dn-portal-toolbar { gap: 5px; }
+  .dn-portal-language-button,
+  .dn-portal-toolbar .dn-theme-toggle { width: 39px; min-width: 39px; min-height: 39px; padding: 0; }
+}
