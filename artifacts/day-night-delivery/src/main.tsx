@@ -18,6 +18,7 @@ import "./styles/dn-site-unification.css";
 import "./styles/dn-vehicle-marker-system.css";
 import "./styles/dn-native-android.css";
 import "./styles/dn-portal-figma-reference-v6.css";
+import "./styles/dn-portal-figma-final-v7.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 
