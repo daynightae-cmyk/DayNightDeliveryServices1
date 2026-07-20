@@ -23,6 +23,7 @@ import {
   Signal,
   Truck,
   UserRound,
+  Weight,
   Wifi,
 } from "lucide-react";
 import { supabase } from "../../supabase";
@@ -249,6 +250,8 @@ export default function DriverDashboard({
     : undefined;
   const currentReference = currentOrder?.tracking_number || currentOrder?.tracking_code || currentOrder?.invoice_number || currentOrder?.id;
   const currentProgress = progressIndex(currentOrder?.status);
+  const currentWeight = Number(currentOrder?.weight);
+  const currentPieces = Number(currentOrder?.pieces);
   const timeline = [
     { ar: "تم الإسناد", en: "Assigned" },
     { ar: "تم القبول", en: "Accepted" },
@@ -367,14 +370,15 @@ export default function DriverDashboard({
                   <p>{isArabic ? "هوية DAY NIGHT — سريع • آمن • موثوق" : "DAY NIGHT identity — Fast • Safe • Reliable"}</p>
                 </div>
                 <div className="dn-driver-vehicle-visual-v3">
-                  <img src={localAssets.hero} onError={(event) => withRemoteFallback(event, localAssets.remote.hero)} alt={vehicleLabel} />
+                  <div className="dn-driver-vehicle-route-grid-v3" aria-hidden="true" />
+                  <img src={localAssets.driverVehicle} alt={vehicleLabel} />
                   <span><img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="" /></span>
                 </div>
                 <div className="dn-driver-mini-metrics-v3">
                   <article><Banknote /><div><strong>{activeCod.toFixed(2)}</strong><small>{isArabic ? "تحصيل AED" : "COD AED"}</small></div></article>
                   <article><Route /><div><strong>{gps.travelledMeters < 1000 ? `${Math.round(gps.travelledMeters)}m` : `${(gps.travelledMeters / 1000).toFixed(1)}km`}</strong><small>{isArabic ? "المسافة" : "Distance"}</small></div></article>
-                  <article><Clock3 /><div><strong>{formatShiftDuration(sessionMinutes, isArabic)}</strong><small>{isArabic ? "مدة الوردية" : "Shift time"}</small></div></article>
-                  <article><Package /><div><strong>{activeOrders.length}</strong><small>{isArabic ? "مهام نشطة" : "Active jobs"}</small></div></article>
+                  <article><Weight /><div><strong>{currentOrder && Number.isFinite(currentWeight) ? `${currentWeight.toFixed(1)} kg` : "—"}</strong><small>{isArabic ? "وزن الشحنة" : "Shipment weight"}</small></div></article>
+                  <article><Package /><div><strong>{currentOrder && Number.isFinite(currentPieces) ? currentPieces : "—"}</strong><small>{isArabic ? "عدد القطع" : "Pieces"}</small></div></article>
                 </div>
               </article>
 
@@ -399,8 +403,8 @@ export default function DriverDashboard({
             <section className="dn-driver-kpi-grid-v3">
               <article><Route /><div><small>{isArabic ? "الطلبات النشطة" : "Active orders"}</small><strong>{activeOrders.length}</strong></div></article>
               <article><CheckCircle2 /><div><small>{isArabic ? "تم التسليم اليوم" : "Delivered today"}</small><strong>{deliveredToday}</strong></div></article>
-              <article><BatteryCharging /><div><small>{isArabic ? "بطارية الجهاز" : "Device battery"}</small><strong>{gps.batteryLevel != null ? `${gps.batteryLevel}%` : "—"}</strong></div></article>
-              <article><Signal /><div><small>{isArabic ? "حالة الشبكة" : "Network status"}</small><strong>{gps.networkState || "—"}</strong></div></article>
+              <article><Clock3 /><div><small>{isArabic ? "مدة الوردية" : "Shift time"}</small><strong>{formatShiftDuration(sessionMinutes, isArabic)}</strong></div></article>
+              <article><BatteryCharging /><div><small>{isArabic ? "الجهاز والشبكة" : "Device & network"}</small><strong>{gps.batteryLevel != null ? `${gps.batteryLevel}%` : "—"}</strong><em><Signal /> {gps.networkState || "—"}</em></div></article>
             </section>
 
             <section className="dn-driver-operations-grid-v3">
