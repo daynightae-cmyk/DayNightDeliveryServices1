@@ -130,6 +130,7 @@ jobs:
           s=re.sub(r'PRODUCT_BUNDLE_IDENTIFIER = [^;]+;',f'PRODUCT_BUNDLE_IDENTIFIER = {bundle};',s)
           s=re.sub(r'MARKETING_VERSION = [^;]+;',f'MARKETING_VERSION = {version};',s)
           s=re.sub(r'CURRENT_PROJECT_VERSION = [^;]+;',f'CURRENT_PROJECT_VERSION = {build};',s)
+          s=re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [^;]+;','IPHONEOS_DEPLOYMENT_TARGET = 15.0;',s)
           p.write_text(s)
           PY
 
