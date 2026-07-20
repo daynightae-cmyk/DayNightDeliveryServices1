@@ -5,10 +5,13 @@ import {
   ArrowRightLeft,
   Banknote,
   Building2,
+  Camera,
   CheckCircle2,
-  Clock3,
+  FileText,
   Globe2,
+  Home,
   Image as ImageIcon,
+  ListFilter,
   Loader2,
   LockKeyhole,
   LogOut,
@@ -19,12 +22,16 @@ import {
   Pencil,
   Phone,
   PlusCircle,
+  ReceiptText,
   RefreshCw,
   Save,
+  Search,
   ShieldCheck,
   Sparkles,
   Store,
   Truck,
+  UserRound,
+  WalletCards,
   X,
 } from "lucide-react";
 import { supabase } from "../../supabase";
@@ -32,11 +39,13 @@ import { useAppContext } from "../../lib/AppContext";
 import companyMeta from "../../data/companyMeta";
 import { UAE_LOCATIONS, getAreasForEmirate } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
+import TrackingMap from "../tracking/TrackingMap";
+import "../../styles/dn-merchant-figma.css";
 
 type SupabaseClient = NonNullable<typeof supabase>;
 type MerchantRecord = Merchant & Record<string, any>;
 type MerchantOrder = Order & Record<string, any>;
-type PortalTab = "overview" | "orders" | "tracking" | "account";
+type PortalTab = "overview" | "services" | "orders" | "finance" | "tracking" | "account";
 
 type MerchantProfileForm = {
   trade_name: string;
@@ -102,22 +111,13 @@ function statusLabel(status: string, isArabic: boolean) {
     accepted: { ar: "قبله المندوب", en: "Accepted" },
     picked_up: { ar: "تم الاستلام", en: "Picked up" },
     in_transit: { ar: "في الطريق", en: "In transit" },
-    out_for_delivery: { ar: "خارج للتسليم", en: "Out for delivery" },
+    out_for_delivery: { ar: "خرج للتسليم", en: "Out for delivery" },
     delivered: { ar: "تم التسليم", en: "Delivered" },
     cancelled: { ar: "ملغي", en: "Cancelled" },
-    returned: { ar: "راجع", en: "Returned" },
+    returned: { ar: "مرتجع", en: "Returned" },
     failed: { ar: "متعثر", en: "Issue" },
   };
   return isArabic ? labels[status]?.ar || status : labels[status]?.en || status;
-}
-
-function statusTone(status: string) {
-  if (status === "delivered") return "border-emerald-400/35 bg-emerald-400/10 text-emerald-200";
-  if (status === "cancelled" || status === "returned" || status === "failed") return "border-rose-400/35 bg-rose-400/10 text-rose-200";
-  if (status === "assigned" || status === "accepted" || status === "picked_up" || status === "in_transit" || status === "out_for_delivery") {
-    return "border-brand-sky/35 bg-brand-sky/10 text-brand-sky";
-  }
-  return "border-brand-gold/35 bg-brand-gold/10 text-brand-gold";
 }
 
 function formatDate(value: unknown, isArabic: boolean) {
@@ -142,11 +142,32 @@ function orderReference(order: MerchantOrder) {
 }
 
 function orderAmount(order: MerchantOrder) {
-  return order.total_price ?? order.total ?? order.amount ?? order.price ?? order.delivery_price ?? order.subtotal;
+  return order.total_price ?? order.total ?? order.total_amount ?? order.amount ?? order.price ?? order.delivery_price ?? order.subtotal ?? 0;
 }
 
 function orderCod(order: MerchantOrder) {
   return order.cod_amount ?? order.cash_on_delivery ?? order.cod ?? 0;
+}
+
+function orderMerchantDue(order: MerchantOrder) {
+  return order.merchant_due ?? order.merchant_net ?? order.net_due ?? 0;
+}
+
+function orderCollected(order: MerchantOrder) {
+  const explicitAmount = order.collected_amount;
+  if (explicitAmount !== null && explicitAmount !== undefined) return explicitAmount;
+  const status = normalizeStatus(order.status);
+  const isFinanciallyPosted = Boolean(order.financial_posted_at || order.settlement_id || order.settled_at || order.cod_collected_at);
+  return status === "delivered" || isFinanciallyPosted ? orderCod(order) : 0;
+}
+
+function progressIndex(value?: unknown) {
+  const status = normalizeStatus(value);
+  if (status === "delivered") return 4;
+  if (["in_transit", "out_for_delivery"].includes(status)) return 3;
+  if (status === "picked_up") return 2;
+  if (["accepted", "assigned"].includes(status)) return 1;
+  return 0;
 }
 
 function dedupeRows<T extends Record<string, any>>(rows: T[], fallbackPrefix: string) {
@@ -165,8 +186,7 @@ function userIdentity(user: User) {
   const meta = user.user_metadata || {};
   const email = clean(user.email || meta.email).toLowerCase();
   const phone = clean(user.phone || meta.phone || meta.phone_number || meta.mobile || meta.mobile_number);
-  const phoneDigits = digits(phone);
-  return { email, phone, phoneDigits };
+  return { email, phone, phoneDigits: digits(phone) };
 }
 
 function profileFromMerchant(merchant?: MerchantRecord | null): MerchantProfileForm {
@@ -189,21 +209,11 @@ function profileFromMerchant(merchant?: MerchantRecord | null): MerchantProfileF
 
 function portalErrorMessage(error: unknown, isArabic: boolean) {
   const raw = error instanceof Error ? error.message : String(error || "");
-  if (/invalid login|credentials|password|email/i.test(raw)) {
-    return isArabic ? "بيانات الدخول غير صحيحة." : "The sign-in details are not correct.";
-  }
-  if (/not_authenticated|jwt|session/i.test(raw)) {
-    return isArabic ? "انتهت الجلسة. سجّل الدخول مرة أخرى." : "Your session expired. Please sign in again.";
-  }
-  if (/merchant_profile_not_found|merchant_record_missing/i.test(raw)) {
-    return isArabic ? "لم يتم العثور على ملف التاجر المرتبط بهذا الحساب." : "No merchant profile is linked to this account.";
-  }
-  if (/invalid_logo_url/i.test(raw)) {
-    return isArabic ? "رابط الشعار يجب أن يبدأ بـ https:// أو يُترك فارغًا." : "The logo URL must start with https:// or remain empty.";
-  }
-  if (/phone|sms|otp/i.test(raw)) {
-    return isArabic ? "تعذر إكمال تحقق الهاتف حالياً." : "Phone verification is unavailable right now.";
-  }
+  if (/invalid login|credentials|password|email/i.test(raw)) return isArabic ? "بيانات الدخول غير صحيحة." : "The sign-in details are not correct.";
+  if (/not_authenticated|jwt|session/i.test(raw)) return isArabic ? "انتهت الجلسة. سجّل الدخول مرة أخرى." : "Your session expired. Please sign in again.";
+  if (/merchant_profile_not_found|merchant_record_missing/i.test(raw)) return isArabic ? "لم يتم العثور على ملف التاجر المرتبط بهذا الحساب." : "No merchant profile is linked to this account.";
+  if (/invalid_logo_url/i.test(raw)) return isArabic ? "رابط الشعار يجب أن يبدأ بـ https:// أو يُترك فارغًا." : "The logo URL must start with https:// or remain empty.";
+  if (/phone|sms|otp/i.test(raw)) return isArabic ? "تعذر إكمال تحقق الهاتف حالياً." : "Phone verification is unavailable right now.";
   return isArabic ? "تعذر تحديث البيانات حالياً. حاول مرة أخرى أو تواصل مع الدعم." : "We could not update the data right now. Please retry or contact support.";
 }
 
@@ -216,7 +226,7 @@ async function queryMerchantsBy(client: SupabaseClient, column: string, value: s
 
 async function queryOrdersBy(client: SupabaseClient, column: string, value: string, mode: "eq" | "ilike" = "eq") {
   if (!value) return { rows: [] as MerchantOrder[], error: "" };
-  const query = client.from("orders").select("*").order("created_at", { ascending: false }).limit(120);
+  const query = client.from("orders").select("*").order("created_at", { ascending: false }).limit(180);
   const { data, error } = mode === "ilike" ? await query.ilike(column, value) : await query.eq(column, value);
   return { rows: (data || []) as MerchantOrder[], error: error?.message || "" };
 }
@@ -236,19 +246,13 @@ async function directMerchantLookup(client: SupabaseClient, user: User) {
     await collect("email", identity.email);
     await collect("email", identity.email, "ilike");
   }
-
   if (identity.phone) {
     await collect("phone", identity.phone);
     await collect("alt_phone", identity.phone);
   }
 
-  const phoneFragments = Array.from(new Set([
-    identity.phoneDigits,
-    identity.phoneDigits.slice(-9),
-    identity.phoneDigits.slice(-7),
-  ].filter((part) => part && part.length >= 7)));
-
-  for (const fragment of phoneFragments) {
+  const fragments = Array.from(new Set([identity.phoneDigits, identity.phoneDigits.slice(-9), identity.phoneDigits.slice(-7)].filter((part) => part && part.length >= 7)));
+  for (const fragment of fragments) {
     await collect("phone", `%${fragment}%`, "ilike");
     await collect("alt_phone", `%${fragment}%`, "ilike");
   }
@@ -279,28 +283,6 @@ async function directOrderLookup(client: SupabaseClient, merchants: MerchantReco
   return { rows: dedupeRows(rows, "order"), errors: Array.from(new Set(errors)) };
 }
 
-function coordinatesFor(order: MerchantOrder) {
-  const pairs = [
-    ["receiver_lat", "receiver_lng"],
-    ["delivery_lat", "delivery_lng"],
-    ["dropoff_lat", "dropoff_lng"],
-    ["current_lat", "current_lng"],
-    ["live_lat", "live_lng"],
-    ["lat", "lng"],
-  ];
-
-  for (const [latKey, lngKey] of pairs) {
-    const lat = Number(order[latKey]);
-    const lng = Number(order[lngKey]);
-    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
-  }
-
-  return null;
-}
-
-const inputClass = "w-full rounded-2xl border border-white/10 bg-[#071A33]/80 px-4 py-3 text-sm font-bold text-white outline-none ring-brand-gold/30 transition placeholder:text-white/28 focus:border-brand-gold/45 focus:ring-4";
-const labelClass = "mb-2 block text-xs font-black text-white/72";
-
 export default function MerchantPortal() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
@@ -318,6 +300,9 @@ export default function MerchantPortal() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
   const [tab, setTab] = useState<PortalTab>("overview");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [selectedTrackingReference, setSelectedTrackingReference] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState<MerchantProfileForm>(emptyProfile);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -331,19 +316,16 @@ export default function MerchantPortal() {
       setAuthLoading(false);
       return;
     }
-
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setUser(data.session?.user || null);
       setAuthLoading(false);
     });
-
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       setAuthLoading(false);
     });
-
     return () => {
       mounted = false;
       data.subscription.unsubscribe();
@@ -354,7 +336,6 @@ export default function MerchantPortal() {
     if (!supabase) return;
     setDataLoading(true);
     setDataError("");
-
     const client = supabase;
     const errors: string[] = [];
     let resolvedMerchants: MerchantRecord[] = [];
@@ -365,9 +346,7 @@ export default function MerchantPortal() {
       if (!merchantRpc.error) {
         const payload = merchantRpc.data as any;
         if (Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
-      } else {
-        errors.push(merchantRpc.error.message);
-      }
+      } else errors.push(merchantRpc.error.message);
 
       if (!resolvedMerchants.length) {
         const claim = await client.rpc("merchant_claim_approved_account");
@@ -375,19 +354,15 @@ export default function MerchantPortal() {
           merchantRpc = await client.rpc("merchant_get_session_profile");
           const payload = merchantRpc.data as any;
           if (!merchantRpc.error && Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
-        } else if (!/merchant_account_not_approved/i.test(claim.error.message)) {
-          errors.push(claim.error.message);
-        }
+        } else if (!/merchant_account_not_approved/i.test(claim.error.message)) errors.push(claim.error.message);
       }
 
       if (resolvedMerchants.length) {
-        const ordersRpc = await client.rpc("merchant_portal_orders", { p_limit: 120 });
+        const ordersRpc = await client.rpc("merchant_portal_orders", { p_limit: 180 });
         if (!ordersRpc.error) {
           const payload = ordersRpc.data as any;
           if (Array.isArray(payload?.orders)) resolvedOrders = payload.orders as MerchantOrder[];
-        } else {
-          errors.push(ordersRpc.error.message);
-        }
+        } else errors.push(ordersRpc.error.message);
       }
 
       if (!resolvedMerchants.length) {
@@ -395,7 +370,6 @@ export default function MerchantPortal() {
         resolvedMerchants = directMerchants.rows;
         errors.push(...directMerchants.errors);
       }
-
       if (resolvedMerchants.length && !resolvedOrders.length) {
         const directOrders = await directOrderLookup(client, resolvedMerchants);
         resolvedOrders = directOrders.rows;
@@ -403,18 +377,12 @@ export default function MerchantPortal() {
       }
 
       resolvedMerchants = dedupeRows(resolvedMerchants, "merchant");
-      resolvedOrders = dedupeRows(resolvedOrders, "order").sort((a, b) => {
-        const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
-        const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
-        return bTime - aTime;
-      });
-
+      resolvedOrders = dedupeRows(resolvedOrders, "order").sort((a, b) => new Date(b.created_at || b.updated_at || 0).getTime() - new Date(a.created_at || a.updated_at || 0).getTime());
       setMerchants(resolvedMerchants);
       setOrders(resolvedOrders);
 
       const meaningfulErrors = Array.from(new Set(errors.filter(Boolean))).filter((message) => !/does not exist|schema cache/i.test(message));
-      if (!resolvedMerchants.length && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
-      else if (resolvedMerchants.length && !resolvedOrders.length && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
+      if ((!resolvedMerchants.length || (resolvedMerchants.length && !resolvedOrders.length)) && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
     } catch (error) {
       setDataError(portalErrorMessage(error, isArabic));
     } finally {
@@ -439,10 +407,7 @@ export default function MerchantPortal() {
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => void loadMerchantData(user))
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "merchants" }, () => void loadMerchantData(user))
       .subscribe();
-
-    return () => {
-      void supabase?.removeChannel(channel);
-    };
+    return () => { void supabase?.removeChannel(channel); };
   }, [user, merchants.length, loadMerchantData]);
 
   async function signInWithPassword(event: FormEvent<HTMLFormElement>) {
@@ -451,7 +416,6 @@ export default function MerchantPortal() {
       setAuthError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       return;
     }
-
     setAuthBusy(true);
     setAuthError("");
     setAuthNotice("");
@@ -477,14 +441,10 @@ export default function MerchantPortal() {
       setAuthError(isArabic ? "اكتب بريد التاجر أولاً." : "Enter the merchant email first.");
       return;
     }
-
     setAuthBusy(true);
     setAuthError("");
     setAuthNotice("");
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: redirectTo() },
-    });
+    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: redirectTo() } });
     if (error) setAuthError(portalErrorMessage(error, isArabic));
     else setAuthNotice(isArabic ? "تم إرسال رابط الدخول إلى بريد التاجر." : "A sign-in link was sent to the merchant email.");
     setAuthBusy(false);
@@ -496,7 +456,6 @@ export default function MerchantPortal() {
       setAuthError(isArabic ? "اكتب رقم هاتف التاجر أولاً." : "Enter the merchant phone first.");
       return;
     }
-
     setAuthBusy(true);
     setAuthError("");
     setAuthNotice("");
@@ -512,7 +471,6 @@ export default function MerchantPortal() {
       setAuthError(isArabic ? "اكتب رقم الهاتف ورمز التحقق." : "Enter the phone number and verification code.");
       return;
     }
-
     setAuthBusy(true);
     setAuthError("");
     const { error } = await supabase.auth.verifyOtp({ phone: phone.trim(), token: phoneOtp.trim(), type: "sms" });
@@ -557,7 +515,6 @@ export default function MerchantPortal() {
   async function saveMerchantProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !user || !currentMerchant) return;
-
     const tradeName = clean(profileForm.trade_name);
     const merchantPhone = clean(profileForm.phone);
     if (!tradeName || !merchantPhone) {
@@ -568,30 +525,18 @@ export default function MerchantPortal() {
       setProfileError(isArabic ? "رابط الشعار يجب أن يبدأ بـ https:// أو يُترك فارغًا." : "Logo URL must start with https:// or remain empty.");
       return;
     }
-
     setProfileSaving(true);
     setProfileError("");
     setProfileNotice("");
-
     try {
-      const { data, error } = await supabase.rpc("merchant_update_own_profile", {
-        p_updates: {
-          ...profileForm,
-          trade_name: tradeName,
-          phone: merchantPhone,
-        },
-      });
+      const { data, error } = await supabase.rpc("merchant_update_own_profile", { p_updates: { ...profileForm, trade_name: tradeName, phone: merchantPhone } });
       if (error) throw error;
-
       const payload = data as any;
       const updatedMerchant = payload?.merchant as MerchantRecord | undefined;
       if (updatedMerchant?.id) {
         setMerchants((rows) => [updatedMerchant, ...rows.filter((row) => clean(row.id) !== clean(updatedMerchant.id))]);
         setProfileForm(profileFromMerchant(updatedMerchant));
-      } else {
-        await loadMerchantData(user);
-      }
-
+      } else await loadMerchantData(user);
       setProfileNotice(isArabic ? "تم حفظ بيانات التاجر بنجاح." : "Merchant details were saved successfully.");
       setEditingProfile(false);
     } catch (error) {
@@ -604,416 +549,197 @@ export default function MerchantPortal() {
   const activeOrders = useMemo(() => orders.filter((order) => activeStatuses.has(normalizeStatus(order.status)) || !closedStatuses.has(normalizeStatus(order.status))), [orders]);
   const deliveredOrders = useMemo(() => orders.filter((order) => normalizeStatus(order.status) === "delivered"), [orders]);
   const codTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderCod(order)), 0), [orders]);
+  const collectedTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderCollected(order)), 0), [orders]);
+  const merchantDueTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderMerchantDue(order)), 0), [orders]);
   const revenueTotal = useMemo(() => orders.reduce((sum, order) => sum + toNumber(orderAmount(order)), 0), [orders]);
+  const deliveredValue = useMemo(() => deliveredOrders.reduce((sum, order) => sum + toNumber(orderAmount(order)), 0), [deliveredOrders]);
+  const activeCod = useMemo(() => activeOrders.reduce((sum, order) => sum + toNumber(orderCod(order)), 0), [activeOrders]);
   const latestOrder = orders[0];
-  const mappedOrder = orders.find((order) => coordinatesFor(order));
-  const mappedCoords = mappedOrder ? coordinatesFor(mappedOrder) : null;
-  const mapSrc = mappedCoords ? `https://maps.google.com/maps?q=${mappedCoords.lat},${mappedCoords.lng}&z=13&output=embed` : "";
+  const mapOrder = activeOrders.find((order) => orderReference(order) === selectedTrackingReference) || activeOrders[0] || latestOrder || null;
   const profileAreas = getAreasForEmirate(profileForm.emirate);
 
-  const kpis = [
-    { icon: PackageCheck, value: orders.length, label: isArabic ? "كل الطلبات" : "Total orders" },
-    { icon: Truck, value: activeOrders.length, label: isArabic ? "قيد التنفيذ" : "In progress" },
-    { icon: CheckCircle2, value: deliveredOrders.length, label: isArabic ? "تم تسليمها" : "Delivered" },
-    { icon: Banknote, value: money(codTotal), label: isArabic ? "تحصيل نقدي" : "Cash collection" },
+  const filteredOrders = useMemo(() => {
+    const query = clean(orderSearch).toLowerCase();
+    return orders.filter((order) => {
+      const status = normalizeStatus(order.status);
+      if (orderStatusFilter !== "all" && status !== orderStatusFilter) return false;
+      if (!query) return true;
+      return [orderReference(order), order.sender_name, order.receiver_name, order.sender_city, order.receiver_city, order.driver_name]
+        .some((value) => clean(value).toLowerCase().includes(query));
+    });
+  }, [orders, orderSearch, orderStatusFilter]);
+
+  const timeline = [
+    { ar: "تم إنشاء الطلب", en: "Order created" },
+    { ar: "تم الإسناد", en: "Assigned" },
+    { ar: "تم الاستلام", en: "Picked up" },
+    { ar: "في الطريق", en: "In transit" },
+    { ar: "تم التسليم", en: "Delivered" },
   ];
 
-  const quickActions = [
-    { href: "/request", icon: PlusCircle, label: isArabic ? "طلب جديد" : "New order" },
-    { href: "/tracking", icon: MapPin, label: isArabic ? "تتبع شحنة" : "Track shipment" },
-    { href: companyMeta.whatsappUrl, icon: MessageCircle, label: isArabic ? "الدعم" : "Support", external: true },
+  const services = [
+    { key: "new", icon: PlusCircle, title: isArabic ? "إنشاء طلب توصيل" : "Create delivery order", text: isArabic ? "سجّل طلباً محلياً أو دولياً ببيانات العميل والشحنة." : "Create a local or international order with customer and parcel details.", href: "/request?source=merchant", tone: "gold" },
+    { key: "coupon", icon: Camera, title: isArabic ? "إدخال الكوبون بالتصوير" : "Coupon photo intake", text: isArabic ? "افتح كاميرا الكوبون لالتقاط البيانات ومراجعتها قبل الحفظ." : "Open the coupon camera, extract details, and review before saving.", href: "/request?source=merchant&mode=coupon", tone: "blue" },
+    { key: "orders", icon: PackageCheck, title: isArabic ? "إدارة الطلبيات" : "Order management", text: isArabic ? "تابع كل الطلبات والحالات والمندوب والمسار من مكان واحد." : "Review every order, status, driver, and route in one place.", tab: "orders" as PortalTab, tone: "navy" },
+    { key: "tracking", icon: MapPin, title: isArabic ? "التتبع المباشر" : "Live tracking", text: isArabic ? "راقب المندوب والمسار والتحديثات الحية على الخريطة." : "Monitor the courier, route, and realtime updates on the map.", tab: "tracking" as PortalTab, tone: "blue" },
+    { key: "finance", icon: WalletCards, title: isArabic ? "التحصيل والتسويات" : "COD & settlements", text: isArabic ? "راجع مبالغ COD، المستحقات، الطلبات المسلمة ودورة التسوية." : "Review COD, merchant due, delivered value, and settlement cycle.", tab: "finance" as PortalTab, tone: "gold" },
+    { key: "profile", icon: Store, title: isArabic ? "هوية المتجر" : "Store identity", text: isArabic ? "حدّث الشعار والعنوان وبيانات النشاط ونقطة الاستلام." : "Update logo, address, business details, and pickup point.", tab: "account" as PortalTab, tone: "navy" },
+    { key: "support", icon: MessageCircle, title: isArabic ? "دعم العمليات 24/7" : "24/7 operations support", text: isArabic ? "اتصل بفريق DAY NIGHT أو افتح واتساب مباشرة." : "Call DAY NIGHT operations or open WhatsApp immediately.", href: companyMeta.whatsappUrl, external: true, tone: "green" },
   ];
 
   if (authLoading) {
-    return (
-      <section className="grid min-h-[65vh] place-items-center" dir={isArabic ? "rtl" : "ltr"}>
-        <div className="rounded-[2rem] border border-brand-gold/25 bg-[#031226] px-8 py-7 text-center shadow-2xl shadow-black/30">
-          <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-brand-gold" />
-          <p className="font-black text-white">{isArabic ? "جاري تجهيز بوابة التاجر..." : "Preparing merchant portal..."}</p>
-        </div>
-      </section>
-    );
+    return <section className="dn-merchant-state-v3" dir={isArabic ? "rtl" : "ltr"}><Loader2 className="dn-spin" /><strong>{isArabic ? "جاري تجهيز بوابة التاجر..." : "Preparing merchant portal..."}</strong></section>;
   }
 
   if (!user) {
     return (
-      <section className="space-y-7" dir={isArabic ? "rtl" : "ltr"}>
-        <div className="relative overflow-hidden rounded-[2.5rem] border border-brand-gold/25 bg-[#031226] p-6 shadow-2xl shadow-black/35 sm:p-8 lg:p-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(212,166,42,0.22),transparent_23rem),radial-gradient(circle_at_90%_8%,rgba(24,168,232,0.22),transparent_28rem)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:52px_52px] opacity-50" />
-          <div className="relative z-10 grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-            <div>
-              <div className="mb-5 flex items-center gap-3">
-                <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-16 w-16 rounded-full border border-brand-gold/55 bg-brand-deep object-cover shadow-xl shadow-brand-gold/10 ring-1 ring-white/10" />
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-gold">DAY NIGHT</p>
-                  <h1 className="text-3xl font-black text-white sm:text-5xl">{isArabic ? "بوابة التاجر" : "Merchant Portal"}</h1>
-                </div>
-              </div>
-              <p className="max-w-2xl text-sm font-bold leading-8 text-white/65">
-                {isArabic
-                  ? "مساحة أنيقة لإدارة الطلبات، متابعة التحصيل، ومراقبة مسار الشحنات وتحديث بيانات نشاطك التجاري."
-                  : "A refined workspace for orders, collections, shipment progress, and your merchant business profile."}
-              </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><Store className="mb-3 h-5 w-5 text-brand-gold" /><strong className="block text-white">{isArabic ? "حساب تجاري" : "Merchant account"}</strong></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><PackageCheck className="mb-3 h-5 w-5 text-brand-sky" /><strong className="block text-white">{isArabic ? "طلبياتك" : "Your orders"}</strong></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4"><ShieldCheck className="mb-3 h-5 w-5 text-emerald-300" /><strong className="block text-white">{isArabic ? "دخول آمن" : "Secure access"}</strong></div>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.07] p-5 shadow-2xl shadow-brand-sky/10 backdrop-blur-xl">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-gold text-brand-deep shadow-lg shadow-brand-gold/20"><Building2 className="h-6 w-6" /></span>
-                <div>
-                  <h2 className="text-xl font-black text-white">{isArabic ? "دخول التاجر" : "Merchant sign in"}</h2>
-                  <p className="text-xs font-bold text-white/55">{isArabic ? "استخدم بريدك أو هاتفك المسجل لدى الشركة." : "Use your registered merchant email or phone."}</p>
-                </div>
-              </div>
-
-              <form onSubmit={signInWithPassword} className="space-y-4">
-                <label className="block">
-                  <span className={labelClass}>{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
-                  <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} />
-                </label>
-                <label className="block">
-                  <span className={labelClass}>{isArabic ? "كلمة المرور" : "Password"}</span>
-                  <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} />
-                </label>
-                <button type="submit" disabled={authBusy || !email.trim() || !password} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-sm font-black text-brand-deep shadow-xl shadow-brand-gold/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                  {authBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
-                  {isArabic ? "دخول بالبريد" : "Sign in with email"}
-                </button>
-              </form>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <button type="button" disabled={authBusy} onClick={() => void signInWithGoogle()} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-xs font-black text-[#071A33] disabled:opacity-50"><Globe2 className="h-4 w-4" /> Google</button>
-                <button type="button" disabled={authBusy} onClick={() => void sendMagicLink()} className="flex items-center justify-center gap-2 rounded-2xl border border-brand-sky/30 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky disabled:opacity-50"><Mail className="h-4 w-4" /> {isArabic ? "رابط بالبريد" : "Email link"}</button>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-white/10 bg-[#071A33]/60 p-4">
-                <label className="block">
-                  <span className={labelClass}>{isArabic ? "رقم الهاتف" : "Phone number"}</span>
-                  <input type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className={inputClass} />
-                </label>
-                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <input type="text" inputMode="numeric" value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value)} aria-label={isArabic ? "رمز الهاتف" : "Phone code"} className={inputClass} />
-                  <button type="button" disabled={authBusy || !phone.trim()} onClick={() => void sendPhoneOtp()} className="rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-3 text-xs font-black text-brand-gold disabled:opacity-50"><Phone className="mr-1 inline h-4 w-4" />{isArabic ? "إرسال الرمز" : "Send code"}</button>
-                </div>
-                <button type="button" disabled={authBusy || !phoneOtp.trim()} onClick={() => void verifyPhoneOtp()} className="mt-2 w-full rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200 disabled:opacity-50">{isArabic ? "تأكيد الرمز" : "Verify code"}</button>
-              </div>
-
-              {authError && <p className="mt-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{authError}</p>}
-              {authNotice && <p className="mt-4 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-bold text-emerald-100">{authNotice}</p>}
-            </div>
+      <section className="dn-merchant-login-v3" dir={isArabic ? "rtl" : "ltr"}>
+        <div className="dn-merchant-login-visual-v3">
+          <div className="dn-merchant-login-brand-v3">
+            <img src={companyMeta.logoUrl} onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }} alt="DAY NIGHT" />
+            <div><small>DAY NIGHT DELIVERY SERVICES</small><h1>{isArabic ? "بوابة التاجر الذكية" : "Smart Merchant Portal"}</h1></div>
           </div>
+          <p>{isArabic ? "مركز بسيط وحديث لإنشاء الطلبات، تصوير الكوبونات، متابعة الشحنات، إدارة التحصيل، ومراجعة أداء متجرك." : "A clean modern center for orders, coupon capture, live tracking, collections, and store performance."}</p>
+          <div className="dn-merchant-login-services-v3">
+            <article><PlusCircle /><strong>{isArabic ? "طلبات فورية" : "Instant orders"}</strong></article>
+            <article><MapPin /><strong>{isArabic ? "تتبع مباشر" : "Live tracking"}</strong></article>
+            <article><WalletCards /><strong>{isArabic ? "تحصيل واضح" : "Clear COD"}</strong></article>
+          </div>
+          <footer><span>{companyMeta.sloganAr}</span><span>{companyMeta.sloganEn}</span></footer>
+        </div>
+
+        <div className="dn-merchant-login-card-v3">
+          <header><span><Building2 /></span><div><h2>{isArabic ? "دخول التاجر" : "Merchant sign in"}</h2><p>{isArabic ? "استخدم البريد أو الهاتف المسجل لدى الشركة." : "Use the email or phone registered with DAY NIGHT."}</p></div></header>
+          <form onSubmit={signInWithPassword}>
+            <label><span>{isArabic ? "البريد الإلكتروني" : "Email address"}</span><input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+            <label><span>{isArabic ? "كلمة المرور" : "Password"}</span><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            <button type="submit" disabled={authBusy || !email.trim() || !password}>{authBusy ? <Loader2 className="dn-spin" /> : <LockKeyhole />}{isArabic ? "دخول آمن" : "Secure sign in"}</button>
+          </form>
+          <div className="dn-merchant-auth-alternatives-v3">
+            <button type="button" disabled={authBusy} onClick={() => void signInWithGoogle()}><Globe2 /> Google</button>
+            <button type="button" disabled={authBusy} onClick={() => void sendMagicLink()}><Mail />{isArabic ? "رابط بالبريد" : "Email link"}</button>
+          </div>
+          <div className="dn-merchant-phone-auth-v3">
+            <label><span>{isArabic ? "رقم الهاتف" : "Phone number"}</span><input type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} dir="ltr" /></label>
+            <div><input type="text" inputMode="numeric" value={phoneOtp} onChange={(event) => setPhoneOtp(event.target.value)} placeholder={isArabic ? "رمز التحقق" : "Verification code"} dir="ltr" /><button type="button" disabled={authBusy || !phone.trim()} onClick={() => void sendPhoneOtp()}><Phone />{isArabic ? "إرسال" : "Send"}</button></div>
+            <button type="button" disabled={authBusy || !phoneOtp.trim()} onClick={() => void verifyPhoneOtp()}>{isArabic ? "تأكيد رمز الهاتف" : "Verify phone code"}</button>
+          </div>
+          {authError && <p className="dn-merchant-message-v3 is-error">{authError}</p>}
+          {authNotice && <p className="dn-merchant-message-v3 is-success">{authNotice}</p>}
         </div>
       </section>
     );
   }
 
   if (dataLoading && merchants.length === 0) {
-    return (
-      <section className="grid min-h-[65vh] place-items-center" dir={isArabic ? "rtl" : "ltr"}>
-        <div className="rounded-[2rem] border border-brand-gold/25 bg-[#031226] px-8 py-7 text-center shadow-2xl shadow-black/30">
-          <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-brand-gold" />
-          <p className="font-black text-white">{isArabic ? "جاري تجهيز لوحة التاجر..." : "Preparing merchant dashboard..."}</p>
-        </div>
-      </section>
-    );
+    return <section className="dn-merchant-state-v3" dir={isArabic ? "rtl" : "ltr"}><Loader2 className="dn-spin" /><strong>{isArabic ? "جاري تجهيز لوحة التاجر..." : "Preparing merchant dashboard..."}</strong></section>;
   }
 
   if (!currentMerchant) {
     return (
-      <section className="space-y-5" dir={isArabic ? "rtl" : "ltr"}>
-        <div className="rounded-[2rem] border border-amber-300/30 bg-[#031226] p-7 shadow-2xl shadow-black/30">
-          <AlertTriangle className="mb-4 h-10 w-10 text-brand-gold" />
-          <h1 className="text-3xl font-black text-white">{isArabic ? "الحساب بانتظار التفعيل" : "Account pending activation"}</h1>
-          <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-white/62">
-            {isArabic
-              ? "لم نجد ملفاً تجارياً مرتبطاً بهذا الدخول. تواصل مع فريق DAY NIGHT لتفعيل الوصول إلى لوحة التاجر."
-              : "We could not find a merchant profile for this sign-in. Contact DAY NIGHT to activate merchant access."}
-          </p>
-          {dataError && <p className="mt-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{dataError}</p>}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button type="button" onClick={() => void loadMerchantData(user)} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/35 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"><RefreshCw className="h-4 w-4" />{isArabic ? "إعادة الفحص" : "Retry"}</button>
-            <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-black text-emerald-200"><MessageCircle className="h-4 w-4" />{isArabic ? "تواصل مع الدعم" : "Contact support"}</a>
-            <button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75"><LogOut className="h-4 w-4" />{isArabic ? "تسجيل الخروج" : "Sign out"}</button>
-          </div>
-        </div>
+      <section className="dn-merchant-state-v3 is-warning" dir={isArabic ? "rtl" : "ltr"}>
+        <AlertTriangle /><h1>{isArabic ? "الحساب بانتظار التفعيل" : "Account pending activation"}</h1>
+        <p>{isArabic ? "لم نجد ملفاً تجارياً مرتبطاً بهذا الدخول. تواصل مع فريق DAY NIGHT لتفعيل الوصول." : "No merchant profile is linked to this sign-in. Contact DAY NIGHT to activate access."}</p>
+        {dataError && <p className="dn-merchant-message-v3 is-error">{dataError}</p>}
+        <div><button type="button" onClick={() => void loadMerchantData(user)}><RefreshCw />{isArabic ? "إعادة الفحص" : "Retry"}</button><a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle />{isArabic ? "الدعم" : "Support"}</a><button type="button" onClick={() => void signOut()}><LogOut />{isArabic ? "خروج" : "Sign out"}</button></div>
       </section>
     );
   }
 
+  const latestProgress = progressIndex(latestOrder?.status);
+
   return (
-    <section className="space-y-7" dir={isArabic ? "rtl" : "ltr"}>
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-brand-gold/25 bg-[#031226] p-6 shadow-2xl shadow-black/35 sm:p-8 lg:p-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(212,166,42,0.20),transparent_25rem),radial-gradient(circle_at_92%_12%,rgba(24,168,232,0.20),transparent_28rem)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-50" />
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-[1.6rem] border border-brand-gold/45 bg-white/95 shadow-2xl shadow-brand-gold/10">
-              {currentMerchant.logo_url ? <img src={currentMerchant.logo_url} alt={currentMerchantName} className="h-full w-full object-contain p-2" /> : <span className="text-2xl font-black text-[#071A33]">{initials(currentMerchantName)}</span>}
-            </div>
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1 text-[11px] font-black text-brand-gold"><Sparkles className="h-3.5 w-3.5" /> {isArabic ? "لوحة التاجر" : "Merchant dashboard"}</span>
-              <h1 className="mt-3 text-3xl font-black text-white sm:text-5xl">{currentMerchantName}</h1>
-              <p className="mt-2 text-sm font-bold text-white/58">{clean(currentMerchant.merchant_code) || clean(currentMerchant.email) || clean(currentMerchant.phone)}</p>
-            </div>
+    <section className="dn-merchant-shell-v3" dir={isArabic ? "rtl" : "ltr"}>
+      <aside className="dn-merchant-rail-v3" aria-label={isArabic ? "تنقل لوحة التاجر" : "Merchant navigation"}>
+        <button type="button" className="dn-merchant-brand-v3" onClick={() => setTab("overview")}>
+          {currentMerchant.logo_url ? <img src={currentMerchant.logo_url} alt={currentMerchantName} /> : <span>{initials(currentMerchantName)}</span>}
+        </button>
+        <nav>
+          {([
+            ["overview", Home, isArabic ? "الرئيسية" : "Overview"],
+            ["services", Sparkles, isArabic ? "الخدمات" : "Services"],
+            ["orders", PackageCheck, isArabic ? "الطلبيات" : "Orders"],
+            ["finance", WalletCards, isArabic ? "المالية" : "Finance"],
+            ["tracking", MapPin, isArabic ? "الخريطة" : "Map"],
+            ["account", UserRound, isArabic ? "الحساب" : "Account"],
+          ] as const).map(([value, Icon, label]) => <button key={value} type="button" className={tab === value ? "is-active" : ""} onClick={() => setTab(value)} title={label}><Icon />{value === "orders" && activeOrders.length > 0 && <b>{activeOrders.length}</b>}</button>)}
+        </nav>
+        <div><a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" title="WhatsApp"><MessageCircle /></a><button type="button" onClick={() => void signOut()} title={isArabic ? "تسجيل الخروج" : "Sign out"}><LogOut /></button></div>
+      </aside>
+
+      <main className="dn-merchant-workspace-v3">
+        <header className="dn-merchant-topbar-v3">
+          <div className="dn-merchant-identity-v3">
+            <img src={companyMeta.logoUrl} onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }} alt="DAY NIGHT" />
+            <div><small>{isArabic ? "مركز أعمال DAY NIGHT" : "DAY NIGHT BUSINESS CENTER"}</small><h1>{currentMerchantName}</h1><p>{clean(currentMerchant.merchant_code) || clean(currentMerchant.email) || clean(currentMerchant.phone)}</p></div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {quickActions.map(({ href, icon: Icon, label, external }) => (
-              <a key={label} href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75 hover:border-brand-gold/40 hover:text-brand-gold"><Icon className="h-4 w-4" />{label}</a>
-            ))}
-            <button type="button" onClick={() => void loadMerchantData(user)} className="inline-flex items-center gap-2 rounded-2xl border border-brand-sky/35 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"><RefreshCw className={`h-4 w-4 ${dataLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث" : "Refresh"}</button>
-            <button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white/75"><LogOut className="h-4 w-4" />{isArabic ? "خروج" : "Sign out"}</button>
+          <div className="dn-merchant-top-actions-v3">
+            <span className={`is-${clean(currentMerchant.status).toLowerCase() || "active"}`}><ShieldCheck />{clean(currentMerchant.status) || (isArabic ? "نشط" : "Active")}</span>
+            <button type="button" onClick={() => void loadMerchantData(user)} title={isArabic ? "تحديث" : "Refresh"}><RefreshCw className={dataLoading ? "dn-spin" : ""} /></button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {dataError && <div className="rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{dataError}</div>}
+        {dataError && <div className="dn-merchant-message-v3 is-error">{dataError}</div>}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map(({ icon: Icon, value, label }) => (
-          <article key={label} className="rounded-[1.6rem] border border-white/10 bg-[#031226] p-5 shadow-xl shadow-black/20">
-            <Icon className="mb-4 h-6 w-6 text-brand-gold" />
-            <strong className="block text-2xl font-black text-white" dir="ltr">{value}</strong>
-            <span className="mt-1 block text-xs font-black text-white/55">{label}</span>
-          </article>
-        ))}
-      </div>
-
-      <nav className="grid gap-2 rounded-[1.6rem] border border-white/10 bg-[#031226] p-2 sm:grid-cols-4">
-        {([
-          ["overview", isArabic ? "الرئيسية" : "Overview", Store],
-          ["orders", isArabic ? "الطلبيات" : "Orders", PackageCheck],
-          ["tracking", isArabic ? "الخريطة" : "Map", MapPin],
-          ["account", isArabic ? "الحساب" : "Account", Building2],
-        ] as const).map(([value, label, Icon]) => (
-          <button key={value} type="button" onClick={() => setTab(value)} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-black transition ${tab === value ? "bg-brand-gold text-brand-deep" : "text-white/62 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{label}</button>
-        ))}
-      </nav>
-
-      {tab === "overview" && (
-        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-            <header className="mb-5 flex items-center justify-between gap-3">
-              <div><p className="text-xs font-black text-brand-gold">{isArabic ? "آخر طلب" : "Latest order"}</p><h2 className="text-2xl font-black text-white">{latestOrder ? orderReference(latestOrder) : isArabic ? "لا توجد طلبيات حالياً" : "No orders yet"}</h2></div>
-              <Clock3 className="h-7 w-7 text-brand-sky" />
-            </header>
-            {latestOrder ? (
-              <div className="space-y-3 text-sm font-bold text-white/65">
-                <p>{isArabic ? "الحالة" : "Status"}: <span className={`rounded-full border px-3 py-1 text-xs font-black ${statusTone(normalizeStatus(latestOrder.status))}`}>{statusLabel(normalizeStatus(latestOrder.status), isArabic)}</span></p>
-                <p>{isArabic ? "من" : "From"}: {clean(latestOrder.sender_city) || "—"}</p>
-                <p>{isArabic ? "إلى" : "To"}: {clean(latestOrder.receiver_city) || "—"}</p>
-                <p>{isArabic ? "آخر تحديث" : "Last update"}: {formatDate(latestOrder.updated_at || latestOrder.created_at, isArabic)}</p>
-                <a href={`/tracking?code=${encodeURIComponent(orderReference(latestOrder))}`} className="inline-flex items-center gap-2 rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "فتح التتبع" : "Open tracking"}</a>
-              </div>
-            ) : (
-              <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "عند تسجيل طلبات جديدة ستظهر هنا مباشرة مع حالتها وتفاصيلها." : "New orders will appear here with their status and details."}</p>
-            )}
-          </article>
-
-          <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-            <header className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-black text-brand-gold">{isArabic ? "الملخص المالي" : "Financial summary"}</p><h2 className="text-2xl font-black text-white">{money(revenueTotal)}</h2></div><Banknote className="h-7 w-7 text-brand-gold" /></header>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-xs font-bold text-white/50">{isArabic ? "قيمة الطلبات" : "Order value"}</span><strong className="mt-2 block text-xl font-black text-white" dir="ltr">{money(revenueTotal)}</strong></div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-xs font-bold text-white/50">{isArabic ? "التحصيل" : "Collection"}</span><strong className="mt-2 block text-xl font-black text-white" dir="ltr">{money(codTotal)}</strong></div>
-            </div>
-          </article>
-        </div>
-      )}
-
-      {tab === "orders" && (
-        <div className="space-y-3">
-          {orders.length === 0 && <div className="rounded-[2rem] border border-white/10 bg-[#031226] p-8 text-center"><PackageCheck className="mx-auto mb-4 h-9 w-9 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "لا توجد طلبيات حالياً" : "No orders yet"}</h2><p className="mt-2 text-sm font-bold text-white/58">{isArabic ? "أنشئ طلباً جديداً أو تواصل مع فريق العمليات للمساعدة." : "Create a new order or contact operations for assistance."}</p></div>}
-          {orders.map((order) => {
-            const status = normalizeStatus(order.status);
-            const reference = orderReference(order);
-            return (
-              <article key={reference} className="rounded-[1.6rem] border border-white/10 bg-[#031226] p-5 shadow-xl shadow-black/20">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${statusTone(status)}`}>{statusLabel(status, isArabic)}</span>
-                    <h3 className="mt-3 text-xl font-black text-white" dir="ltr">{reference}</h3>
-                    <p className="mt-2 text-xs font-bold text-white/55">{formatDate(order.created_at, isArabic)}</p>
-                  </div>
-                  <div className="grid min-w-[42%] gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><span className="text-[11px] font-black text-white/45">{isArabic ? "المسار" : "Route"}</span><p className="mt-1 text-xs font-bold text-white/75">{clean(order.sender_city) || "—"} <ArrowRightLeft className="inline h-3 w-3 text-brand-gold" /> {clean(order.receiver_city) || "—"}</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><span className="text-[11px] font-black text-white/45">{isArabic ? "الإجمالي" : "Total"}</span><p className="mt-1 text-sm font-black text-white" dir="ltr">{money(orderAmount(order))}</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><span className="text-[11px] font-black text-white/45">{isArabic ? "المندوب" : "Driver"}</span><p className="mt-1 text-xs font-bold text-white/75">{clean(order.driver_name) || clean(order.assigned_driver_name) || "—"}</p></div>
-                  </div>
-                </div>
-                {reference && <a href={`/tracking?code=${encodeURIComponent(reference)}`} className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2 text-xs font-black text-brand-gold"><MapPin className="h-4 w-4" />{isArabic ? "متابعة الطلب" : "Track order"}</a>}
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === "tracking" && (
-        <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="min-h-[420px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#031226] shadow-xl shadow-black/20">
-            {mapSrc ? <iframe title="Merchant order map" src={mapSrc} className="h-[420px] w-full border-0" loading="lazy" /> : <div className="grid h-[420px] place-items-center p-8 text-center"><MapPin className="mb-4 h-10 w-10 text-brand-gold" /><h2 className="text-2xl font-black text-white">{isArabic ? "الخريطة بانتظار أول موقع" : "Map awaiting first location"}</h2><p className="mt-2 max-w-md text-sm font-bold leading-7 text-white/58">{isArabic ? "ستظهر الخريطة عند توفر موقع تسليم محفوظ للطلب." : "The map appears when an order has a saved delivery location."}</p></div>}
-          </article>
-          <article className="rounded-[2rem] border border-white/10 bg-[#031226] p-6 shadow-xl shadow-black/20">
-            <h2 className="text-2xl font-black text-white">{isArabic ? "طلبيات على الخريطة" : "Orders on map"}</h2>
-            <div className="mt-5 space-y-3">
-              {orders.filter((order) => coordinatesFor(order)).slice(0, 8).map((order) => (
-                <div key={orderReference(order)} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-                  <strong className="block text-sm font-black text-white" dir="ltr">{orderReference(order)}</strong>
-                  <span className="mt-1 block text-xs font-bold text-white/55">{clean(order.receiver_city) || clean(order.receiver_address) || "—"}</span>
-                </div>
-              ))}
-              {orders.filter((order) => coordinatesFor(order)).length === 0 && <p className="text-sm font-bold leading-7 text-white/58">{isArabic ? "لا توجد مواقع محفوظة للطلبات حالياً." : "No saved order locations right now."}</p>}
-            </div>
-          </article>
-        </div>
-      )}
-
-      {tab === "account" && (
-        <div className="space-y-5">
-          <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#031226] shadow-xl shadow-black/20">
-            <header className="flex flex-col gap-4 border-b border-white/10 bg-[linear-gradient(110deg,rgba(212,175,55,0.14),rgba(24,168,232,0.08),transparent)] p-6 sm:flex-row sm:items-center sm:justify-between">
+        {tab === "overview" && (
+          <>
+            <section className="dn-merchant-hero-v3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-brand-gold">{isArabic ? "إدارة الملف التجاري" : "Merchant profile management"}</p>
-                <h2 className="mt-2 text-2xl font-black text-white">{isArabic ? "بيانات الحساب والنشاط" : "Account and business details"}</h2>
-                <p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-white/55">{isArabic ? "حدّث اسم النشاط، وسائل التواصل، العنوان، موقع الاستلام، الشعار والبيانات القانونية. الحقول الأمنية والمالية الأساسية تبقى تحت إدارة الشركة." : "Update business identity, contacts, addresses, pickup point, logo, and legal details. Core security and settlement controls remain company-managed."}</p>
+                <span><Sparkles />{isArabic ? "لوحة التاجر الذكية" : "SMART MERCHANT WORKSPACE"}</span>
+                <h2>{isArabic ? "كل خدمات متجرك في واجهة واحدة" : "Every merchant service in one clear workspace"}</h2>
+                <p>{isArabic ? "أنشئ الطلب، صوّر الكوبون، تابع المندوب، راجع التحصيل، وحدّث بيانات متجرك بدون ازدحام." : "Create orders, capture coupons, track drivers, review COD, and manage your store without clutter."}</p>
+                <div><a href="/request?source=merchant"><PlusCircle />{isArabic ? "طلب جديد" : "New order"}</a><button type="button" onClick={() => setTab("services")}><Sparkles />{isArabic ? "كل الخدمات" : "All services"}</button></div>
               </div>
-              {!editingProfile ? (
-                <button type="button" onClick={beginProfileEdit} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-gold px-5 py-3 text-xs font-black text-brand-deep shadow-xl shadow-brand-gold/15"><Pencil className="h-4 w-4" />{isArabic ? "تعديل البيانات" : "Edit details"}</button>
-              ) : (
-                <button type="button" onClick={cancelProfileEdit} disabled={profileSaving} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-5 py-3 text-xs font-black text-white/70 disabled:opacity-50"><X className="h-4 w-4" />{isArabic ? "إلغاء" : "Cancel"}</button>
-              )}
-            </header>
+              <aside>
+                <img src={currentMerchant.logo_url || companyMeta.logoUrl} onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }} alt={currentMerchantName} />
+                <small>{isArabic ? "دورة التسوية" : "Settlement cycle"}</small><strong>{clean(currentMerchant.settlement_cycle) || (isArabic ? "حسب الاتفاق" : "As agreed")}</strong><p>{clean(currentMerchant.pickup_address) || clean(currentMerchant.address) || companyMeta.addressAr}</p>
+              </aside>
+            </section>
 
-            {profileNotice && <div className="mx-6 mt-5 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-xs font-bold text-emerald-100">{profileNotice}</div>}
-            {profileError && <div className="mx-6 mt-5 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-100">{profileError}</div>}
+            <section className="dn-merchant-kpis-v3">
+              <article><PackageCheck /><small>{isArabic ? "إجمالي الطلبات" : "Total orders"}</small><strong>{orders.length}</strong></article>
+              <article><Truck /><small>{isArabic ? "قيد التنفيذ" : "In progress"}</small><strong>{activeOrders.length}</strong></article>
+              <article><CheckCircle2 /><small>{isArabic ? "تم التسليم" : "Delivered"}</small><strong>{deliveredOrders.length}</strong></article>
+              <article><Banknote /><small>{isArabic ? "COD نشط" : "Active COD"}</small><strong>{money(activeCod)}</strong></article>
+            </section>
 
-            {!editingProfile ? (
-              <div className="p-6">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    [isArabic ? "اسم النشاط" : "Business name", currentMerchant.trade_name],
-                    [isArabic ? "الكود" : "Code", currentMerchant.merchant_code],
-                    [isArabic ? "المالك" : "Owner", currentMerchant.owner_name],
-                    [isArabic ? "البريد" : "Email", currentMerchant.email],
-                    [isArabic ? "الهاتف" : "Phone", currentMerchant.phone],
-                    [isArabic ? "هاتف بديل" : "Alternate phone", currentMerchant.alt_phone],
-                    [isArabic ? "الإمارة" : "Emirate", currentMerchant.emirate],
-                    [isArabic ? "المنطقة" : "Area", currentMerchant.city],
-                    [isArabic ? "العنوان" : "Address", currentMerchant.address],
-                    [isArabic ? "عنوان الاستلام" : "Pickup address", currentMerchant.pickup_address],
-                    [isArabic ? "رقم الرخصة" : "License number", currentMerchant.license_number],
-                    [isArabic ? "الرقم الضريبي" : "TRN", currentMerchant.trn || currentMerchant.tax_number],
-                    [isArabic ? "الحالة" : "Status", currentMerchant.status],
-                    [isArabic ? "دورة التسوية" : "Settlement", currentMerchant.settlement_cycle],
-                    [isArabic ? "آخر تحديث" : "Updated", formatDate(currentMerchant.updated_at || currentMerchant.created_at, isArabic)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-                      <span className="text-[11px] font-black text-white/45">{label}</span>
-                      <p className="mt-2 break-words text-sm font-bold text-white/80">{clean(value) || "—"}</p>
-                    </div>
-                  ))}
-                </div>
-                {clean(currentMerchant.notes) && <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-[11px] font-black text-white/45">{isArabic ? "ملاحظات النشاط" : "Business notes"}</span><p className="mt-2 whitespace-pre-wrap text-sm font-bold leading-7 text-white/78">{clean(currentMerchant.notes)}</p></div>}
-              </div>
-            ) : (
-              <form onSubmit={saveMerchantProfile} className="p-6">
-                <div className="mb-6 grid gap-4 rounded-[1.6rem] border border-brand-gold/20 bg-brand-gold/[0.055] p-4 sm:grid-cols-[auto_1fr] sm:items-center">
-                  <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-[1.5rem] border border-brand-gold/35 bg-white/95">
-                    {profileForm.logo_url ? <img src={profileForm.logo_url} alt="" className="h-full w-full object-contain p-2" /> : <ImageIcon className="h-9 w-9 text-[#071A33]/45" />}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white">{isArabic ? "شعار النشاط" : "Business logo"}</h3>
-                    <p className="mt-1 text-xs font-bold leading-6 text-white/50">{isArabic ? "استخدم رابط صورة آمن يبدأ بـ https://. سيظهر الشعار فور الحفظ في رأس لوحة التاجر." : "Use a secure image URL beginning with https://. The logo appears in the merchant dashboard after saving."}</p>
-                    <input type="url" value={profileForm.logo_url} onChange={(event) => updateProfileField("logo_url", event.target.value)} placeholder="https://..." className={`${inputClass} mt-3`} dir="ltr" />
-                  </div>
-                </div>
+            <section className="dn-merchant-overview-grid-v3">
+              <article className="dn-merchant-latest-order-v3">
+                <header><div><small>{isArabic ? "آخر طلب" : "Latest order"}</small><h3>{latestOrder ? orderReference(latestOrder) : (isArabic ? "لا توجد طلبات" : "No orders yet")}</h3></div><PackageCheck /></header>
+                {latestOrder ? <>
+                  <div className="dn-merchant-timeline-v3">{timeline.map((step, index) => <span key={step.en} className={index <= latestProgress ? "is-done" : ""}><i>{index <= latestProgress ? <CheckCircle2 /> : index + 1}</i><small>{isArabic ? step.ar : step.en}</small></span>)}</div>
+                  <div className="dn-merchant-route-v3"><article><span>1</span><div><small>{isArabic ? "الاستلام" : "Pickup"}</small><strong>{[latestOrder.sender_city, latestOrder.sender_address].filter(Boolean).join("، ") || "—"}</strong></div></article><article><span>2</span><div><small>{isArabic ? "التسليم" : "Drop-off"}</small><strong>{[latestOrder.receiver_city, latestOrder.receiver_address].filter(Boolean).join("، ") || "—"}</strong></div></article></div>
+                  <div className="dn-merchant-latest-actions-v3"><button type="button" onClick={() => setTab("orders")}><PackageCheck />{isArabic ? "تفاصيل الطلب" : "Order details"}</button><a href={`/tracking?code=${encodeURIComponent(orderReference(latestOrder))}`}><MapPin />{isArabic ? "فتح التتبع" : "Open tracking"}</a></div>
+                </> : <div className="dn-merchant-empty-v3"><ShieldCheck /><p>{isArabic ? "ابدأ بإنشاء أول طلب وسيظهر هنا مباشرة." : "Create your first order and it will appear here."}</p></div>}
+              </article>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "اسم النشاط التجاري *" : "Business name *"}</span>
-                    <input value={profileForm.trade_name} onChange={(event) => updateProfileField("trade_name", event.target.value)} maxLength={160} required className={inputClass} />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "اسم المالك أو المسؤول" : "Owner or manager name"}</span>
-                    <input value={profileForm.owner_name} onChange={(event) => updateProfileField("owner_name", event.target.value)} maxLength={160} className={inputClass} />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "رقم الهاتف *" : "Phone number *"}</span>
-                    <input type="tel" value={profileForm.phone} onChange={(event) => updateProfileField("phone", event.target.value)} maxLength={40} required className={inputClass} dir="ltr" />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "رقم هاتف بديل" : "Alternate phone"}</span>
-                    <input type="tel" value={profileForm.alt_phone} onChange={(event) => updateProfileField("alt_phone", event.target.value)} maxLength={40} className={inputClass} dir="ltr" />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "الإمارة" : "Emirate"}</span>
-                    <select
-                      value={profileForm.emirate}
-                      onChange={(event) => {
-                        const emirate = event.target.value;
-                        const areas = getAreasForEmirate(emirate);
-                        setProfileForm((current) => ({ ...current, emirate, city: areas.some((area) => area.value === current.city) ? current.city : areas[0]?.value || "" }));
-                      }}
-                      className={inputClass}
-                    >
-                      {UAE_LOCATIONS.map((location) => <option key={location.value} value={location.value}>{isArabic ? location.ar : location.en}</option>)}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "المنطقة" : "Area"}</span>
-                    <select value={profileForm.city} onChange={(event) => updateProfileField("city", event.target.value)} className={inputClass}>
-                      {profileAreas.map((area) => <option key={area.value} value={area.value}>{isArabic ? area.ar : area.en}</option>)}
-                    </select>
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className={labelClass}>{isArabic ? "العنوان التجاري" : "Business address"}</span>
-                    <input value={profileForm.address} onChange={(event) => updateProfileField("address", event.target.value)} maxLength={500} className={inputClass} />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className={labelClass}>{isArabic ? "عنوان استلام الطلبيات" : "Order pickup address"}</span>
-                    <input value={profileForm.pickup_address} onChange={(event) => updateProfileField("pickup_address", event.target.value)} maxLength={500} className={inputClass} />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "رقم الرخصة التجارية" : "Trade license number"}</span>
-                    <input value={profileForm.license_number} onChange={(event) => updateProfileField("license_number", event.target.value)} maxLength={120} className={inputClass} dir="ltr" />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>{isArabic ? "الرقم الضريبي TRN" : "Tax registration number"}</span>
-                    <input value={profileForm.trn} onChange={(event) => updateProfileField("trn", event.target.value)} maxLength={120} className={inputClass} dir="ltr" />
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className={labelClass}>{isArabic ? "ملاحظات النشاط" : "Business notes"}</span>
-                    <textarea value={profileForm.notes} onChange={(event) => updateProfileField("notes", event.target.value)} maxLength={1200} rows={4} className={inputClass} />
-                  </label>
-                </div>
+              <article className="dn-merchant-map-card-v3"><header><div><small>{isArabic ? "التتبع المباشر" : "Live operations map"}</small><h3>{mapOrder ? orderReference(mapOrder) : (isArabic ? "الخريطة جاهزة" : "Map ready")}</h3></div><MapPin /></header><div><TrackingMap order={mapOrder} /></div><button type="button" onClick={() => setTab("tracking")}>{isArabic ? "عرض الخريطة الكاملة" : "Open full map"}</button></article>
 
-                <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {[
-                    [isArabic ? "البريد المسجل" : "Registered email", currentMerchant.email],
-                    [isArabic ? "كود التاجر" : "Merchant code", currentMerchant.merchant_code],
-                    [isArabic ? "الحالة" : "Status", currentMerchant.status],
-                    [isArabic ? "دورة التسوية" : "Settlement cycle", currentMerchant.settlement_cycle],
-                  ].map(([label, value]) => (
-                    <div key={label}><span className="text-[10px] font-black text-white/40">{label}</span><p className="mt-1 break-words text-xs font-bold text-white/70">{clean(value) || "—"}</p></div>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs font-bold leading-6 text-white/42">{isArabic ? "لأمان الحساب لا يمكن للتاجر تغيير البريد، الكود، الحالة، العمولة أو دورة التسوية من هذه الصفحة. يتم تعديلها من الإدارة." : "For account security, email, code, status, commission, and settlement settings remain admin-managed."}</p>
+              <article className="dn-merchant-finance-snapshot-v3"><header><div><small>{isArabic ? "ملخص التحصيل" : "Collection snapshot"}</small><h3>{money(codTotal)}</h3></div><WalletCards /></header><div><span><small>{isArabic ? "قيمة الطلبات" : "Order value"}</small><strong>{money(revenueTotal)}</strong></span><span><small>{isArabic ? "تم تحصيله" : "Collected"}</small><strong>{money(collectedTotal)}</strong></span><span><small>{isArabic ? "مستحق التاجر" : "Merchant due"}</small><strong>{money(merchantDueTotal)}</strong></span></div><button type="button" onClick={() => setTab("finance")}>{isArabic ? "فتح التفاصيل المالية" : "Open finance details"}</button></article>
+            </section>
 
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button type="submit" disabled={profileSaving} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-2xl bg-brand-gold px-6 py-3 text-sm font-black text-brand-deep shadow-xl shadow-brand-gold/15 disabled:cursor-not-allowed disabled:opacity-55">
-                    {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {isArabic ? "حفظ التعديلات" : "Save changes"}
-                  </button>
-                  <button type="button" onClick={cancelProfileEdit} disabled={profileSaving} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-6 py-3 text-sm font-black text-white/70 disabled:opacity-50"><X className="h-4 w-4" />{isArabic ? "إلغاء" : "Cancel"}</button>
-                </div>
-              </form>
-            )}
-          </article>
-        </div>
-      )}
+            <section className="dn-merchant-services-strip-v3"><header><div><small>{isArabic ? "الخدمات السريعة" : "Quick merchant services"}</small><h3>{isArabic ? "ابدأ أي مهمة بضغطة واحدة" : "Start any merchant task in one click"}</h3></div><button type="button" onClick={() => setTab("services")}>{isArabic ? "عرض الكل" : "View all"}</button></header><div>{services.slice(0, 4).map(({ key, icon: Icon, title, href, tab: serviceTab, external, tone }) => href ? <a key={key} href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className={`is-${tone}`}><Icon /><strong>{title}</strong></a> : <button key={key} type="button" onClick={() => serviceTab && setTab(serviceTab)} className={`is-${tone}`}><Icon /><strong>{title}</strong></button>)}</div></section>
+          </>
+        )}
+
+        {tab === "services" && <section className="dn-merchant-section-v3"><header><div><small>{isArabic ? "مركز الخدمات" : "MERCHANT SERVICES"}</small><h2>{isArabic ? "خدمات التاجر موزعة بوضوح" : "Merchant services, clearly organized"}</h2><p>{isArabic ? "كل خدمة مرتبطة بمسارها الحقيقي داخل النظام، دون أزرار وهمية أو بيانات تجريبية." : "Every service is connected to a real system path—no fake buttons or mock operational data."}</p></div><Sparkles /></header><div className="dn-merchant-service-grid-v3">{services.map(({ key, icon: Icon, title, text, href, tab: serviceTab, external, tone }) => { const content = <><span className={`is-${tone}`}><Icon /></span><div><h3>{title}</h3><p>{text}</p></div><b>↗</b></>; return href ? <a key={key} href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>{content}</a> : <button key={key} type="button" onClick={() => serviceTab && setTab(serviceTab)}>{content}</button>; })}</div><div className="dn-merchant-support-banner-v3"><div><MessageCircle /><span><strong>{isArabic ? "فريق العمليات معك 24/7" : "Operations support is available 24/7"}</strong><small>{companyMeta.phone} · {companyMeta.email}</small></span></div><div><a href={`tel:${companyMeta.phone.replace(/\s/g, "")}`}><Phone />{isArabic ? "اتصال" : "Call"}</a><a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp</a></div></div></section>}
+
+        {tab === "orders" && <section className="dn-merchant-section-v3"><header><div><small>{isArabic ? "إدارة الطلبيات" : "ORDER MANAGEMENT"}</small><h2>{isArabic ? "كل طلبات متجرك" : "All store orders"}</h2><p>{isArabic ? "ابحث برقم التتبع أو العميل أو المدينة، وصفِّ النتائج حسب الحالة." : "Search by reference, customer, or city and filter by status."}</p></div><PackageCheck /></header><div className="dn-merchant-order-tools-v3"><label><Search /><input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder={isArabic ? "ابحث في الطلبات..." : "Search orders..."} /></label><label><ListFilter /><select value={orderStatusFilter} onChange={(event) => setOrderStatusFilter(event.target.value)}><option value="all">{isArabic ? "كل الحالات" : "All statuses"}</option><option value="pending">{statusLabel("pending", isArabic)}</option><option value="assigned">{statusLabel("assigned", isArabic)}</option><option value="picked_up">{statusLabel("picked_up", isArabic)}</option><option value="in_transit">{statusLabel("in_transit", isArabic)}</option><option value="delivered">{statusLabel("delivered", isArabic)}</option><option value="returned">{statusLabel("returned", isArabic)}</option></select></label><a href="/request?source=merchant"><PlusCircle />{isArabic ? "طلب جديد" : "New order"}</a></div><div className="dn-merchant-order-list-v3">{filteredOrders.length === 0 && <div className="dn-merchant-empty-v3"><PackageCheck /><h3>{isArabic ? "لا توجد نتائج" : "No matching orders"}</h3><p>{isArabic ? "غيّر البحث أو أنشئ طلباً جديداً." : "Adjust the filters or create a new order."}</p></div>}{filteredOrders.map((order) => { const reference = orderReference(order); const status = normalizeStatus(order.status); return <article key={reference}><header><div><span className={`is-${status}`}>{statusLabel(status, isArabic)}</span><h3>{reference}</h3><p>{formatDate(order.created_at, isArabic)}</p></div><strong>{money(orderAmount(order))}</strong></header><div className="dn-merchant-order-data-v3"><span><small>{isArabic ? "المسار" : "Route"}</small><b>{clean(order.sender_city) || "—"} <ArrowRightLeft /> {clean(order.receiver_city) || "—"}</b></span><span><small>{isArabic ? "العميل" : "Customer"}</small><b>{clean(order.receiver_name) || "—"}</b></span><span><small>{isArabic ? "المندوب" : "Driver"}</small><b>{clean(order.driver_name) || clean(order.assigned_driver_name) || "—"}</b></span><span><small>COD</small><b>{money(orderCod(order))}</b></span></div><footer><a href={`/tracking?code=${encodeURIComponent(reference)}`}><MapPin />{isArabic ? "تتبع الطلب" : "Track order"}</a></footer></article>; })}</div></section>}
+
+        {tab === "finance" && <section className="dn-merchant-section-v3"><header><div><small>{isArabic ? "التحصيل والتسويات" : "COD & SETTLEMENTS"}</small><h2>{isArabic ? "الملخص المالي للتاجر" : "Merchant financial summary"}</h2><p>{isArabic ? "القيم أدناه محسوبة فقط من الطلبات الحقيقية المرتبطة بحساب التاجر." : "The figures below are calculated only from real orders linked to this merchant account."}</p></div><WalletCards /></header><div className="dn-merchant-finance-grid-v3"><article><ReceiptText /><small>{isArabic ? "قيمة كل الطلبات" : "All order value"}</small><strong>{money(revenueTotal)}</strong></article><article><CheckCircle2 /><small>{isArabic ? "قيمة الطلبات المسلمة" : "Delivered value"}</small><strong>{money(deliveredValue)}</strong></article><article><Banknote /><small>{isArabic ? "إجمالي COD" : "Total COD"}</small><strong>{money(codTotal)}</strong></article><article><Truck /><small>{isArabic ? "COD قيد التنفيذ" : "Active COD"}</small><strong>{money(activeCod)}</strong></article><article><WalletCards /><small>{isArabic ? "تم تحصيله" : "Collected"}</small><strong>{money(collectedTotal)}</strong></article><article><Store /><small>{isArabic ? "مستحق التاجر" : "Merchant due"}</small><strong>{money(merchantDueTotal)}</strong></article></div><div className="dn-merchant-settlement-card-v3"><div><small>{isArabic ? "دورة التسوية المسجلة" : "Registered settlement cycle"}</small><h3>{clean(currentMerchant.settlement_cycle) || (isArabic ? "غير محددة" : "Not specified")}</h3><p>{isArabic ? "إعدادات العمولة والتسوية الأساسية تدار من لوحة الإدارة لضمان دقة الحسابات." : "Core commission and settlement controls remain admin-managed for financial accuracy."}</p></div><FileText /></div><div className="dn-merchant-finance-table-v3"><header><span>{isArabic ? "آخر الطلبات المالية" : "Recent financial orders"}</span><span>{isArabic ? "الإجمالي" : "Total"}</span><span>COD</span><span>{isArabic ? "مستحق" : "Due"}</span></header>{orders.slice(0, 12).map((order) => <article key={orderReference(order)}><span><b>{orderReference(order)}</b><small>{statusLabel(normalizeStatus(order.status), isArabic)}</small></span><span>{money(orderAmount(order))}</span><span>{money(orderCod(order))}</span><span>{money(orderMerchantDue(order))}</span></article>)}</div></section>}
+
+        {tab === "tracking" && <section className="dn-merchant-section-v3"><header><div><small>{isArabic ? "الخريطة المباشرة" : "LIVE TRACKING"}</small><h2>{isArabic ? "مراقبة الشحنات والمندوبين" : "Monitor shipments and couriers"}</h2><p>{isArabic ? "الخريطة تستخدم بيانات الطلب والمندوب الحقيقية المتاحة في Supabase." : "The map uses real order and courier data available in Supabase."}</p></div><MapPin /></header><div className="dn-merchant-tracking-grid-v3"><article><TrackingMap order={mapOrder} /></article><aside><h3>{isArabic ? "الطلبات النشطة" : "Active shipments"}</h3>{activeOrders.length === 0 && <p>{isArabic ? "لا توجد طلبات نشطة الآن." : "No active shipments right now."}</p>}{activeOrders.slice(0, 10).map((order) => <button key={orderReference(order)} type="button" onClick={() => setSelectedTrackingReference(orderReference(order))}><span><strong>{orderReference(order)}</strong><small>{clean(order.receiver_city) || "—"}</small></span><b>{statusLabel(normalizeStatus(order.status), isArabic)}</b></button>)}<a href="/tracking"><Search />{isArabic ? "بحث برقم تتبع آخر" : "Track another reference"}</a></aside></div></section>}
+
+        {tab === "account" && <section className="dn-merchant-section-v3"><header><div><small>{isArabic ? "ملف المتجر" : "STORE PROFILE"}</small><h2>{isArabic ? "هوية النشاط وبيانات الاستلام" : "Business identity and pickup details"}</h2><p>{isArabic ? "حدّث المعلومات التي تظهر لفريق العمليات، مع إبقاء صلاحيات التسوية والأمان تحت إدارة الشركة." : "Update operational business details while settlement and security controls remain company-managed."}</p></div>{!editingProfile ? <button type="button" onClick={beginProfileEdit}><Pencil />{isArabic ? "تعديل البيانات" : "Edit details"}</button> : <button type="button" onClick={cancelProfileEdit} disabled={profileSaving}><X />{isArabic ? "إلغاء" : "Cancel"}</button>}</header>{profileNotice && <div className="dn-merchant-message-v3 is-success">{profileNotice}</div>}{profileError && <div className="dn-merchant-message-v3 is-error">{profileError}</div>}{!editingProfile ? <div className="dn-merchant-profile-v3"><div className="dn-merchant-profile-hero-v3"><div>{currentMerchant.logo_url ? <img src={currentMerchant.logo_url} alt={currentMerchantName} /> : <span>{initials(currentMerchantName)}</span>}</div><section><h3>{currentMerchantName}</h3><p>{clean(currentMerchant.merchant_code) || "—"}</p><span><ShieldCheck />{clean(currentMerchant.status) || (isArabic ? "نشط" : "Active")}</span></section></div><div className="dn-merchant-profile-grid-v3">{[[isArabic ? "المالك" : "Owner", currentMerchant.owner_name],[isArabic ? "البريد" : "Email", currentMerchant.email],[isArabic ? "الهاتف" : "Phone", currentMerchant.phone],[isArabic ? "هاتف بديل" : "Alternate phone", currentMerchant.alt_phone],[isArabic ? "الإمارة" : "Emirate", currentMerchant.emirate],[isArabic ? "المنطقة" : "Area", currentMerchant.city],[isArabic ? "العنوان" : "Address", currentMerchant.address],[isArabic ? "عنوان الاستلام" : "Pickup address", currentMerchant.pickup_address],[isArabic ? "رقم الرخصة" : "License number", currentMerchant.license_number],[isArabic ? "الرقم الضريبي" : "TRN", currentMerchant.trn || currentMerchant.tax_number],[isArabic ? "دورة التسوية" : "Settlement", currentMerchant.settlement_cycle],[isArabic ? "آخر تحديث" : "Updated", formatDate(currentMerchant.updated_at || currentMerchant.created_at, isArabic)]].map(([label, value]) => <article key={String(label)}><small>{label}</small><strong>{clean(value) || "—"}</strong></article>)}</div>{clean(currentMerchant.notes) && <div className="dn-merchant-notes-v3"><small>{isArabic ? "ملاحظات النشاط" : "Business notes"}</small><p>{clean(currentMerchant.notes)}</p></div>}</div> : <form onSubmit={saveMerchantProfile} className="dn-merchant-profile-form-v3"><div className="dn-merchant-logo-editor-v3"><div>{profileForm.logo_url ? <img src={profileForm.logo_url} alt="" /> : <ImageIcon />}</div><section><h3>{isArabic ? "شعار النشاط" : "Business logo"}</h3><p>{isArabic ? "استخدم رابطاً آمناً يبدأ بـ https://." : "Use a secure image URL beginning with https://."}</p><input type="url" value={profileForm.logo_url} onChange={(event) => updateProfileField("logo_url", event.target.value)} placeholder="https://..." dir="ltr" /></section></div><div className="dn-merchant-fields-v3"><label><span>{isArabic ? "اسم النشاط التجاري *" : "Business name *"}</span><input value={profileForm.trade_name} onChange={(event) => updateProfileField("trade_name", event.target.value)} maxLength={160} required /></label><label><span>{isArabic ? "اسم المالك أو المسؤول" : "Owner or manager"}</span><input value={profileForm.owner_name} onChange={(event) => updateProfileField("owner_name", event.target.value)} maxLength={160} /></label><label><span>{isArabic ? "رقم الهاتف *" : "Phone number *"}</span><input type="tel" value={profileForm.phone} onChange={(event) => updateProfileField("phone", event.target.value)} maxLength={40} required dir="ltr" /></label><label><span>{isArabic ? "هاتف بديل" : "Alternate phone"}</span><input type="tel" value={profileForm.alt_phone} onChange={(event) => updateProfileField("alt_phone", event.target.value)} maxLength={40} dir="ltr" /></label><label><span>{isArabic ? "الإمارة" : "Emirate"}</span><select value={profileForm.emirate} onChange={(event) => { const emirate = event.target.value; const areas = getAreasForEmirate(emirate); setProfileForm((current) => ({ ...current, emirate, city: areas.some((area) => area.value === current.city) ? current.city : areas[0]?.value || "" })); }}>{UAE_LOCATIONS.map((location) => <option key={location.value} value={location.value}>{isArabic ? location.ar : location.en}</option>)}</select></label><label><span>{isArabic ? "المنطقة" : "Area"}</span><select value={profileForm.city} onChange={(event) => updateProfileField("city", event.target.value)}>{profileAreas.map((area) => <option key={area.value} value={area.value}>{isArabic ? area.ar : area.en}</option>)}</select></label><label className="is-wide"><span>{isArabic ? "العنوان التجاري" : "Business address"}</span><input value={profileForm.address} onChange={(event) => updateProfileField("address", event.target.value)} maxLength={500} /></label><label className="is-wide"><span>{isArabic ? "عنوان استلام الطلبيات" : "Order pickup address"}</span><input value={profileForm.pickup_address} onChange={(event) => updateProfileField("pickup_address", event.target.value)} maxLength={500} /></label><label><span>{isArabic ? "رقم الرخصة التجارية" : "Trade license number"}</span><input value={profileForm.license_number} onChange={(event) => updateProfileField("license_number", event.target.value)} maxLength={120} dir="ltr" /></label><label><span>{isArabic ? "الرقم الضريبي TRN" : "Tax registration number"}</span><input value={profileForm.trn} onChange={(event) => updateProfileField("trn", event.target.value)} maxLength={120} dir="ltr" /></label><label className="is-wide"><span>{isArabic ? "ملاحظات النشاط" : "Business notes"}</span><textarea value={profileForm.notes} onChange={(event) => updateProfileField("notes", event.target.value)} maxLength={1200} rows={4} /></label></div><div className="dn-merchant-form-note-v3"><ShieldCheck /><p>{isArabic ? "البريد، كود التاجر، الحالة، العمولة ودورة التسوية تظل تحت إدارة DAY NIGHT." : "Email, merchant code, status, commission, and settlement cycle remain DAY NIGHT managed."}</p></div><div className="dn-merchant-form-actions-v3"><button type="submit" disabled={profileSaving}>{profileSaving ? <Loader2 className="dn-spin" /> : <Save />}{isArabic ? "حفظ التعديلات" : "Save changes"}</button><button type="button" onClick={cancelProfileEdit} disabled={profileSaving}><X />{isArabic ? "إلغاء" : "Cancel"}</button></div></form>}</section>}
+      </main>
+
+      <nav className="dn-merchant-mobile-dock-v3" aria-label={isArabic ? "تنقل التاجر" : "Merchant navigation"}>
+        <button type="button" className={tab === "overview" ? "is-active" : ""} onClick={() => setTab("overview")}><Home /><span>{isArabic ? "الرئيسية" : "Home"}</span></button>
+        <button type="button" className={tab === "services" ? "is-active" : ""} onClick={() => setTab("services")}><Sparkles /><span>{isArabic ? "الخدمات" : "Services"}</span></button>
+        <button type="button" className={tab === "orders" ? "is-active" : ""} onClick={() => setTab("orders")}><PackageCheck /><span>{isArabic ? "الطلبات" : "Orders"}</span>{activeOrders.length > 0 && <b>{activeOrders.length}</b>}</button>
+        <button type="button" className={tab === "finance" ? "is-active" : ""} onClick={() => setTab("finance")}><WalletCards /><span>{isArabic ? "المالية" : "Finance"}</span></button>
+        <button type="button" className={tab === "account" ? "is-active" : ""} onClick={() => setTab("account")}><UserRound /><span>{isArabic ? "الحساب" : "Account"}</span></button>
+      </nav>
     </section>
   );
 }
