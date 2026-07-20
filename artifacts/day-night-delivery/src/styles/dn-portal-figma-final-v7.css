@@ -1,0 +1,499 @@
+/* DAY NIGHT PORTALS — FINAL FIGMA REFERENCE V7
+   Uses the supplied 1600x1200 tracking dashboard as a visual system, not as
+   fixed-position code. All existing React handlers, Supabase data, realtime,
+   maps, GPS, COD and account ownership rules remain unchanged. */
+
+/* --------------------------------------------------------------------------
+   Pointer, click and stacking safety
+   -------------------------------------------------------------------------- */
+html[data-portal-route="true"],
+html[data-portal-route="true"] body,
+body:has(.dn-driver-shell-v3),
+body:has(.dn-merchant-shell-v3),
+body:has(.dn-portal-auth-page),
+body:has(.dn-merchant-login-v3) {
+  cursor: default !important;
+  overflow-x: hidden;
+}
+
+html[data-portal-route="true"] :is(button,a,[role="button"],summary,label[for]),
+body:has(.dn-driver-shell-v3) :is(button,a,[role="button"],summary,label[for]),
+body:has(.dn-merchant-shell-v3) :is(button,a,[role="button"],summary,label[for]),
+body:has(.dn-portal-auth-page) :is(button,a,[role="button"],summary,label[for]),
+body:has(.dn-merchant-login-v3) :is(button,a,[role="button"],summary,label[for]) {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+html[data-portal-route="true"] :is(input,textarea,select),
+body:has(.dn-driver-shell-v3) :is(input,textarea,select),
+body:has(.dn-merchant-shell-v3) :is(input,textarea,select),
+body:has(.dn-portal-auth-page) :is(input,textarea,select),
+body:has(.dn-merchant-login-v3) :is(input,textarea,select) {
+  cursor: text !important;
+  pointer-events: auto !important;
+}
+
+html[data-portal-route="true"] :is(.dn-cursor-ring,.dn-cursor-dot) {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.dn-driver-shell-v3::before,
+.dn-driver-shell-v3::after,
+.dn-merchant-shell-v3::before,
+.dn-merchant-shell-v3::after,
+.dn-portal-auth-page::before,
+.dn-portal-auth-page::after,
+.dn-merchant-login-v3::before,
+.dn-merchant-login-v3::after {
+  pointer-events: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared tokens
+   -------------------------------------------------------------------------- */
+.dn-driver-shell-v3,
+.dn-merchant-shell-v3,
+.dn-portal-auth-page,
+.dn-merchant-login-v3 {
+  --dn-v7-black: #111111;
+  --dn-v7-navy: #071a33;
+  --dn-v7-deep: #0a1c3a;
+  --dn-v7-blue: #0b4db2;
+  --dn-v7-sky: #3195f7;
+  --dn-v7-gold: #d4af37;
+  --dn-v7-gold-soft: #f4df86;
+  --dn-v7-cream: #fdfbf0;
+  --dn-v7-cream-2: #f2eed1;
+  --dn-v7-paper: #ffffff;
+  --dn-v7-ink: #111827;
+  --dn-v7-muted: #667085;
+  --dn-v7-line: rgba(17,17,17,.10);
+  font-family: Cairo, Poppins, Inter, system-ui, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Driver dashboard — Figma desktop geometry
+   -------------------------------------------------------------------------- */
+.dn-driver-shell-v3 {
+  width: min(1600px, calc(100vw - 20px)) !important;
+  min-height: max(820px, calc(100dvh - 20px)) !important;
+  margin: 10px auto !important;
+  grid-template-columns: 96px minmax(0,1fr) !important;
+  border: 1px solid rgba(17,17,17,.08) !important;
+  border-radius: 46px !important;
+  overflow: hidden !important;
+  color: var(--dn-v7-ink) !important;
+  background:
+    radial-gradient(circle at 10% 4%,rgba(212,175,55,.14),transparent 26rem),
+    radial-gradient(circle at 92% 92%,rgba(49,149,247,.11),transparent 29rem),
+    var(--dn-v7-cream) !important;
+  box-shadow: 18px 30px 80px rgba(7,26,51,.16),-14px 24px 60px rgba(7,26,51,.08) !important;
+}
+
+.dn-driver-rail-v3 {
+  min-height: calc(100% - 32px) !important;
+  margin: 16px 0 16px 16px !important;
+  padding: 16px 11px !important;
+  border-radius: 48px !important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.045),transparent 28%),
+    linear-gradient(180deg,#111111 0%,#071a33 62%,#0b4db2 100%) !important;
+  box-shadow: 12px 18px 38px rgba(7,26,51,.20) !important;
+}
+.dn-driver-shell-v3[dir="rtl"] .dn-driver-rail-v3 { margin: 16px 16px 16px 0 !important; }
+.dn-driver-brand-mark-v3 { width: 62px !important; height: 62px !important; border-radius: 22px !important; }
+.dn-driver-rail-v3 nav { gap: 15px !important; }
+.dn-driver-rail-v3 nav button,
+.dn-driver-rail-tools-v3 button,
+.dn-driver-rail-tools-v3 a { width: 49px !important; height: 49px !important; border-radius: 16px !important; }
+.dn-driver-rail-v3 nav button.is-active {
+  color: var(--dn-v7-black) !important;
+  background: linear-gradient(135deg,var(--dn-v7-gold-soft),var(--dn-v7-gold)) !important;
+  box-shadow: 0 12px 26px rgba(212,175,55,.28) !important;
+}
+
+.dn-driver-workspace-v3 { padding: 16px 18px 22px !important; background: transparent !important; }
+.dn-driver-topbar-v3 {
+  top: 8px !important;
+  min-height: 64px !important;
+  margin-bottom: 12px !important;
+  padding: 9px 12px 9px 17px !important;
+  border: 1px solid rgba(17,17,17,.08) !important;
+  border-radius: 23px !important;
+  background: rgba(255,255,255,.91) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 12px 29px rgba(7,26,51,.08) !important;
+}
+[dir="rtl"] .dn-driver-topbar-v3 { padding: 9px 17px 9px 12px !important; }
+.dn-driver-heading-v3 span { color: #9b750d !important; font-size: 9px !important; }
+.dn-driver-heading-v3 h1 { color: var(--dn-v7-black) !important; font-size: clamp(20px,1.7vw,28px) !important; }
+.dn-driver-profile-chip-v3 { background: #faf9f3 !important; border-color: rgba(17,17,17,.09) !important; }
+
+.dn-driver-command-surface-v3 {
+  direction: ltr !important;
+  grid-template-columns: minmax(292px,315px) minmax(420px,1fr) minmax(345px,390px) !important;
+  grid-template-areas: "mission vehicle map" !important;
+  gap: 13px !important;
+  min-height: 568px !important;
+}
+.dn-driver-shell-v3[dir="rtl"] .dn-driver-command-surface-v3 { grid-template-areas: "map vehicle mission" !important; }
+.dn-driver-command-surface-v3 > article {
+  min-height: 568px !important;
+  border: 1px solid rgba(17,17,17,.09) !important;
+  border-radius: 30px !important;
+  background: rgba(255,255,255,.95) !important;
+  box-shadow: 0 17px 38px rgba(7,26,51,.09) !important;
+}
+.dn-driver-shell-v3[dir="rtl"] .dn-driver-command-surface-v3 > article { direction: rtl !important; }
+.dn-driver-shell-v3[dir="ltr"] .dn-driver-command-surface-v3 > article { direction: ltr !important; }
+.dn-driver-tracking-card-v3 { grid-area: mission; padding: 22px 17px 17px !important; }
+.dn-driver-vehicle-stage-v3 { grid-area: vehicle; }
+.dn-driver-map-stage-v3 { grid-area: map; }
+
+.dn-driver-tracking-card-v3 {
+  color: #fff !important;
+  background:
+    radial-gradient(circle at 88% 10%,rgba(255,255,255,.16),transparent 25%),
+    linear-gradient(155deg,#0b4db2 0%,#0a2c58 56%,#071a33 100%) !important;
+}
+.dn-driver-tracking-card-v3.has-order {
+  background:
+    linear-gradient(151deg,rgba(255,255,255,.10),transparent 28%),
+    linear-gradient(151deg,#d4af37 0%,#c09a25 47%,#0a2c58 47.5%,#071a33 100%) !important;
+}
+.dn-driver-progress-line-v3 { height: 10px !important; }
+.dn-driver-timeline-v3 { gap: 7px !important; margin-top: 18px !important; }
+.dn-driver-timeline-v3 > div { min-height: 53px !important; }
+.dn-driver-route-v3 { gap: 8px !important; }
+.dn-driver-route-v3 article { background: rgba(255,255,255,.08) !important; border-color: rgba(255,255,255,.12) !important; }
+.dn-driver-card-actions-v3 { margin-top: 12px !important; }
+.dn-driver-card-actions-v3 :is(button,a) { min-height: 45px !important; border-radius: 14px !important; }
+.dn-driver-waiting-v3 { min-height: 310px !important; padding: 26px 14px !important; }
+.dn-driver-waiting-v3 svg { width: 44px !important; height: 44px !important; }
+
+.dn-driver-vehicle-stage-v3 {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  padding: 24px 20px 18px !important;
+  overflow: hidden !important;
+  color: var(--dn-v7-black) !important;
+  background:
+    radial-gradient(circle at 20% 12%,rgba(49,149,247,.11),transparent 22rem),
+    radial-gradient(circle at 84% 86%,rgba(212,175,55,.15),transparent 22rem),
+    linear-gradient(145deg,#fff 0%,#f7fbff 54%,#f5f0d8 100%) !important;
+}
+.dn-driver-vehicle-stage-v3::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 90px 20px 150px !important;
+  border-radius: 28px !important;
+  background:
+    linear-gradient(120deg,transparent 0 30%,rgba(49,149,247,.10) 30% 31%,transparent 31% 56%,rgba(212,175,55,.12) 56% 57%,transparent 57%),
+    radial-gradient(circle at 22% 72%,rgba(49,149,247,.18) 0 7px,transparent 8px),
+    radial-gradient(circle at 74% 28%,rgba(212,175,55,.22) 0 7px,transparent 8px) !important;
+}
+.dn-driver-vehicle-copy-v3 { position: relative !important; z-index: 2 !important; }
+.dn-driver-vehicle-copy-v3 span { color: #9a7204 !important; }
+.dn-driver-vehicle-copy-v3 h2 { color: var(--dn-v7-black) !important; font-size: clamp(24px,2.6vw,40px) !important; }
+.dn-driver-vehicle-copy-v3 p { color: var(--dn-v7-muted) !important; }
+.dn-driver-vehicle-visual-v3 {
+  position: relative !important;
+  z-index: 2 !important;
+  min-height: 275px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  border-radius: 25px !important;
+  isolation: isolate !important;
+}
+.dn-driver-vehicle-visual-v3 > img { width: 1px !important; height: 1px !important; opacity: 0 !important; }
+.dn-driver-vehicle-visual-v3::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: inherit !important;
+  background:
+    linear-gradient(180deg,rgba(7,26,51,.02),rgba(7,26,51,.12)),
+    url("https://i.postimg.cc/Gmfdn2FW/Chat-GPT-Image-Jul-20-2026-03-03-22-PM.png") center/cover no-repeat !important;
+  filter: drop-shadow(0 22px 22px rgba(7,26,51,.16)) !important;
+}
+.dn-driver-vehicle-visual-v3 > span {
+  z-index: 3 !important;
+  inset-inline-end: 14px !important;
+  top: 14px !important;
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 18px !important;
+}
+.dn-driver-mini-metrics-v3 { position: relative !important; z-index: 2 !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; gap: 8px !important; }
+.dn-driver-mini-metrics-v3 article { min-height: 72px !important; padding: 11px !important; border-radius: 17px !important; background: rgba(255,255,255,.90) !important; }
+.dn-driver-mini-metrics-v3 svg { width: 18px !important; height: 18px !important; }
+.dn-driver-mini-metrics-v3 strong { font-size: 14px !important; }
+
+.dn-driver-map-stage-v3 { padding: 13px !important; background: #fff !important; }
+.dn-driver-map-stage-v3 > header { min-height: 57px !important; padding: 2px 2px 9px !important; }
+.dn-driver-map-stage-v3 header h2 { color: var(--dn-v7-black) !important; font-size: 16px !important; }
+.dn-driver-live-map-v3 { height: 430px !important; border-radius: 24px !important; overflow: hidden !important; }
+.dn-driver-live-map-v3 > *,
+.dn-driver-live-map-v3 .leaflet-container,
+.dn-driver-live-map-v3 .dn-tracking-map,
+.dn-driver-live-map-v3 iframe { width: 100% !important; height: 100% !important; min-height: 100% !important; }
+.dn-driver-map-stage-v3 footer { min-height: 42px !important; color: var(--dn-v7-muted) !important; }
+
+.dn-driver-kpi-grid-v3 { gap: 9px !important; margin-top: 11px !important; }
+.dn-driver-kpi-grid-v3 article,
+.dn-driver-operations-grid-v3 > article,
+.dn-driver-section-v3 { border-radius: 22px !important; border-color: rgba(17,17,17,.08) !important; background: rgba(255,255,255,.94) !important; box-shadow: 0 11px 27px rgba(7,26,51,.07) !important; }
+
+/* --------------------------------------------------------------------------
+   Merchant dashboard — compact Figma business center
+   -------------------------------------------------------------------------- */
+.dn-merchant-shell-v3 {
+  width: min(1600px,calc(100vw - 20px)) !important;
+  min-height: max(820px,calc(100dvh - 20px)) !important;
+  margin: 10px auto !important;
+  border: 1px solid rgba(17,17,17,.08) !important;
+  border-radius: 46px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 10% 3%,rgba(212,175,55,.13),transparent 25rem),
+    radial-gradient(circle at 91% 4%,rgba(49,149,247,.10),transparent 29rem),
+    var(--dn-v7-cream) !important;
+  box-shadow: 18px 30px 80px rgba(7,26,51,.16),-14px 24px 60px rgba(7,26,51,.08) !important;
+}
+.dn-merchant-rail-v3 {
+  border-radius: 44px !important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.045),transparent 28%),
+    linear-gradient(180deg,#111111 0%,#071a33 63%,#0b4db2 100%) !important;
+}
+.dn-merchant-rail-v3 nav button:hover,
+.dn-merchant-rail-v3 nav button.is-active,
+.dn-merchant-rail-v3 > div a:hover,
+.dn-merchant-rail-v3 > div button:hover {
+  color: var(--dn-v7-black) !important;
+  background: linear-gradient(135deg,var(--dn-v7-gold-soft),var(--dn-v7-gold)) !important;
+}
+.dn-merchant-workspace-v3 { padding: 16px 18px 22px !important; }
+.dn-merchant-topbar-v3 {
+  min-height: 66px !important;
+  margin-bottom: 12px !important;
+  border-color: rgba(17,17,17,.08) !important;
+  border-radius: 23px !important;
+  background: rgba(255,255,255,.91) !important;
+  box-shadow: 0 12px 29px rgba(7,26,51,.08) !important;
+}
+.dn-merchant-hero-v3 {
+  min-height: 190px !important;
+  padding: 24px 27px !important;
+  border: 1px solid rgba(17,17,17,.08) !important;
+  border-radius: 29px !important;
+  background:
+    radial-gradient(circle at 14% 12%,rgba(212,175,55,.20),transparent 22rem),
+    radial-gradient(circle at 90% 8%,rgba(49,149,247,.22),transparent 28rem),
+    linear-gradient(135deg,#111111 0%,#071a33 54%,#0b4db2 100%) !important;
+}
+.dn-merchant-hero-v3 > div h2 { max-width: 700px !important; font-size: clamp(25px,3vw,43px) !important; }
+.dn-merchant-hero-v3 > div p { max-width: 760px !important; }
+.dn-merchant-hero-v3 aside { min-width: 240px !important; padding: 15px !important; border-radius: 22px !important; }
+.dn-merchant-kpis-v3 { gap: 9px !important; margin-top: 10px !important; }
+.dn-merchant-kpis-v3 article { min-height: 100px !important; padding: 16px !important; border-radius: 21px !important; }
+.dn-merchant-overview-grid-v3 {
+  grid-template-columns: minmax(360px,1.15fr) minmax(340px,1fr) minmax(260px,.72fr) !important;
+  gap: 11px !important;
+  margin-top: 11px !important;
+  align-items: stretch !important;
+}
+.dn-merchant-overview-grid-v3 > article {
+  min-height: 390px !important;
+  border-radius: 25px !important;
+  border-color: rgba(17,17,17,.08) !important;
+  background: rgba(255,255,255,.95) !important;
+  box-shadow: 0 13px 30px rgba(7,26,51,.07) !important;
+}
+.dn-merchant-map-card-v3 > div { min-height: 270px !important; height: 270px !important; overflow: hidden !important; border-radius: 20px !important; }
+.dn-merchant-map-card-v3 > div > *,
+.dn-merchant-map-card-v3 .leaflet-container,
+.dn-merchant-map-card-v3 .dn-tracking-map,
+.dn-merchant-map-card-v3 iframe { width: 100% !important; height: 100% !important; min-height: 100% !important; }
+.dn-merchant-latest-order-v3,
+.dn-merchant-map-card-v3,
+.dn-merchant-finance-snapshot-v3 { padding: 18px !important; }
+.dn-merchant-timeline-v3 { margin-top: 15px !important; gap: 6px !important; }
+.dn-merchant-route-v3 article { background: #faf9f3 !important; }
+.dn-merchant-services-strip-v3 { margin-top: 11px !important; border-radius: 23px !important; }
+.dn-merchant-services-strip-v3 > div > a,
+.dn-merchant-services-strip-v3 > div > button { background: #faf9f3 !important; }
+.dn-merchant-section-v3 { border-radius: 25px !important; }
+
+/* --------------------------------------------------------------------------
+   Login surfaces — balanced, simple and usable at normal or reduced zoom
+   -------------------------------------------------------------------------- */
+.dn-portal-auth-page,
+.dn-merchant-login-v3 {
+  padding: clamp(10px,1.4vw,22px) !important;
+  background:
+    radial-gradient(circle at 7% 3%,rgba(212,175,55,.17),transparent 24rem),
+    radial-gradient(circle at 94% 8%,rgba(49,149,247,.14),transparent 32rem),
+    var(--dn-v7-cream) !important;
+}
+.dn-portal-auth-shell,
+.dn-merchant-login-v3 {
+  grid-template-columns: minmax(0,1.12fr) minmax(430px,.88fr) !important;
+  gap: clamp(12px,1.4vw,22px) !important;
+}
+.dn-portal-auth-visual,
+.dn-portal-auth-card,
+.dn-merchant-login-visual-v3,
+.dn-merchant-login-card-v3 {
+  min-height: calc(100dvh - clamp(20px,2.8vw,44px)) !important;
+  border-radius: clamp(26px,2vw,36px) !important;
+  box-shadow: 0 28px 70px rgba(7,26,51,.16) !important;
+}
+.dn-portal-auth-visual,
+.dn-merchant-login-visual-v3 { padding: clamp(25px,3vw,50px) !important; }
+.dn-portal-auth-brand h1,
+.dn-merchant-login-brand-v3 h1 { font-size: clamp(31px,3.6vw,56px) !important; }
+.dn-portal-auth-copy { margin: auto 0 24px !important; }
+.dn-portal-auth-copy h2 { font-size: clamp(28px,3.2vw,48px) !important; }
+.dn-portal-auth-feature-grid article,
+.dn-merchant-login-services-v3 article { min-height: 104px !important; padding: 16px !important; border-radius: 20px !important; }
+.dn-portal-auth-card,
+.dn-merchant-login-card-v3 { padding: clamp(24px,3vw,46px) !important; }
+.dn-portal-auth-card > header,
+.dn-merchant-login-card-v3 > header { margin-bottom: 20px !important; }
+.dn-portal-auth-form,
+.dn-merchant-login-card-v3 form { gap: 12px !important; }
+.dn-portal-auth-card input,
+.dn-merchant-login-card-v3 input { min-height: 50px !important; border-radius: 14px !important; }
+.dn-portal-auth-primary,
+.dn-merchant-login-card-v3 form > button { min-height: 51px !important; border-radius: 14px !important; }
+.dn-merchant-phone-auth-v3 { margin-top: 10px !important; padding: 13px !important; border-radius: 18px !important; }
+
+/* --------------------------------------------------------------------------
+   Dark theme preserves the same geometry and contrast hierarchy
+   -------------------------------------------------------------------------- */
+html[data-theme="dark"] .dn-driver-shell-v3,
+html[data-theme="dark"] .dn-merchant-shell-v3,
+html[data-theme="dark"] .dn-portal-auth-page,
+html[data-theme="dark"] .dn-merchant-login-v3 {
+  --dn-v7-cream: #071a33;
+  --dn-v7-paper: #0d2849;
+  --dn-v7-ink: #f8fbff;
+  --dn-v7-muted: #a9bad0;
+  --dn-v7-line: rgba(255,255,255,.11);
+  border-color: rgba(255,255,255,.10) !important;
+  background:
+    radial-gradient(circle at 12% 0,rgba(49,149,247,.18),transparent 28rem),
+    radial-gradient(circle at 88% 90%,rgba(212,175,55,.12),transparent 28rem),
+    linear-gradient(145deg,#030d1c 0%,#071a33 55%,#0a2c58 100%) !important;
+}
+html[data-theme="dark"] :is(.dn-driver-topbar-v3,.dn-driver-command-surface-v3 > article:not(.dn-driver-tracking-card-v3),.dn-driver-kpi-grid-v3 article,.dn-driver-operations-grid-v3 > article,.dn-driver-section-v3,.dn-merchant-topbar-v3,.dn-merchant-kpis-v3 article,.dn-merchant-overview-grid-v3 > article,.dn-merchant-services-strip-v3,.dn-merchant-section-v3,.dn-portal-auth-card,.dn-merchant-login-card-v3) {
+  border-color: rgba(255,255,255,.11) !important;
+  background: rgba(10,31,58,.92) !important;
+  color: #f8fbff !important;
+}
+html[data-theme="dark"] .dn-driver-vehicle-stage-v3 {
+  background:
+    radial-gradient(circle at 18% 12%,rgba(49,149,247,.17),transparent 22rem),
+    radial-gradient(circle at 85% 84%,rgba(212,175,55,.14),transparent 22rem),
+    linear-gradient(145deg,#0d2849 0%,#0a203d 57%,#071a33 100%) !important;
+}
+html[data-theme="dark"] :is(.dn-driver-heading-v3 h1,.dn-driver-vehicle-copy-v3 h2,.dn-driver-map-stage-v3 header h2,.dn-merchant-identity-v3 h1,.dn-merchant-kpis-v3 strong,.dn-merchant-section-v3 h2,.dn-merchant-section-v3 h3,.dn-portal-auth-card h2,.dn-merchant-login-card-v3 h2) { color: #f8fbff !important; }
+html[data-theme="dark"] :is(.dn-driver-profile-chip-v3,.dn-driver-mini-metrics-v3 article,.dn-merchant-route-v3 article,.dn-merchant-services-strip-v3 > div > a,.dn-merchant-services-strip-v3 > div > button,.dn-merchant-phone-auth-v3) {
+  border-color: rgba(255,255,255,.10) !important;
+  background: rgba(255,255,255,.06) !important;
+  color: #f8fbff !important;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive — mission and actions first, then map, then supporting metrics
+   -------------------------------------------------------------------------- */
+@media (max-width: 1320px) {
+  .dn-driver-command-surface-v3 {
+    grid-template-columns: minmax(300px,.82fr) minmax(420px,1.18fr) !important;
+    grid-template-areas: "mission vehicle" "map map" !important;
+  }
+  .dn-driver-shell-v3[dir="rtl"] .dn-driver-command-surface-v3 { grid-template-areas: "vehicle mission" "map map" !important; }
+  .dn-driver-command-surface-v3 > article { min-height: auto !important; }
+  .dn-driver-map-stage-v3 { min-height: 500px !important; }
+  .dn-driver-live-map-v3 { height: 400px !important; }
+  .dn-merchant-overview-grid-v3 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .dn-merchant-finance-snapshot-v3 { grid-column: 1 / -1 !important; min-height: 250px !important; }
+}
+
+@media (max-width: 980px) {
+  .dn-driver-shell-v3,
+  .dn-merchant-shell-v3 { width: 100% !important; min-height: 100dvh !important; margin: 0 !important; border-radius: 0 !important; }
+  .dn-driver-rail-v3,
+  .dn-merchant-rail-v3 { display: none !important; }
+  .dn-driver-shell-v3,
+  .dn-merchant-shell-v3 { display: block !important; }
+  .dn-driver-workspace-v3,
+  .dn-merchant-workspace-v3 { padding: 10px 10px 92px !important; }
+  .dn-driver-topbar-v3,
+  .dn-merchant-topbar-v3 { position: relative !important; top: 0 !important; border-radius: 19px !important; }
+  .dn-driver-command-surface-v3 { display: grid !important; grid-template-columns: 1fr !important; grid-template-areas: "mission" "map" "vehicle" !important; min-height: 0 !important; }
+  .dn-driver-command-surface-v3 > article { min-height: auto !important; border-radius: 24px !important; }
+  .dn-driver-live-map-v3 { height: 390px !important; }
+  .dn-driver-vehicle-visual-v3 { min-height: 240px !important; }
+  .dn-driver-mini-metrics-v3 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .dn-merchant-hero-v3 { min-height: 0 !important; grid-template-columns: 1fr !important; }
+  .dn-merchant-hero-v3 aside { min-width: 0 !important; }
+  .dn-merchant-kpis-v3 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .dn-merchant-overview-grid-v3 { grid-template-columns: 1fr !important; }
+  .dn-merchant-overview-grid-v3 > article { min-height: auto !important; }
+  .dn-merchant-map-card-v3 > div { height: 360px !important; }
+  .dn-portal-auth-shell,
+  .dn-merchant-login-v3 { grid-template-columns: 1fr !important; grid-template-areas: "card" "visual" !important; align-items: start !important; }
+  .dn-portal-auth-card,
+  .dn-merchant-login-card-v3 { grid-area: card !important; min-height: auto !important; }
+  .dn-portal-auth-visual,
+  .dn-merchant-login-visual-v3 { grid-area: visual !important; min-height: auto !important; }
+}
+
+@media (max-width: 640px) {
+  .dn-driver-workspace-v3,
+  .dn-merchant-workspace-v3 { padding: 7px 7px 88px !important; }
+  .dn-driver-topbar-v3 { align-items: flex-start !important; }
+  .dn-driver-heading-v3 h1 { font-size: 20px !important; }
+  .dn-driver-profile-chip-v3 { max-width: 100% !important; }
+  .dn-driver-shift-badge { display: none !important; }
+  .dn-driver-command-surface-v3 { gap: 8px !important; }
+  .dn-driver-tracking-card-v3 { padding: 20px 14px 14px !important; }
+  .dn-driver-timeline-v3 { overflow-x: auto !important; grid-template-columns: repeat(5,minmax(76px,1fr)) !important; }
+  .dn-driver-route-v3 { grid-template-columns: 1fr !important; }
+  .dn-driver-live-map-v3 { height: 330px !important; }
+  .dn-driver-kpi-grid-v3 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .dn-merchant-topbar-v3 { align-items: flex-start !important; }
+  .dn-merchant-identity-v3 h1 { font-size: 18px !important; }
+  .dn-merchant-hero-v3 { padding: 20px 17px !important; }
+  .dn-merchant-hero-v3 > div h2 { font-size: 27px !important; }
+  .dn-merchant-kpis-v3 { gap: 7px !important; }
+  .dn-merchant-kpis-v3 article { min-height: 88px !important; padding: 12px !important; }
+  .dn-merchant-map-card-v3 > div { height: 310px !important; }
+  .dn-portal-auth-page,
+  .dn-merchant-login-v3 { padding: 7px !important; }
+  .dn-portal-auth-visual,
+  .dn-portal-auth-card,
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 { border-radius: 23px !important; }
+  .dn-portal-auth-card,
+  .dn-merchant-login-card-v3 { padding: 20px 15px !important; }
+  .dn-portal-auth-feature-grid,
+  .dn-merchant-login-services-v3 { grid-template-columns: 1fr !important; }
+  .dn-portal-auth-feature-grid article,
+  .dn-merchant-login-services-v3 article { min-height: 78px !important; flex-direction: row !important; align-items: center !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dn-driver-shell-v3 *,
+  .dn-merchant-shell-v3 *,
+  .dn-portal-auth-page *,
+  .dn-merchant-login-v3 * { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
