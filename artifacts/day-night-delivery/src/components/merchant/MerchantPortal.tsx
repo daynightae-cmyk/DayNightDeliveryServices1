@@ -155,7 +155,7 @@ function orderMerchantDue(order: MerchantOrder) {
 
 function orderCollected(order: MerchantOrder) {
   const explicitAmount = order.collected_amount;
-  if (explicitAmount !== null && explicitAmount !== undefined && explicitAmount !== "") return explicitAmount;
+  if (explicitAmount !== null && explicitAmount !== undefined) return explicitAmount;
   const status = normalizeStatus(order.status);
   const isFinanciallyPosted = Boolean(order.financial_posted_at || order.settlement_id || order.settled_at || order.cod_collected_at);
   return status === "delivered" || isFinanciallyPosted ? orderCod(order) : 0;
