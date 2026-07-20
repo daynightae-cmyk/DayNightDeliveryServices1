@@ -1,5 +1,20 @@
 import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, Globe2, Loader2, LockKeyhole, Mail, Navigation, ShieldCheck } from "lucide-react";
+import {
+  Banknote,
+  Camera,
+  Eye,
+  EyeOff,
+  Globe2,
+  Headphones,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  MapPinned,
+  Navigation,
+  PackageCheck,
+  PhoneCall,
+  ShieldCheck,
+} from "lucide-react";
 import { supabase } from "../../supabase";
 import companyMeta from "../../data/companyMeta";
 
@@ -72,75 +87,118 @@ export default function DriverLogin({ isArabic }: { isArabic: boolean }) {
   }
 
   return (
-    <section className="dn-driver-login-page" dir={isArabic ? "rtl" : "ltr"}>
-      <div className="dn-driver-login-card">
-        <div className="dn-driver-login-brand">
-          <span className="dn-driver-login-icon">
-            <img src={companyMeta.logoUrl} alt="DAY NIGHT" className="h-full w-full rounded-full bg-brand-deep object-cover ring-1 ring-brand-gold/35" />
-          </span>
-          <div>
-            <small>DAY NIGHT DELIVERY SERVICES</small>
-            <h1>{isArabic ? "بوابة المندوب" : "Driver Operations Portal"}</h1>
-            <p>{isArabic ? "طلباتك، موقعك الحي، وحالة التوصيل من هاتفك." : "Assigned orders, live location, and delivery status from your phone."}</p>
-          </div>
-        </div>
-
-        <div className="dn-driver-login-security">
-          <ShieldCheck className="h-5 w-5" />
-          <span>{isArabic ? "دخول آمن ومشفّر لحساب المندوب" : "Secure encrypted driver access"}</span>
-        </div>
-
-        <form onSubmit={submit} className="dn-driver-login-form">
-          <label>
-            <span>{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
-            <input
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
+    <section className="dn-driver-login-page dn-portal-auth-page dn-driver-auth-v5" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="dn-portal-auth-shell">
+        <aside className="dn-portal-auth-visual dn-driver-auth-visual">
+          <div className="dn-portal-auth-brand">
+            <img
+              src={companyMeta.logoUrl}
+              onError={(event) => { event.currentTarget.src = companyMeta.logoRemoteUrl; }}
+              alt="DAY NIGHT"
             />
-          </label>
+            <div>
+              <small>DAY NIGHT DRIVER OPERATIONS</small>
+              <h1>{isArabic ? "مركز تشغيل المندوب" : "Driver Operations Center"}</h1>
+            </div>
+          </div>
 
-          <label>
-            <span>{isArabic ? "كلمة المرور" : "Password"}</span>
-            <div className="dn-driver-password-field">
+          <div className="dn-portal-auth-copy">
+            <span><ShieldCheck />{isArabic ? "دخول تشغيلي آمن" : "SECURE OPERATIONS ACCESS"}</span>
+            <h2>{isArabic ? "مهامك ومسارك وإثبات التسليم في واجهة واحدة" : "Jobs, navigation, and proof of delivery in one clear workspace"}</h2>
+            <p>{isArabic
+              ? "بعد الدخول ستظهر طلباتك الحقيقية فقط، موقعك المباشر، حالة الوردية، الملاحة، التحصيل، وإجراءات الاستلام والتسليم المرتبطة بنظام DAY NIGHT."
+              : "After sign-in you will see only your real assigned orders, live location, shift status, navigation, collections, pickup, and delivery actions connected to DAY NIGHT."
+            }</p>
+          </div>
+
+          <div className="dn-portal-auth-feature-grid">
+            <article>
+              <PackageCheck />
+              <div><strong>{isArabic ? "المهام المسندة" : "Assigned jobs"}</strong><small>{isArabic ? "طلبات المندوب الحقيقية من Supabase" : "Real Supabase driver assignments"}</small></div>
+            </article>
+            <article>
+              <MapPinned />
+              <div><strong>{isArabic ? "GPS وملاحة مباشرة" : "Live GPS & navigation"}</strong><small>{isArabic ? "المسار والموقع وآخر مزامنة" : "Route, location, and last sync"}</small></div>
+            </article>
+            <article>
+              <Camera />
+              <div><strong>{isArabic ? "إثبات وتسليم وCOD" : "Proof, delivery & COD"}</strong><small>{isArabic ? "تحديث الحالة والتحصيل بدون بيانات وهمية" : "Status and collection without mock data"}</small></div>
+            </article>
+          </div>
+
+          <div className="dn-portal-auth-support">
+            <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer"><Headphones />{isArabic ? "البلاغات والدعم" : "Reports & support"}</a>
+            <a href={`tel:${companyMeta.phone}`}><PhoneCall />{companyMeta.phone}</a>
+          </div>
+
+          <footer><span>{companyMeta.sloganAr}</span><span>{companyMeta.sloganEn}</span></footer>
+        </aside>
+
+        <main className="dn-portal-auth-card dn-driver-auth-card">
+          <header>
+            <span><Navigation /></span>
+            <div>
+              <h2>{isArabic ? "دخول المندوب" : "Driver sign in"}</h2>
+              <p>{isArabic ? "استخدم البريد المعتمد لدى عمليات DAY NIGHT." : "Use the email approved by DAY NIGHT operations."}</p>
+            </div>
+          </header>
+
+          <form onSubmit={submit} className="dn-portal-auth-form">
+            <label>
+              <span>{isArabic ? "البريد الإلكتروني" : "Email address"}</span>
               <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={isArabic ? "بريد المندوب المعتمد" : "Approved driver email"}
                 required
               />
-              <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label="Toggle password visibility">
-                {showPassword ? <EyeOff /> : <Eye />}
-              </button>
-            </div>
-          </label>
+            </label>
 
-          {error && <p className="dn-driver-login-error">{error}</p>}
-          {notice && <p className="dn-driver-login-note">{notice}</p>}
+            <label>
+              <span>{isArabic ? "كلمة المرور" : "Password"}</span>
+              <div className="dn-portal-password-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={isArabic ? "كلمة المرور" : "Password"}
+                  required
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={isArabic ? "إظهار أو إخفاء كلمة المرور" : "Show or hide password"}>
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+            </label>
 
-          <button type="submit" disabled={busy} className="dn-driver-primary-button">
-            {busy ? <Loader2 className="animate-spin" /> : <LockKeyhole />}
-            {isArabic ? "دخول إلى قسم المندوب" : "Open driver workspace"}
-          </button>
-        </form>
+            {error && <p className="dn-portal-auth-message is-error">{error}</p>}
+            {notice && <p className="dn-portal-auth-message is-success">{notice}</p>}
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <button type="button" disabled={busy} onClick={() => void signInWithGoogle()} className="dn-driver-primary-button">
-            <Globe2 className="h-4 w-4" /> Google
-          </button>
-          <button type="button" disabled={busy} onClick={() => void sendMagicLink()} className="dn-driver-primary-button">
-            <Mail className="h-4 w-4" /> {isArabic ? "رابط بالبريد" : "Email link"}
-          </button>
-        </div>
+            <button type="submit" disabled={busy || !email.trim() || !password} className="dn-portal-auth-primary">
+              {busy ? <Loader2 className="animate-spin" /> : <LockKeyhole />}
+              {isArabic ? "فتح مركز التشغيل" : "Open operations center"}
+            </button>
+          </form>
 
-        <p className="dn-driver-login-note">
-          <Navigation className="inline h-4 w-4" /> {isArabic
-            ? "بعد الدخول اضغط بدء الوردية واسمح بالموقع حتى تظهر حركتك للإدارة."
-            : "After login, start your shift and allow location access so operations can follow your route."}
-        </p>
+          <div className="dn-portal-auth-alternatives">
+            <button type="button" disabled={busy} onClick={() => void signInWithGoogle()}>
+              <Globe2 /> Google
+            </button>
+            <button type="button" disabled={busy || !email.trim()} onClick={() => void sendMagicLink()}>
+              <Mail /> {isArabic ? "رابط دخول بالبريد" : "Email sign-in link"}
+            </button>
+          </div>
+
+          <p className="dn-portal-auth-note">
+            <Banknote />
+            <span>{isArabic
+              ? "لن تظهر أي مبالغ أو طلبات تجريبية. البيانات داخل اللوحة تُقرأ من حساب المندوب المرتبط وقاعدة البيانات الحقيقية."
+              : "No demo orders or balances are displayed. The workspace reads from the linked driver account and production data."
+            }</span>
+          </p>
+        </main>
       </div>
     </section>
   );
