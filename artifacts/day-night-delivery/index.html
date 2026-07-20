@@ -12,10 +12,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="DAY NIGHT" />
     <meta name="format-detection" content="telephone=no, address=no, email=no" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#071A33" />
     <meta name="msapplication-TileColor" content="#071A33" />
     <link rel="canonical" href="https://daynightae.com/" />
+
+    <script>
+      (function () {
+        var path = window.location.pathname || "/";
+        if (/^\/(merchant|driver)(?:\/|$)/.test(path)) {
+          document.documentElement.setAttribute("data-portal-route", "true");
+        }
+      })();
+    </script>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -49,6 +58,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles/dn-merchant-login-dashboard.css" />
     <link rel="stylesheet" href="/src/styles/dn-merchant-route-isolation.css" />
+    <link rel="stylesheet" href="/src/styles/dn-portals-live.css" />
+    <link rel="stylesheet" href="/src/styles/dn-portal-route-lock.css" />
 
     <script type="application/ld+json">
       {
