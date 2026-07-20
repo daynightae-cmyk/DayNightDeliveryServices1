@@ -3,6 +3,7 @@ import type { SyntheticEvent } from "react";
 export const localAssets = {
   logo: "/assets/daynight/logo.png",
   hero: "/assets/daynight/hero-uae-delivery.png",
+  driverVehicle: "/assets/daynight/driver/daynight-toyota-rush-cutout.png",
   uaeMap: "/assets/daynight/uae-live-map.png",
   remote: {
     logo: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png",
