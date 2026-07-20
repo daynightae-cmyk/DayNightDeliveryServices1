@@ -1,0 +1,101 @@
+name: Apply final route isolation polish
+
+on:
+  push:
+    branches:
+      - site-final-finish-auto-update-v1
+    paths:
+      - .github/workflows/site-final-finish-route-isolation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: site-final-finish-auto-update-v1
+          fetch-depth: 0
+
+      - name: Isolate application portals and skip public splash
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('artifacts/day-night-delivery/src/App.tsx')
+          source = path.read_text(encoding='utf-8')
+
+          logo_anchor = 'const LOGO_IMAGE_URL = localAssets.logo;\n'
+          portal_constant = '''const LOGO_IMAGE_URL = localAssets.logo;
+const PORTAL_ROUTE_PATTERN = /^\\/(auth|driver|merchant|customer|admin|update-password)(\\/|$)/;
+'''
+          if 'const PORTAL_ROUTE_PATTERN' not in source:
+              if logo_anchor not in source:
+                  raise SystemExit('LOGO_IMAGE_URL anchor not found')
+              source = source.replace(logo_anchor, portal_constant, 1)
+
+          old_route = '''  if (location.pathname === "/auth") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#071A33]" />}>
+        <Routes>
+          <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+'''
+          new_route = '''  if (PORTAL_ROUTE_PATTERN.test(location.pathname)) {
+    return (
+      <div className="min-h-screen bg-[#071A33]">
+        <DNRouteErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<div className="min-h-screen bg-[#071A33]" />}>
+            <Routes>
+              <Route path="/auth" element={<Auth onAuthSuccess={() => navigate("/admin")} />} />
+              <Route path="/driver" element={<DriverPortal />} />
+              <Route path="/merchant" element={<MerchantPortal />} />
+              <Route path="/customer" element={<CustomerDashboard />} />
+              <Route path="/update-password" element={<CustomerDashboard />} />
+              <Route path="/admin" element={<ProtectedAdminRoute><AdminPanel /></ProtectedAdminRoute>} />
+            </Routes>
+          </Suspense>
+        </DNRouteErrorBoundary>
+      </div>
+    );
+  }
+'''
+          if old_route in source:
+              source = source.replace(old_route, new_route, 1)
+          elif new_route not in source:
+              raise SystemExit('Portal route block anchor not found')
+
+          old_splash = '''  const skipSplash =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/auth" || new URLSearchParams(window.location.search).has("nosplash"));
+'''
+          new_splash = '''  const skipSplash =
+    typeof window !== "undefined" &&
+    (PORTAL_ROUTE_PATTERN.test(window.location.pathname) || new URLSearchParams(window.location.search).has("nosplash"));
+'''
+          if old_splash in source:
+              source = source.replace(old_splash, new_splash, 1)
+          elif new_splash not in source:
+              raise SystemExit('Splash skip anchor not found')
+
+          path.write_text(source, encoding='utf-8')
+          PY
+
+      - name: Commit route isolation
+        shell: bash
+        run: |
+          git config user.name "DAY NIGHT Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add artifacts/day-night-delivery/src/App.tsx
+          if git diff --cached --quiet; then
+            echo "No route changes required"
+            exit 0
+          fi
+          git commit -m "Isolate installed app portals from the public site shell"
+          git push origin HEAD:site-final-finish-auto-update-v1
