@@ -5,395 +5,154 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/day-night-ios.yml'
-      - 'artifacts/day-night-delivery/**'
-      - 'lib/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: day-night-ios-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
-  APP_NAME: DAY NIGHT
   APP_ID: ae.daynight.admin
+  APP_NAME: DAY NIGHT
   APP_VERSION: 1.1.0
   BUILD_NUMBER: '110'
-  DEPLOYMENT_TARGET: '15.0'
   WEB_ROOT: artifacts/day-night-delivery
-  IOS_BUILDER: .ios-builder
+  IOS_ROOT: .ios-builder
   VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ngdwybpgacauorygoedi.supabase.co' }}
   VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || secrets.IOS_TEAM_ID }}
-  IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 || secrets.BUILD_CERTIFICATE_BASE64 || secrets.APPLE_CERTIFICATE_BASE64 }}
-  IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD || secrets.P12_PASSWORD || secrets.APPLE_CERTIFICATE_PASSWORD }}
-  IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || secrets.PROVISIONING_PROFILE_BASE64 || secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
 
 jobs:
-  build-ios:
-    name: Build DAY NIGHT iPhone package
+  build:
     runs-on: macos-latest
     timeout-minutes: 75
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Select current Xcode
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild -version
-          xcode-select -p
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 10.34.4
           run_install: false
 
-      - name: Enable macOS native build packages
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare macOS workspace
         shell: bash
         run: |
           set -euo pipefail
+          xcodebuild -version
           python3 - <<'PY'
           from pathlib import Path
           p = Path('pnpm-workspace.yaml')
-          blocked = {
-              '"esbuild>@esbuild/darwin-arm64": "-"',
-              '"esbuild>@esbuild/darwin-x64": "-"',
-              '"lightningcss>lightningcss-darwin-arm64": "-"',
-              '"lightningcss>lightningcss-darwin-x64": "-"',
-              '"@tailwindcss/oxide>@tailwindcss/oxide-darwin-arm64": "-"',
-              '"@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64": "-"',
-              '"rollup>@rollup/rollup-darwin-arm64": "-"',
-              '"rollup>@rollup/rollup-darwin-x64": "-"',
-              '"@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64": "-"',
-              '"@expo/ngrok-bin>@expo/ngrok-bin-darwin-x64": "-"',
-          }
-          lines = p.read_text().splitlines()
-          p.write_text('\n'.join(line for line in lines if line.strip() not in blocked) + '\n')
+          blocked = ('darwin-arm64', 'darwin-x64')
+          p.write_text('\n'.join(
+              line for line in p.read_text().splitlines()
+              if not ('": "-"' in line and any(x in line for x in blocked))
+          ) + '\n')
           PY
-
-      - name: Install workspace dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
           pnpm install --no-frozen-lockfile --force
 
-      - name: Configure public production environment
+      - name: Build DAY NIGHT web app
         shell: bash
         run: |
           set -euo pipefail
           {
             echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}"
-            if [[ -n "${VITE_SUPABASE_ANON_KEY:-}" ]]; then
-              echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}"
-            fi
+            [[ -n "${VITE_SUPABASE_ANON_KEY:-}" ]] && echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" || true
           } > "${WEB_ROOT}/.env.production.local"
-          chmod 600 "${WEB_ROOT}/.env.production.local"
-
-      - name: Build latest DAY NIGHT web application
-        shell: bash
-        run: |
-          set -euo pipefail
           pnpm run web:build
           test -f "${WEB_ROOT}/dist/public/index.html"
 
-      - name: Create isolated Capacitor iOS project
+      - name: Create Capacitor iOS project
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf "${IOS_BUILDER}"
-          mkdir -p "${IOS_BUILDER}/www" "${IOS_BUILDER}/assets"
-          cp -R "${WEB_ROOT}/dist/public/." "${IOS_BUILDER}/www/"
-
-          cat > "${IOS_BUILDER}/package.json" <<EOF
+          rm -rf "${IOS_ROOT}"
+          mkdir -p "${IOS_ROOT}/www"
+          cp -R "${WEB_ROOT}/dist/public/." "${IOS_ROOT}/www/"
+          cat > "${IOS_ROOT}/package.json" <<EOF
           {
-            "name": "day-night-ios",
-            "version": "${APP_VERSION}",
-            "private": true,
-            "type": "module",
-            "dependencies": {
-              "@capacitor/core": "^8.0.0",
-              "@capacitor/ios": "^8.0.0",
-              "@capacitor/app": "^8.0.0",
-              "@capacitor/browser": "^8.0.0",
-              "@capacitor/camera": "^8.0.0",
-              "@capacitor/geolocation": "^8.0.0",
-              "@capacitor/haptics": "^8.0.0",
-              "@capacitor/keyboard": "^8.0.0",
-              "@capacitor/network": "^8.0.0",
-              "@capacitor/share": "^8.0.0",
-              "@capacitor/splash-screen": "^8.0.0",
-              "@capacitor/status-bar": "^8.0.0"
+            "name":"day-night-ios",
+            "version":"${APP_VERSION}",
+            "private":true,
+            "type":"module",
+            "dependencies":{
+              "@capacitor/core":"^8.0.0",
+              "@capacitor/ios":"^8.0.0",
+              "@capacitor/app":"^8.0.0",
+              "@capacitor/browser":"^8.0.0",
+              "@capacitor/camera":"^8.0.0",
+              "@capacitor/geolocation":"^8.0.0",
+              "@capacitor/splash-screen":"^8.0.0",
+              "@capacitor/status-bar":"^8.0.0"
             },
-            "devDependencies": {
-              "@capacitor/cli": "^8.0.0",
-              "@capacitor/assets": "^3.0.5",
-              "typescript": "^5.9.0"
-            }
+            "devDependencies":{"@capacitor/cli":"^8.0.0","typescript":"^5.9.0"}
           }
           EOF
-
-          cat > "${IOS_BUILDER}/capacitor.config.ts" <<EOF
+          cat > "${IOS_ROOT}/capacitor.config.ts" <<EOF
           import type { CapacitorConfig } from '@capacitor/cli';
-
           const config: CapacitorConfig = {
             appId: '${APP_ID}',
             appName: '${APP_NAME}',
             webDir: 'www',
             loggingBehavior: 'none',
-            appendUserAgent: ' DAY-NIGHT-IOS/${APP_VERSION}',
             backgroundColor: '#071A33',
-            ios: {
-              contentInset: 'automatic',
-              backgroundColor: '#071A33',
-              allowsLinkPreview: false,
-              preferredContentMode: 'mobile',
-              scrollEnabled: true,
-              zoomEnabled: false
-            },
+            ios: { backgroundColor: '#071A33', allowsLinkPreview: false },
             plugins: {
-              SplashScreen: {
-                launchShowDuration: 1600,
-                launchAutoHide: true,
-                launchFadeOutDuration: 350,
-                backgroundColor: '#071A33',
-                showSpinner: false
-              },
-              StatusBar: {
-                style: 'DARK',
-                overlaysWebView: false
-              },
-              Keyboard: {
-                resize: 'body',
-                style: 'DARK',
-                resizeOnFullScreen: true
-              }
+              SplashScreen: { launchShowDuration: 1600, backgroundColor: '#071A33', showSpinner: false },
+              StatusBar: { overlaysWebView: false }
             }
           };
-
           export default config;
           EOF
-
-          curl --fail --location --retry 4 \
-            'https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png' \
-            --output "${IOS_BUILDER}/assets/source-logo.png"
-
-          sips -s format jpeg "${IOS_BUILDER}/assets/source-logo.png" \
-            --out "${IOS_BUILDER}/assets/source-logo-flat.jpg" >/dev/null
-          sips -s format png -z 1024 1024 "${IOS_BUILDER}/assets/source-logo-flat.jpg" \
-            --out "${IOS_BUILDER}/assets/icon-only.png" >/dev/null
-          sips -s format png -z 2048 2048 "${IOS_BUILDER}/assets/source-logo-flat.jpg" \
-            --out "${IOS_BUILDER}/assets/splash.png" >/dev/null
-          cp "${IOS_BUILDER}/assets/splash.png" "${IOS_BUILDER}/assets/splash-dark.png"
-
-          cd "${IOS_BUILDER}"
+          cd "${IOS_ROOT}"
           pnpm install --no-frozen-lockfile
           pnpm exec cap add ios
           pnpm exec cap sync ios
-          pnpm exec capacitor-assets generate --ios
 
-      - name: Apply iOS identity, version and privacy declarations
+      - name: Apply iPhone metadata
         shell: bash
         run: |
           set -euo pipefail
-          INFO_PLIST="${IOS_BUILDER}/ios/App/App/Info.plist"
-          PBXPROJ="${IOS_BUILDER}/ios/App/App.xcodeproj/project.pbxproj"
-          PRIVACY_FILE="${IOS_BUILDER}/ios/App/App/PrivacyInfo.xcprivacy"
-
-          plutil -replace CFBundleDisplayName -string "${APP_NAME}" "$INFO_PLIST" 2>/dev/null || plutil -insert CFBundleDisplayName -string "${APP_NAME}" "$INFO_PLIST"
-          plutil -replace CFBundleShortVersionString -string "${APP_VERSION}" "$INFO_PLIST" 2>/dev/null || plutil -insert CFBundleShortVersionString -string "${APP_VERSION}" "$INFO_PLIST"
-          plutil -replace CFBundleVersion -string "${BUILD_NUMBER}" "$INFO_PLIST" 2>/dev/null || plutil -insert CFBundleVersion -string "${BUILD_NUMBER}" "$INFO_PLIST"
-          plutil -replace ITSAppUsesNonExemptEncryption -bool false "$INFO_PLIST" 2>/dev/null || plutil -insert ITSAppUsesNonExemptEncryption -bool false "$INFO_PLIST"
-          plutil -replace NSLocationWhenInUseUsageDescription -string 'نستخدم موقعك لعرض موقع المندوب والمسار المباشر وتتبع طلبات DAY NIGHT.' "$INFO_PLIST" 2>/dev/null || plutil -insert NSLocationWhenInUseUsageDescription -string 'نستخدم موقعك لعرض موقع المندوب والمسار المباشر وتتبع طلبات DAY NIGHT.' "$INFO_PLIST"
-          plutil -replace NSCameraUsageDescription -string 'نستخدم الكاميرا لتصوير الكوبون وإثبات الاستلام أو التسليم.' "$INFO_PLIST" 2>/dev/null || plutil -insert NSCameraUsageDescription -string 'نستخدم الكاميرا لتصوير الكوبون وإثبات الاستلام أو التسليم.' "$INFO_PLIST"
-          plutil -replace NSPhotoLibraryUsageDescription -string 'نستخدم مكتبة الصور لاختيار صورة الكوبون أو الإثبات أو صورة الحساب.' "$INFO_PLIST" 2>/dev/null || plutil -insert NSPhotoLibraryUsageDescription -string 'نستخدم مكتبة الصور لاختيار صورة الكوبون أو الإثبات أو صورة الحساب.' "$INFO_PLIST"
-          plutil -replace NSPhotoLibraryAddUsageDescription -string 'نستخدم مكتبة الصور لحفظ التقارير وملفات التوصيل التي يطلبها المستخدم.' "$INFO_PLIST" 2>/dev/null || plutil -insert NSPhotoLibraryAddUsageDescription -string 'نستخدم مكتبة الصور لحفظ التقارير وملفات التوصيل التي يطلبها المستخدم.' "$INFO_PLIST"
-
-          cat > "$PRIVACY_FILE" <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>NSPrivacyTracking</key><false/>
-            <key>NSPrivacyTrackingDomains</key><array/>
-            <key>NSPrivacyCollectedDataTypes</key><array/>
-            <key>NSPrivacyAccessedAPITypes</key>
-            <array>
-              <dict>
-                <key>NSPrivacyAccessedAPIType</key>
-                <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-                <key>NSPrivacyAccessedAPITypeReasons</key>
-                <array><string>CA92.1</string></array>
-              </dict>
-            </array>
-          </dict>
-          </plist>
-          EOF
-
-          python3 - "$PBXPROJ" "${APP_ID}" "${APP_VERSION}" "${BUILD_NUMBER}" "${DEPLOYMENT_TARGET}" "${APPLE_TEAM_ID:-}" <<'PY'
+          PLIST="${IOS_ROOT}/ios/App/App/Info.plist"
+          PROJ="${IOS_ROOT}/ios/App/App.xcodeproj/project.pbxproj"
+          plutil -replace CFBundleDisplayName -string "${APP_NAME}" "$PLIST" 2>/dev/null || plutil -insert CFBundleDisplayName -string "${APP_NAME}" "$PLIST"
+          plutil -replace CFBundleShortVersionString -string "${APP_VERSION}" "$PLIST" 2>/dev/null || plutil -insert CFBundleShortVersionString -string "${APP_VERSION}" "$PLIST"
+          plutil -replace CFBundleVersion -string "${BUILD_NUMBER}" "$PLIST" 2>/dev/null || plutil -insert CFBundleVersion -string "${BUILD_NUMBER}" "$PLIST"
+          plutil -insert NSCameraUsageDescription -string 'تصوير الكوبون وإثبات التسليم.' "$PLIST" 2>/dev/null || true
+          plutil -insert NSPhotoLibraryUsageDescription -string 'اختيار صور الكوبونات وإثباتات التسليم.' "$PLIST" 2>/dev/null || true
+          plutil -insert NSLocationWhenInUseUsageDescription -string 'التتبع المباشر ومسارات التوصيل.' "$PLIST" 2>/dev/null || true
+          python3 - "$PROJ" "${APP_ID}" "${APP_VERSION}" "${BUILD_NUMBER}" <<'PY'
           from pathlib import Path
           import re, sys
-          p = Path(sys.argv[1])
-          bundle, version, build, target, team = sys.argv[2:]
-          s = p.read_text()
-          s = re.sub(r'PRODUCT_BUNDLE_IDENTIFIER = [^;]+;', f'PRODUCT_BUNDLE_IDENTIFIER = {bundle};', s)
-          s = re.sub(r'MARKETING_VERSION = [^;]+;', f'MARKETING_VERSION = {version};', s)
-          s = re.sub(r'CURRENT_PROJECT_VERSION = [^;]+;', f'CURRENT_PROJECT_VERSION = {build};', s)
-          s = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [^;]+;', f'IPHONEOS_DEPLOYMENT_TARGET = {target};', s)
-          s = re.sub(r'CODE_SIGN_STYLE = [^;]+;', 'CODE_SIGN_STYLE = Automatic;', s)
-          if team:
-              if 'DEVELOPMENT_TEAM =' in s:
-                  s = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', f'DEVELOPMENT_TEAM = {team};', s)
-              else:
-                  s = s.replace('CODE_SIGN_STYLE = Automatic;', f'CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = {team};')
+          p=Path(sys.argv[1]); bundle,version,build=sys.argv[2:]
+          s=p.read_text()
+          s=re.sub(r'PRODUCT_BUNDLE_IDENTIFIER = [^;]+;',f'PRODUCT_BUNDLE_IDENTIFIER = {bundle};',s)
+          s=re.sub(r'MARKETING_VERSION = [^;]+;',f'MARKETING_VERSION = {version};',s)
+          s=re.sub(r'CURRENT_PROJECT_VERSION = [^;]+;',f'CURRENT_PROJECT_VERSION = {build};',s)
           p.write_text(s)
           PY
 
-      - name: Build unsigned iPhone IPA fallback
+      - name: Build one IPA file
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf build-device Payload output
-          mkdir -p output
+          rm -rf DerivedData Payload output
           xcodebuild \
-            -workspace "${IOS_BUILDER}/ios/App/App.xcworkspace" \
-            -scheme App \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build-device \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
-
-          APP_PATH="$(find build-device/Build/Products -type d -path '*Release-iphoneos/*.app' | head -n1)"
-          test -n "$APP_PATH"
-          mkdir Payload
-          cp -R "$APP_PATH" Payload/
+            -workspace "${IOS_ROOT}/ios/App/App.xcworkspace" \
+            -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          APP="$(find DerivedData/Build/Products -type d -path '*Release-iphoneos/*.app' | head -n1)"
+          test -n "$APP"
+          mkdir -p Payload output
+          cp -R "$APP" Payload/
           ditto -c -k --sequesterRsrc --keepParent Payload "output/DAY-NIGHT-iOS-v${APP_VERSION}-UNSIGNED.ipa"
+          shasum -a 256 output/*.ipa
+          ls -lh output/*.ipa
 
-      - name: Import Apple signing assets when configured
-        id: signing
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${APPLE_TEAM_ID:-}" || -z "${IOS_CERTIFICATE_BASE64:-}" || -z "${IOS_CERTIFICATE_PASSWORD:-}" || -z "${IOS_PROVISIONING_PROFILE_BASE64:-}" ]]; then
-            echo 'available=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo 'available=true' >> "$GITHUB_OUTPUT"
-          CERT_PATH="$RUNNER_TEMP/day-night-distribution.p12"
-          PROFILE_PATH="$RUNNER_TEMP/day-night.mobileprovision"
-          KEYCHAIN_PATH="$RUNNER_TEMP/day-night-signing.keychain-db"
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
-
-          printf '%s' "$IOS_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
-          printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
-
-          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
-          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
-          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")"
-          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST")"
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-
-          echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
-          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Build signed installable IPA
-        if: steps.signing.outputs.available == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf DAY-NIGHT.xcarchive signed-export
-
-          xcodebuild \
-            -workspace "${IOS_BUILDER}/ios/App/App.xcworkspace" \
-            -scheme App \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath DAY-NIGHT.xcarchive \
-            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="${{ steps.signing.outputs.profile_name }}" \
-            archive
-
-          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
-          if /usr/libexec/PlistBuddy -c 'Print ProvisionsAllDevices' "$PROFILE_PLIST" 2>/dev/null | grep -q true; then
-            EXPORT_METHOD='enterprise'
-          elif /usr/libexec/PlistBuddy -c 'Print ProvisionedDevices' "$PROFILE_PLIST" >/dev/null 2>&1; then
-            if /usr/libexec/PlistBuddy -c 'Print Entitlements:get-task-allow' "$PROFILE_PLIST" 2>/dev/null | grep -q true; then
-              EXPORT_METHOD='development'
-            else
-              EXPORT_METHOD='ad-hoc'
-            fi
-          else
-            EXPORT_METHOD='app-store-connect'
-          fi
-
-          cat > ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>${EXPORT_METHOD}</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${APP_ID}</key><string>${{ steps.signing.outputs.profile_name }}</string>
-            </dict>
-            <key>stripSwiftSymbols</key><true/>
-            <key>uploadSymbols</key><true/>
-          </dict>
-          </plist>
-          EOF
-
-          mkdir -p signed-export
-          xcodebuild \
-            -exportArchive \
-            -archivePath DAY-NIGHT.xcarchive \
-            -exportPath signed-export \
-            -exportOptionsPlist ExportOptions.plist
-
-          SIGNED_IPA="$(find signed-export -name '*.ipa' | head -n1)"
-          test -n "$SIGNED_IPA"
-          rm -f output/*.ipa
-          cp "$SIGNED_IPA" "output/DAY-NIGHT-iOS-v${APP_VERSION}.ipa"
-
-      - name: Verify final package
-        shell: bash
-        run: |
-          set -euo pipefail
-          FINAL_IPA="$(find output -maxdepth 1 -name '*.ipa' | head -n1)"
-          test -n "$FINAL_IPA"
-          shasum -a 256 "$FINAL_IPA"
-          ls -lh "$FINAL_IPA"
-
-      - name: Upload one iPhone file
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-iOS-v1.1.0
           path: output/*.ipa
