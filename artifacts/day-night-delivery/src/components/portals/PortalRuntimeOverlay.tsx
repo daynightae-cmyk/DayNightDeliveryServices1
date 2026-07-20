@@ -11,6 +11,8 @@ import "../../styles/dn-portal-route-lock.css";
 import "../../styles/dn-portal-overlay.css";
 import "../../styles/dn-portal-auth-v5.css";
 
+export const PORTAL_NOTIFICATIONS_OPEN_EVENT = "daynight:portal-notifications-open";
+
 function isPortalPath(pathname: string) {
   return pathname === "/merchant" || pathname.startsWith("/merchant/") || pathname === "/driver" || pathname.startsWith("/driver/");
 }
@@ -20,7 +22,6 @@ export default function PortalRuntimeOverlay() {
   const { language, themeMode, toggleLanguage, toggleTheme } = useAppContext();
   const isArabic = language === "ar";
   const portalActive = isPortalPath(location.pathname);
-  const isDriver = location.pathname === "/driver" || location.pathname.startsWith("/driver/");
   const [userId, setUserId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifications = usePortalNotifications(portalActive ? userId : null);
@@ -49,35 +50,11 @@ export default function PortalRuntimeOverlay() {
   }, [portalActive]);
 
   useEffect(() => {
-    if (!portalActive || !isDriver) return;
-
-    const bind = () => {
-      const button = document.querySelector<HTMLButtonElement>(".dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child");
-      if (!button) return;
-      button.dataset.portalNotificationButton = "true";
-      button.onclick = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setNotificationsOpen(true);
-      };
-      button.setAttribute("aria-label", isArabic ? "فتح الإشعارات الحقيقية" : "Open realtime notifications");
-
-      let badge = button.querySelector<HTMLElement>("b");
-      if (!badge && notifications.unreadCount > 0) {
-        badge = document.createElement("b");
-        button.appendChild(badge);
-      }
-      if (badge) {
-        badge.textContent = String(notifications.unreadCount);
-        badge.style.display = notifications.unreadCount > 0 ? "grid" : "none";
-      }
-    };
-
-    bind();
-    const observer = new MutationObserver(bind);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [isArabic, isDriver, notifications.unreadCount, portalActive]);
+    if (!portalActive) return;
+    const openNotifications = () => setNotificationsOpen(true);
+    window.addEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
+    return () => window.removeEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
+  }, [portalActive]);
 
   const ThemeIcon = useMemo(() => themeMode === "dark" ? Moon : themeMode === "light" ? Sun : Laptop2, [themeMode]);
   const themeLabel = themeMode === "dark"
@@ -103,7 +80,7 @@ export default function PortalRuntimeOverlay() {
           <Headphones />
           <span>{isArabic ? "الدعم" : "Support"}</span>
         </a>
-        {userId && !isDriver && (
+        {userId && (
           <button type="button" className="is-notification" onClick={() => setNotificationsOpen(true)} title={isArabic ? "الإشعارات" : "Notifications"}>
             <Bell />
             <span>{isArabic ? "تنبيهات" : "Alerts"}</span>
