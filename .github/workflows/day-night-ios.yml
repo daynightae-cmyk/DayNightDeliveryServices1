@@ -16,7 +16,7 @@ env:
   APP_VERSION: 1.1.0
   BUILD_NUMBER: '110'
   WEB_ROOT: artifacts/day-night-delivery
-  IOS_ROOT: ${{ runner.temp }}/day-night-ios-builder
+  IOS_ROOT: /tmp/day-night-ios-builder
   VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ngdwybpgacauorygoedi.supabase.co' }}
   VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
