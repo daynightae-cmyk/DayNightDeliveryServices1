@@ -7,6 +7,7 @@ import { usePortalNotifications } from "../../hooks/usePortalNotifications";
 import PortalNotificationCenter from "./PortalNotificationCenter";
 import "../../styles/dn-portals-live.css";
 import "../../styles/dn-portal-route-lock.css";
+import "../../styles/dn-portal-overlay.css";
 
 function isPortalPath(pathname: string) {
   return pathname === "/merchant" || pathname.startsWith("/merchant/") || pathname === "/driver" || pathname.startsWith("/driver/");
