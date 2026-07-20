@@ -47,7 +47,11 @@ export default function PortalRuntimeOverlay() {
   const notifications = usePortalNotifications(portalActive ? userId : null);
 
   useEffect(() => {
-    document.documentElement.toggleAttribute("data-portal-route", portalActive);
+    if (portalActive) {
+      document.documentElement.dataset.portalRoute = "true";
+    } else {
+      delete document.documentElement.dataset.portalRoute;
+    }
     if (!portalActive) {
       setNotificationsOpen(false);
       setUserId(null);

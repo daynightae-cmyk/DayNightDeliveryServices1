@@ -80,5 +80,11 @@ body:has(.dn-driver-shell) #root main ~ footer {
 
 html[data-theme="light"][data-portal-route="true"],
 html[data-theme="light"][data-portal-route="true"] body {
-  background: #eef4fc;
+  background: #f7f5ea;
+}
+
+/* Driver dashboard mounts after the public shell. This fallback removes the
+   public header spacer immediately, before the route effect has painted. */
+body:has(.dn-driver-exact-shell) .dn-official-shell-frame + div[aria-hidden="true"] {
+  display: none !important;
 }
