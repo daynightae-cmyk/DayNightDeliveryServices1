@@ -59,10 +59,17 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss(), buildMetadataPlugin()],
   resolve: {
-    alias: {
-      "@": path.resolve(appRoot, "src"),
-      "@assets": path.resolve(appRoot, "../../attached_assets"),
-    },
+    alias: [
+      { find: "@", replacement: path.resolve(appRoot, "src") },
+      { find: "@assets", replacement: path.resolve(appRoot, "../../attached_assets") },
+      {
+        find: "./components/AdminPanelLuxury",
+        replacement: path.resolve(
+          appRoot,
+          "src/components/admin/command-center/AdminPanelCommandCenter.tsx",
+        ),
+      },
+    ],
     dedupe: ["react", "react-dom"],
   },
   root: appRoot,
