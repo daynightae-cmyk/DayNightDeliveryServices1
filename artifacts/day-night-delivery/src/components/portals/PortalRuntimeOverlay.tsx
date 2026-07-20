@@ -22,6 +22,7 @@ export default function PortalRuntimeOverlay() {
   const { language, themeMode, toggleLanguage, toggleTheme } = useAppContext();
   const isArabic = language === "ar";
   const portalActive = isPortalPath(location.pathname);
+  const isDriver = location.pathname === "/driver" || location.pathname.startsWith("/driver/");
   const [userId, setUserId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifications = usePortalNotifications(portalActive ? userId : null);
@@ -55,6 +56,21 @@ export default function PortalRuntimeOverlay() {
     window.addEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
     return () => window.removeEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
   }, [portalActive]);
+
+  useEffect(() => {
+    if (!portalActive || !isDriver) return;
+    const openFromDriverBell = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest(".dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child");
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setNotificationsOpen(true);
+    };
+    document.addEventListener("click", openFromDriverBell, true);
+    return () => document.removeEventListener("click", openFromDriverBell, true);
+  }, [isDriver, portalActive]);
 
   const ThemeIcon = useMemo(() => themeMode === "dark" ? Moon : themeMode === "light" ? Sun : Laptop2, [themeMode]);
   const themeLabel = themeMode === "dark"
