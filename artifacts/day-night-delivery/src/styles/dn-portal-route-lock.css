@@ -1,0 +1,84 @@
+/* Hard route isolation for DAY NIGHT merchant/driver applications. */
+
+html[data-portal-route="true"],
+html[data-portal-route="true"] body,
+body:has(.dn-merchant-login-v3),
+body:has(.dn-merchant-state-v3),
+body:has(.dn-merchant-shell-v3),
+body:has(.dn-driver-login-page),
+body:has(.dn-driver-shell) {
+  min-height: 100%;
+  margin: 0;
+  background: #071a33;
+}
+
+html[data-portal-route="true"] .dn-splash,
+html[data-portal-route="true"] .dn-official-shell-frame,
+html[data-portal-route="true"] .dn-wa-widget,
+html[data-portal-route="true"] .dn-chat-bubble,
+html[data-portal-route="true"] .dn-smartchat-panel,
+html[data-portal-route="true"] .dn-smartchat-trigger,
+html[data-portal-route="true"] .dn-sticky-mobile-bar {
+  display: none !important;
+}
+
+body:has(.dn-merchant-login-v3) .dn-official-shell-frame,
+body:has(.dn-merchant-state-v3) .dn-official-shell-frame,
+body:has(.dn-merchant-shell-v3) .dn-official-shell-frame,
+body:has(.dn-driver-login-page) .dn-official-shell-frame,
+body:has(.dn-driver-shell) .dn-official-shell-frame,
+body:has(.dn-merchant-login-v3) .dn-wa-widget,
+body:has(.dn-merchant-state-v3) .dn-wa-widget,
+body:has(.dn-merchant-shell-v3) .dn-wa-widget,
+body:has(.dn-driver-login-page) .dn-wa-widget,
+body:has(.dn-driver-shell) .dn-wa-widget,
+body:has(.dn-merchant-login-v3) .dn-chat-bubble,
+body:has(.dn-merchant-state-v3) .dn-chat-bubble,
+body:has(.dn-merchant-shell-v3) .dn-chat-bubble,
+body:has(.dn-driver-login-page) .dn-chat-bubble,
+body:has(.dn-driver-shell) .dn-chat-bubble,
+body:has(.dn-merchant-login-v3) .dn-smartchat-panel,
+body:has(.dn-merchant-state-v3) .dn-smartchat-panel,
+body:has(.dn-merchant-shell-v3) .dn-smartchat-panel,
+body:has(.dn-driver-login-page) .dn-smartchat-panel,
+body:has(.dn-driver-shell) .dn-smartchat-panel,
+body:has(.dn-merchant-login-v3) .dn-smartchat-trigger,
+body:has(.dn-merchant-state-v3) .dn-smartchat-trigger,
+body:has(.dn-merchant-shell-v3) .dn-smartchat-trigger,
+body:has(.dn-driver-login-page) .dn-smartchat-trigger,
+body:has(.dn-driver-shell) .dn-smartchat-trigger {
+  display: none !important;
+}
+
+/* Remove only the public site shell spacer; portal runtime controls remain visible. */
+html[data-portal-route="true"] .dn-official-shell-frame + div[aria-hidden="true"] {
+  display: none !important;
+}
+
+html[data-portal-route="true"] #root main,
+body:has(.dn-merchant-login-v3) #root main,
+body:has(.dn-merchant-state-v3) #root main,
+body:has(.dn-merchant-shell-v3) #root main,
+body:has(.dn-driver-login-page) #root main,
+body:has(.dn-driver-shell) #root main {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Footer is the final direct child of the public AppContent shell. */
+html[data-portal-route="true"] #root main ~ footer,
+body:has(.dn-merchant-login-v3) #root main ~ footer,
+body:has(.dn-merchant-state-v3) #root main ~ footer,
+body:has(.dn-merchant-shell-v3) #root main ~ footer,
+body:has(.dn-driver-login-page) #root main ~ footer,
+body:has(.dn-driver-shell) #root main ~ footer {
+  display: none !important;
+}
+
+html[data-theme="light"][data-portal-route="true"],
+html[data-theme="light"][data-portal-route="true"] body {
+  background: #eef4fc;
+}

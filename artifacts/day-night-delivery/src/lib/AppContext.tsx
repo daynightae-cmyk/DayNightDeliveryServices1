@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { getSavedLanguage, saveLanguage } from "../i18n";
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { detectBrowserLanguage, getSavedLanguage, saveLanguage } from "../i18n";
 
 type Theme = "dark" | "light";
 type ThemeMode = Theme | "system";
@@ -17,42 +17,57 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 const THEME_MODE_KEY = "dn_theme_mode";
-const THEME_TOUCHED_KEY = "dn_theme_user_selected";
-const THEME_DEFAULT_VERSION_KEY = "dn_theme_default_version";
-const THEME_DEFAULT_VERSION = "20260703-night-only-production";
 
-function forceNightStorage() {
+function savedThemeMode(): ThemeMode {
   try {
-    localStorage.setItem(THEME_MODE_KEY, "dark");
-    localStorage.setItem(THEME_DEFAULT_VERSION_KEY, THEME_DEFAULT_VERSION);
-    localStorage.removeItem(THEME_TOUCHED_KEY);
+    const saved = localStorage.getItem(THEME_MODE_KEY);
+    if (saved === "light" || saved === "dark" || saved === "system") return saved;
   } catch {
-    // ignore storage issues
+    // Storage may be unavailable in private browser contexts.
   }
+  return "system";
+}
+
+function systemTheme(): Theme {
+  if (typeof window === "undefined" || !window.matchMedia) return "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
-    forceNightStorage();
-    return "dark";
-  });
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(savedThemeMode);
+  const [systemPreference, setSystemPreference] = useState<Theme>(systemTheme);
+  const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || detectBrowserLanguage());
 
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || "ar");
+  const theme = useMemo<Theme>(
+    () => (themeMode === "system" ? systemPreference : themeMode),
+    [systemPreference, themeMode],
+  );
 
   useEffect(() => {
-    forceNightStorage();
-    if (themeMode !== "dark") setThemeModeState("dark");
-    setTheme("dark");
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemPreference(media.matches ? "dark" : "light");
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_MODE_KEY, themeMode);
+    } catch {
+      // Ignore storage failures.
+    }
   }, [themeMode]);
 
   useEffect(() => {
-    document.documentElement.classList.add("dark-theme");
-    document.documentElement.classList.remove("light-theme");
-    document.documentElement.dataset.theme = "dark";
-    document.documentElement.style.colorScheme = "dark";
-    document.body?.classList.remove("light-theme");
-    document.body?.classList.add("dark-theme");
+    const root = document.documentElement;
+    root.classList.toggle("light-theme", theme === "light");
+    root.classList.toggle("dark-theme", theme === "dark");
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme;
+    document.body?.classList.toggle("light-theme", theme === "light");
+    document.body?.classList.toggle("dark-theme", theme === "dark");
   }, [theme]);
 
   useEffect(() => {
@@ -61,15 +76,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLanguage(language);
   }, [language]);
 
-  const setThemeMode = (_mode: ThemeMode) => {
-    forceNightStorage();
-    setThemeModeState("dark");
-    setTheme("dark");
-  };
-
-  const toggleTheme = () => setThemeMode("dark");
+  const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
+  const toggleTheme = () => setThemeModeState((current) => (
+    current === "dark" ? "light" : current === "light" ? "system" : "dark"
+  ));
   const setLanguage = (lang: Language) => setLanguageState(lang);
-  const toggleLanguage = () => setLanguageState((prev) => (prev === "ar" ? "en" : "ar"));
+  const toggleLanguage = () => setLanguageState((current) => (current === "ar" ? "en" : "ar"));
 
   return (
     <AppContext.Provider value={{ theme, themeMode, toggleTheme, setThemeMode, language, setLanguage, toggleLanguage }}>
@@ -80,8 +92,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 export function useAppContext() {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error("useAppContext must be used within AppProvider");
-  }
+  if (!context) throw new Error("useAppContext must be used within AppProvider");
   return context;
 }
