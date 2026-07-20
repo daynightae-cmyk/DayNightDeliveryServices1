@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { Layers, MapPin, Navigation, Radio, Route, Satellite, Truck } from "lucide-react";
+import { Clock3, Crosshair, Flag, Layers, MapPin, Navigation, Radio, Route, Satellite, Truck, X } from "lucide-react";
 import { defaultLocations } from "../../data/defaultLocations";
 import { translations } from "../../data/translations";
 import { useAppContext } from "../../lib/AppContext";
@@ -16,6 +16,21 @@ type MapMode = "standard" | "satellite" | "terrain";
 
 type TrackingMapProps = {
   order?: Order | null;
+  navigationMode?: boolean;
+  devicePosition?: {
+    latitude: number;
+    longitude: number;
+    heading?: number | null;
+    speed?: number | null;
+    accuracy?: number | null;
+  } | null;
+  onExitNavigation?: () => void;
+};
+
+type RouteSummary = {
+  distanceMeters: number;
+  durationSeconds: number;
+  roadName: string;
 };
 
 type CityPoint = {
@@ -119,6 +134,26 @@ function progressFromStatus(status?: string | null) {
   return 0.12;
 }
 
+function isDeliveryLeg(status?: string | null) {
+  const value = String(status || "").toLowerCase();
+  return value.includes("picked") || value.includes("transit") || value.includes("out_for_delivery") || value.includes("deliver");
+}
+
+function formatRouteDistance(meters: number, isArabic: boolean) {
+  if (!Number.isFinite(meters) || meters <= 0) return "—";
+  if (meters < 1000) return `${Math.round(meters)} ${isArabic ? "م" : "m"}`;
+  return `${(meters / 1000).toFixed(meters >= 10_000 ? 0 : 1)} ${isArabic ? "كم" : "km"}`;
+}
+
+function formatRouteDuration(seconds: number, isArabic: boolean) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) return `${minutes} ${isArabic ? "دقيقة" : "min"}`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `${hours} ${isArabic ? "س" : "h"}${remainder ? ` ${remainder} ${isArabic ? "د" : "m"}` : ""}`;
+}
+
 function FitBounds({ points }: { points: LatLngTuple[] }) {
   const map = useMap();
   useEffect(() => {
@@ -129,7 +164,16 @@ function FitBounds({ points }: { points: LatLngTuple[] }) {
   return null;
 }
 
-export default function TrackingMap({ order }: TrackingMapProps) {
+function FollowDriver({ position, enabled }: { position: LatLngTuple; enabled: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!enabled) return;
+    map.setView(position, Math.max(map.getZoom(), 16), { animate: true });
+  }, [enabled, map, position[0], position[1]]);
+  return null;
+}
+
+export default function TrackingMap({ order, navigationMode = false, devicePosition, onExitNavigation }: TrackingMapProps) {
   const { language } = useAppContext();
   const t = translations[language].trackingMap;
   const isArabic = language === "ar";
@@ -139,8 +183,12 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   const [tileFailed, setTileFailed] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>("satellite");
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
+  const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
+  const [followDriver, setFollowDriver] = useState(navigationMode);
 
   useEffect(() => setIsMounted(true), []);
+
+  useEffect(() => setFollowDriver(navigationMode), [navigationMode]);
 
   useEffect(() => {
     setLiveOrder(null);
@@ -172,7 +220,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
       .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations", filter: `driver_id=eq.${driverId}` }, (payload) => {
         const location = payload.new as Record<string, unknown>;
         setLiveOrder((current) => ({
-          ...((current || activeOrder || {}) as Order),
+          ...((current || order || {}) as Order),
           driver_lat: location.lat ?? location.latitude ?? location.driver_lat,
           driver_lng: location.lng ?? location.longitude ?? location.driver_lng,
         } as Order));
@@ -183,7 +231,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     return () => {
       supabaseClient.removeChannel(driverChannel);
     };
-  }, [driverId]);
+  }, [driverId, order]);
 
   const pickupCity = getString(activeOrder, ["sender_city", "pickup_city", "origin_city", "from_city"]) || "Mussafah";
   const destinationCity = getString(activeOrder, ["receiver_city", "delivery_city", "destination_city", "to_city"]) || "Abu Dhabi";
@@ -199,36 +247,59 @@ export default function TrackingMap({ order }: TrackingMapProps) {
     getNumeric(activeOrder, ["delivery_lng", "receiver_lng", "destination_lng", "to_lng", "delivery_lon", "receiver_lon"]) ?? destination.lng,
   ];
 
-  const driverLat = getNumeric(activeOrder, ["driver_lat", "current_lat", "live_lat", "courier_lat"]);
-  const driverLng = getNumeric(activeOrder, ["driver_lng", "current_lng", "live_lng", "courier_lng", "driver_lon", "current_lon"]);
+  const deviceLat = Number(devicePosition?.latitude);
+  const deviceLng = Number(devicePosition?.longitude);
+  const hasDevicePosition = Number.isFinite(deviceLat) && Number.isFinite(deviceLng);
+  const driverLat = hasDevicePosition ? deviceLat : getNumeric(activeOrder, ["driver_lat", "current_lat", "live_lat", "courier_lat"]);
+  const driverLng = hasDevicePosition ? deviceLng : getNumeric(activeOrder, ["driver_lng", "current_lng", "live_lng", "courier_lng", "driver_lon", "current_lon"]);
   const hasLiveDriver = driverLat !== null && driverLng !== null;
   const driverPos: LatLngTuple = hasLiveDriver && driverLat !== null && driverLng !== null ? [driverLat, driverLng] : interpolate(pickupPos, destPos, progressFromStatus(getString(activeOrder, ["status"])));
-  const fitPoints = [pickupPos, driverPos, destPos];
-  const vehicleBearing = calculateBearing(hasLiveDriver ? driverPos : pickupPos, destPos);
+  const deliveryLeg = isDeliveryLeg(getString(activeOrder, ["status"]));
+  const navigationTarget = deliveryLeg ? destPos : pickupPos;
+  const fitPoints = navigationMode ? [driverPos, navigationTarget] : [pickupPos, driverPos, destPos];
+  const suppliedHeading = Number(devicePosition?.heading);
+  const vehicleBearing = Number.isFinite(suppliedHeading) && suppliedHeading >= 0
+    ? suppliedHeading
+    : calculateBearing(hasLiveDriver ? driverPos : pickupPos, navigationMode ? navigationTarget : destPos);
 
   const routeWaypoints = useMemo(() => {
-    const points = hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos];
+    const points = navigationMode
+      ? [driverPos, navigationTarget]
+      : hasLiveDriver
+        ? [pickupPos, driverPos, destPos]
+        : [pickupPos, destPos];
     return points.map(([lat, lng]) => `${lng},${lat}`).join(";");
-  }, [hasLiveDriver, pickupPos[0], pickupPos[1], driverPos[0], driverPos[1], destPos[0], destPos[1]]);
+  }, [navigationMode, hasLiveDriver, pickupPos[0], pickupPos[1], driverPos[0], driverPos[1], destPos[0], destPos[1], navigationTarget[0], navigationTarget[1]]);
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+    setRouteSummary(null);
 
     async function fetchRoadRoute() {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${routeWaypoints}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${routeWaypoints}?overview=full&geometries=geojson&alternatives=false&steps=true`;
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json();
-        const coords = data?.routes?.[0]?.geometry?.coordinates;
+        const route = data?.routes?.[0];
+        const coords = route?.geometry?.coordinates;
         if (!cancelled && Array.isArray(coords) && coords.length > 1) {
           setRoutePoints(coords.map(([lng, lat]: [number, number]) => [lat, lng] as LatLngTuple));
+          const firstStep = route?.legs?.[0]?.steps?.find((step: { distance?: number }) => Number(step?.distance) > 15) || route?.legs?.[0]?.steps?.[0];
+          setRouteSummary({
+            distanceMeters: Number(route?.distance || 0),
+            durationSeconds: Number(route?.duration || 0),
+            roadName: String(firstStep?.name || firstStep?.maneuver?.type || ""),
+          });
           return;
         }
       } catch {
         // Use a real map with straight-line route fallback if OSRM is temporarily unavailable.
       }
-      if (!cancelled) setRoutePoints(hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos]);
+      if (!cancelled) {
+        setRouteSummary(null);
+        setRoutePoints(navigationMode ? [driverPos, navigationTarget] : hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos]);
+      }
     }
 
     fetchRoadRoute();
@@ -236,7 +307,7 @@ export default function TrackingMap({ order }: TrackingMapProps) {
       cancelled = true;
       controller.abort();
     };
-  }, [routeWaypoints, hasLiveDriver]);
+  }, [routeWaypoints, hasLiveDriver, navigationMode]);
 
   if (!isMounted) return <div className="h-full min-h-72 rounded-2xl bg-brand-deep animate-pulse" />;
 
@@ -244,6 +315,9 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   const reference = getString(activeOrder, ["tracking_code", "tracking_number", "invoice_number", "coupon_number", "id"]) || "DAY NIGHT";
   const liveLabel = hasLiveDriver ? (isArabic ? "خريطة حقيقية — موقع المندوب مباشر" : "Real map — live courier position") : (isArabic ? "خريطة حقيقية — مسار الإمارات" : "Real map — UAE shipment route");
   const lastLiveLabel = lastLiveAt ? lastLiveAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const navigationTargetLabel = deliveryLeg
+    ? (getString(activeOrder, ["receiver_address", "delivery_address", "destination_address"]) || (isArabic ? destination.labelAr : destination.labelEn))
+    : (getString(activeOrder, ["sender_address", "pickup_address", "origin_address"]) || (isArabic ? pickup.labelAr : pickup.labelEn));
 
   const mapModes: { mode: MapMode; label: string; labelAr: string }[] = [
     { mode: "standard", label: "Standard", labelAr: "عادي" },
@@ -273,24 +347,33 @@ export default function TrackingMap({ order }: TrackingMapProps) {
   };
 
   return (
-    <div className="dn-live-map-shell dn-satellite-map relative h-full min-h-[360px] w-full overflow-hidden rounded-2xl border border-brand-gold/20 bg-[#020812]">
-      <div className="pointer-events-none absolute left-3 right-3 top-3 z-[650] flex flex-wrap items-center justify-between gap-2">
-        <div className="rounded-2xl border border-brand-gold/25 bg-[#071A33]/88 px-3 py-2 shadow-xl backdrop-blur-xl">
+    <div className={`dn-live-map-shell dn-satellite-map relative h-full min-h-[360px] w-full overflow-hidden rounded-2xl border border-brand-gold/20 bg-[#020812] ${navigationMode ? "dn-live-map-navigation" : ""}`}>
+      <div className="absolute left-3 right-3 top-3 z-[650] flex flex-wrap items-center justify-between gap-2">
+        <div className={`pointer-events-none rounded-2xl border border-brand-gold/25 bg-[#071A33]/88 px-3 py-2 shadow-xl backdrop-blur-xl ${navigationMode ? "dn-navigation-hud" : ""}`}>
           <p className="flex items-center gap-2 text-[11px] font-black text-brand-gold">
-            <Radio className="h-3.5 w-3.5 animate-pulse" />
-            {liveLabel}
+            {navigationMode ? <Navigation className="h-3.5 w-3.5" /> : <Radio className="h-3.5 w-3.5 animate-pulse" />}
+            {navigationMode ? (isArabic ? "ملاحة DAY NIGHT داخل التطبيق" : "DAY NIGHT in-app navigation") : liveLabel}
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-white/60">
-            <Satellite className="h-3 w-3 text-brand-sky" />
-            {tileFailed ? (isArabic ? "خريطة طرق احتياطية" : "Fallback road map") : (isArabic ? "طبقات خرائط حقيقية + توجيه طرق" : "Real map layers + road routing")}
+            {navigationMode ? <Flag className="h-3 w-3 text-brand-gold" /> : <Satellite className="h-3 w-3 text-brand-sky" />}
+            {navigationMode
+              ? `${deliveryLeg ? (isArabic ? "إلى التسليم" : "To drop-off") : (isArabic ? "إلى الاستلام" : "To pickup")}: ${navigationTargetLabel}`
+              : tileFailed ? (isArabic ? "خريطة طرق احتياطية" : "Fallback road map") : (isArabic ? "طبقات خرائط حقيقية + توجيه طرق" : "Real map layers + road routing")}
           </p>
         </div>
-        <div className="rounded-full border border-white/10 bg-[#071A33]/82 px-3 py-2 text-[10px] font-black text-white/70 backdrop-blur-xl" dir="ltr">
-          {status} • {String(reference).slice(0, 22)} • {lastLiveLabel}
-        </div>
+        {navigationMode ? (
+          <div className="dn-navigation-controls flex items-center gap-2">
+            <button type="button" className={followDriver ? "is-active" : ""} onClick={() => setFollowDriver((value) => !value)} title={isArabic ? "تتبع السيارة" : "Follow vehicle"}><Crosshair /></button>
+            {onExitNavigation && <button type="button" onClick={onExitNavigation} title={isArabic ? "إغلاق الملاحة" : "Close navigation"}><X /></button>}
+          </div>
+        ) : (
+          <div className="pointer-events-none rounded-full border border-white/10 bg-[#071A33]/82 px-3 py-2 text-[10px] font-black text-white/70 backdrop-blur-xl" dir="ltr">
+            {status} • {String(reference).slice(0, 22)} • {lastLiveLabel}
+          </div>
+        )}
       </div>
 
-      <div className="absolute right-3 top-24 z-[650] flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-[#071A33]/86 p-1 text-[10px] font-black text-white/70 backdrop-blur-xl" dir={isArabic ? "rtl" : "ltr"}>
+      <div className={`absolute right-3 z-[650] flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-[#071A33]/86 p-1 text-[10px] font-black text-white/70 backdrop-blur-xl ${navigationMode ? "top-28" : "top-24"}`} dir={isArabic ? "rtl" : "ltr"}>
         <Layers className="mx-1 h-3.5 w-3.5 text-brand-gold" />
         {mapModes.map((item) => (
           <button
@@ -307,11 +390,11 @@ export default function TrackingMap({ order }: TrackingMapProps) {
         ))}
       </div>
 
-      <MapContainer key={mapMode} center={driverPos} zoom={10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false} zoomControl>
+      <MapContainer key={mapMode} center={driverPos} zoom={navigationMode ? 16 : 10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={navigationMode} zoomControl>
         {renderBaseLayers()}
-        <FitBounds points={fitPoints} />
-        <Polyline positions={routePoints.length ? routePoints : [pickupPos, destPos]} pathOptions={{ color: "#D4AF37", weight: 6, opacity: 0.92 }} />
-        <Polyline positions={[pickupPos, driverPos, destPos]} pathOptions={{ color: "#18A8E8", weight: 2.4, opacity: 0.76, dashArray: "10 12" }} />
+        {navigationMode ? <FollowDriver position={driverPos} enabled={followDriver} /> : <FitBounds points={fitPoints} />}
+        <Polyline positions={routePoints.length ? routePoints : navigationMode ? [driverPos, navigationTarget] : [pickupPos, destPos]} pathOptions={{ color: "#D4AF37", weight: navigationMode ? 8 : 6, opacity: 0.94 }} />
+        {!navigationMode && <Polyline positions={[pickupPos, driverPos, destPos]} pathOptions={{ color: "#071A33", weight: 2.4, opacity: 0.72, dashArray: "10 12" }} />}
         {(routePoints.length ? routePoints : [pickupPos, driverPos, destPos]).filter((_, index) => index % Math.max(1, Math.floor((routePoints.length || 3) / 10)) === 0).map((point, index) => (
           <CircleMarker key={`${point[0]}-${point[1]}-${index}`} center={point} radius={2.8} pathOptions={{ color: "#F5B700", fillColor: "#F5B700", fillOpacity: 0.75, opacity: 0.55 }} />
         ))}
@@ -349,12 +432,20 @@ export default function TrackingMap({ order }: TrackingMapProps) {
         </Marker>
       </MapContainer>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-[650] flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#071A33]/86 px-3 py-2 text-[10px] font-bold text-white/65 backdrop-blur-xl">
-        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-brand-gold" />{isArabic ? pickup.labelAr : pickup.labelEn}</span>
-        <span className="flex items-center gap-1.5 text-brand-gold"><Route className="h-3.5 w-3.5" />{isArabic ? "مسار خرائط حقيقي" : "Real map route"}</span>
-        <span className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-brand-sky" />{hasLiveDriver ? (isArabic ? "مباشر" : "Live") : (isArabic ? "تقديري" : "Estimated")}</span>
-        <span className="flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5 text-brand-sky" />{isArabic ? destination.labelAr : destination.labelEn}</span>
-      </div>
+      {navigationMode ? (
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-[650] grid grid-cols-3 gap-2 rounded-2xl border border-brand-gold/25 bg-[#071A33]/92 px-3 py-3 text-white backdrop-blur-xl dn-navigation-summary">
+          <span><Route /><small>{isArabic ? "المتبقي" : "Remaining"}</small><strong>{formatRouteDistance(routeSummary?.distanceMeters || 0, isArabic)}</strong></span>
+          <span><Clock3 /><small>{isArabic ? "الوصول المتوقع" : "ETA"}</small><strong>{formatRouteDuration(routeSummary?.durationSeconds || 0, isArabic)}</strong></span>
+          <span><Navigation /><small>{isArabic ? "الاتجاه التالي" : "Next road"}</small><strong>{routeSummary?.roadName || (isArabic ? "تابع المسار الذهبي" : "Follow the gold route")}</strong></span>
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-[650] flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#071A33]/86 px-3 py-2 text-[10px] font-bold text-white/65 backdrop-blur-xl">
+          <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-brand-gold" />{isArabic ? pickup.labelAr : pickup.labelEn}</span>
+          <span className="flex items-center gap-1.5 text-brand-gold"><Route className="h-3.5 w-3.5" />{isArabic ? "مسار خرائط حقيقي" : "Real map route"}</span>
+          <span className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5 text-brand-gold" />{hasLiveDriver ? (isArabic ? "مباشر" : "Live") : (isArabic ? "تقديري" : "Estimated")}</span>
+          <span className="flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5 text-brand-gold" />{isArabic ? destination.labelAr : destination.labelEn}</span>
+        </div>
+      )}
     </div>
   );
 }

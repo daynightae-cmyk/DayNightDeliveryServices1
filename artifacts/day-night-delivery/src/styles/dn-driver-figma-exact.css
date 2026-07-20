@@ -482,85 +482,324 @@ body:has(.dn-driver-exact-shell) .dn-portal-toolbar{
   display:none !important;
 }
 
-html[data-theme] body:has(.dn-driver-exact-shell),
-html[data-theme] #root:has(.dn-driver-exact-shell),
-html[data-theme] body:has(.dn-driver-exact-shell) #root>div,
-html[data-theme] body:has(.dn-driver-exact-shell) #root main{
+html body:has(.dn-driver-exact-shell),
+html #root:has(.dn-driver-exact-shell),
+html body:has(.dn-driver-exact-shell) #root>div,
+html body:has(.dn-driver-exact-shell) #root main{
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-shell-v3.dn-driver-exact-shell{
+html .dn-driver-shell-v3.dn-driver-exact-shell{
   color:#111111 !important;
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-workspace-v3{
+html .dn-driver-exact-shell .dn-driver-workspace-v3{
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-exact-header{
+html .dn-driver-exact-shell .dn-driver-exact-header{
   border:1px solid rgba(7,26,51,.08) !important;
   color:#111111 !important;
   background:#ffffff !important;
   box-shadow:0 8px 22px rgba(7,26,51,.04) !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-heading-v3 h1,
-html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3 strong{
+html .dn-driver-exact-shell .dn-driver-heading-v3 h1,
+html .dn-driver-exact-shell .dn-driver-profile-chip-v3 strong{
   color:#111111 !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3{
+html .dn-driver-exact-shell .dn-driver-profile-chip-v3{
   border:1px solid rgba(7,26,51,.08) !important;
   color:#111111 !important;
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3 small{
+html .dn-driver-exact-shell .dn-driver-profile-chip-v3 small{
   color:#575751 !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-icon-button-v3{
+html .dn-driver-exact-shell .dn-driver-icon-button-v3{
   border:1px solid rgba(7,26,51,.1) !important;
   color:#071a33 !important;
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map){
+html .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map){
   border:1px solid rgba(7,26,51,.09) !important;
   color:#111111 !important;
   background:#ffffff !important;
 }
 
-html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map)>header{
+html .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map)>header{
   border:0 !important;
   color:#111111 !important;
   background:transparent !important;
   box-shadow:none !important;
 }
 
-html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-vehicle,.dn-driver-exact-map)>header h2{
+html .dn-driver-exact-shell :is(.dn-driver-exact-vehicle,.dn-driver-exact-map)>header h2{
   color:#111111 !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-exact-job-list>button:not(.is-selected),
-html[data-theme] .dn-driver-exact-shell .dn-driver-exact-metrics article{
+html .dn-driver-exact-shell .dn-driver-exact-job-list>button:not(.is-selected),
+html .dn-driver-exact-shell .dn-driver-exact-metrics article{
   border-color:rgba(7,26,51,.1) !important;
   color:#111111 !important;
   background:#f7f5ea !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-exact-job-list>button.is-selected{
+html .dn-driver-exact-shell .dn-driver-exact-job-list>button.is-selected{
   border-color:#111111 !important;
   color:#ffffff !important;
   background:#111111 !important;
 }
 
-html[data-theme] .dn-driver-exact-shell .dn-driver-exact-actionbar{
+html .dn-driver-exact-shell .dn-driver-exact-actionbar{
   border-color:rgba(7,26,51,.09) !important;
   color:#111111 !important;
   background:#ffffff !important;
 }
+
+/* In-app mission navigation — never leaves the DAY NIGHT application. */
+.dn-driver-exact-map>footer section>.dn-driver-map-navigation-button,
+.dn-driver-exact-actions button.is-navigation{
+  border:0;
+  color:#111111;
+  background:#d4af37;
+  cursor:pointer;
+}
+.dn-driver-exact-map>footer section>.dn-driver-map-navigation-button{
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  width:35px;
+  height:35px;
+  border-radius:50%;
+}
+.dn-driver-exact-map>footer section>.dn-driver-map-navigation-button svg{width:15px}
+
+.dn-driver-navigation-workspace{
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  gap:10px;
+  min-height:calc(100dvh - 116px);
+}
+.dn-driver-navigation-header,
+.dn-driver-navigation-sync{
+  border:1px solid rgba(7,26,51,.09);
+  color:#111111;
+  background:#ffffff;
+}
+.dn-driver-navigation-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:14px 16px;
+  border-radius:22px;
+}
+.dn-driver-navigation-header>div>span{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#806316;
+  font-size:11px;
+  font-weight:900;
+}
+.dn-driver-navigation-header>div>span svg{width:15px}
+.dn-driver-navigation-header h2{margin:3px 0;color:#111111 !important;font-size:22px;font-weight:950}
+.dn-driver-navigation-header p{color:#575751 !important;font-size:11px;font-weight:800}
+.dn-driver-navigation-header>button{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:42px;
+  padding:0 13px;
+  border:1px solid rgba(7,26,51,.12);
+  border-radius:13px;
+  color:#ffffff;
+  background:#111111;
+  font-size:11px;
+  font-weight:900;
+}
+.dn-driver-navigation-header>button svg{width:16px}
+.dn-driver-navigation-layout{
+  direction:ltr;
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(330px,.55fr);
+  gap:10px;
+  min-height:650px;
+}
+.dn-driver-navigation-map{
+  min-width:0;
+  min-height:650px;
+  overflow:hidden;
+  border-radius:26px;
+}
+.dn-driver-navigation-map>.dn-live-map-shell{min-height:650px;border-radius:26px}
+.dn-driver-navigation-mission{
+  min-width:0;
+  min-height:0;
+  overflow:auto;
+  padding:1px;
+  direction:rtl;
+}
+.dn-driver-exact-shell[dir="ltr"] .dn-driver-navigation-mission{direction:ltr}
+.dn-driver-navigation-sync{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:9px 18px;
+  min-height:52px;
+  padding:9px 13px;
+  border-radius:18px;
+  font-size:11px;
+  font-weight:800;
+}
+.dn-driver-navigation-sync span,
+.dn-driver-navigation-sync strong{display:flex;align-items:center;gap:6px}
+.dn-driver-navigation-sync svg{width:15px;color:#071a33}
+.dn-driver-navigation-sync strong{margin-inline-start:auto;color:#806316}
+
+.dn-live-map-navigation{min-height:650px !important}
+.dn-navigation-hud{max-width:min(620px,calc(100% - 110px))}
+.dn-navigation-hud p:last-child{max-width:580px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dn-navigation-controls button{
+  display:grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:13px;
+  color:#ffffff;
+  background:rgba(7,26,51,.9);
+  box-shadow:0 10px 24px rgba(0,0,0,.2);
+}
+.dn-navigation-controls button.is-active{color:#111111;background:#d4af37}
+.dn-navigation-controls svg{width:18px}
+.dn-navigation-summary>span{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  grid-template-areas:"icon label" "icon value";
+  align-items:center;
+  gap:1px 7px;
+  min-width:0;
+}
+.dn-navigation-summary>span>svg{grid-area:icon;width:20px;color:#d4af37}
+.dn-navigation-summary small{grid-area:label;color:rgba(255,255,255,.62);font-size:9px;font-weight:800}
+.dn-navigation-summary strong{grid-area:value;overflow:hidden;color:#ffffff;font-size:13px;font-weight:950;text-overflow:ellipsis;white-space:nowrap}
+
+/* Complete the jobs, history and profile sections in the same light system. */
+html .dn-driver-exact-shell .dn-driver-section-heading-v3{
+  margin:0 0 12px !important;
+  padding:16px 18px !important;
+  border:1px solid rgba(7,26,51,.09) !important;
+  border-radius:22px !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+  box-shadow:0 8px 22px rgba(7,26,51,.04) !important;
+}
+html .dn-driver-exact-shell .dn-driver-section-heading-v3>div>span{color:#806316 !important;font-size:10px !important}
+html .dn-driver-exact-shell .dn-driver-section-heading-v3 h2{color:#111111 !important;font-size:22px !important}
+html .dn-driver-exact-shell .dn-driver-section-heading-v3 p{color:#575751 !important;font-size:12px !important}
+.dn-driver-exact-shell .dn-driver-order-list-v3{align-items:start;gap:12px}
+html .dn-driver-exact-shell .dn-driver-empty-v3{
+  grid-column:1/-1;
+  min-height:230px;
+  border-color:rgba(7,26,51,.16) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+}
+html .dn-driver-exact-shell .dn-driver-empty-v3 h3{color:#111111 !important}
+html .dn-driver-exact-shell .dn-driver-empty-v3 p{color:#575751 !important}
+
+html .dn-driver-exact-shell .dn-driver-order-card-v2{
+  padding:16px !important;
+  border:1px solid rgba(7,26,51,.1) !important;
+  border-radius:22px !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+  box-shadow:none !important;
+}
+html .dn-driver-exact-shell .dn-driver-order-header{
+  margin:-4px -4px 12px !important;
+  padding:12px !important;
+  border:0 !important;
+  border-radius:17px !important;
+  color:#111111 !important;
+  background:#f7f5ea !important;
+}
+html .dn-driver-exact-shell .dn-driver-order-reference small{color:#806316 !important;font-size:11px !important}
+html .dn-driver-exact-shell .dn-driver-order-header h3{color:#111111 !important;font-size:18px !important}
+html .dn-driver-exact-shell .dn-driver-order-header p{color:#575751 !important;font-size:11px !important}
+html .dn-driver-exact-shell .dn-driver-status{color:#ffffff !important;background:#071a33 !important}
+html .dn-driver-exact-shell .dn-driver-status-delivered{color:#067647 !important;background:#ecfdf3 !important}
+html .dn-driver-exact-shell :is(.dn-driver-status-cancelled,.dn-driver-status-returned){color:#b42318 !important;background:#fef3f2 !important}
+html .dn-driver-exact-shell .dn-driver-order-progress span{color:#77776f !important}
+html .dn-driver-exact-shell .dn-driver-order-progress span:not(:last-child):after{background:rgba(7,26,51,.12) !important}
+html .dn-driver-exact-shell .dn-driver-order-progress i{color:#071a33 !important;background:#f7f5ea !important;border-color:rgba(7,26,51,.18) !important}
+html .dn-driver-exact-shell .dn-driver-order-progress span.is-complete{color:#067647 !important}
+html .dn-driver-exact-shell .dn-driver-order-progress span.is-complete i{color:#067647 !important;background:#ecfdf3 !important;border-color:#12b76a !important}
+html .dn-driver-exact-shell .dn-driver-order-route small{color:#6f6f67 !important;font-size:10px !important}
+html .dn-driver-exact-shell .dn-driver-order-route strong{color:#111111 !important;font-size:13px !important}
+html .dn-driver-exact-shell .dn-driver-order-route>div>span{color:#071a33 !important;background:#f7f5ea !important}
+html .dn-driver-exact-shell .dn-driver-order-meta span{color:#454540 !important;background:#f7f5ea !important}
+html .dn-driver-exact-shell .dn-driver-order-meta svg{color:#071a33 !important}
+html .dn-driver-exact-shell .dn-driver-order-notes{border-color:rgba(212,175,55,.28) !important;background:#fbf7e8 !important}
+html .dn-driver-exact-shell .dn-driver-order-notes strong{color:#806316 !important}
+html .dn-driver-exact-shell .dn-driver-order-notes p{color:#454540 !important}
+.dn-driver-contact-grid button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:11px;
+  border-radius:13px;
+  font-size:11px;
+  font-weight:900;
+}
+html .dn-driver-exact-shell .dn-driver-contact-grid :is(a,button){border:1px solid rgba(7,26,51,.12) !important;color:#071a33 !important;background:#f7f5ea !important}
+html .dn-driver-exact-shell .dn-driver-contact-grid button:last-child{border-color:#d4af37 !important;color:#111111 !important;background:#d4af37 !important}
+html .dn-driver-exact-shell .dn-driver-contact-grid button.is-navigation-active{border-color:#071a33 !important;color:#ffffff !important;background:#071a33 !important}
+html .dn-driver-exact-shell .dn-driver-action-grid button{color:#111111 !important;background:#d4af37 !important}
+html .dn-driver-exact-shell .dn-driver-action-grid button.is-danger{border:1px solid #fda29b !important;color:#b42318 !important;background:#fef3f2 !important}
+html .dn-driver-exact-shell .dn-driver-action-note{color:#111111 !important;background:#f7f5ea !important}
+html .dn-driver-exact-shell .dn-driver-action-note label{color:#454540 !important}
+html .dn-driver-exact-shell .dn-driver-action-note textarea{border-color:rgba(7,26,51,.14) !important;color:#111111 !important;background:#ffffff !important}
+html .dn-driver-exact-shell .dn-driver-action-note button{border-color:rgba(7,26,51,.14) !important;color:#111111 !important;background:#ffffff !important}
+
+html .dn-driver-exact-shell .dn-driver-profile-editor-v2{color:#111111 !important}
+html .dn-driver-exact-shell .dn-driver-profile-hero-v2{
+  border-color:rgba(7,26,51,.1) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+}
+html .dn-driver-exact-shell .dn-driver-profile-hero-v2 h3{color:#111111 !important}
+html .dn-driver-exact-shell .dn-driver-profile-hero-v2 p{color:#575751 !important}
+html .dn-driver-exact-shell .dn-driver-profile-badges span{color:#071a33 !important;background:#f7f5ea !important}
+html .dn-driver-exact-shell .dn-driver-profile-completion i{background:rgba(7,26,51,.1) !important}
+html .dn-driver-exact-shell .dn-driver-profile-guidance article,
+html .dn-driver-exact-shell .dn-driver-profile-static-v2 article,
+html .dn-driver-exact-shell .dn-driver-documents-grid article{
+  border-color:rgba(7,26,51,.1) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+}
+html .dn-driver-exact-shell .dn-driver-profile-guidance strong,
+html .dn-driver-exact-shell .dn-driver-profile-static-v2 strong,
+html .dn-driver-exact-shell .dn-driver-documents-grid strong{color:#111111 !important}
+html .dn-driver-exact-shell .dn-driver-profile-guidance p,
+html .dn-driver-exact-shell .dn-driver-profile-static-v2 small,
+html .dn-driver-exact-shell .dn-driver-profile-static-v2 em,
+html .dn-driver-exact-shell .dn-driver-documents-grid small{color:#575751 !important}
+html .dn-driver-exact-shell .dn-driver-profile-form-grid label{color:#454540 !important}
+html .dn-driver-exact-shell .dn-driver-profile-form-grid :is(input,select,textarea){border-color:rgba(7,26,51,.13) !important;color:#111111 !important;background:#ffffff !important}
+html .dn-driver-exact-shell .dn-driver-admin-managed-note{color:#071a33 !important;background:#eef1f5 !important}
+html .dn-driver-exact-shell .dn-driver-profile-message.is-success{color:#067647 !important;background:#ecfdf3 !important}
+html .dn-driver-exact-shell .dn-driver-profile-message.is-error{color:#b42318 !important;background:#fef3f2 !important}
+html .dn-driver-exact-shell .dn-driver-profile-save{color:#111111 !important;background:#d4af37 !important}
 
 @media(max-width:1260px){
   .dn-driver-exact-board{
@@ -573,6 +812,7 @@ html[data-theme] .dn-driver-exact-shell .dn-driver-exact-actionbar{
   .dn-driver-exact-vehicle{grid-area:vehicle;min-height:610px}
   .dn-driver-exact-map{grid-area:map;min-height:610px}
   .dn-driver-exact-map-canvas{min-height:430px}
+  .dn-driver-navigation-layout{grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr)}
 }
 
 @media(max-width:980px){
@@ -610,6 +850,10 @@ html[data-theme] .dn-driver-exact-shell .dn-driver-exact-actionbar{
   .dn-driver-exact-map{min-height:580px}
   .dn-driver-exact-map-canvas{min-height:390px}
   .dn-driver-exact-vehicle{min-height:570px}
+  .dn-driver-navigation-layout{grid-template-columns:1fr}
+  .dn-driver-navigation-map,
+  .dn-driver-navigation-map>.dn-live-map-shell{min-height:620px}
+  .dn-driver-navigation-mission{overflow:visible}
 }
 
 @media(max-width:680px){
@@ -633,6 +877,16 @@ html[data-theme] .dn-driver-exact-shell .dn-driver-exact-actionbar{
   .dn-driver-exact-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin:2px 0 0}
   .dn-driver-exact-actions button,
   .dn-driver-exact-actions a{min-height:43px;padding:0 8px}
+  .dn-driver-navigation-header{align-items:flex-start;padding:12px}
+  .dn-driver-navigation-header h2{font-size:18px !important}
+  .dn-driver-navigation-header>button span{display:none}
+  .dn-driver-navigation-map,
+  .dn-driver-navigation-map>.dn-live-map-shell{min-height:72dvh}
+  .dn-navigation-hud{max-width:calc(100% - 100px)}
+  .dn-navigation-summary{gap:5px;padding:8px !important}
+  .dn-navigation-summary strong{font-size:10px}
+  .dn-navigation-summary small{font-size:8px}
+  .dn-driver-navigation-sync strong{width:100%;margin:0}
 }
 
 @media(max-width:420px){
