@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Banknote,
   CheckCircle2,
@@ -6,6 +6,7 @@ import {
   Clock3,
   MapPin,
   MessageCircle,
+  Navigation,
   PackageCheck,
   Phone,
   Route,
@@ -19,7 +20,9 @@ type Props = {
   order: DriverOrder;
   isArabic: boolean;
   busy: boolean;
-  onStatus: (status: string, note?: string) => void;
+  navigationActive?: boolean;
+  onStatus: (status: string, note?: string) => Promise<boolean>;
+  onNavigate?: (acceptIfAssigned?: boolean) => void;
 };
 
 const actions: DriverStatusAction[] = [
@@ -57,7 +60,7 @@ function nextActions(status: string) {
   return [];
 }
 
-export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Props) {
+export default function DriverOrderCard({ order, isArabic, busy, navigationActive = false, onStatus, onNavigate }: Props) {
   const [note, setNote] = useState("");
   const [selectedAction, setSelectedAction] = useState<DriverStatusAction | null>(null);
   const [copied, setCopied] = useState(false);
@@ -65,24 +68,25 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
   const pickupAddress = [order.sender_city, order.sender_address].filter(Boolean).join("، ");
   const deliveryAddress = [order.receiver_city, order.receiver_address].filter(Boolean).join("، ");
   const reference = order.tracking_number || order.tracking_code || order.invoice_number || order.id;
-  const mapQuery = useMemo(() => {
-    const lat = Number(order.receiver_lat ?? order.delivery_lat);
-    const lng = Number(order.receiver_lng ?? order.delivery_lng);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat},${lng}`;
-    return deliveryAddress;
-  }, [deliveryAddress, order.delivery_lat, order.delivery_lng, order.receiver_lat, order.receiver_lng]);
-  const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
   const availableActions = nextActions(order.status);
   const normalizedStatus = String(order.status || "assigned").toLowerCase();
   const activeStep = Math.max(0, progressStatuses.indexOf(normalizedStatus));
   const isClosed = ["delivered", "cancelled", "returned"].includes(normalizedStatus);
 
-  function confirmAction() {
+  async function runAction(action: DriverStatusAction, actionNote?: string) {
+    const succeeded = await onStatus(action.value, actionNote);
+    if (succeeded && action.value === "accepted") onNavigate?.(false);
+    return succeeded;
+  }
+
+  async function confirmAction() {
     if (!selectedAction) return;
     if (selectedAction.requiresNote && !note.trim()) return;
-    onStatus(selectedAction.value, note.trim() || undefined);
-    setSelectedAction(null);
-    setNote("");
+    const succeeded = await runAction(selectedAction, note.trim() || undefined);
+    if (succeeded) {
+      setSelectedAction(null);
+      setNote("");
+    }
   }
 
   async function copyReference() {
@@ -147,7 +151,10 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
       <div className="dn-driver-contact-grid">
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone}><Phone /> <span>{isArabic ? "اتصال" : "Call"}</span></a>
         <a href={phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!phone}><MessageCircle /> <span>WhatsApp</span></a>
-        <a href={mapUrl} target="_blank" rel="noreferrer"><MapPin /> <span>{isArabic ? "الملاحة" : "Navigate"}</span></a>
+        <button type="button" className={navigationActive ? "is-navigation-active" : ""} onClick={() => onNavigate?.(true)} disabled={!onNavigate || navigationActive}>
+          <Navigation />
+          <span>{navigationActive ? (isArabic ? "الملاحة تعمل" : "Navigation active") : (isArabic ? "الملاحة داخل التطبيق" : "In-app navigation")}</span>
+        </button>
       </div>
 
       {availableActions.length > 0 && (
@@ -160,7 +167,7 @@ export default function DriverOrderCard({ order, isArabic, busy, onStatus }: Pro
               className={action.value === "cancelled" || action.value === "returned" ? "is-danger" : ""}
               onClick={() => {
                 if (action.requiresNote) setSelectedAction(action);
-                else onStatus(action.value);
+                else void runAction(action);
               }}
             >
               {action.value === "delivered" ? <CheckCircle2 /> : action.value === "cancelled" || action.value === "returned" ? <TriangleAlert /> : <Send />}

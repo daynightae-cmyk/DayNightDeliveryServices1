@@ -7,6 +7,7 @@ import {
   Crosshair,
   History,
   Home,
+  Languages,
   LogOut,
   MessageCircle,
   Navigation,
@@ -23,16 +24,18 @@ import {
   UserRound,
   Weight,
   Wifi,
+  X,
 } from "lucide-react";
 import { supabase } from "../../supabase";
 import { driverErrorMessage, setDriverPresence, updateDriverOrderStatus } from "../../lib/driverData";
-import type { DriverProfile, DriverShiftStatus, ProfileRole } from "../../types/driver";
+import type { DriverOrder, DriverProfile, DriverShiftStatus, ProfileRole } from "../../types/driver";
 import { useDriverOrders } from "../../hooks/useDriverOrders";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import localAssets, { withRemoteFallback } from "../../data/localAssets";
 import DriverOrderCard from "./DriverOrderCard";
 import DriverProfilePanel from "./DriverProfilePanel";
 import TrackingMap from "../tracking/TrackingMap";
+import { useAppContext } from "../../lib/AppContext";
 
 const ADMIN_PHONE = "+971568757331";
 const closedStatuses = ["delivered", "cancelled", "returned"];
@@ -45,14 +48,6 @@ function accuracyLabel(value: number | null | undefined, isArabic: boolean) {
   if (value <= 50) return isArabic ? "جيدة" : "Good";
   if (value <= 150) return isArabic ? "متوسطة" : "Moderate";
   return isArabic ? "ضعيفة" : "Low";
-}
-
-function orderDestination(order: ReturnType<typeof useDriverOrders>["activeOrders"][number] | undefined) {
-  if (!order) return "";
-  const lat = Number(order.receiver_lat ?? order.delivery_lat);
-  const lng = Number(order.receiver_lng ?? order.delivery_lng);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat},${lng}`;
-  return [order.receiver_city, order.receiver_address].filter(Boolean).join(", ");
 }
 
 function normalizeStatus(value?: string | null) {
@@ -105,6 +100,7 @@ export default function DriverDashboard({
   isArabic: boolean;
   onProfileUpdated: () => Promise<void> | void;
 }) {
+  const { toggleLanguage } = useAppContext();
   const {
     activeOrders,
     completedOrders,
@@ -114,7 +110,11 @@ export default function DriverDashboard({
     refresh,
   } = useDriverOrders(driver.id);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const currentOrder = activeOrders.find((order) => order.id === selectedOrderId) || activeOrders[0];
+  const [navigationOrderId, setNavigationOrderId] = useState<string | null>(null);
+  const currentOrder = activeOrders.find((order) => order.id === navigationOrderId)
+    || activeOrders.find((order) => order.id === selectedOrderId)
+    || activeOrders[0];
+  const navigationActive = Boolean(navigationOrderId && currentOrder?.id === navigationOrderId);
   const currentOrderId = currentOrder?.id || null;
   const [shiftStarted, setShiftStarted] = useState(true);
   const [shiftMode, setShiftMode] = useState<DriverShiftStatus>(
@@ -130,11 +130,24 @@ export default function DriverDashboard({
   const vehicleLabel = driver.vehicle_type || (isArabic ? "Toyota Rush — أسطول DAY NIGHT" : "Toyota Rush — DAY NIGHT Fleet");
   const plateLabel = driver.vehicle_plate || (isArabic ? "لوحة المركبة غير مسجلة" : "Vehicle plate not registered");
   const accuracy = gps.position?.coords.accuracy;
+  const navigationDevicePosition = useMemo(() => gps.position ? {
+    latitude: gps.position.coords.latitude,
+    longitude: gps.position.coords.longitude,
+    heading: gps.position.coords.heading,
+    speed: gps.position.coords.speed,
+    accuracy: gps.position.coords.accuracy,
+  } : null, [gps.position]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (navigationOrderId && !activeOrders.some((order) => order.id === navigationOrderId)) {
+      setNavigationOrderId(null);
+    }
+  }, [activeOrders, navigationOrderId]);
 
   const sessionMinutes = useMemo(() => {
     if (!gps.sessionStartedAt) return 0;
@@ -193,20 +206,45 @@ export default function DriverDashboard({
       await refresh();
       if (closedStatuses.includes(status)) setShiftMode("available");
       else setShiftMode("busy");
+      if (closedStatuses.includes(status) && navigationOrderId === orderId) setNavigationOrderId(null);
+      return true;
     } catch (statusError) {
       setActionError(driverErrorMessage(statusError, isArabic));
+      return false;
     } finally {
       setBusyOrder("");
     }
   }
 
+  async function startInAppNavigation(order: DriverOrder, acceptIfAssigned = true) {
+    setSelectedOrderId(order.id);
+    setActionError("");
+
+    if (!shiftStarted) {
+      try {
+        await setDriverPresence(true, "busy", "Mission started from DAY NIGHT in-app navigation");
+        setShiftStarted(true);
+        setShiftMode("busy");
+      } catch (presenceError) {
+        setActionError(driverErrorMessage(presenceError, isArabic));
+        return;
+      }
+    }
+
+    if (acceptIfAssigned && normalizeStatus(order.status) === "assigned") {
+      const accepted = await updateStatus(order.id, "accepted", isArabic ? "بدأ المندوب المهمة من ملاحة DAY NIGHT الداخلية" : "Driver started the mission from DAY NIGHT in-app navigation");
+      if (!accepted) return;
+    }
+
+    setNavigationOrderId(order.id);
+    setTab("home");
+    setShiftMode("busy");
+    if (gps.permission !== "granted") window.setTimeout(() => gps.requestLocation(), 50);
+  }
+
   const lastSyncLabel = gps.lastSyncedAt
     ? new Date(gps.lastSyncedAt).toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", { hour: "2-digit", minute: "2-digit" })
     : "—";
-  const destination = orderDestination(currentOrder);
-  const navigationUrl = destination
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`
-    : undefined;
   const currentWeight = Number(currentOrder?.weight);
   const currentPieces = Number(currentOrder?.pieces);
   return (
@@ -256,6 +294,10 @@ export default function DriverDashboard({
             <button type="button" className="dn-driver-icon-button-v3" onClick={() => void refresh()} aria-label={isArabic ? "تحديث" : "Refresh"}>
               <RefreshCw className={loading ? "animate-spin" : ""} />
             </button>
+            <button type="button" className="dn-driver-icon-button-v3 dn-driver-language-button" onClick={toggleLanguage} aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"} title={isArabic ? "English" : "العربية"}>
+              <Languages />
+              <span>{isArabic ? "EN" : "ع"}</span>
+            </button>
             <button type="button" className="dn-driver-icon-button-v3" aria-label={isArabic ? "الإشعارات" : "Notifications"}>
               <Bell />
               {activeOrders.length > 0 && <b>{activeOrders.length}</b>}
@@ -267,7 +309,44 @@ export default function DriverDashboard({
           <div className="dn-driver-alert dn-driver-alert-v3">{actionError || gps.error || error}</div>
         )}
 
-        {tab === "home" && (
+        {tab === "home" && navigationActive && currentOrder ? (
+          <section className="dn-driver-navigation-workspace">
+            <header className="dn-driver-navigation-header">
+              <div>
+                <span><Wifi />{isArabic ? "موقع حي متصل بمركز العمليات" : "Live location connected to operations"}</span>
+                <h2>{isArabic ? "ملاحة DAY NIGHT الداخلية" : "DAY NIGHT in-app navigation"}</h2>
+                <p>{currentOrder.tracking_number || currentOrder.tracking_code || currentOrder.invoice_number || currentOrder.id} · {statusLabel(currentOrder.status, isArabic)}</p>
+              </div>
+              <button type="button" onClick={() => setNavigationOrderId(null)}><X />{isArabic ? "إغلاق الملاحة" : "Close navigation"}</button>
+            </header>
+            <div className="dn-driver-navigation-layout">
+              <div className="dn-driver-navigation-map">
+                <TrackingMap
+                  order={currentOrder}
+                  navigationMode
+                  devicePosition={navigationDevicePosition}
+                  onExitNavigation={() => setNavigationOrderId(null)}
+                />
+              </div>
+              <aside className="dn-driver-navigation-mission">
+                <DriverOrderCard
+                  order={currentOrder}
+                  isArabic={isArabic}
+                  busy={busyOrder === currentOrder.id}
+                  navigationActive
+                  onStatus={(status, note) => updateStatus(currentOrder.id, status, note)}
+                  onNavigate={() => undefined}
+                />
+              </aside>
+            </div>
+            <footer className="dn-driver-navigation-sync">
+              <span><Crosshair />{accuracy != null ? `${Math.round(accuracy)}m · ${accuracyLabel(accuracy, isArabic)}` : (isArabic ? "بانتظار GPS" : "Waiting for GPS")}</span>
+              <span><Clock3 />{isArabic ? "آخر مزامنة" : "Last sync"}: {lastSyncLabel}</span>
+              <span><BatteryCharging />{gps.batteryLevel != null ? `${gps.batteryLevel}%` : "—"}</span>
+              <strong><Signal />{isArabic ? "يظهر الآن للإدارة والتاجر والعميل" : "Visible to admin, merchant and customer"}</strong>
+            </footer>
+          </section>
+        ) : tab === "home" && (
           <>
             <section className="dn-driver-exact-board">
               <article className="dn-driver-exact-jobs">
@@ -328,7 +407,7 @@ export default function DriverDashboard({
                   </section>
                   <section>
                     <div><small>{isArabic ? "عنوان التسليم" : "Delivery address"}</small><strong>{currentOrder ? [currentOrder.receiver_city, currentOrder.receiver_address].filter(Boolean).join("، ") || "—" : (isArabic ? "بانتظار مهمة" : "Waiting for assignment")}</strong><span><Clock3 />{isArabic ? "آخر مزامنة" : "Last sync"}: {lastSyncLabel}</span></div>
-                    {navigationUrl ? <a href={navigationUrl} target="_blank" rel="noreferrer" aria-label={isArabic ? "فتح الملاحة" : "Open navigation"}><Navigation /></a> : <span className="is-disabled"><Navigation /></span>}
+                    {currentOrder ? <button type="button" className="dn-driver-map-navigation-button" onClick={() => void startInAppNavigation(currentOrder)} aria-label={isArabic ? "فتح الملاحة الداخلية" : "Open in-app navigation"}><Navigation /></button> : <span className="is-disabled"><Navigation /></span>}
                   </section>
                 </footer>
               </article>
@@ -342,7 +421,7 @@ export default function DriverDashboard({
                 {gps.permission !== "granted" && shiftStarted && <button type="button" onClick={() => gps.requestLocation()}><Crosshair />{isArabic ? "تفعيل الموقع" : "Enable GPS"}</button>}
                 <button type="button" onClick={() => void changeShiftMode(shiftMode === "paused" ? "available" : "paused")} disabled={!shiftStarted || shiftBusy || Boolean(currentOrder)}>{shiftMode === "paused" ? <PlayCircle /> : <PauseCircle />}{shiftMode === "paused" ? (isArabic ? "متاح" : "Available") : (isArabic ? "استراحة" : "Break")}</button>
                 {currentOrder && <button type="button" className="is-primary" onClick={() => setTab("active")}><Settings2 />{isArabic ? "إدارة المهمة" : "Manage job"}</button>}
-                {navigationUrl && <a href={navigationUrl} target="_blank" rel="noreferrer"><Navigation />{isArabic ? "ابدأ الملاحة" : "Navigate"}</a>}
+                {currentOrder && <button type="button" className="is-navigation" onClick={() => void startInAppNavigation(currentOrder)}><Navigation />{isArabic ? "ابدأ الملاحة داخل التطبيق" : "Start in-app navigation"}</button>}
               </div>
             </section>
           </>
@@ -362,14 +441,14 @@ export default function DriverDashboard({
         {tab === "active" && (
           <div className="dn-driver-order-list dn-driver-order-list-v3">
             {!loading && activeOrders.length === 0 && <div className="dn-driver-empty dn-driver-empty-v3"><Truck /><h3>{isArabic ? "لا توجد مهام مسندة الآن" : "No active jobs"}</h3><p>{isArabic ? "ستظهر الطلبات فور إسنادها من لوحة الإدارة." : "Orders appear immediately after dispatch assignment."}</p></div>}
-            {activeOrders.map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={busyOrder === order.id} onStatus={(status, note) => void updateStatus(order.id, status, note)} />)}
+            {activeOrders.map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={busyOrder === order.id} onStatus={(status, note) => updateStatus(order.id, status, note)} onNavigate={(acceptIfAssigned) => void startInAppNavigation(order, acceptIfAssigned)} />)}
           </div>
         )}
 
         {tab === "history" && (
           <div className="dn-driver-order-list dn-driver-order-list-v3">
             {!loading && completedOrders.length === 0 && <div className="dn-driver-empty dn-driver-empty-v3"><Clock3 /><h3>{isArabic ? "لا يوجد سجل حتى الآن" : "No history yet"}</h3></div>}
-            {completedOrders.slice(0, 30).map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={false} onStatus={() => undefined} />)}
+            {completedOrders.slice(0, 30).map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={false} onStatus={async () => false} />)}
           </div>
         )}
 
