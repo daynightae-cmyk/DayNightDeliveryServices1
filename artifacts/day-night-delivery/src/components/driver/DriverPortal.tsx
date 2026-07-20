@@ -4,6 +4,7 @@ import "../../styles/dn-driver-operations.css";
 import "../../styles/dn-driver-profiles.css";
 import "../../styles/dn-driver-flex.css";
 import "../../styles/dn-driver-figma.css";
+import "../../styles/dn-driver-figma-exact.css";
 
 export default function DriverPortal() {
   const { language } = useAppContext();
