@@ -1,0 +1,5 @@
+/* The driver header previously used the active-order count inside the bell.
+   Realtime notification counts are shown by PortalRuntimeOverlay instead. */
+.dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child > b {
+  display: none !important;
+}
