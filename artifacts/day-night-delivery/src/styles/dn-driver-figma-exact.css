@@ -7,16 +7,16 @@ body:has(.dn-driver-exact-shell),
   width:100%;
   min-height:100%;
   margin:0;
-  background:#f2eed1 !important;
+  background:#f7f5ea !important;
 }
 
 .dn-driver-shell-v3.dn-driver-exact-shell{
   --exact-black:#111111;
   --exact-navy:#071a33;
-  --exact-blue:#0b4db2;
+  --exact-blue:#071a33;
   --exact-gold:#d4af37;
   --exact-gold-light:#f0dc7b;
-  --exact-cream:#f2eed1;
+  --exact-cream:#f7f5ea;
   --exact-white:#ffffff;
   --exact-ink:#111111;
   --exact-muted:#6f6f67;
@@ -166,7 +166,8 @@ body:has(.dn-driver-exact-shell),
   flex-direction:column;
   padding:14px 11px 11px;
   color:var(--exact-black);
-  background:var(--exact-gold);
+  border:1px solid rgba(7,26,51,.09);
+  background:var(--exact-white);
 }
 .dn-driver-exact-jobs>header{
   display:flex;
@@ -184,8 +185,8 @@ body:has(.dn-driver-exact-shell),
   min-width:27px;
   height:27px;
   border-radius:9px;
-  color:#fff;
-  background:var(--exact-black);
+  color:var(--exact-black);
+  background:var(--exact-gold);
   font-size:12px;
 }
 .dn-driver-exact-jobs>header button{
@@ -196,7 +197,7 @@ body:has(.dn-driver-exact-shell),
   border:0;
   border-radius:11px;
   color:var(--exact-black);
-  background:rgba(255,255,255,.42);
+  background:var(--exact-cream);
   cursor:pointer;
 }
 .dn-driver-exact-jobs>header svg{width:16px}
@@ -208,18 +209,18 @@ body:has(.dn-driver-exact-shell),
   overflow:auto;
   overscroll-behavior:contain;
   scrollbar-width:thin;
-  scrollbar-color:rgba(17,17,17,.36) transparent;
+  scrollbar-color:rgba(7,26,51,.28) transparent;
 }
 .dn-driver-exact-job-list>button{
   display:grid;
   gap:8px;
   width:100%;
   padding:13px 12px;
-  border:1px solid rgba(17,17,17,.08);
+  border:1px solid rgba(7,26,51,.1);
   border-radius:18px;
   color:var(--exact-black);
   text-align:start;
-  background:rgba(255,255,255,.83);
+  background:var(--exact-cream);
   cursor:pointer;
 }
 .dn-driver-exact-job-list>button.is-selected{
@@ -229,7 +230,7 @@ body:has(.dn-driver-exact-shell),
 }
 .dn-driver-exact-job-number{
   overflow:hidden;
-  font:900 13px/1.25 Poppins,Cairo,sans-serif;
+  font:900 15px/1.3 Poppins,Cairo,sans-serif;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
@@ -239,19 +240,19 @@ body:has(.dn-driver-exact-shell),
   border-radius:999px;
   color:inherit;
   background:rgba(17,17,17,.08);
-  font-size:8px;
+  font-size:10px;
   font-style:normal;
   font-weight:800;
 }
 .dn-driver-exact-job-list>button.is-selected .dn-driver-exact-job-tags em{background:rgba(255,255,255,.14)}
 .dn-driver-exact-job-route{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5px}
-.dn-driver-exact-job-route b{overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.dn-driver-exact-job-route b{overflow:hidden;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
 .dn-driver-exact-job-route i{font-style:normal;opacity:.56}
 .dn-driver-exact-job-progress{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .dn-driver-exact-job-progress i{height:4px;border-radius:999px;background:rgba(17,17,17,.13)}
 .dn-driver-exact-job-progress i.is-complete{background:var(--exact-gold)}
-.dn-driver-exact-job-list>button:not(.is-selected) .dn-driver-exact-job-progress i.is-complete{background:var(--exact-blue)}
-.dn-driver-exact-job-list>button>small{color:inherit;font-size:8px;opacity:.62}
+.dn-driver-exact-job-list>button:not(.is-selected) .dn-driver-exact-job-progress i.is-complete{background:var(--exact-navy)}
+.dn-driver-exact-job-list>button>small{color:inherit;font-size:10px;opacity:.72}
 .dn-driver-exact-no-job{
   display:grid;
   place-items:center;
@@ -273,6 +274,7 @@ body:has(.dn-driver-exact-shell),
   padding:17px;
   color:var(--exact-black);
   background:#fff;
+  border:1px solid rgba(7,26,51,.09);
 }
 .dn-driver-exact-vehicle>header,
 .dn-driver-exact-map>header{
@@ -281,11 +283,15 @@ body:has(.dn-driver-exact-shell),
   justify-content:space-between;
   gap:12px;
   min-height:56px;
+  border:0 !important;
+  color:var(--exact-black) !important;
+  background:transparent !important;
+  box-shadow:none !important;
 }
 .dn-driver-exact-vehicle header small,
-.dn-driver-exact-map header small{display:block;color:#90701a;font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+.dn-driver-exact-map header small{display:block;color:#806316;font-size:10px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
 .dn-driver-exact-vehicle header h2,
-.dn-driver-exact-map header h2{margin-top:3px;color:var(--exact-black);font-size:16px;font-weight:900;line-height:1.3}
+.dn-driver-exact-map header h2{margin-top:3px;color:var(--exact-black);font-size:18px;font-weight:900;line-height:1.3}
 .dn-driver-exact-vehicle>header>button{
   flex:0 0 auto;
   padding:7px 10px;
@@ -293,7 +299,7 @@ body:has(.dn-driver-exact-shell),
   border-radius:9px;
   color:#8a6810;
   background:#f7f2d8;
-  font-size:8px;
+  font-size:10px;
   font-weight:850;
   cursor:pointer;
 }
@@ -303,7 +309,7 @@ body:has(.dn-driver-exact-shell),
   min-height:0;
   overflow:hidden;
   border-radius:22px;
-  background:linear-gradient(145deg,#fafafa 0%,#f6f3e4 100%);
+  background:var(--exact-cream);
 }
 .dn-driver-exact-vehicle-canvas>*{grid-area:1/1}
 .dn-driver-exact-vehicle-grid{
@@ -311,8 +317,8 @@ body:has(.dn-driver-exact-shell),
   height:100%;
   opacity:.55;
   background:
-    linear-gradient(115deg,transparent 0 27%,rgba(11,77,178,.14) 27.2% 27.8%,transparent 28% 57%,rgba(212,175,55,.24) 57.2% 57.8%,transparent 58%),
-    radial-gradient(circle at 18% 72%,var(--exact-blue) 0 5px,transparent 6px),
+    linear-gradient(115deg,transparent 0 27%,rgba(7,26,51,.11) 27.2% 27.8%,transparent 28% 57%,rgba(212,175,55,.22) 57.2% 57.8%,transparent 58%),
+    radial-gradient(circle at 18% 72%,var(--exact-navy) 0 5px,transparent 6px),
     radial-gradient(circle at 78% 23%,var(--exact-gold) 0 5px,transparent 6px);
 }
 .dn-driver-exact-vehicle-canvas>img{
@@ -344,11 +350,11 @@ body:has(.dn-driver-exact-shell),
   color:var(--exact-black);
   background:#fbfaf6;
 }
-.dn-driver-exact-metrics article>svg{grid-area:icon;width:17px;color:var(--exact-blue)}
+.dn-driver-exact-metrics article>svg{grid-area:icon;width:18px;color:var(--exact-navy)}
 .dn-driver-exact-metrics article>div{grid-area:value;display:flex;align-items:baseline;gap:4px}
 .dn-driver-exact-metrics strong{font:900 22px/1 Poppins,Cairo,sans-serif}
-.dn-driver-exact-metrics small{font-size:8px;font-weight:800}
-.dn-driver-exact-metrics article>span{grid-area:label;color:var(--exact-muted);font-size:8px;font-weight:800}
+.dn-driver-exact-metrics small{font-size:10px;font-weight:800}
+.dn-driver-exact-metrics article>span{grid-area:label;color:#55554f;font-size:10px;font-weight:800}
 
 .dn-driver-exact-map{
   display:grid;
@@ -356,6 +362,7 @@ body:has(.dn-driver-exact-shell),
   padding:12px;
   color:var(--exact-black);
   background:#fff;
+  border:1px solid rgba(7,26,51,.09);
 }
 .dn-driver-exact-map>header{padding:4px 4px 8px}
 .dn-driver-exact-map>header>span{
@@ -366,7 +373,7 @@ body:has(.dn-driver-exact-shell),
   border-radius:999px;
   color:#b42318;
   background:#fef3f2;
-  font-size:8px;
+  font-size:10px;
   font-weight:850;
 }
 .dn-driver-exact-map>header>span.is-live{color:#027a48;background:#ecfdf3}
@@ -410,9 +417,9 @@ body:has(.dn-driver-exact-shell),
 }
 .dn-driver-exact-map>footer .dn-driver-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .dn-driver-exact-map>footer section>div{min-width:0;flex:1}
-.dn-driver-exact-map>footer small{display:block;color:var(--exact-gold-light);font-size:7px;font-weight:800}
-.dn-driver-exact-map>footer strong{display:block;overflow:hidden;margin:2px 0;color:#fff;font-size:10px;font-weight:850;text-overflow:ellipsis;white-space:nowrap}
-.dn-driver-exact-map>footer section>div>span{display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.64);font-size:7px}
+.dn-driver-exact-map>footer small{display:block;color:var(--exact-gold-light);font-size:9px;font-weight:800}
+.dn-driver-exact-map>footer strong{display:block;overflow:hidden;margin:3px 0;color:#fff;font-size:12px;font-weight:850;text-overflow:ellipsis;white-space:nowrap}
+.dn-driver-exact-map>footer section>div>span{display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.72);font-size:9px}
 .dn-driver-exact-map>footer section>div>span svg{width:10px}
 .dn-driver-exact-map>footer section>a,
 .dn-driver-exact-map>footer section>span.is-disabled{
@@ -442,8 +449,8 @@ body:has(.dn-driver-exact-shell),
   color:var(--exact-black);
   background:#fff;
 }
-.dn-driver-exact-actionbar>div:not(.dn-driver-exact-actions){display:flex;align-items:center;gap:5px;color:#575751;font-size:9px;font-weight:750}
-.dn-driver-exact-actionbar>div>svg{width:14px;color:var(--exact-blue)}
+.dn-driver-exact-actionbar>div:not(.dn-driver-exact-actions){display:flex;align-items:center;gap:5px;color:#454540;font-size:11px;font-weight:750}
+.dn-driver-exact-actionbar>div>svg{width:15px;color:var(--exact-navy)}
 .dn-driver-exact-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-inline-start:auto}
 .dn-driver-exact-actions button,
 .dn-driver-exact-actions a{
@@ -457,14 +464,103 @@ body:has(.dn-driver-exact-shell),
   border-radius:12px;
   color:var(--exact-black);
   background:#f7f6ef;
-  font-size:9px;
+  font-size:11px;
   font-weight:850;
   cursor:pointer;
 }
 .dn-driver-exact-actions button.is-primary,
-.dn-driver-exact-actions a{border-color:var(--exact-black);color:#fff;background:var(--exact-black)}
+.dn-driver-exact-actions a{border-color:var(--exact-gold);color:var(--exact-black);background:var(--exact-gold)}
+.dn-driver-exact-actions button.is-primary{border-color:var(--exact-black);color:#fff;background:var(--exact-black)}
 .dn-driver-exact-actions svg{width:14px}
 .dn-driver-exact-actions button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Final DAY NIGHT balance: this dashboard intentionally stays light in every
+   theme. Navy and black provide structure; gold is reserved for actions and
+   selection, never for large surfaces. */
+body:has(.dn-driver-exact-shell) .dn-portal-floating-tools,
+body:has(.dn-driver-exact-shell) .dn-portal-toolbar{
+  display:none !important;
+}
+
+html[data-theme] body:has(.dn-driver-exact-shell),
+html[data-theme] #root:has(.dn-driver-exact-shell),
+html[data-theme] body:has(.dn-driver-exact-shell) #root>div,
+html[data-theme] body:has(.dn-driver-exact-shell) #root main{
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-shell-v3.dn-driver-exact-shell{
+  color:#111111 !important;
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-workspace-v3{
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-exact-header{
+  border:1px solid rgba(7,26,51,.08) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+  box-shadow:0 8px 22px rgba(7,26,51,.04) !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-heading-v3 h1,
+html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3 strong{
+  color:#111111 !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3{
+  border:1px solid rgba(7,26,51,.08) !important;
+  color:#111111 !important;
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-profile-chip-v3 small{
+  color:#575751 !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-icon-button-v3{
+  border:1px solid rgba(7,26,51,.1) !important;
+  color:#071a33 !important;
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map){
+  border:1px solid rgba(7,26,51,.09) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+}
+
+html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-jobs,.dn-driver-exact-vehicle,.dn-driver-exact-map)>header{
+  border:0 !important;
+  color:#111111 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+html[data-theme] .dn-driver-exact-shell :is(.dn-driver-exact-vehicle,.dn-driver-exact-map)>header h2{
+  color:#111111 !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-exact-job-list>button:not(.is-selected),
+html[data-theme] .dn-driver-exact-shell .dn-driver-exact-metrics article{
+  border-color:rgba(7,26,51,.1) !important;
+  color:#111111 !important;
+  background:#f7f5ea !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-exact-job-list>button.is-selected{
+  border-color:#111111 !important;
+  color:#ffffff !important;
+  background:#111111 !important;
+}
+
+html[data-theme] .dn-driver-exact-shell .dn-driver-exact-actionbar{
+  border-color:rgba(7,26,51,.09) !important;
+  color:#111111 !important;
+  background:#ffffff !important;
+}
 
 @media(max-width:1260px){
   .dn-driver-exact-board{
