@@ -142,7 +142,7 @@ jobs:
           set +e
           xcodebuild \
             -quiet \
-            -workspace "${IOS_ROOT}/ios/App/App.xcworkspace" \
+            -project "${IOS_ROOT}/ios/App/App.xcodeproj" \
             -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath DerivedData \
