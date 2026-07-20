@@ -1,0 +1,648 @@
+/* DAY NIGHT — merchant + driver authentication surfaces v5
+   Figma-inspired, responsive at normal and reduced browser zoom, no mock data. */
+
+.dn-portal-auth-page,
+.dn-merchant-login-v3 {
+  --dn-auth-navy: #071a33;
+  --dn-auth-deep: #0a1c3a;
+  --dn-auth-blue: #0b4db2;
+  --dn-auth-sky: #3195f7;
+  --dn-auth-gold: #d4af37;
+  --dn-auth-gold-soft: #f4df86;
+  --dn-auth-paper: #ffffff;
+  --dn-auth-canvas: #eef4fc;
+  --dn-auth-ink: #071a33;
+  --dn-auth-muted: #667085;
+  --dn-auth-line: rgba(7, 26, 51, .12);
+  font-family: Cairo, Poppins, Inter, system-ui, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Shared full-screen canvas
+   -------------------------------------------------------------------------- */
+.dn-portal-auth-page,
+.dn-merchant-login-v3 {
+  position: fixed !important;
+  z-index: 2147483000 !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  min-width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: auto !important;
+  padding: clamp(14px, 2vw, 28px) !important;
+  background:
+    radial-gradient(circle at 7% 3%, rgba(212, 175, 55, .20), transparent 25rem),
+    radial-gradient(circle at 94% 8%, rgba(49, 149, 247, .17), transparent 34rem),
+    linear-gradient(145deg, #f9f7ec 0%, #eef5ff 52%, #ffffff 100%) !important;
+  color: var(--dn-auth-ink);
+  isolation: isolate;
+}
+
+.dn-portal-auth-page::before,
+.dn-merchant-login-v3::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(10, 28, 58, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10, 28, 58, .035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, #000, transparent 92%);
+}
+
+.dn-portal-auth-shell {
+  width: 100%;
+  min-height: calc(100dvh - clamp(28px, 4vw, 56px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(480px, .72fr);
+  grid-template-areas: "visual card";
+  gap: clamp(16px, 2vw, 30px);
+  align-items: stretch;
+}
+
+.dn-portal-auth-visual,
+.dn-portal-auth-card,
+.dn-merchant-login-visual-v3,
+.dn-merchant-login-card-v3 {
+  min-width: 0;
+  min-height: calc(100dvh - clamp(28px, 4vw, 56px)) !important;
+  border-radius: clamp(28px, 2.5vw, 42px) !important;
+  box-shadow: 0 32px 90px rgba(7, 26, 51, .18) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared visual panel
+   -------------------------------------------------------------------------- */
+.dn-portal-auth-visual,
+.dn-merchant-login-visual-v3 {
+  grid-area: visual;
+  position: relative;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 4vw, 64px) !important;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .18) !important;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(212, 175, 55, .24), transparent 22rem),
+    radial-gradient(circle at 92% 8%, rgba(49, 149, 247, .25), transparent 30rem),
+    linear-gradient(135deg, #06162d 0%, #0a376c 58%, #0b4db2 100%) !important;
+  color: #fff !important;
+}
+
+.dn-portal-auth-visual::before,
+.dn-portal-auth-visual::after,
+.dn-merchant-login-visual-v3::before,
+.dn-merchant-login-visual-v3::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 50%;
+}
+
+.dn-portal-auth-visual::before,
+.dn-merchant-login-visual-v3::before {
+  width: min(33vw, 520px);
+  height: min(33vw, 520px);
+  inset-inline-end: -13vw;
+  top: -18vw;
+  box-shadow: 0 0 0 48px rgba(255,255,255,.026), 0 0 0 98px rgba(255,255,255,.017);
+}
+
+.dn-portal-auth-visual::after,
+.dn-merchant-login-visual-v3::after {
+  width: min(25vw, 390px);
+  height: min(25vw, 390px);
+  inset-inline-start: -11vw;
+  bottom: -14vw;
+  border-color: rgba(212,175,55,.18);
+  box-shadow: 0 0 0 42px rgba(212,175,55,.025);
+}
+
+.dn-portal-auth-brand,
+.dn-merchant-login-brand-v3 {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.dn-portal-auth-brand img,
+.dn-merchant-login-brand-v3 img {
+  width: clamp(72px, 6vw, 96px) !important;
+  height: clamp(72px, 6vw, 96px) !important;
+  flex: 0 0 auto;
+  padding: 5px !important;
+  border: 1px solid rgba(212,175,55,.58) !important;
+  border-radius: 28px !important;
+  background: #fff !important;
+  object-fit: contain !important;
+  box-shadow: 0 18px 42px rgba(0,0,0,.22) !important;
+}
+
+.dn-portal-auth-brand small,
+.dn-merchant-login-brand-v3 small {
+  display: block;
+  color: #f4d96f !important;
+  font-size: clamp(9px, .75vw, 12px) !important;
+  font-weight: 1000 !important;
+  letter-spacing: .16em !important;
+}
+
+.dn-portal-auth-brand h1,
+.dn-merchant-login-brand-v3 h1 {
+  margin: 6px 0 0 !important;
+  color: #fff !important;
+  font-size: clamp(34px, 4.4vw, 68px) !important;
+  line-height: 1.04 !important;
+  font-weight: 1000 !important;
+}
+
+.dn-portal-auth-copy,
+.dn-merchant-login-visual-v3 > p {
+  position: relative;
+  z-index: 2;
+  max-width: 830px;
+  margin: auto 0 clamp(24px, 4vh, 48px) !important;
+}
+
+.dn-portal-auth-copy > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid rgba(212,175,55,.28);
+  border-radius: 999px;
+  background: rgba(212,175,55,.10);
+  color: #f4d96f;
+  font-size: 10px;
+  font-weight: 1000;
+}
+
+.dn-portal-auth-copy h2 {
+  max-width: 900px;
+  margin: 16px 0 10px;
+  color: #fff;
+  font-size: clamp(30px, 4vw, 60px);
+  line-height: 1.08;
+  font-weight: 1000;
+}
+
+.dn-portal-auth-copy p,
+.dn-merchant-login-visual-v3 > p {
+  max-width: 820px;
+  margin: 0 !important;
+  color: rgba(255,255,255,.74) !important;
+  font-size: clamp(13px, 1.15vw, 18px) !important;
+  line-height: 1.95 !important;
+  font-weight: 700 !important;
+}
+
+.dn-portal-auth-feature-grid,
+.dn-merchant-login-services-v3 {
+  position: relative;
+  z-index: 2;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.dn-portal-auth-feature-grid article,
+.dn-merchant-login-services-v3 article {
+  min-height: 128px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding: 19px !important;
+  border: 1px solid rgba(255,255,255,.15) !important;
+  border-radius: 23px !important;
+  background: rgba(255,255,255,.09) !important;
+  color: #fff !important;
+  backdrop-filter: blur(16px);
+}
+
+.dn-portal-auth-feature-grid svg,
+.dn-merchant-login-services-v3 svg {
+  width: 27px !important;
+  height: 27px !important;
+  color: #f4d96f !important;
+}
+
+.dn-portal-auth-feature-grid strong,
+.dn-merchant-login-services-v3 strong {
+  display: block;
+  color: #fff !important;
+  font-size: clamp(12px, 1vw, 15px) !important;
+  font-weight: 950 !important;
+}
+
+.dn-portal-auth-feature-grid small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255,255,255,.58);
+  font-size: 9px;
+  line-height: 1.6;
+  font-weight: 750;
+}
+
+.dn-portal-auth-support {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.dn-portal-auth-support a {
+  min-height: 43px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 14px;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.dn-portal-auth-support a:first-child { color: #a7f3d0; }
+.dn-portal-auth-support svg { width: 17px; height: 17px; }
+
+.dn-portal-auth-visual footer,
+.dn-merchant-login-visual-v3 footer {
+  position: relative;
+  z-index: 2;
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: space-between !important;
+  gap: 8px 18px;
+  margin-top: 24px !important;
+  padding-top: 17px !important;
+  border-top: 1px solid rgba(255,255,255,.12) !important;
+  color: rgba(255,255,255,.58) !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared form card
+   -------------------------------------------------------------------------- */
+.dn-portal-auth-card,
+.dn-merchant-login-card-v3 {
+  grid-area: card;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(24px, 3.2vw, 54px) !important;
+  border: 1px solid var(--dn-auth-line) !important;
+  background: rgba(255,255,255,.94) !important;
+  color: var(--dn-auth-ink) !important;
+  backdrop-filter: blur(24px);
+}
+
+.dn-portal-auth-card > header,
+.dn-merchant-login-card-v3 > header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 15px !important;
+  margin-bottom: clamp(20px, 3vh, 30px) !important;
+}
+
+.dn-portal-auth-card > header > span,
+.dn-merchant-login-card-v3 > header > span {
+  width: 60px !important;
+  height: 60px !important;
+  flex: 0 0 auto;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid rgba(212,175,55,.42) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(135deg, #f4df86, #d4af37) !important;
+  color: #071a33 !important;
+  box-shadow: 0 14px 30px rgba(212,175,55,.22) !important;
+}
+
+.dn-portal-auth-card > header svg,
+.dn-merchant-login-card-v3 > header svg { width: 27px !important; height: 27px !important; }
+
+.dn-portal-auth-card > header h2,
+.dn-merchant-login-card-v3 > header h2 {
+  margin: 0 !important;
+  color: #071a33 !important;
+  font-size: clamp(28px, 2.6vw, 42px) !important;
+  line-height: 1.12 !important;
+  font-weight: 1000 !important;
+}
+
+.dn-portal-auth-card > header p,
+.dn-merchant-login-card-v3 > header p {
+  margin: 7px 0 0 !important;
+  color: #667085 !important;
+  font-size: 12px !important;
+  line-height: 1.75 !important;
+  font-weight: 700 !important;
+}
+
+.dn-portal-auth-form,
+.dn-merchant-login-card-v3 form,
+.dn-merchant-phone-auth-v3 {
+  display: grid !important;
+  gap: 15px !important;
+}
+
+.dn-portal-auth-card label,
+.dn-merchant-login-card-v3 label {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.dn-portal-auth-card label > span,
+.dn-merchant-login-card-v3 label > span {
+  color: #344054 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.dn-portal-auth-card input,
+.dn-merchant-login-card-v3 input {
+  width: 100% !important;
+  min-height: 54px !important;
+  padding: 0 16px !important;
+  border: 1px solid rgba(10,28,58,.14) !important;
+  border-radius: 16px !important;
+  outline: none !important;
+  background: #f8fafc !important;
+  color: #071a33 !important;
+  font-size: 13px !important;
+  font-weight: 760 !important;
+}
+
+.dn-portal-auth-card input:focus,
+.dn-merchant-login-card-v3 input:focus {
+  border-color: rgba(49,149,247,.65) !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 4px rgba(49,149,247,.11) !important;
+}
+
+.dn-portal-password-field {
+  position: relative;
+}
+
+.dn-portal-password-field input { padding-inline-end: 54px !important; }
+.dn-portal-password-field button {
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-end: 6px;
+  width: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(49,149,247,.08);
+  color: #0b4db2;
+}
+.dn-portal-password-field svg { width: 18px; }
+
+.dn-portal-auth-primary,
+.dn-merchant-login-card-v3 form > button {
+  min-height: 55px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 9px !important;
+  margin-top: 3px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg,#f4df86,#d4af37) !important;
+  color: #071a33 !important;
+  font-size: 13px !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 16px 34px rgba(212,175,55,.24) !important;
+}
+
+.dn-portal-auth-alternatives,
+.dn-merchant-auth-alternatives-v3 {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  gap: 10px !important;
+  margin: 15px 0 !important;
+}
+
+.dn-portal-auth-alternatives button,
+.dn-merchant-auth-alternatives-v3 button {
+  min-height: 49px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border: 1px solid rgba(10,28,58,.11) !important;
+  border-radius: 15px !important;
+  background: #fff !important;
+  color: #344054 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+.dn-portal-auth-alternatives button:last-child,
+.dn-merchant-auth-alternatives-v3 button:last-child {
+  border-color: rgba(49,149,247,.24) !important;
+  background: rgba(49,149,247,.07) !important;
+  color: #0b4db2 !important;
+}
+
+.dn-portal-auth-message,
+.dn-driver-login-error,
+.dn-driver-login-note {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-radius: 14px;
+  font-size: 10px;
+  line-height: 1.7;
+  font-weight: 800;
+}
+
+.dn-portal-auth-message.is-error,
+.dn-driver-login-error {
+  border: 1px solid rgba(239,68,68,.24);
+  background: rgba(239,68,68,.07);
+  color: #b42318;
+}
+
+.dn-portal-auth-message.is-success,
+.dn-driver-login-note {
+  border: 1px solid rgba(34,197,94,.22);
+  background: rgba(34,197,94,.07);
+  color: #15803d;
+}
+
+.dn-portal-auth-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  color: #667085;
+  font-size: 10px;
+  line-height: 1.75;
+  font-weight: 750;
+}
+.dn-portal-auth-note svg { width: 17px; flex: 0 0 auto; color: #0b4db2; }
+
+/* Merchant login keeps its existing real auth handlers but receives the same shell. */
+.dn-merchant-login-v3 {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.28fr) minmax(480px, .72fr) !important;
+  grid-template-areas: "visual card" !important;
+  gap: clamp(16px, 2vw, 30px) !important;
+  align-items: stretch !important;
+}
+.dn-merchant-login-visual-v3 { grid-area: visual !important; order: initial !important; }
+.dn-merchant-login-card-v3 { grid-area: card !important; order: initial !important; }
+
+/* --------------------------------------------------------------------------
+   Dark mode
+   -------------------------------------------------------------------------- */
+html[data-theme="dark"] .dn-portal-auth-page,
+html[data-theme="dark"] .dn-merchant-login-v3 {
+  --dn-auth-paper: #0a203d;
+  --dn-auth-canvas: #071a33;
+  --dn-auth-ink: #f8fbff;
+  --dn-auth-muted: #a9bad0;
+  --dn-auth-line: rgba(255,255,255,.12);
+  background:
+    radial-gradient(circle at 8% 0,rgba(212,175,55,.13),transparent 28rem),
+    radial-gradient(circle at 92% 5%,rgba(49,149,247,.18),transparent 34rem),
+    linear-gradient(145deg,#020b17 0%,#071a33 54%,#0a2c58 100%) !important;
+}
+
+html[data-theme="dark"] .dn-portal-auth-card,
+html[data-theme="dark"] .dn-merchant-login-card-v3 {
+  border-color: rgba(255,255,255,.12) !important;
+  background: rgba(7,26,51,.94) !important;
+  color: #f8fbff !important;
+  box-shadow: 0 32px 90px rgba(0,0,0,.34) !important;
+}
+
+html[data-theme="dark"] .dn-portal-auth-card > header h2,
+html[data-theme="dark"] .dn-merchant-login-card-v3 > header h2,
+html[data-theme="dark"] .dn-portal-auth-card label > span,
+html[data-theme="dark"] .dn-merchant-login-card-v3 label > span { color: #f8fbff !important; }
+
+html[data-theme="dark"] .dn-portal-auth-card > header p,
+html[data-theme="dark"] .dn-merchant-login-card-v3 > header p,
+html[data-theme="dark"] .dn-portal-auth-note { color: #a9bad0 !important; }
+
+html[data-theme="dark"] .dn-portal-auth-card input,
+html[data-theme="dark"] .dn-merchant-login-card-v3 input,
+html[data-theme="dark"] .dn-portal-auth-alternatives button,
+html[data-theme="dark"] .dn-merchant-auth-alternatives-v3 button,
+html[data-theme="dark"] .dn-merchant-phone-auth-v3 {
+  border-color: rgba(255,255,255,.12) !important;
+  background: rgba(255,255,255,.07) !important;
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .dn-portal-auth-card input:focus,
+html[data-theme="dark"] .dn-merchant-login-card-v3 input:focus {
+  background: rgba(255,255,255,.10) !important;
+}
+
+html[data-theme="dark"] .dn-portal-password-field button {
+  background: rgba(49,149,247,.15);
+  color: #8ecbff;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive and reduced browser zoom resilience
+   -------------------------------------------------------------------------- */
+@media (max-width: 1120px) {
+  .dn-portal-auth-shell,
+  .dn-merchant-login-v3 {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "card" "visual" !important;
+  }
+
+  .dn-portal-auth-visual,
+  .dn-portal-auth-card,
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 {
+    min-height: auto !important;
+  }
+
+  .dn-portal-auth-card,
+  .dn-merchant-login-card-v3 { min-height: min(720px, calc(100dvh - 28px)) !important; }
+  .dn-portal-auth-visual,
+  .dn-merchant-login-visual-v3 { min-height: 560px !important; }
+}
+
+@media (max-width: 720px) {
+  .dn-portal-auth-page,
+  .dn-merchant-login-v3 { padding: 10px !important; }
+
+  .dn-portal-auth-shell,
+  .dn-merchant-login-v3 { gap: 10px !important; }
+
+  .dn-portal-auth-visual,
+  .dn-portal-auth-card,
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 { border-radius: 25px !important; }
+
+  .dn-portal-auth-card,
+  .dn-merchant-login-card-v3 { min-height: calc(100dvh - 20px) !important; padding: 22px 17px !important; }
+  .dn-portal-auth-visual,
+  .dn-merchant-login-visual-v3 { min-height: 520px !important; padding: 23px !important; }
+
+  .dn-portal-auth-brand,
+  .dn-merchant-login-brand-v3 { align-items: flex-start !important; }
+
+  .dn-portal-auth-brand img,
+  .dn-merchant-login-brand-v3 img { width: 62px !important; height: 62px !important; border-radius: 20px !important; }
+  .dn-portal-auth-brand h1,
+  .dn-merchant-login-brand-v3 h1 { font-size: 31px !important; }
+
+  .dn-portal-auth-feature-grid,
+  .dn-merchant-login-services-v3 { grid-template-columns: 1fr !important; }
+
+  .dn-portal-auth-feature-grid article,
+  .dn-merchant-login-services-v3 article {
+    min-height: 84px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .dn-portal-auth-alternatives,
+  .dn-merchant-auth-alternatives-v3,
+  .dn-merchant-phone-auth-v3 > div { grid-template-columns: 1fr !important; }
+
+  .dn-portal-auth-support { display: grid; grid-template-columns: 1fr 1fr; }
+  .dn-portal-auth-support a { padding: 0 9px; }
+}
+
+@media (max-height: 760px) and (min-width: 1121px) {
+  .dn-portal-auth-page,
+  .dn-merchant-login-v3 { padding: 12px !important; }
+  .dn-portal-auth-shell,
+  .dn-portal-auth-visual,
+  .dn-portal-auth-card,
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 { min-height: calc(100dvh - 24px) !important; }
+  .dn-portal-auth-visual,
+  .dn-merchant-login-visual-v3 { padding: 26px !important; }
+  .dn-portal-auth-card,
+  .dn-merchant-login-card-v3 { padding: 24px !important; }
+  .dn-portal-auth-copy { margin-bottom: 18px !important; }
+  .dn-portal-auth-feature-grid article,
+  .dn-merchant-login-services-v3 article { min-height: 98px !important; }
+}
