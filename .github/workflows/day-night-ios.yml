@@ -138,12 +138,22 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf DerivedData Payload output
+          set +e
           xcodebuild \
+            -quiet \
             -workspace "${IOS_ROOT}/ios/App/App.xcworkspace" \
             -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath DerivedData \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build > xcodebuild-ios.log 2>&1
+          STATUS=$?
+          set -e
+          tail -n 160 xcodebuild-ios.log
+          if [[ $STATUS -ne 0 ]]; then exit $STATUS; fi
           APP="$(find DerivedData/Build/Products -type d -path '*Release-iphoneos/*.app' | head -n1)"
           test -n "$APP"
           mkdir -p Payload output
