@@ -1,0 +1,461 @@
+.dn-merchant-login-v3 {
+  position: fixed;
+  z-index: 2147483000;
+  inset: 0;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(380px, .82fr) minmax(520px, 1.18fr);
+  gap: clamp(14px, 2vw, 28px);
+  padding: clamp(18px, 3vw, 48px);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(212, 175, 55, .20), transparent 27rem),
+    radial-gradient(circle at 92% 6%, rgba(49, 149, 247, .16), transparent 34rem),
+    linear-gradient(145deg, #f9f7ec 0%, #eef5ff 58%, #ffffff 100%);
+  color: #111827;
+  isolation: isolate;
+}
+
+.dn-merchant-login-v3::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(10, 28, 58, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10, 28, 58, .035) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 86%);
+}
+
+.dn-merchant-login-visual-v3,
+.dn-merchant-login-card-v3 {
+  align-self: center;
+  min-width: 0;
+  border-radius: clamp(28px, 3vw, 42px);
+  box-shadow: 0 30px 80px rgba(7, 26, 51, .18);
+}
+
+.dn-merchant-login-visual-v3 {
+  order: 2;
+  position: relative;
+  min-height: min(760px, calc(100dvh - 96px));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 4vw, 58px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .18);
+  background:
+    radial-gradient(circle at 15% 12%, rgba(212, 175, 55, .24), transparent 22rem),
+    radial-gradient(circle at 90% 12%, rgba(49, 149, 247, .25), transparent 30rem),
+    linear-gradient(135deg, #071a33 0%, #0b376c 58%, #0b4db2 100%);
+  color: #fff;
+}
+
+.dn-merchant-login-visual-v3::before,
+.dn-merchant-login-visual-v3::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 50%;
+}
+
+.dn-merchant-login-visual-v3::before {
+  width: 410px;
+  height: 410px;
+  inset-inline-end: -155px;
+  top: -140px;
+  box-shadow: 0 0 0 42px rgba(255, 255, 255, .025), 0 0 0 86px rgba(255, 255, 255, .018);
+}
+
+.dn-merchant-login-visual-v3::after {
+  width: 300px;
+  height: 300px;
+  inset-inline-start: -150px;
+  bottom: -170px;
+  border-color: rgba(212, 175, 55, .16);
+  box-shadow: 0 0 0 38px rgba(212, 175, 55, .025);
+}
+
+.dn-merchant-login-brand-v3 {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.dn-merchant-login-brand-v3 img {
+  width: clamp(70px, 7vw, 94px);
+  height: clamp(70px, 7vw, 94px);
+  padding: 5px;
+  border: 1px solid rgba(212, 175, 55, .58);
+  border-radius: 28px;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .22);
+}
+
+.dn-merchant-login-brand-v3 small {
+  display: block;
+  color: #f4d96f;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .18em;
+}
+
+.dn-merchant-login-brand-v3 h1 {
+  margin: 7px 0 0;
+  max-width: 720px;
+  color: #fff;
+  font-size: clamp(34px, 5vw, 66px);
+  line-height: 1.04;
+  font-weight: 1000;
+}
+
+.dn-merchant-login-visual-v3 > p {
+  position: relative;
+  z-index: 2;
+  max-width: 760px;
+  margin: auto 0 28px;
+  color: rgba(255, 255, 255, .73);
+  font-size: clamp(14px, 1.35vw, 18px);
+  line-height: 2;
+  font-weight: 680;
+}
+
+.dn-merchant-login-services-v3 {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dn-merchant-login-services-v3 article {
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .09);
+  backdrop-filter: blur(16px);
+}
+
+.dn-merchant-login-services-v3 svg {
+  width: 27px;
+  height: 27px;
+  color: #f4d96f;
+}
+
+.dn-merchant-login-services-v3 strong {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.dn-merchant-login-visual-v3 footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 18px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  color: rgba(255, 255, 255, .58);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.dn-merchant-login-card-v3 {
+  order: 1;
+  width: 100%;
+  max-width: 590px;
+  margin-inline: auto;
+  padding: clamp(24px, 3vw, 40px);
+  border: 1px solid rgba(10, 28, 58, .10);
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(24px);
+  color: #071a33;
+}
+
+.dn-merchant-login-card-v3 > header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 26px;
+}
+
+.dn-merchant-login-card-v3 > header > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(212, 175, 55, .40);
+  border-radius: 19px;
+  background: linear-gradient(135deg, #f4df86, #d4af37);
+  color: #071a33;
+  box-shadow: 0 14px 30px rgba(212, 175, 55, .22);
+}
+
+.dn-merchant-login-card-v3 > header svg {
+  width: 26px;
+  height: 26px;
+}
+
+.dn-merchant-login-card-v3 > header h2 {
+  margin: 0;
+  color: #071a33;
+  font-size: clamp(25px, 3vw, 36px);
+  line-height: 1.15;
+  font-weight: 1000;
+}
+
+.dn-merchant-login-card-v3 > header p {
+  margin: 7px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.7;
+  font-weight: 700;
+}
+
+.dn-merchant-login-card-v3 form,
+.dn-merchant-phone-auth-v3 {
+  display: grid;
+  gap: 15px;
+}
+
+.dn-merchant-login-card-v3 label {
+  display: grid;
+  gap: 8px;
+}
+
+.dn-merchant-login-card-v3 label > span {
+  color: #344054;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.dn-merchant-login-card-v3 input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid rgba(10, 28, 58, .13);
+  border-radius: 16px;
+  outline: none;
+  background: #f8fafc;
+  color: #071a33;
+  font-size: 13px;
+  font-weight: 760;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.dn-merchant-login-card-v3 input::placeholder {
+  color: #98a2b3;
+}
+
+.dn-merchant-login-card-v3 input:focus {
+  border-color: rgba(49, 149, 247, .58);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(49, 149, 247, .10);
+}
+
+.dn-merchant-login-card-v3 form > button {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 3px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f4df86, #d4af37);
+  color: #071a33;
+  font-size: 13px;
+  font-weight: 1000;
+  box-shadow: 0 16px 34px rgba(212, 175, 55, .24);
+}
+
+.dn-merchant-login-card-v3 button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.dn-merchant-login-card-v3 button:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.dn-merchant-login-card-v3 button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dn-merchant-auth-alternatives-v3 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.dn-merchant-auth-alternatives-v3 button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(10, 28, 58, .11);
+  border-radius: 15px;
+  background: #fff;
+  color: #344054;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.dn-merchant-auth-alternatives-v3 button:last-child {
+  border-color: rgba(49, 149, 247, .24);
+  background: rgba(49, 149, 247, .07);
+  color: #0b4db2;
+}
+
+.dn-merchant-phone-auth-v3 {
+  margin-top: 4px;
+  padding: 17px;
+  border: 1px solid rgba(10, 28, 58, .09);
+  border-radius: 21px;
+  background: #f8fafc;
+}
+
+.dn-merchant-phone-auth-v3 > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.dn-merchant-phone-auth-v3 > div > button,
+.dn-merchant-phone-auth-v3 > button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(49, 149, 247, .24);
+  border-radius: 15px;
+  background: rgba(49, 149, 247, .08);
+  color: #0b4db2;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.dn-merchant-phone-auth-v3 > button {
+  width: 100%;
+  border-color: rgba(34, 197, 94, .25);
+  background: rgba(34, 197, 94, .08);
+  color: #15803d;
+}
+
+.dn-merchant-login-card-v3 .dn-merchant-message-v3 {
+  margin-top: 14px;
+}
+
+.dn-merchant-state-v3 {
+  position: fixed;
+  z-index: 2147483000;
+  inset: 0;
+  width: 100%;
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: linear-gradient(145deg, #f9f7ec, #eef5ff 58%, #fff);
+  color: #071a33;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .dn-merchant-login-v3 {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding: 18px;
+  }
+
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 {
+    width: min(100%, 760px);
+    max-width: 760px;
+    margin-inline: auto;
+  }
+
+  .dn-merchant-login-visual-v3 {
+    order: 1;
+    min-height: auto;
+  }
+
+  .dn-merchant-login-card-v3 {
+    order: 2;
+  }
+
+  .dn-merchant-login-visual-v3 > p {
+    margin-top: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dn-merchant-login-v3 {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .dn-merchant-login-visual-v3,
+  .dn-merchant-login-card-v3 {
+    border-radius: 26px;
+  }
+
+  .dn-merchant-login-visual-v3 {
+    padding: 23px;
+  }
+
+  .dn-merchant-login-brand-v3 {
+    align-items: flex-start;
+  }
+
+  .dn-merchant-login-brand-v3 img {
+    width: 62px;
+    height: 62px;
+    border-radius: 20px;
+  }
+
+  .dn-merchant-login-brand-v3 h1 {
+    font-size: 31px;
+  }
+
+  .dn-merchant-login-services-v3 {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-merchant-login-services-v3 article {
+    min-height: 86px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dn-merchant-login-card-v3 {
+    padding: 22px 17px;
+  }
+
+  .dn-merchant-auth-alternatives-v3,
+  .dn-merchant-phone-auth-v3 > div {
+    grid-template-columns: 1fr;
+  }
+}

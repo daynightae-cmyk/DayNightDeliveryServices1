@@ -1,0 +1,43 @@
+html:has(.dn-merchant-login-v3),
+html:has(.dn-merchant-state-v3),
+html:has(.dn-merchant-shell-v3),
+body:has(.dn-merchant-login-v3),
+body:has(.dn-merchant-state-v3),
+body:has(.dn-merchant-shell-v3) {
+  overflow: hidden !important;
+}
+
+.dn-merchant-shell-v3 {
+  position: fixed !important;
+  z-index: 2147482000 !important;
+  inset: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow: auto !important;
+}
+
+@media (min-width: 901px) {
+  .dn-merchant-shell-v3 {
+    padding-block: 18px !important;
+    padding-inline-end: 18px !important;
+  }
+
+  .dn-merchant-shell-v3[dir="ltr"] {
+    padding-inline-start: 116px !important;
+  }
+
+  .dn-merchant-shell-v3[dir="rtl"] {
+    padding-inline-start: 18px !important;
+    padding-inline-end: 116px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .dn-merchant-shell-v3 {
+    padding: 10px 10px 92px !important;
+  }
+}
