@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Languages, Laptop2, Moon, Sun } from "lucide-react";
+import { Bell, Headphones, Languages, Laptop2, Moon, Sun } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useAppContext } from "../../lib/AppContext";
+import companyMeta from "../../data/companyMeta";
 import { supabase } from "../../supabase";
 import { usePortalNotifications } from "../../hooks/usePortalNotifications";
 import PortalNotificationCenter from "./PortalNotificationCenter";
 import "../../styles/dn-portals-live.css";
 import "../../styles/dn-portal-route-lock.css";
 import "../../styles/dn-portal-overlay.css";
+import "../../styles/dn-portal-auth-v5.css";
 
 function isPortalPath(pathname: string) {
   return pathname === "/merchant" || pathname.startsWith("/merchant/") || pathname === "/driver" || pathname.startsWith("/driver/");
@@ -97,6 +99,10 @@ export default function PortalRuntimeOverlay() {
           <Languages />
           <span>{isArabic ? "EN" : "عربي"}</span>
         </button>
+        <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" className="is-support" title={isArabic ? "البلاغات والدعم" : "Reports and support"}>
+          <Headphones />
+          <span>{isArabic ? "الدعم" : "Support"}</span>
+        </a>
         {userId && !isDriver && (
           <button type="button" className="is-notification" onClick={() => setNotificationsOpen(true)} title={isArabic ? "الإشعارات" : "Notifications"}>
             <Bell />
