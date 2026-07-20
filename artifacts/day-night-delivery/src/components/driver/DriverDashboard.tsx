@@ -7,6 +7,7 @@ import {
   Crosshair,
   History,
   Home,
+  Languages,
   LogOut,
   MessageCircle,
   Navigation,
@@ -34,6 +35,7 @@ import localAssets, { withRemoteFallback } from "../../data/localAssets";
 import DriverOrderCard from "./DriverOrderCard";
 import DriverProfilePanel from "./DriverProfilePanel";
 import TrackingMap from "../tracking/TrackingMap";
+import { useAppContext } from "../../lib/AppContext";
 
 const ADMIN_PHONE = "+971568757331";
 const closedStatuses = ["delivered", "cancelled", "returned"];
@@ -98,6 +100,7 @@ export default function DriverDashboard({
   isArabic: boolean;
   onProfileUpdated: () => Promise<void> | void;
 }) {
+  const { toggleLanguage } = useAppContext();
   const {
     activeOrders,
     completedOrders,
@@ -290,6 +293,10 @@ export default function DriverDashboard({
             </button>
             <button type="button" className="dn-driver-icon-button-v3" onClick={() => void refresh()} aria-label={isArabic ? "تحديث" : "Refresh"}>
               <RefreshCw className={loading ? "animate-spin" : ""} />
+            </button>
+            <button type="button" className="dn-driver-icon-button-v3 dn-driver-language-button" onClick={toggleLanguage} aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"} title={isArabic ? "English" : "العربية"}>
+              <Languages />
+              <span>{isArabic ? "EN" : "ع"}</span>
             </button>
             <button type="button" className="dn-driver-icon-button-v3" aria-label={isArabic ? "الإشعارات" : "Notifications"}>
               <Bell />

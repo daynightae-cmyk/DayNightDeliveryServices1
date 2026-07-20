@@ -141,6 +141,16 @@ body:has(.dn-driver-exact-shell),
 }
 .dn-driver-exact-shift-button svg{width:16px}
 .dn-driver-exact-shift-button:disabled{opacity:.5}
+.dn-driver-language-button{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  width:auto !important;
+  min-width:48px;
+  padding-inline:9px !important;
+}
+.dn-driver-language-button span{font-size:10px;font-weight:950}
 
 .dn-driver-exact-board{
   direction:ltr;

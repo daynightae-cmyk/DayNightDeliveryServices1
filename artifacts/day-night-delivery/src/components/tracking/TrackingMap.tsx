@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -154,6 +154,18 @@ function formatRouteDuration(seconds: number, isArabic: boolean) {
   return `${hours} ${isArabic ? "س" : "h"}${remainder ? ` ${remainder} ${isArabic ? "د" : "m"}` : ""}`;
 }
 
+function distanceBetweenMeters(a: LatLngTuple, b: LatLngTuple) {
+  const earthRadius = 6_371_000;
+  const toRadians = (value: number) => value * Math.PI / 180;
+  const latitudeDelta = toRadians(b[0] - a[0]);
+  const longitudeDelta = toRadians(b[1] - a[1]);
+  const latitudeA = toRadians(a[0]);
+  const latitudeB = toRadians(b[0]);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
 function FitBounds({ points }: { points: LatLngTuple[] }) {
   const map = useMap();
   useEffect(() => {
@@ -185,6 +197,9 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
   const [routePoints, setRoutePoints] = useState<LatLngTuple[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
   const [followDriver, setFollowDriver] = useState(navigationMode);
+  const [navigationRouteOrigin, setNavigationRouteOrigin] = useState<LatLngTuple | null>(null);
+  const latestDriverPositionRef = useRef<LatLngTuple | null>(null);
+  const lastRoutedPositionRef = useRef<LatLngTuple | null>(null);
 
   useEffect(() => setIsMounted(true), []);
 
@@ -262,14 +277,39 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
     ? suppliedHeading
     : calculateBearing(hasLiveDriver ? driverPos : pickupPos, navigationMode ? navigationTarget : destPos);
 
+  latestDriverPositionRef.current = driverPos;
+
+  useEffect(() => {
+    if (!navigationMode) {
+      lastRoutedPositionRef.current = null;
+      setNavigationRouteOrigin(null);
+      return;
+    }
+
+    const refreshRouteOrigin = () => {
+      const latestPosition = latestDriverPositionRef.current;
+      if (!latestPosition) return;
+      const previousPosition = lastRoutedPositionRef.current;
+      if (previousPosition && distanceBetweenMeters(previousPosition, latestPosition) < 40) return;
+      lastRoutedPositionRef.current = latestPosition;
+      setNavigationRouteOrigin(latestPosition);
+    };
+
+    refreshRouteOrigin();
+    const timer = window.setInterval(refreshRouteOrigin, 12_000);
+    return () => window.clearInterval(timer);
+  }, [navigationMode, activeOrder?.id, navigationTarget[0], navigationTarget[1]]);
+
+  const routingDriverPos = navigationMode && navigationRouteOrigin ? navigationRouteOrigin : driverPos;
+
   const routeWaypoints = useMemo(() => {
     const points = navigationMode
-      ? [driverPos, navigationTarget]
+      ? [routingDriverPos, navigationTarget]
       : hasLiveDriver
         ? [pickupPos, driverPos, destPos]
         : [pickupPos, destPos];
     return points.map(([lat, lng]) => `${lng},${lat}`).join(";");
-  }, [navigationMode, hasLiveDriver, pickupPos[0], pickupPos[1], driverPos[0], driverPos[1], destPos[0], destPos[1], navigationTarget[0], navigationTarget[1]]);
+  }, [navigationMode, hasLiveDriver, pickupPos[0], pickupPos[1], driverPos[0], driverPos[1], routingDriverPos[0], routingDriverPos[1], destPos[0], destPos[1], navigationTarget[0], navigationTarget[1]]);
 
   useEffect(() => {
     let cancelled = false;
@@ -298,7 +338,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
       }
       if (!cancelled) {
         setRouteSummary(null);
-        setRoutePoints(navigationMode ? [driverPos, navigationTarget] : hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos]);
+        setRoutePoints(navigationMode ? [routingDriverPos, navigationTarget] : hasLiveDriver ? [pickupPos, driverPos, destPos] : [pickupPos, destPos]);
       }
     }
 
