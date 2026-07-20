@@ -11,8 +11,29 @@ import "../../styles/dn-portal-route-lock.css";
 import "../../styles/dn-portal-overlay.css";
 import "../../styles/dn-portal-auth-v5.css";
 
+export const PORTAL_NOTIFICATIONS_OPEN_EVENT = "daynight:portal-notifications-open";
+const DRIVER_BELL_SELECTOR = ".dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child";
+
 function isPortalPath(pathname: string) {
   return pathname === "/merchant" || pathname.startsWith("/merchant/") || pathname === "/driver" || pathname.startsWith("/driver/");
+}
+
+function syncDriverBell(unreadCount: number, isArabic: boolean) {
+  const button = document.querySelector<HTMLButtonElement>(DRIVER_BELL_SELECTOR);
+  if (!button) return false;
+
+  button.dataset.portalNotificationButton = "true";
+  button.setAttribute("aria-label", isArabic ? "فتح الإشعارات الحقيقية" : "Open realtime notifications");
+  let badge = button.querySelector<HTMLElement>("b");
+  if (!badge && unreadCount > 0) {
+    badge = document.createElement("b");
+    button.appendChild(badge);
+  }
+  if (badge) {
+    badge.textContent = String(unreadCount);
+    badge.style.display = unreadCount > 0 ? "grid" : "none";
+  }
+  return true;
 }
 
 export default function PortalRuntimeOverlay() {
@@ -49,34 +70,40 @@ export default function PortalRuntimeOverlay() {
   }, [portalActive]);
 
   useEffect(() => {
+    if (!portalActive) return;
+    const openNotifications = () => setNotificationsOpen(true);
+    window.addEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
+    return () => window.removeEventListener(PORTAL_NOTIFICATIONS_OPEN_EVENT, openNotifications);
+  }, [portalActive]);
+
+  useEffect(() => {
     if (!portalActive || !isDriver) return;
-
-    const bind = () => {
-      const button = document.querySelector<HTMLButtonElement>(".dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child");
+    const openFromDriverBell = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest(DRIVER_BELL_SELECTOR);
       if (!button) return;
-      button.dataset.portalNotificationButton = "true";
-      button.onclick = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setNotificationsOpen(true);
-      };
-      button.setAttribute("aria-label", isArabic ? "فتح الإشعارات الحقيقية" : "Open realtime notifications");
-
-      let badge = button.querySelector<HTMLElement>("b");
-      if (!badge && notifications.unreadCount > 0) {
-        badge = document.createElement("b");
-        button.appendChild(badge);
-      }
-      if (badge) {
-        badge.textContent = String(notifications.unreadCount);
-        badge.style.display = notifications.unreadCount > 0 ? "grid" : "none";
-      }
+      event.preventDefault();
+      event.stopPropagation();
+      setNotificationsOpen(true);
     };
+    document.addEventListener("click", openFromDriverBell, true);
+    return () => document.removeEventListener("click", openFromDriverBell, true);
+  }, [isDriver, portalActive]);
 
-    bind();
-    const observer = new MutationObserver(bind);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+  useEffect(() => {
+    if (!portalActive || !isDriver) return;
+    if (syncDriverBell(notifications.unreadCount, isArabic)) return;
+
+    let attempts = 0;
+    let frame = 0;
+    const retry = () => {
+      attempts += 1;
+      if (syncDriverBell(notifications.unreadCount, isArabic) || attempts >= 12) return;
+      frame = window.requestAnimationFrame(retry);
+    };
+    frame = window.requestAnimationFrame(retry);
+    return () => window.cancelAnimationFrame(frame);
   }, [isArabic, isDriver, notifications.unreadCount, portalActive]);
 
   const ThemeIcon = useMemo(() => themeMode === "dark" ? Moon : themeMode === "light" ? Sun : Laptop2, [themeMode]);
@@ -103,7 +130,7 @@ export default function PortalRuntimeOverlay() {
           <Headphones />
           <span>{isArabic ? "الدعم" : "Support"}</span>
         </a>
-        {userId && !isDriver && (
+        {userId && (
           <button type="button" className="is-notification" onClick={() => setNotificationsOpen(true)} title={isArabic ? "الإشعارات" : "Notifications"}>
             <Bell />
             <span>{isArabic ? "تنبيهات" : "Alerts"}</span>
