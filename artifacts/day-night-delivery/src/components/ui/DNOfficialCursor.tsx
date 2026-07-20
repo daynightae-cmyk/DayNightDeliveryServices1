@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import PortalRuntimeOverlay from "../portals/PortalRuntimeOverlay";
 
 const INTERACTIVE_SELECTOR = "a, button, input, textarea, select, [role='button'], [data-cursor='interactive']";
 
@@ -77,6 +78,7 @@ export function DNOfficialCursor() {
 
   return (
     <>
+      <PortalRuntimeOverlay />
       <div ref={ringRef} className="dn-cursor-ring" aria-hidden="true" />
       <div ref={dotRef} className="dn-cursor-dot" aria-hidden="true" />
     </>
