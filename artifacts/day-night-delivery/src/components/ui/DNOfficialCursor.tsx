@@ -1,14 +1,28 @@
 import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import PortalRuntimeOverlay from "../portals/PortalRuntimeOverlay";
 
 const INTERACTIVE_SELECTOR = "a, button, input, textarea, select, [role='button'], [data-cursor='interactive']";
 
+function requiresNativeCursor(pathname: string) {
+  return ["/driver", "/merchant", "/admin", "/auth", "/customer"].some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
 export function DNOfficialCursor() {
+  const location = useLocation();
   const ringRef = useRef<HTMLDivElement | null>(null);
   const dotRef = useRef<HTMLDivElement | null>(null);
+  const nativeCursor = requiresNativeCursor(location.pathname);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    root.classList.remove("dn-custom-cursor-enabled", "dn-custom-cursor-visible", "dn-custom-cursor-pressed");
+
+    if (nativeCursor) return;
 
     const finePointer = window.matchMedia("(pointer: fine)");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -18,7 +32,6 @@ export function DNOfficialCursor() {
     const dot = dotRef.current;
     if (!ring || !dot) return;
 
-    const root = document.documentElement;
     let pointerX = -120;
     let pointerY = -120;
     let ringX = pointerX;
@@ -74,13 +87,17 @@ export function DNOfficialCursor() {
       document.removeEventListener("mouseleave", onMouseLeave);
       document.removeEventListener("mouseenter", onMouseEnter);
     };
-  }, []);
+  }, [nativeCursor]);
 
   return (
     <>
       <PortalRuntimeOverlay />
-      <div ref={ringRef} className="dn-cursor-ring" aria-hidden="true" />
-      <div ref={dotRef} className="dn-cursor-dot" aria-hidden="true" />
+      {!nativeCursor && (
+        <>
+          <div ref={ringRef} className="dn-cursor-ring" aria-hidden="true" />
+          <div ref={dotRef} className="dn-cursor-dot" aria-hidden="true" />
+        </>
+      )}
     </>
   );
 }
