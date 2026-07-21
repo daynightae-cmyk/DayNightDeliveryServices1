@@ -15,8 +15,8 @@ language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-  if lower(coalesce(new.status, '')) = 'delivered'
-     and lower(coalesce(old.status, '')) is distinct from 'delivered' then
+  if lower(coalesce(new.status::text, '')) = 'delivered'
+     and lower(coalesce(old.status::text, '')) is distinct from 'delivered' then
     new.delivered_at := coalesce(new.delivered_at, now());
   end if;
   return new;
@@ -30,7 +30,7 @@ for each row execute function public.dn_set_order_delivered_at();
 
 update public.orders
 set delivered_at = coalesce(delivered_at, updated_at, created_at)
-where lower(coalesce(status, '')) = 'delivered'
+where lower(coalesce(status::text, '')) = 'delivered'
   and delivered_at is null;
 
 create table if not exists public.delivery_confirmation_outbox (
@@ -123,7 +123,7 @@ begin
   from (
     select *
     from public.orders o
-    where lower(coalesce(o.status, '')) in ('delivered','cancelled','canceled','returned','failed','delivery_failed')
+    where lower(coalesce(o.status::text, '')) in ('delivered','cancelled','canceled','returned','failed','delivery_failed')
       and (
         coalesce(to_jsonb(o)->>'customer_id', '') = v_uid::text
         or (v_email <> '' and lower(coalesce(to_jsonb(o)->>'customer_email', '')) = v_email)
