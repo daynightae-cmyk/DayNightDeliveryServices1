@@ -1,0 +1,390 @@
+/* DAY NIGHT — PRODUCTION VISUAL RESCUE V3
+   Final scoped overrides for the live Merchant and Admin portals.
+   No data, Supabase, pricing, order, driver, or financial logic is changed. */
+
+/* --------------------------------------------------------------------------
+   Merchant portal — deterministic desktop shell
+   -------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  body:has(.dn-merchant-app) {
+    overflow: hidden !important;
+    background: #07101e !important;
+  }
+
+  .dn-merchant-app {
+    position: relative !important;
+    display: grid !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    direction: ltr !important;
+    background:
+      radial-gradient(circle at 9% 4%, rgba(49, 149, 247, 0.13), transparent 31rem),
+      radial-gradient(circle at 93% 94%, rgba(212, 175, 55, 0.09), transparent 27rem),
+      #07101e !important;
+  }
+
+  .dn-merchant-app[dir="rtl"] {
+    grid-template-columns: minmax(0, 1fr) clamp(248px, 18vw, 286px) !important;
+    grid-template-areas: "main sidebar" !important;
+  }
+
+  .dn-merchant-app[dir="ltr"] {
+    grid-template-columns: clamp(248px, 18vw, 286px) minmax(0, 1fr) !important;
+    grid-template-areas: "sidebar main" !important;
+  }
+
+  .dn-merchant-app > .dn-merchant-sidebar {
+    grid-area: sidebar !important;
+    position: relative !important;
+    inset: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    z-index: 40 !important;
+  }
+
+  .dn-merchant-app > .dn-merchant-main-column {
+    grid-area: main !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .dn-merchant-app[dir="rtl"] > .dn-merchant-sidebar,
+  .dn-merchant-app[dir="rtl"] > .dn-merchant-main-column {
+    direction: rtl !important;
+  }
+
+  .dn-merchant-app[dir="ltr"] > .dn-merchant-sidebar,
+  .dn-merchant-app[dir="ltr"] > .dn-merchant-main-column {
+    direction: ltr !important;
+  }
+
+  .dn-merchant-main-column > .dn-merchant-header {
+    position: relative !important;
+    inset: auto !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .dn-merchant-main-column > .dn-merchant-connectivity-banner {
+    flex: 0 0 auto !important;
+  }
+
+  .dn-merchant-main-column > .dn-merchant-content {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: clamp(16px, 1.8vw, 28px) clamp(16px, 2vw, 32px) 48px !important;
+    scrollbar-color: #d4af37 #071a33;
+  }
+
+  .dn-merchant-content-inner {
+    width: 100% !important;
+    max-width: 1600px !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+  }
+
+  .dn-merchant-bottom-nav,
+  .dn-merchant-mobile-sheet-backdrop,
+  .dn-merchant-mobile-menu {
+    display: none !important;
+  }
+
+  .dn-merchant-dashboard-hero,
+  .dn-merchant-hero {
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1.45fr) minmax(230px, 0.55fr) !important;
+  }
+
+  .dn-merchant-dashboard-hero > *,
+  .dn-merchant-hero > *,
+  .dn-merchant-dashboard-grid > *,
+  .dn-merchant-two-col > *,
+  .dn-merchant-tracking-grid > *,
+  .dn-merchant-analytics-grid > * {
+    min-width: 0 !important;
+  }
+
+  .dn-merchant-metrics,
+  .dn-merchant-metrics.compact,
+  .dn-merchant-metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)) !important;
+  }
+
+  .dn-merchant-list-grid,
+  .dn-merchant-settings-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  }
+
+  .dn-merchant-table-wrap {
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: auto !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .dn-merchant-app[dir="rtl"] {
+    grid-template-columns: minmax(0, 1fr) 240px !important;
+  }
+
+  .dn-merchant-app[dir="ltr"] {
+    grid-template-columns: 240px minmax(0, 1fr) !important;
+  }
+
+  .dn-merchant-dashboard-hero,
+  .dn-merchant-hero {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-merchant-dashboard-hero aside,
+  .dn-merchant-hero aside {
+    min-width: 0 !important;
+  }
+}
+
+/* Dark merchant cards and form controls must remain readable. */
+.dn-merchant-app.is-dark :is(
+  .dn-merchant-card,
+  .dn-merchant-metric,
+  .dn-merchant-search,
+  .dn-merchant-tabs button,
+  .dn-merchant-field input,
+  .dn-merchant-field select,
+  .dn-merchant-field textarea,
+  .dn-merchant-choice-grid button,
+  .dn-merchant-modal,
+  .dn-merchant-mobile-sheet
+) {
+  border-color: rgba(148, 197, 239, 0.18) !important;
+  background: #0b213d !important;
+  color: #f8fbff !important;
+}
+
+.dn-merchant-app.is-dark :is(
+  .dn-merchant-card h2,
+  .dn-merchant-card h3,
+  .dn-merchant-card strong,
+  .dn-merchant-field > span,
+  .dn-merchant-section-header h2,
+  .dn-merchant-table td,
+  .dn-merchant-table th
+) {
+  color: #f8fbff !important;
+}
+
+.dn-merchant-app.is-dark :is(
+  .dn-merchant-card p,
+  .dn-merchant-card small,
+  .dn-merchant-section-header p,
+  .dn-merchant-metric > span,
+  .dn-merchant-table th
+) {
+  color: #b9cbe0 !important;
+}
+
+.dn-merchant-app.is-dark .dn-merchant-table tbody tr:hover {
+  background: #12385d !important;
+}
+
+/* --------------------------------------------------------------------------
+   Admin portal — one coherent high-contrast visual system for every section
+   -------------------------------------------------------------------------- */
+.dn-admin-fullscreen .dn-section-workspace {
+  --dn-ops-panel: #0a1d34;
+  --dn-ops-panel-2: #0d2743;
+  --dn-ops-panel-3: #12385d;
+  --dn-ops-line: rgba(148, 197, 239, 0.2);
+  --dn-ops-text: #f8fafc;
+  --dn-ops-muted: #b9cbe0;
+  color: var(--dn-ops-text) !important;
+  background: transparent !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-hero,
+  .dn-section-kpis > article,
+  .dn-section-panels > article,
+  .dn-section-table-card
+) {
+  border: 1px solid var(--dn-ops-line) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 42%),
+    linear-gradient(145deg, var(--dn-ops-panel), #07172c) !important;
+  color: var(--dn-ops-text) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24) !important;
+}
+
+.dn-admin-fullscreen .dn-section-hero {
+  border-color: rgba(212, 175, 55, 0.28) !important;
+  background:
+    radial-gradient(circle at 10% 0, rgba(49, 149, 247, 0.15), transparent 25rem),
+    radial-gradient(circle at 92% 100%, rgba(212, 175, 55, 0.12), transparent 23rem),
+    linear-gradient(145deg, #07172c, #0c2a4a) !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-hero h1,
+  .dn-section-hero h2,
+  .dn-section-hero h3,
+  .dn-section-kpis strong,
+  .dn-section-kpis span,
+  .dn-section-panels h3,
+  .dn-section-table-card h3
+) {
+  color: var(--dn-ops-text) !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-hero p,
+  .dn-section-hero span,
+  .dn-section-kpis small,
+  .dn-section-panels p,
+  .dn-clean-note
+) {
+  color: var(--dn-ops-muted) !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen .dn-section-kpis > article {
+  min-height: 118px !important;
+}
+
+.dn-admin-fullscreen .dn-section-kpis > article:hover,
+.dn-admin-fullscreen .dn-section-panels > article:hover {
+  border-color: rgba(212, 175, 55, 0.42) !important;
+  background: linear-gradient(145deg, var(--dn-ops-panel-3), #0a213b) !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-form input,
+  .dn-section-form select,
+  .dn-section-form textarea,
+  .dn-section-panels input,
+  .dn-section-panels select,
+  .dn-section-panels textarea
+) {
+  border: 1px solid rgba(99, 179, 237, 0.36) !important;
+  background: #061426 !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-form input,
+  .dn-section-form textarea,
+  .dn-section-panels input,
+  .dn-section-panels textarea
+)::placeholder {
+  color: #8fa8c2 !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-hero-actions button,
+  .dn-section-panels button,
+  .dn-section-table-card button
+) {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #f8fafc !important;
+}
+
+.dn-admin-fullscreen :is(
+  .dn-section-hero-actions button,
+  .dn-section-panels button,
+  .dn-section-table-card button
+):hover {
+  border-color: rgba(212, 175, 55, 0.6) !important;
+  background: linear-gradient(135deg, #d4af37, #ffe18a) !important;
+  color: #07172c !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-card {
+  overflow: hidden !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap {
+  border-color: var(--dn-ops-line) !important;
+  background: #061426 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap :is(table, tbody) {
+  background: #061426 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap thead,
+.dn-admin-fullscreen .dn-section-table-wrap thead tr,
+.dn-admin-fullscreen .dn-section-table-wrap th {
+  background: #0b2948 !important;
+  color: #ffe18a !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr {
+  background: var(--dn-ops-panel) !important;
+  color: #f8fafc !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr:nth-child(even) {
+  background: var(--dn-ops-panel-2) !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr:hover {
+  background: var(--dn-ops-panel-3) !important;
+  box-shadow: inset 4px 0 0 #d4af37 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap :is(td, td strong, td span, td small) {
+  color: #f8fafc !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td small {
+  color: #b9cbe0 !important;
+}
+
+/* Remove accidental washed-out overlays inherited from old light themes. */
+.dn-admin-fullscreen .dn-section-workspace :is(
+  .bg-white,
+  .bg-white\/90,
+  .bg-white\/95,
+  .bg-slate-50,
+  .bg-gray-50
+) {
+  background-color: var(--dn-ops-panel) !important;
+  color: var(--dn-ops-text) !important;
+}
+
+@media (max-width: 900px) {
+  .dn-admin-fullscreen .dn-section-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .dn-admin-fullscreen .dn-section-kpis {
+    grid-template-columns: 1fr !important;
+  }
+}
