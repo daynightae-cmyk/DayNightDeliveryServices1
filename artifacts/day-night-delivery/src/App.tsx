@@ -37,6 +37,7 @@ import "./lib/adminUiPolish";
 import "./styles/dn-admin-real-map-hotfix.css";
 import "./styles/dn-admin-day-polish.css";
 
+
 const Home = lazy(() => import("./components/Home"));
 const AboutUs = lazy(() => import("./components/AboutUs"));
 const Services = lazy(() => import("./components/Services"));
@@ -54,7 +55,7 @@ const Policy = lazy(() => import("./components/Policy"));
 const Privacy = lazy(() => import("./components/Privacy"));
 const QR = lazy(() => import("./components/QR"));
 const DriverPortal = lazy(() => import("./components/driver/DriverPortal"));
-const MerchantPortal = lazy(() => import("./components/merchant/MerchantPortal"));
+const MerchantPortal = lazy(() => import("./components/merchant/MerchantPortalCommandCenter"));
 const UltimateGalleryV2 = lazy(() => import("./components/Gallery/UltimateGalleryV2"));
 const AdminPanel = lazy(() => import("./components/AdminPanelLuxury"));
 const CustomerDashboard = lazy(() => import("./components/customer/CustomerDashboardLuxury"));
@@ -183,6 +184,7 @@ function AppContent() {
       </Suspense>
     );
   }
+
 
   return (
     <div
