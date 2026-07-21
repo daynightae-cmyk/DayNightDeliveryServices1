@@ -1,13 +1,28 @@
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useState,
   type ComponentProps,
 } from "react";
+import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
+import AdminOrderBulkOperations from "./AdminOrderBulkOperations";
 import AdminSectionWorkspaceComplete from "./AdminSectionWorkspaceComplete";
 
 const PENDING_SCOPE_KEY = "dn-admin-pending-merchant-order-scope";
 const SCOPE_TTL_MS = 60_000;
+
+const ORDER_SECTIONS = new Set([
+  "all_orders",
+  "cancelled",
+  "review",
+  "postponed",
+  "returned",
+  "pickup",
+  "abu_dhabi",
+  "external",
+  "out_scope",
+]);
 
 type WorkspaceProps = ComponentProps<typeof AdminSectionWorkspaceComplete>;
 
@@ -35,6 +50,42 @@ function clean(value: unknown) {
 
 function normalize(value: unknown) {
   return clean(value).toLocaleLowerCase();
+}
+
+function orderId(order: WorkspaceProps["orders"][number]) {
+  return clean(order.id || order.tracking_number || order.invoice_number || order.coupon_number);
+}
+
+function orderSearchText(order: WorkspaceProps["orders"][number]) {
+  return normalize(
+    [
+      order.id,
+      order.tracking_number,
+      order.invoice_number,
+      order.coupon_number,
+      order.merchant_id,
+      order.merchant_code,
+      order.merchant_name,
+      order.sender_name,
+      order.sender_phone,
+      order.receiver_name,
+      order.customer_name,
+      order.receiver_phone,
+      order.customer_phone,
+      order.sender_city,
+      order.receiver_city,
+      order.destination_country,
+      order.sender_address,
+      order.receiver_address,
+      order.driver_name,
+      order.driver_phone,
+      order.status,
+      normalizeOrderStatus(order),
+      order.cod_amount,
+      order.delivery_price,
+      order.notes,
+    ].join(" "),
+  );
 }
 
 function installMerchantOrderScopeCapture() {
@@ -115,6 +166,9 @@ function consumePendingScope(): MerchantScopeHint | null {
 
 export default function AdminSectionWorkspace(props: WorkspaceProps) {
   const [scopeHint, setScopeHint] = useState<MerchantScopeHint | null>(null);
+  const [merchantFilterId, setMerchantFilterId] = useState("");
+  const [bulkQuery, setBulkQuery] = useState("");
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   useLayoutEffect(() => {
     if (props.id !== "all_orders") {
@@ -123,6 +177,12 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     }
 
     setScopeHint(consumePendingScope());
+  }, [props.id]);
+
+  useEffect(() => {
+    setMerchantFilterId("");
+    setBulkQuery("");
+    setSelectedOrderIds([]);
   }, [props.id]);
 
   const resolution = useMemo(() => {
@@ -188,6 +248,39 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     };
   }, [props.merchants, props.orders, scopeHint]);
 
+  const filteredOrders = useMemo(() => {
+    const query = normalize(bulkQuery);
+    return resolution.orders.filter((order) => {
+      if (merchantFilterId && clean(order.merchant_id) !== merchantFilterId) return false;
+      if (query && !orderSearchText(order).includes(query)) return false;
+      return true;
+    });
+  }, [bulkQuery, merchantFilterId, resolution.orders]);
+
+  const visibleSectionOrders = useMemo(
+    () => filteredOrders.filter((order) => matchesAdminSection(order, props.id)),
+    [filteredOrders, props.id],
+  );
+
+  useEffect(() => {
+    const allowed = new Set(visibleSectionOrders.map(orderId).filter(Boolean));
+    setSelectedOrderIds((current) => {
+      const next = current.filter((id) => allowed.has(id));
+      return next.length === current.length && next.every((id, index) => id === current[index])
+        ? current
+        : next;
+    });
+  }, [visibleSectionOrders]);
+
+  const selectedOrders = useMemo(() => {
+    if (!selectedOrderIds.length) return [];
+    const selected = new Set(selectedOrderIds);
+    return visibleSectionOrders.filter((order) => selected.has(orderId(order)));
+  }, [selectedOrderIds, visibleSectionOrders]);
+
+  const workspaceOrders = selectedOrders.length ? selectedOrders : filteredOrders;
+  const showBulkConsole = ORDER_SECTIONS.has(props.id);
+
   return (
     <>
       {scopeHint && (
@@ -230,7 +323,29 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
         </div>
       )}
 
-      <AdminSectionWorkspaceComplete {...props} orders={resolution.orders} />
+      {showBulkConsole && (
+        <div className="mb-4">
+          <AdminOrderBulkOperations
+            isArabic={props.isArabic}
+            orders={visibleSectionOrders}
+            merchants={props.merchants}
+            merchantId={merchantFilterId}
+            query={bulkQuery}
+            selectedIds={selectedOrderIds}
+            onMerchantChange={(merchantId) => {
+              setMerchantFilterId(merchantId);
+              setSelectedOrderIds([]);
+            }}
+            onQueryChange={(query) => {
+              setBulkQuery(query);
+              setSelectedOrderIds([]);
+            }}
+            onSelectionChange={setSelectedOrderIds}
+          />
+        </div>
+      )}
+
+      <AdminSectionWorkspaceComplete {...props} orders={workspaceOrders} />
     </>
   );
 }
