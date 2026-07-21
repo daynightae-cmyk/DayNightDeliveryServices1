@@ -43,7 +43,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: TypeScript check
-        run: pnpm run web:typecheck
+        run: |
+          set -o pipefail
+          pnpm run web:typecheck 2>&1 | tee typecheck.log
+
+      - name: Upload TypeScript diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-closure-typecheck
+          path: typecheck.log
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Production hardening gate
         run: pnpm run web:gate
