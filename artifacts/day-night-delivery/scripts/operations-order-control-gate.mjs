@@ -35,7 +35,7 @@ expect(bulk, /orders\.map\(orderId\)/, "Select-all uses only currently filtered 
 
 const workspace = read("src/components/admin/AdminSectionWorkspace.tsx");
 expect(workspace, /AdminOrderBulkOperations/, "Admin order workspace mounts bulk operations");
-expect(workspace, /clean\(order\.merchant_id\) === merchantFilterId/, "Merchant filter uses orders.merchant_id only");
+expect(workspace, /merchantFilterId[\s\S]{0,120}clean\(order\.merchant_id\) !== merchantFilterId/, "Merchant filter excludes every non-matching orders.merchant_id row");
 expect(workspace, /matchesAdminSection/, "Bulk list respects the active operational order section");
 
 const driver = read("src/components/driver/DriverOrderCard.tsx");
