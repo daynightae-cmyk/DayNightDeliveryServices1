@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/delivery-confirmation",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "redirects": [
