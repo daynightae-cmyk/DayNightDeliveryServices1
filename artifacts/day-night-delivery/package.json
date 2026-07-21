@@ -9,12 +9,13 @@
     "build": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs",
     "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "production:gate": "node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs && node scripts/coupon-camera-production-gate.mjs && node scripts/admin-final-closure-gate.mjs && node scripts/merchant-final-closure-gate.mjs && node scripts/runtime-live-feature-gate.mjs && node scripts/production-core-rescue-gate.mjs",
+    "production:gate": "node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs && node scripts/coupon-camera-production-gate.mjs && node scripts/admin-final-closure-gate.mjs && node scripts/merchant-final-closure-gate.mjs && node scripts/runtime-live-feature-gate.mjs && node scripts/production-core-rescue-gate.mjs && node scripts/operations-order-control-gate.mjs",
     "admin:closure": "node scripts/admin-final-closure-gate.mjs",
     "build:spa": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs",
     "merchant:closure": "node scripts/merchant-final-closure-gate.mjs",
     "runtime:gate": "node scripts/runtime-live-feature-gate.mjs",
     "core:gate": "node scripts/production-core-rescue-gate.mjs",
+    "operations:gate": "node scripts/operations-order-control-gate.mjs",
     "runtime:e2e": "node scripts/runtime-delivery-e2e.mjs"
   },
   "devDependencies": {
@@ -87,7 +88,7 @@
     "@supabase/supabase-js": "^2.108.2",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
-    "motion": "^12.41.0",
+    "motion": "catalog:",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.18.0"
   }
