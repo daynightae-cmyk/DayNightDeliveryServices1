@@ -44,6 +44,106 @@ function Invoke-Checked {
   Write-Host "PASSED: $Name" -ForegroundColor Green
 }
 
+function Remove-DirectoryRobust {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  Write-Host "Removing stale dependency directory: $Path" -ForegroundColor Yellow
+
+  $Previous = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    & cmd.exe /d /c "rmdir /s /q `"$Path`""
+    $ExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $Previous
+  }
+
+  if ($ExitCode -ne 0 -and (Test-Path -LiteralPath $Path)) {
+    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+  }
+}
+
+function Install-WorkspaceDependencies {
+  param([Parameter(Mandatory = $true)][string]$Root)
+
+  $IsWindowsHost = $env:OS -eq "Windows_NT"
+  if (-not $IsWindowsHost) {
+    Invoke-Checked -Name "Install workspace dependencies" -Command {
+      pnpm install --frozen-lockfile
+    }
+    return
+  }
+
+  $WorkspaceFile = Join-Path $Root "pnpm-workspace.yaml"
+  $LockFile = Join-Path $Root "pnpm-lock.yaml"
+  $NodeModules = Join-Path $Root "node_modules"
+
+  if (-not (Test-Path -LiteralPath $WorkspaceFile)) {
+    throw "pnpm-workspace.yaml is missing."
+  }
+
+  if (-not (Test-Path -LiteralPath $LockFile)) {
+    throw "pnpm-lock.yaml is missing."
+  }
+
+  $WorkspaceOriginal = Get-Content -LiteralPath $WorkspaceFile -Raw
+  $LockOriginal = Get-Content -LiteralPath $LockFile -Raw
+
+  try {
+    # The production workspace intentionally strips unused platform binaries on Linux.
+    # For a real Windows validation build, temporarily allow the x64 native bindings
+    # required by Tailwind Oxide, Lightning CSS, Rollup, and esbuild.
+    $WorkspaceWindows = $WorkspaceOriginal
+    $Patterns = @(
+      '(?m)^\s*"esbuild>@esbuild/win32-x64":\s*"-"\s*\r?\n?',
+      '(?m)^\s*"lightningcss>lightningcss-win32-x64-msvc":\s*"-"\s*\r?\n?',
+      '(?m)^\s*"@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc":\s*"-"\s*\r?\n?',
+      '(?m)^\s*"rollup>@rollup/rollup-win32-x64-msvc":\s*"-"\s*\r?\n?'
+    )
+
+    foreach ($Pattern in $Patterns) {
+      $WorkspaceWindows = [regex]::Replace($WorkspaceWindows, $Pattern, "")
+    }
+
+    [System.IO.File]::WriteAllText(
+      $WorkspaceFile,
+      $WorkspaceWindows,
+      [System.Text.UTF8Encoding]::new($false)
+    )
+
+    Remove-DirectoryRobust -Path $NodeModules
+
+    Invoke-Checked -Name "Install Windows-native workspace dependencies" -Command {
+      pnpm install --no-frozen-lockfile --force
+    }
+
+    $OxideBinary = Get-ChildItem -LiteralPath $NodeModules -Recurse -File -Filter "tailwindcss-oxide.win32-x64-msvc.node" -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+
+    if (-not $OxideBinary) {
+      throw "Tailwind Oxide Windows native binding was not installed."
+    }
+
+    Write-Host "PASSED: Tailwind Oxide Windows native binding is installed" -ForegroundColor Green
+  } finally {
+    [System.IO.File]::WriteAllText(
+      $WorkspaceFile,
+      $WorkspaceOriginal,
+      [System.Text.UTF8Encoding]::new($false)
+    )
+
+    [System.IO.File]::WriteAllText(
+      $LockFile,
+      $LockOriginal,
+      [System.Text.UTF8Encoding]::new($false)
+    )
+  }
+}
+
 if (-not (Test-Path -LiteralPath $RepoPath)) {
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is not installed. Run the owner audit installer first."
@@ -67,9 +167,7 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
   }
 }
 
-Invoke-Checked -Name "Install workspace dependencies" -Command {
-  pnpm install --frozen-lockfile
-}
+Install-WorkspaceDependencies -Root $RepoPath
 
 Invoke-Checked -Name "Validate production web application" -Command {
   pnpm run web:validate
