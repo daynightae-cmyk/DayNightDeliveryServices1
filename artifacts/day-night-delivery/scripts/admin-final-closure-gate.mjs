@@ -43,6 +43,7 @@ const drivers = read("src/components/admin/DriverTrackingPanel.tsx");
 const driverHook = read("src/hooks/useAdminDrivers.ts");
 const finance = read("src/components/admin/AdminFinanceOperationsCenter.tsx");
 const financeLedger = read("src/lib/adminFinanceLedger.ts");
+const dailyClosing = read("src/components/admin/AdminDailyClosingPanel.tsx");
 const support = read("src/components/admin/AdminSystemSupportCenter.tsx");
 const health = read("src/components/admin/AdminDatabaseHealthCenter.tsx");
 const readiness = read("src/components/admin/AdminProductionReadinessCenter.tsx");
@@ -75,7 +76,7 @@ includesAll(legacyPanel, [
   'active === "merchants"', 'active === "live_drivers"', 'active === "finance_dashboard"',
   'active === "database_health"', 'active === "production_readiness"',
   'active === "settings"', 'active === "support"', "operationsLayerSections.includes(active)",
-  "SpecializedAdminSectionWorkspace",
+  "SpecializedAdminSectionWorkspace", "AdminDailyClosingPanel",
 ], "renderer coverage");
 
 includesAll(commandCenter, [
@@ -111,12 +112,13 @@ assert(!map.includes("Math.random("), "Admin map contains no random coordinates"
 
 includesAll(finance, [
   "adminFinanceLedger", "createFinanceExpense", "setFinanceExpenseStatus",
-  "createFinanceAdjustment", "upsertFinanceBudget", "AdminDailyClosingPanel",
+  "createFinanceAdjustment", "upsertFinanceBudget",
 ], "finance center operations");
 includesAll(financeLedger, [
   "admin_finance_operations_snapshot", "order_financial_settlements",
   "financial_account_entries", "admin_finance_budget_status",
 ], "authoritative finance sources");
+includesAll(dailyClosing, ["saveAdminDailyClosing", "financeSummary", "onNavigate"], "daily closing operation");
 
 includesAll(productionData, [
   'id === "import"', 'table: "import_batches"', 'table: "print_jobs"',
@@ -148,7 +150,7 @@ includesAll(financeMigration, [
   "admin_finance_hardening_health", "financial_account_entries",
 ], "finance hardening migration");
 
-const adminFiles = [legacyPanel, commandCenter, commandShell, workspace, operationsLayer, orderForm, merchantForm, drivers, finance, support, health, readiness];
+const adminFiles = [legacyPanel, commandCenter, commandShell, workspace, operationsLayer, orderForm, merchantForm, drivers, finance, dailyClosing, support, health, readiness];
 const combined = adminFiles.join("\n");
 assert(!combined.includes("alert("), "Admin production components contain no alert() operations");
 assert(!combined.includes("onClick={() => {}}"), "Admin production components contain no explicit no-op buttons");
