@@ -1,0 +1,95 @@
+name: Runtime Delivery E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_test_data:
+        description: Preserve the generated test order and records for manual inspection
+        required: false
+        type: boolean
+        default: false
+      confirmation_api_url:
+        description: Deployed confirmation endpoint, for example https://daynightae.com/api/delivery-confirmation
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-delivery-e2e
+  cancel-in-progress: false
+
+jobs:
+  live-runtime:
+    name: Merchant → Admin → Driver live lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify required protected secrets
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY \
+            RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD \
+            RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD \
+            RUNTIME_DRIVER_EMAIL RUNTIME_DRIVER_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected secrets: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+
+      - name: Static runtime feature gate
+        run: pnpm --dir artifacts/day-night-delivery run runtime:gate
+
+      - name: Execute live delivery lifecycle
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+          RUNTIME_CUSTOMER_EMAIL: ${{ secrets.RUNTIME_CUSTOMER_EMAIL }}
+          RUNTIME_CONFIRMATION_API_URL: ${{ inputs.confirmation_api_url }}
+          RUNTIME_E2E_KEEP_DATA: ${{ inputs.keep_test_data }}
+        run: pnpm --dir artifacts/day-night-delivery run runtime:e2e
