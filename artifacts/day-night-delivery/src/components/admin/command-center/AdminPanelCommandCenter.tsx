@@ -31,8 +31,10 @@ import {
   XCircle,
 } from "lucide-react";
 import companyMeta from "../../../data/companyMeta";
+import { fetchAdminOrders, fetchMerchants } from "../../../lib/adminData";
 import { useAppContext } from "../../../lib/AppContext";
 import { supabase } from "../../../supabase";
+import type { Merchant, Order } from "../../../types";
 import AdminPanelLuxury from "../../AdminPanelLuxury";
 import type { AdminSectionId } from "../AdminSectionRegistry";
 import AdminCommandCenterShell, {
@@ -75,12 +77,32 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "logout", ar: "تسجيل الخروج", en: "Logout", groupAr: "الحساب", groupEn: "Account", Icon: LogOut },
 ];
 
-function hiddenSidebarButtons() {
+function legacySidebarButtons() {
   return Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-admin-side-nav button"));
 }
 
-function hiddenRefreshAction() {
+function legacyRefreshAction() {
   return document.querySelectorAll<HTMLButtonElement>(".dn-admin-top-actions button").item(1);
+}
+
+function orderReference(order: Order) {
+  return String(order.tracking_number || order.invoice_number || order.coupon_number || order.id || "").trim();
+}
+
+function applyWorkspaceSearch(value: string) {
+  const run = () => {
+    const input = document.querySelector<HTMLInputElement>(".dn-admin-workspace-host .dn-section-form input");
+    if (!input) return false;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.focus();
+    return true;
+  };
+  if (run()) return;
+  window.setTimeout(run, 120);
+  window.setTimeout(run, 360);
 }
 
 export default function AdminPanelCommandCenter() {
@@ -93,21 +115,56 @@ export default function AdminPanelCommandCenter() {
   const [error, setError] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [khalifaOpen, setKhalifaOpen] = useState(false);
+  const [searchOrders, setSearchOrders] = useState<Order[]>([]);
+  const [searchMerchants, setSearchMerchants] = useState<Merchant[]>([]);
 
   const activeItem = menu.find((item) => item.id === active) ?? menu[0];
-  const searchItems = useMemo<AdminCommandSearchItem[]>(
-    () =>
-      menu.map((item) => ({
-        key: `section:${item.id}`,
-        sectionId: item.id,
-        labelAr: item.ar,
-        labelEn: item.en,
-        secondaryAr: item.groupAr,
-        secondaryEn: item.groupEn,
-        kind: "section",
-      })),
-    [],
-  );
+  const searchItems = useMemo<AdminCommandSearchItem[]>(() => {
+    const sections = menu.map((item) => ({
+      key: `section:${item.id}`,
+      sectionId: item.id,
+      labelAr: item.ar,
+      labelEn: item.en,
+      secondaryAr: item.groupAr,
+      secondaryEn: item.groupEn,
+      kind: "section" as const,
+    }));
+    const orders = searchOrders.slice(0, 120).map((order) => {
+      const reference = orderReference(order) || (isArabic ? "طلب بدون مرجع" : "Order without reference");
+      const secondary = [order.merchant_name || order.sender_name, order.receiver_name || order.customer_name, order.receiver_phone]
+        .filter(Boolean)
+        .join(" · ");
+      return {
+        key: `order:${String(order.id || reference)}`,
+        sectionId: "all_orders" as const,
+        labelAr: reference,
+        labelEn: reference,
+        secondaryAr: secondary,
+        secondaryEn: secondary,
+        kind: "order" as const,
+      };
+    });
+    const merchants = searchMerchants.slice(0, 100).map((merchant) => {
+      const name = String(merchant.trade_name || merchant.owner_name || merchant.merchant_code || merchant.id);
+      const secondary = [merchant.merchant_code, merchant.phone, merchant.city || merchant.emirate].filter(Boolean).join(" · ");
+      return {
+        key: `merchant:${merchant.id}`,
+        sectionId: "merchants" as const,
+        labelAr: name,
+        labelEn: name,
+        secondaryAr: secondary,
+        secondaryEn: secondary,
+        kind: "merchant" as const,
+      };
+    });
+    return [...sections, ...orders, ...merchants];
+  }, [isArabic, searchMerchants, searchOrders]);
+
+  async function loadSearchData() {
+    const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
+    if (ordersResult.status === "fulfilled") setSearchOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+    if (merchantsResult.status === "fulfilled") setSearchMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -118,6 +175,7 @@ export default function AdminPanelCommandCenter() {
       const name = String(metadata?.full_name || metadata?.name || metadata?.display_name || "").trim();
       setOperatorLabel(name || String(user?.email || "").split("@")[0] || "DAY NIGHT Operations Admin");
     });
+    void loadSearchData();
     return () => {
       mounted = false;
     };
@@ -125,45 +183,53 @@ export default function AdminPanelCommandCenter() {
 
   useEffect(() => {
     const syncFromLegacyPanel = () => {
-      const buttons = hiddenSidebarButtons();
+      const buttons = legacySidebarButtons();
       const selectedIndex = buttons.findIndex((button) => button.classList.contains("is-active"));
       if (selectedIndex >= 0 && menu[selectedIndex]) setActive(menu[selectedIndex].id);
-
       const isLoading = Boolean(document.querySelector(".dn-admin-loading-banner"));
       const errorNode = document.querySelector<HTMLElement>(".dn-admin-error-banner");
       setLoading(isLoading);
       setError(errorNode?.textContent?.trim() || "");
-      if (!isLoading && document.querySelector(".dn-admin-fullscreen")) {
-        setLastSyncAt((current) => current ?? new Date());
-      }
+      if (!isLoading && document.querySelector(".dn-admin-fullscreen")) setLastSyncAt((current) => current ?? new Date());
     };
-
     syncFromLegacyPanel();
     const observer = new MutationObserver(syncFromLegacyPanel);
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["class", "dir"],
-    });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "dir"] });
     return () => observer.disconnect();
   }, []);
 
   const navigate = (id: AdminSectionId) => {
     const index = menu.findIndex((item) => item.id === id);
-    const button = hiddenSidebarButtons()[index];
+    const button = legacySidebarButtons()[index];
     if (button) button.click();
     else if (id === "logout") navigateRouter("/auth");
     setActive(id);
   };
 
+  const selectSearchItem = (item: AdminCommandSearchItem) => {
+    navigate(item.sectionId);
+    if (item.kind === "order") applyWorkspaceSearch(item.labelEn);
+  };
+
   const refresh = () => {
-    const button = hiddenRefreshAction();
+    const button = legacyRefreshAction();
     if (button) {
       setLoading(true);
       button.click();
       setLastSyncAt(new Date());
     }
+    void loadSearchData();
+  };
+
+  const openNotifications = () => {
+    const clickBell = () => document.querySelector<HTMLButtonElement>(".dn-admin-notification-bell > button")?.click();
+    if (document.querySelector(".dn-admin-notification-bell > button")) {
+      clickBell();
+      return;
+    }
+    navigate("dashboard");
+    window.setTimeout(clickBell, 120);
+    window.setTimeout(clickBell, 360);
   };
 
   const goBack = () => {
@@ -190,14 +256,18 @@ export default function AdminPanelCommandCenter() {
       searchItems={searchItems}
       khalifaOpen={khalifaOpen}
       onNavigate={navigate}
-      onSearchSelect={(item) => navigate(item.sectionId)}
+      onSearchSelect={selectSearchItem}
       onToggleLanguage={toggleLanguage}
       onToggleTheme={toggleTheme}
       onToggleKhalifa={() => setKhalifaOpen((value) => !value)}
       onBack={goBack}
       onOpenWebsite={() => navigateRouter("/")}
       onRefresh={refresh}
-      notificationSlot={<Bell aria-hidden="true" />}
+      notificationSlot={
+        <button type="button" onClick={openNotifications} aria-label={isArabic ? "فتح الإشعارات" : "Open notifications"} title={isArabic ? "الإشعارات" : "Notifications"}>
+          <Bell aria-hidden="true" />
+        </button>
+      }
     >
       <AdminPanelLuxury />
     </AdminCommandCenterShell>
