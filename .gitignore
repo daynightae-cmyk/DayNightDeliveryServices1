@@ -1,56 +1,40 @@
-# dependencies
+```
+# Dependencies
 node_modules/
-
-# build outputs
-dist/
-build/
-out-tsc/
-tmp/
+.yarn/
+npm-debug.log*
+$RECYCLE.BIN/
 *.tsbuildinfo
+.nyc_output/
+coverage/
+lib-cov/
 
-# environment and local secrets
+# Environment variables
 .env
+.env.local
 .env.*
 !.env.example
-*.local
-.vercel/
-.netlify/
 
-# logs and caches
-.cache/
-.local/
-coverage/
-npm-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-*.log
-
-# editors
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# IDE and editor files
+.vscode/
 .idea/
-.project
-.classpath
-.settings/
-*.sublime-workspace
-.c9/
-
-# system files
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 
-# generated / migrated legacy material
-.migration-backup/
-attached_assets/Pasted-*.txt
+# Build outputs
+dist/
+build/
+.out/
+.bundle/
 
-# Replit / generated rules
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-.expo/
-.expo-shared/
+# Logs
+*.log
 
-backup_auth_ref_*/
-backup_premium_auth_*/
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+```
