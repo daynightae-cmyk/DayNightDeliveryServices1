@@ -80,40 +80,63 @@ function Install-WorkspaceDependencies {
 
   $WorkspaceFile = Join-Path $Root "pnpm-workspace.yaml"
   $LockFile = Join-Path $Root "pnpm-lock.yaml"
+  $PackageFile = Join-Path $Root "package.json"
   $NodeModules = Join-Path $Root "node_modules"
 
   if (-not (Test-Path -LiteralPath $WorkspaceFile)) {
-    throw "pnpm-workspace.yaml is missing."
+    throw "pnpm-workspace.yaml is missing. Resolved repository root: $Root"
   }
 
   if (-not (Test-Path -LiteralPath $LockFile)) {
-    throw "pnpm-lock.yaml is missing."
+    throw "pnpm-lock.yaml is missing. Resolved repository root: $Root"
+  }
+
+  if (-not (Test-Path -LiteralPath $PackageFile)) {
+    throw "package.json is missing. Resolved repository root: $Root"
   }
 
   $WorkspaceOriginal = Get-Content -LiteralPath $WorkspaceFile -Raw
   $LockOriginal = Get-Content -LiteralPath $LockFile -Raw
+  $PackageOriginal = Get-Content -LiteralPath $PackageFile -Raw
 
   try {
-    # The production workspace intentionally strips unused platform binaries on Linux.
-    # For a real Windows validation build, temporarily allow the x64 native bindings
-    # required by Tailwind Oxide, Lightning CSS, Rollup, and esbuild.
-    $WorkspaceWindows = $WorkspaceOriginal
-    $Patterns = @(
-      '(?m)^\s*"esbuild>@esbuild/win32-x64":\s*"-"\s*\r?\n?',
-      '(?m)^\s*"lightningcss>lightningcss-win32-x64-msvc":\s*"-"\s*\r?\n?',
-      '(?m)^\s*"@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc":\s*"-"\s*\r?\n?',
-      '(?m)^\s*"rollup>@rollup/rollup-win32-x64-msvc":\s*"-"\s*\r?\n?'
+    # The production Linux workspace strips unused platform binaries. For a
+    # Windows validation build we remove only the four exact x64 exclusion
+    # lines. Filtering line-by-line preserves all YAML indentation.
+    $ExcludedKeys = @(
+      '"esbuild>@esbuild/win32-x64":',
+      '"lightningcss>lightningcss-win32-x64-msvc":',
+      '"@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc":',
+      '"rollup>@rollup/rollup-win32-x64-msvc":'
     )
 
-    foreach ($Pattern in $Patterns) {
-      $WorkspaceWindows = [regex]::Replace($WorkspaceWindows, $Pattern, "")
+    $WorkspaceLines = [System.IO.File]::ReadAllLines($WorkspaceFile)
+    $WorkspaceWindowsLines = foreach ($Line in $WorkspaceLines) {
+      $Trimmed = $Line.TrimStart()
+      $ShouldRemove = $false
+
+      foreach ($Key in $ExcludedKeys) {
+        if ($Trimmed.StartsWith($Key, [System.StringComparison]::Ordinal)) {
+          $ShouldRemove = $true
+          break
+        }
+      }
+
+      if (-not $ShouldRemove) {
+        $Line
+      }
     }
 
-    [System.IO.File]::WriteAllText(
+    [System.IO.File]::WriteAllLines(
       $WorkspaceFile,
-      $WorkspaceWindows,
+      [string[]]$WorkspaceWindowsLines,
       [System.Text.UTF8Encoding]::new($false)
     )
+
+    # Fail immediately if the temporary YAML was malformed.
+    Invoke-Checked -Name "Validate temporary Windows pnpm workspace" -Command {
+      pnpm config get minimumReleaseAge --location project | Out-Null
+    }
 
     Remove-DirectoryRobust -Path $NodeModules
 
@@ -125,10 +148,21 @@ function Install-WorkspaceDependencies {
       Select-Object -First 1
 
     if (-not $OxideBinary) {
+      Write-Host "Tailwind Oxide was not pulled transitively; installing the exact Windows binding..." -ForegroundColor Yellow
+      Invoke-Checked -Name "Install exact Tailwind Oxide Windows binding" -Command {
+        pnpm add --workspace-root --save-optional "@tailwindcss/oxide-win32-x64-msvc@4.3.0" --no-frozen-lockfile
+      }
+
+      $OxideBinary = Get-ChildItem -LiteralPath $NodeModules -Recurse -File -Filter "tailwindcss-oxide.win32-x64-msvc.node" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    }
+
+    if (-not $OxideBinary) {
       throw "Tailwind Oxide Windows native binding was not installed."
     }
 
     Write-Host "PASSED: Tailwind Oxide Windows native binding is installed" -ForegroundColor Green
+    Write-Host "Native binding: $($OxideBinary.FullName)" -ForegroundColor DarkGreen
   } finally {
     [System.IO.File]::WriteAllText(
       $WorkspaceFile,
@@ -139,6 +173,12 @@ function Install-WorkspaceDependencies {
     [System.IO.File]::WriteAllText(
       $LockFile,
       $LockOriginal,
+      [System.Text.UTF8Encoding]::new($false)
+    )
+
+    [System.IO.File]::WriteAllText(
+      $PackageFile,
+      $PackageOriginal,
       [System.Text.UTF8Encoding]::new($false)
     )
   }
@@ -154,6 +194,7 @@ if (-not (Test-Path -LiteralPath $RepoPath)) {
   }
 }
 
+$RepoPath = (Resolve-Path -LiteralPath $RepoPath).Path
 Set-Location -LiteralPath $RepoPath
 
 Invoke-Checked -Name "Update main" -Command {
