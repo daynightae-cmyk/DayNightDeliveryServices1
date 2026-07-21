@@ -83,7 +83,11 @@ function readPendingNotes(): FinanceRow[] {
 }
 function writePendingNotes(rows: FinanceRow[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(storageKey, JSON.stringify(rows.slice(0, 80)));
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(rows.slice(0, 80)));
+  } catch {
+    // Storage can be unavailable in private browser contexts.
+  }
 }
 function rowDate(row: FinanceRow) {
   return String(row.created_at || row.updated_at || new Date().toISOString()).slice(0, 19).replace("T", " ");
@@ -253,7 +257,11 @@ export default function AdminSystemSupportCenter({ isArabic, orders, merchants, 
     let syncedCount = 0;
     for (const row of pending) {
       const rowMeta = metadata(row);
-      const cleanMetadata = { ...rowMeta, sync_status: "database", syncedAt: new Date().toISOString() };
+      const cleanMetadata: Record<string, unknown> = {
+        ...rowMeta,
+        sync_status: "database",
+        syncedAt: new Date().toISOString(),
+      };
       delete cleanMetadata.local_id;
       const saved = await createAdminAuditEvent({
         entity_type: "support_note",
