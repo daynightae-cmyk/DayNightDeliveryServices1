@@ -1,0 +1,475 @@
+/* DAY NIGHT Admin Command Center — harmony hotfix
+   Removes duplicate legacy chrome, restores navigation and theme coherence,
+   and converts Khalifa into an intentional assistant drawer.
+*/
+
+.dncc-shell {
+  --dncc-page: #f3f6fa;
+  --dncc-surface: #ffffff;
+  --dncc-surface-2: #f7f9fc;
+  --dncc-elevated: #ffffff;
+  --dncc-text: #10213a;
+  --dncc-text-soft: #66758b;
+  --dncc-border: rgba(7, 26, 51, 0.11);
+  --dncc-card-shadow: 0 10px 30px rgba(7, 26, 51, 0.07);
+}
+
+.dncc-shell[data-theme="dark"] {
+  --dncc-page: #06111f;
+  --dncc-surface: #0b1c30;
+  --dncc-surface-2: #0e223a;
+  --dncc-elevated: #102741;
+  --dncc-text: #edf5ff;
+  --dncc-text-soft: #9fb0c7;
+  --dncc-border: rgba(148, 179, 214, 0.18);
+  --dncc-card-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+  color-scheme: dark;
+}
+
+.dncc-shell .dncc-stage {
+  background: var(--dncc-page) !important;
+  color: var(--dncc-text);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.dncc-shell .dncc-topbar {
+  grid-template-columns: minmax(280px, 0.95fr) minmax(260px, 1.35fr) minmax(370px, 1.2fr);
+  min-height: 76px;
+  border-color: var(--dncc-border);
+  background: color-mix(in srgb, var(--dncc-surface) 94%, transparent);
+  box-shadow: 0 7px 24px rgba(7, 26, 51, 0.05);
+}
+
+.dncc-shell[data-theme="dark"] .dncc-topbar {
+  box-shadow: 0 9px 28px rgba(0, 0, 0, 0.22);
+}
+
+.dncc-history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  flex: 0 0 auto;
+}
+
+.dncc-history-actions button,
+.dncc-topbar-actions > button,
+.dncc-notification-slot > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  gap: 0.3rem;
+  border: 1px solid var(--dncc-border);
+  border-radius: 11px;
+  background: var(--dncc-surface);
+  color: var(--dncc-text-soft);
+  transition: 150ms ease;
+}
+
+.dncc-history-actions button:hover,
+.dncc-history-actions button:focus-visible,
+.dncc-topbar-actions > button:hover,
+.dncc-topbar-actions > button:focus-visible {
+  border-color: rgba(0, 87, 184, 0.32);
+  background: color-mix(in srgb, var(--dncc-surface) 86%, #38bdf8 14%);
+  color: #0873cf;
+  outline: none;
+}
+
+.dncc-topbar-actions > button.is-active {
+  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.14);
+  color: #a77d00;
+}
+
+.dncc-shell[data-theme="dark"] .dncc-topbar-actions > button.is-active {
+  color: #f4ce58;
+}
+
+.dncc-shell .dncc-page-title strong,
+.dncc-shell .dncc-sync-state strong {
+  color: var(--dncc-text);
+}
+
+.dncc-shell .dncc-page-title span,
+.dncc-shell .dncc-sync-state small {
+  color: var(--dncc-text-soft);
+}
+
+.dncc-shell .dncc-search input,
+.dncc-shell .dncc-search kbd,
+.dncc-shell .dncc-search-results {
+  border-color: var(--dncc-border);
+  background: var(--dncc-surface);
+  color: var(--dncc-text);
+}
+
+.dncc-shell .dncc-search input {
+  padding-inline: 2.8rem 3.15rem;
+}
+
+.dncc-shell .dncc-search input:focus {
+  background: var(--dncc-elevated);
+}
+
+.dncc-shell .dncc-search-results button {
+  color: var(--dncc-text);
+}
+
+.dncc-shell .dncc-search-results button:hover,
+.dncc-shell .dncc-search-results button:focus-visible {
+  background: var(--dncc-surface-2);
+}
+
+.dncc-shell .dncc-main {
+  padding: 1rem clamp(0.8rem, 1.4vw, 1.45rem) 1.5rem;
+  background: var(--dncc-page);
+}
+
+/* The command-center shell is now the only chrome. */
+.dncc-shell .dn-admin-mobile-open,
+.dncc-shell .dn-admin-mobile-shade,
+.dncc-shell .dn-admin-sidebar-full,
+.dncc-shell .dn-admin-top-strip,
+.dncc-shell .dn-admin-current-section {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-fullscreen,
+.dncc-shell .dn-admin-layout-full,
+.dncc-shell .dn-admin-content-full {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+.dncc-shell .dn-admin-layout-full {
+  display: block !important;
+}
+
+.dncc-shell .dn-admin-content-full {
+  padding: 0 !important;
+}
+
+.dncc-shell .dn-admin-home-full {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+.dncc-shell .dn-admin-workspace-host {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.dncc-shell .dn-admin-center-zone {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  color: var(--dncc-text);
+  background: transparent !important;
+}
+
+/* The shell title replaces the oversized internal dashboard hero. */
+.dncc-shell .dn-admin-dashboard-hero {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-command-deck {
+  margin: 0 0 1rem !important;
+  padding: 0.55rem !important;
+  gap: 0.42rem !important;
+  border: 1px solid var(--dncc-border) !important;
+  border-radius: 15px !important;
+  background: var(--dncc-surface) !important;
+  box-shadow: var(--dncc-card-shadow) !important;
+}
+
+.dncc-shell .dn-admin-command-card {
+  min-height: 62px !important;
+  border: 1px solid transparent !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  color: var(--dncc-text-soft) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-command-card:hover,
+.dncc-shell .dn-admin-command-card:focus-visible {
+  border-color: var(--dncc-border) !important;
+  background: var(--dncc-surface-2) !important;
+}
+
+.dncc-shell .dn-admin-command-card.is-current {
+  border-color: rgba(212, 175, 55, 0.42) !important;
+  background: rgba(212, 175, 55, 0.11) !important;
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell .dn-admin-command-card strong,
+.dncc-shell .dn-admin-command-card span {
+  color: inherit !important;
+}
+
+.dncc-shell .dn-admin-command-card small {
+  color: var(--dncc-text-soft) !important;
+}
+
+/* Unified cards, forms, tables and dashboards. */
+.dncc-shell .dn-admin-section-kpis article,
+.dncc-shell .dn-admin-quick-actions-compact,
+.dncc-shell .dn-admin-secondary-panel,
+.dncc-shell .dn-admin-core-full,
+.dncc-shell .dn-admin-workspace-host > section,
+.dncc-shell .dn-admin-workspace-host > div,
+.dncc-shell .dn-admin-loading-banner,
+.dncc-shell .dn-admin-error-banner {
+  border-color: var(--dncc-border) !important;
+  background: var(--dncc-surface) !important;
+  color: var(--dncc-text) !important;
+  box-shadow: var(--dncc-card-shadow) !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis {
+  margin-top: 0 !important;
+  gap: 0.72rem !important;
+}
+
+.dncc-shell .dn-admin-section-kpis article {
+  min-height: 102px !important;
+  border-radius: 14px !important;
+}
+
+.dncc-shell .dn-admin-section-kpis article strong,
+.dncc-shell .dn-admin-section-kpis article span,
+.dncc-shell .dn-admin-quick-actions-compact h2,
+.dncc-shell .dn-admin-secondary-panel h2 {
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell .dn-admin-section-kpis article small,
+.dncc-shell .dn-admin-quick-actions-compact p,
+.dncc-shell .dn-admin-secondary-panel p {
+  color: var(--dncc-text-soft) !important;
+}
+
+.dncc-shell .dn-admin-map-first-grid {
+  grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.65fr) !important;
+  align-items: stretch !important;
+  gap: 1rem !important;
+  margin-top: 1rem !important;
+}
+
+.dncc-shell .dn-admin-map-primary,
+.dncc-shell .dn-admin-quick-actions-compact {
+  min-width: 0 !important;
+  border-radius: 16px !important;
+}
+
+.dncc-shell .dn-admin-map-primary {
+  overflow: hidden !important;
+  border: 1px solid var(--dncc-border) !important;
+  background: var(--dncc-surface) !important;
+  box-shadow: var(--dncc-card-shadow) !important;
+}
+
+.dncc-shell .dn-admin-action-tile {
+  border-color: var(--dncc-border) !important;
+  background: var(--dncc-surface-2) !important;
+  color: var(--dncc-text) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-action-tile:hover,
+.dncc-shell .dn-admin-action-tile:focus-visible {
+  border-color: rgba(0, 87, 184, 0.35) !important;
+  background: color-mix(in srgb, var(--dncc-surface) 86%, #38bdf8 14%) !important;
+}
+
+.dncc-shell input,
+.dncc-shell select,
+.dncc-shell textarea {
+  border-color: var(--dncc-border) !important;
+  background: var(--dncc-surface) !important;
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell table {
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell thead,
+.dncc-shell th {
+  background: var(--dncc-surface-2) !important;
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell td {
+  border-color: var(--dncc-border) !important;
+  color: var(--dncc-text) !important;
+}
+
+/* Khalifa becomes a deliberate assistant drawer instead of a second sidebar. */
+.dncc-shell .dn-admin-left-ai {
+  position: fixed !important;
+  z-index: 92 !important;
+  inset-block: 92px 18px !important;
+  inset-inline-end: 18px !important;
+  width: min(390px, calc(100vw - 36px)) !important;
+  max-width: 390px !important;
+  overflow-y: auto !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 0.8rem !important;
+  padding: 0.85rem !important;
+  border: 1px solid var(--dncc-border) !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--dncc-surface) 96%, transparent) !important;
+  color: var(--dncc-text) !important;
+  box-shadow: 0 26px 80px rgba(7, 26, 51, 0.24) !important;
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(calc(-100% - 30px));
+  transition: 180ms ease;
+}
+
+.dncc-shell[dir="ltr"] .dn-admin-left-ai {
+  transform: translateX(calc(100% + 30px));
+}
+
+.dncc-shell.is-khalifa-open .dn-admin-left-ai {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.dncc-khalifa-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 76px 0 0;
+  border: 0;
+  background: rgba(2, 10, 20, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.dncc-shell .dn-admin-user-head {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card,
+.dncc-shell .dn-admin-left-ai > * {
+  border-color: var(--dncc-border) !important;
+  background: var(--dncc-surface-2) !important;
+  color: var(--dncc-text) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card {
+  border-radius: 15px !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card h2,
+.dncc-shell .dn-admin-khalifa-card p,
+.dncc-shell .dn-khalifa-status-row,
+.dncc-shell .dn-khalifa-status-row b {
+  color: var(--dncc-text) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card small,
+.dncc-shell .dn-khalifa-status-row span {
+  color: var(--dncc-text-soft) !important;
+}
+
+/* Dark mode broad harmonization for specialist workspaces. */
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone article,
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone form,
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone > div,
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone > section,
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone aside {
+  border-color: var(--dncc-border);
+  color: var(--dncc-text);
+}
+
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone :is(h1, h2, h3, h4, strong, b, label) {
+  color: var(--dncc-text);
+}
+
+.dncc-shell[data-theme="dark"] .dn-admin-center-zone :is(p, small, span) {
+  color: var(--dncc-text-soft);
+}
+
+@media (max-width: 1220px) {
+  .dncc-shell .dncc-topbar {
+    grid-template-columns: minmax(240px, 1fr) minmax(230px, 1.1fr) auto;
+  }
+
+  .dncc-sync-state {
+    display: none !important;
+  }
+
+  .dncc-shell .dn-admin-map-first-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .dncc-shell .dncc-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dncc-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: none !important;
+  }
+
+  .dncc-topbar {
+    padding-block: 0.65rem !important;
+  }
+
+  .dncc-topbar-actions > button span {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .dncc-history-actions button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .dncc-page-title span {
+    display: none;
+  }
+
+  .dncc-page-title strong {
+    font-size: 0.94rem !important;
+  }
+
+  .dncc-shell .dn-admin-command-deck {
+    overflow-x: auto !important;
+    display: flex !important;
+  }
+
+  .dncc-shell .dn-admin-command-card {
+    flex: 0 0 140px !important;
+  }
+
+  .dncc-shell .dn-admin-section-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .dncc-shell .dn-admin-left-ai {
+    inset-inline: 10px !important;
+    inset-block: 84px 10px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}

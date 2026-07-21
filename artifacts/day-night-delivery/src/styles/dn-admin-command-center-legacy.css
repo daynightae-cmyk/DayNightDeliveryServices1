@@ -1,0 +1,556 @@
+/* Existing AdminPanelLuxury content, re-skinned inside the command-center shell. */
+.dncc-shell .dn-admin-fullscreen {
+  position: static !important;
+  z-index: auto !important;
+  display: block !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  color: var(--dncc-ink) !important;
+  overflow: visible !important;
+}
+
+.dncc-shell .dn-admin-layout-full,
+.dncc-shell .dn-admin-content-full {
+  display: block !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.dncc-shell .dn-admin-sidebar-full,
+.dncc-shell .dn-admin-top-strip,
+.dncc-shell .dn-admin-mobile-open,
+.dncc-shell .dn-admin-mobile-shade {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-content-full {
+  padding: 0 !important;
+}
+
+.dncc-shell .dn-admin-command-deck {
+  display: grid !important;
+  grid-template-columns: repeat(9, minmax(124px, 1fr)) !important;
+  gap: 0.55rem !important;
+  margin: 0 0 0.85rem !important;
+  padding: 0.45rem !important;
+  border: 1px solid var(--dncc-line) !important;
+  border-radius: 15px !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  box-shadow: 0 10px 30px rgba(7, 26, 51, 0.035) !important;
+  overflow-x: auto !important;
+}
+
+.dncc-shell .dn-admin-command-card {
+  min-height: 74px !important;
+  padding: 0.62rem 0.72rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  color: #53627a !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-command-card:hover,
+.dncc-shell .dn-admin-command-card:focus-visible {
+  border-color: rgba(0, 87, 184, 0.12) !important;
+  background: #f3f7fb !important;
+  outline: none !important;
+}
+
+.dncc-shell .dn-admin-command-card.is-current {
+  border-color: rgba(212, 175, 55, 0.28) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(212, 175, 55, 0.12),
+    rgba(255, 255, 255, 0.9)
+  ) !important;
+  color: var(--dncc-navy) !important;
+  box-shadow: inset 0 -3px 0 var(--dncc-gold) !important;
+}
+
+.dncc-shell .dn-admin-command-card-title {
+  color: inherit !important;
+  font-size: 0.75rem !important;
+  font-weight: 850 !important;
+}
+
+.dncc-shell .dn-admin-command-card strong {
+  color: var(--dncc-navy) !important;
+  font-size: 1.04rem !important;
+  font-weight: 950 !important;
+}
+
+.dncc-shell .dn-admin-command-card small {
+  color: #8a96a7 !important;
+  font-size: 0.68rem !important;
+  font-weight: 650 !important;
+}
+
+.dncc-shell .dn-admin-current-section {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-loading-banner,
+.dncc-shell .dn-admin-error-banner {
+  margin: 0 0 0.85rem !important;
+  padding: 0.72rem 0.9rem !important;
+  border-radius: 12px !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+}
+
+.dncc-shell .dn-admin-loading-banner {
+  border: 1px solid rgba(0, 87, 184, 0.14) !important;
+  background: rgba(0, 87, 184, 0.07) !important;
+  color: var(--dncc-blue) !important;
+}
+
+.dncc-shell .dn-admin-error-banner {
+  border: 1px solid rgba(220, 38, 38, 0.16) !important;
+  background: rgba(220, 38, 38, 0.07) !important;
+  color: #b91c1c !important;
+}
+
+.dncc-shell .dn-admin-home-full {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0.9rem !important;
+  align-items: start !important;
+  overflow: visible !important;
+}
+
+.dncc-shell .dn-admin-left-ai {
+  order: 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(240px, 0.55fr) minmax(320px, 1.45fr) !important;
+  gap: 0.8rem !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.dncc-shell .dn-admin-user-head {
+  display: none !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card,
+.dncc-shell .dn-khalifa-guidance-feed,
+.dncc-shell .dn-admin-secondary-panel,
+.dncc-shell .dn-admin-main-panel,
+.dncc-shell .dn-admin-section-card,
+.dncc-shell .dn-section-workspace,
+.dncc-shell .dn-section-table-card,
+.dncc-shell .dn-admin-support-card,
+.dncc-shell .dn-admin-core-full,
+.dncc-shell .dn-admin-map-primary,
+.dncc-shell .dn-admin-quick-actions-compact {
+  border: 1px solid var(--dncc-line) !important;
+  border-radius: 15px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--dncc-ink) !important;
+  box-shadow: var(--dncc-shadow) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card {
+  min-height: 100% !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card h2,
+.dncc-shell .dn-admin-khalifa-card strong,
+.dncc-shell .dn-khalifa-guidance-feed h2,
+.dncc-shell .dn-khalifa-guidance-feed h3,
+.dncc-shell .dn-khalifa-guidance-feed strong,
+.dncc-shell .dn-admin-main-title h1,
+.dncc-shell .dn-admin-main-title span,
+.dncc-shell .dn-admin-secondary-panel strong,
+.dncc-shell .dn-section-workspace h1,
+.dncc-shell .dn-section-workspace h2,
+.dncc-shell .dn-section-workspace h3,
+.dncc-shell .dn-section-table-card th,
+.dncc-shell .dn-section-table-card strong {
+  color: var(--dncc-navy) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card p,
+.dncc-shell .dn-admin-khalifa-card small,
+.dncc-shell .dn-khalifa-guidance-feed p,
+.dncc-shell .dn-khalifa-guidance-feed small,
+.dncc-shell .dn-admin-main-title p,
+.dncc-shell .dn-admin-secondary-panel p,
+.dncc-shell .dn-section-workspace p,
+.dncc-shell .dn-section-workspace small,
+.dncc-shell .dn-section-table-card td {
+  color: #65748a !important;
+}
+
+.dncc-shell .dn-khalifa-status-row {
+  border-color: var(--dncc-line) !important;
+  background: #f6f8fb !important;
+  color: var(--dncc-ink) !important;
+}
+
+.dncc-shell .dn-admin-workspace-host {
+  order: 1 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.dncc-shell .dn-admin-center-zone {
+  min-width: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--dncc-ink) !important;
+}
+
+.dncc-shell .dn-admin-dashboard-polished {
+  gap: 0.85rem !important;
+}
+
+.dncc-shell .dn-admin-dashboard-hero {
+  min-height: 126px !important;
+  padding: 1.25rem 1.35rem !important;
+  border: 1px solid var(--dncc-line) !important;
+  border-radius: 17px !important;
+  background:
+    linear-gradient(90deg, rgba(7, 26, 51, 0.96), rgba(7, 26, 51, 0.88)),
+    radial-gradient(circle at 85% 30%, rgba(56, 189, 248, 0.2), transparent 38%) !important;
+  box-shadow: var(--dncc-shadow) !important;
+}
+
+.dncc-shell .dn-admin-dashboard-hero h1,
+.dncc-shell .dn-admin-dashboard-hero span {
+  color: #fff !important;
+}
+
+.dncc-shell .dn-admin-dashboard-hero p {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis {
+  grid-template-columns: repeat(6, minmax(150px, 1fr)) !important;
+  gap: 0.65rem !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis > article {
+  min-height: 104px !important;
+  padding: 0.85rem 0.9rem !important;
+  border: 1px solid var(--dncc-line) !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  color: var(--dncc-ink) !important;
+  box-shadow: 0 10px 30px rgba(7, 26, 51, 0.045) !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis > article > strong {
+  color: var(--dncc-navy) !important;
+  font-size: 1.22rem !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis > article > span {
+  color: #40506a !important;
+  font-size: 0.86rem !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis > article > small {
+  color: #8793a5 !important;
+  font-size: 0.78rem !important;
+}
+
+.dncc-shell .dn-admin-icon-badge,
+.dncc-shell .dn-admin-secondary-icon,
+.dncc-shell .dn-iconized-icon,
+.dncc-shell .dn-admin-sidebar-icon {
+  border-color: rgba(0, 87, 184, 0.14) !important;
+  background: rgba(0, 87, 184, 0.075) !important;
+  color: var(--dncc-blue) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-dashboard-kpis .dn-admin-icon-badge,
+.dncc-shell .dn-admin-hero-icon {
+  border-color: rgba(212, 175, 55, 0.25) !important;
+  background: rgba(212, 175, 55, 0.1) !important;
+  color: var(--dncc-gold) !important;
+}
+
+.dncc-shell .dn-admin-map-first-grid {
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.7fr) !important;
+  justify-content: stretch !important;
+  gap: 0.85rem !important;
+}
+
+.dncc-shell .dn-admin-map-primary,
+.dncc-shell .dn-admin-quick-actions-compact {
+  max-width: none !important;
+  padding: 0.8rem !important;
+}
+
+.dncc-shell .dn-admin-quick-actions-head h2,
+.dncc-shell .dn-admin-quick-actions-head span {
+  color: var(--dncc-navy) !important;
+}
+
+.dncc-shell .dn-admin-action-tile {
+  border-color: var(--dncc-line) !important;
+  background: #f7f9fc !important;
+  color: var(--dncc-ink) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-action-tile:hover,
+.dncc-shell .dn-admin-action-tile:focus-visible {
+  border-color: rgba(0, 87, 184, 0.24) !important;
+  background: #eef5fc !important;
+  transform: translateY(-1px) !important;
+  outline: none !important;
+}
+
+.dncc-shell .dn-admin-action-tile strong {
+  color: var(--dncc-navy) !important;
+}
+
+.dncc-shell .dn-admin-action-tile small {
+  color: #718096 !important;
+}
+
+.dncc-shell input,
+.dncc-shell select,
+.dncc-shell textarea {
+  border-color: rgba(7, 26, 51, 0.13) !important;
+  background: #fff !important;
+  color: var(--dncc-ink) !important;
+}
+
+.dncc-shell input::placeholder,
+.dncc-shell textarea::placeholder {
+  color: #94a0b2 !important;
+}
+
+.dncc-shell input:focus,
+.dncc-shell select:focus,
+.dncc-shell textarea:focus {
+  border-color: rgba(0, 87, 184, 0.36) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(0, 87, 184, 0.08) !important;
+}
+
+.dncc-shell table {
+  color: var(--dncc-ink) !important;
+}
+
+.dncc-shell thead,
+.dncc-shell th {
+  background: #f4f7fa !important;
+  color: #42516a !important;
+}
+
+.dncc-shell tbody tr:hover {
+  background: rgba(0, 87, 184, 0.035) !important;
+}
+
+.dncc-shell .dn-admin-notification-drawer {
+  z-index: 1200 !important;
+}
+
+.dncc-mobile-layer {
+  display: none;
+}
+
+@media (max-width: 1440px) {
+  .dncc-topbar {
+    grid-template-columns: minmax(170px, 0.7fr) minmax(260px, 1.4fr) auto;
+  }
+  .dncc-sync-state {
+    display: none;
+  }
+  .dncc-shell .dn-admin-dashboard-kpis {
+    grid-template-columns: repeat(3, minmax(170px, 1fr)) !important;
+  }
+  .dncc-shell .dn-admin-command-deck {
+    grid-template-columns: repeat(9, minmax(132px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .dncc-topbar {
+    grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.3fr) auto;
+  }
+  .dncc-page-title span {
+    display: none;
+  }
+  .dncc-shell .dn-admin-map-first-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dncc-shell .dn-admin-left-ai {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dncc-desktop-sidebar {
+    display: none;
+  }
+  .dncc-mobile-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: block;
+  }
+  .dncc-mobile-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(3, 10, 20, 0.72);
+    backdrop-filter: blur(5px);
+  }
+  .dncc-mobile-drawer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(86vw, 310px);
+    animation: dncc-drawer-in 180ms ease-out;
+  }
+  .dncc-mobile-drawer .dncc-sidebar {
+    width: 100%;
+  }
+  .dncc-mobile-drawer .dncc-collapse {
+    display: none;
+  }
+  .dncc-mobile-close {
+    position: absolute;
+    inset-inline-end: 0.65rem;
+    inset-block-start: 0.65rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+  }
+  @keyframes dncc-drawer-in {
+    from {
+      transform: translateX(-18px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  [dir="rtl"] .dncc-mobile-drawer {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
+  .dncc-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 72px;
+    padding-inline: 0.8rem;
+  }
+  .dncc-mobile-menu {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--dncc-line);
+    border-radius: 11px;
+    background: #fff;
+    color: var(--dncc-navy);
+  }
+  .dncc-page-title {
+    display: none;
+  }
+  .dncc-topbar-actions > button span,
+  .dncc-search kbd {
+    display: none;
+  }
+  .dncc-main {
+    padding-inline: 0.8rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .dncc-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.55rem;
+  }
+  .dncc-topbar-actions {
+    gap: 0.35rem;
+  }
+  .dncc-topbar-actions > button,
+  .dncc-notification-slot .dn-admin-notification-bell > button {
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .dncc-notification-slot .dn-admin-notification-bell > button:nth-child(2) {
+    display: none;
+  }
+  .dncc-search input {
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+  .dncc-shell .dn-admin-command-deck {
+    margin-inline: -0.1rem !important;
+    padding: 0.34rem !important;
+  }
+  .dncc-shell .dn-admin-command-card {
+    min-width: 122px !important;
+  }
+  .dncc-shell .dn-admin-dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .dncc-shell .dn-admin-dashboard-hero {
+    min-height: 108px !important;
+    padding: 1rem !important;
+  }
+  .dncc-shell .dn-admin-dashboard-hero h1 {
+    font-size: 1.12rem !important;
+  }
+  .dncc-shell .dn-admin-left-ai {
+    display: block !important;
+  }
+  .dncc-shell .dn-khalifa-guidance-feed {
+    margin-top: 0.75rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dncc-topbar {
+    padding-inline: 0.55rem;
+  }
+  .dncc-topbar-actions > button:nth-of-type(1) {
+    display: none;
+  }
+  .dncc-main {
+    padding: 0.7rem 0.55rem 1.1rem;
+  }
+  .dncc-shell .dn-admin-dashboard-kpis {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.48rem !important;
+  }
+  .dncc-shell .dn-admin-dashboard-kpis > article {
+    min-height: 98px !important;
+    padding: 0.68rem !important;
+  }
+  .dncc-shell .dn-admin-map-primary,
+  .dncc-shell .dn-admin-quick-actions-compact {
+    padding: 0.55rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dncc-shell *,
+  .dncc-shell *::before,
+  .dncc-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

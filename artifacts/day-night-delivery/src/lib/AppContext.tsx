@@ -17,11 +17,15 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 const THEME_MODE_KEY = "dn_theme_mode";
+const ADMIN_SETTINGS_KEY = "dn_admin_control_settings_v2";
 
 function savedThemeMode(): ThemeMode {
   try {
     const saved = localStorage.getItem(THEME_MODE_KEY);
     if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    const admin = JSON.parse(localStorage.getItem(ADMIN_SETTINGS_KEY) || "{}");
+    if (admin?.theme === "day") return "light";
+    if (admin?.theme === "night") return "dark";
   } catch {
     // Storage may be unavailable in private browser contexts.
   }
@@ -31,6 +35,18 @@ function savedThemeMode(): ThemeMode {
 function systemTheme(): Theme {
   if (typeof window === "undefined" || !window.matchMedia) return "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function persistAdminTheme(theme: Theme) {
+  try {
+    const current = JSON.parse(localStorage.getItem(ADMIN_SETTINGS_KEY) || "{}");
+    localStorage.setItem(
+      ADMIN_SETTINGS_KEY,
+      JSON.stringify({ ...current, theme: theme === "light" ? "day" : "night" }),
+    );
+  } catch {
+    // Keep rendering safe when storage is restricted or malformed.
+  }
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -53,6 +69,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const syncFromAdminSettings = (event: Event) => {
+      const detail = (event as CustomEvent<{ theme?: "day" | "night" }>).detail;
+      if (detail?.theme === "day") setThemeModeState("light");
+      if (detail?.theme === "night") setThemeModeState("dark");
+    };
+    window.addEventListener("dn-admin-settings-change", syncFromAdminSettings);
+    return () => window.removeEventListener("dn-admin-settings-change", syncFromAdminSettings);
+  }, []);
+
+  useEffect(() => {
     try {
       localStorage.setItem(THEME_MODE_KEY, themeMode);
     } catch {
@@ -65,9 +91,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("light-theme", theme === "light");
     root.classList.toggle("dark-theme", theme === "dark");
     root.dataset.theme = theme;
+    root.dataset.dnAdminTheme = theme === "light" ? "day" : "night";
     root.style.colorScheme = theme;
     document.body?.classList.toggle("light-theme", theme === "light");
     document.body?.classList.toggle("dark-theme", theme === "dark");
+    persistAdminTheme(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -77,9 +105,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
-  const toggleTheme = () => setThemeModeState((current) => (
-    current === "dark" ? "light" : current === "light" ? "system" : "dark"
-  ));
+  const toggleTheme = () =>
+    setThemeModeState((current) =>
+      current === "dark" ? "light" : current === "light" ? "system" : "dark",
+    );
   const setLanguage = (lang: Language) => setLanguageState(lang);
   const toggleLanguage = () => setLanguageState((current) => (current === "ar" ? "en" : "ar"));
 
