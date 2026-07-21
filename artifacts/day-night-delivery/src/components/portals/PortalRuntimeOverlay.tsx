@@ -43,6 +43,7 @@ export default function PortalRuntimeOverlay() {
   const isArabic = language === "ar";
   const portalActive = isPortalPath(location.pathname);
   const isDriver = location.pathname === "/driver" || location.pathname.startsWith("/driver/");
+  const isMerchant = location.pathname === "/merchant" || location.pathname.startsWith("/merchant/");
   const [userId, setUserId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifications = usePortalNotifications(portalActive ? userId : null);
@@ -122,27 +123,29 @@ export default function PortalRuntimeOverlay() {
 
   return (
     <>
-      <div className="dn-portal-floating-tools" dir={isArabic ? "rtl" : "ltr"}>
-        <button type="button" onClick={toggleTheme} title={isArabic ? `المظهر: ${themeLabel}` : `Appearance: ${themeLabel}`}>
-          <ThemeIcon />
-          <span>{themeLabel}</span>
-        </button>
-        <button type="button" onClick={toggleLanguage} title={isArabic ? "English" : "العربية"}>
-          <Languages />
-          <span>{isArabic ? "EN" : "عربي"}</span>
-        </button>
-        <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" className="is-support" title={isArabic ? "البلاغات والدعم" : "Reports and support"}>
-          <Headphones />
-          <span>{isArabic ? "الدعم" : "Support"}</span>
-        </a>
-        {userId && (
-          <button type="button" className="is-notification" onClick={() => setNotificationsOpen(true)} title={isArabic ? "الإشعارات" : "Notifications"}>
-            <Bell />
-            <span>{isArabic ? "تنبيهات" : "Alerts"}</span>
-            {notifications.unreadCount > 0 && <b>{notifications.unreadCount}</b>}
+      {!isMerchant && (
+        <div className="dn-portal-floating-tools" dir={isArabic ? "rtl" : "ltr"}>
+          <button type="button" onClick={toggleTheme} title={isArabic ? `المظهر: ${themeLabel}` : `Appearance: ${themeLabel}`}>
+            <ThemeIcon />
+            <span>{themeLabel}</span>
           </button>
-        )}
-      </div>
+          <button type="button" onClick={toggleLanguage} title={isArabic ? "English" : "العربية"}>
+            <Languages />
+            <span>{isArabic ? "EN" : "عربي"}</span>
+          </button>
+          <a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer" className="is-support" title={isArabic ? "البلاغات والدعم" : "Reports and support"}>
+            <Headphones />
+            <span>{isArabic ? "الدعم" : "Support"}</span>
+          </a>
+          {userId && (
+            <button type="button" className="is-notification" onClick={() => setNotificationsOpen(true)} title={isArabic ? "الإشعارات" : "Notifications"}>
+              <Bell />
+              <span>{isArabic ? "تنبيهات" : "Alerts"}</span>
+              {notifications.unreadCount > 0 && <b>{notifications.unreadCount}</b>}
+            </button>
+          )}
+        </div>
+      )}
 
       <PortalNotificationCenter
         open={notificationsOpen}
