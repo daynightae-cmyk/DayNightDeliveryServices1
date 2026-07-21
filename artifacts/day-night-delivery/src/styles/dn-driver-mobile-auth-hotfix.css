@@ -1,0 +1,122 @@
+/* DAY NIGHT — emergency mobile driver authentication hardening.
+   The driver credentials must be visible immediately in portrait mobile webviews.
+   This file only affects the unauthenticated driver route. */
+
+.dn-driver-login-page {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .dn-driver-login-page.dn-portal-auth-page {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100svh !important;
+    min-height: 100svh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(14px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left)) !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-shell {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* The form is the only critical first screen on a driver's phone. */
+  .dn-driver-login-page .dn-driver-auth-card {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 560px !important;
+    min-height: auto !important;
+    margin: 0 auto !important;
+    padding: 22px 17px 20px !important;
+    border-radius: 24px !important;
+    position: relative !important;
+    z-index: 20 !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Marketing content must never push the credential form below the viewport. */
+  .dn-driver-login-page .dn-driver-auth-visual {
+    display: none !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card > header {
+    margin-bottom: 18px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card > header > span {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 15px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card > header h2 {
+    font-size: clamp(24px, 7vw, 32px) !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card > header p {
+    font-size: 12px !important;
+    line-height: 1.6 !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-form {
+    width: 100% !important;
+    gap: 13px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card input {
+    min-height: 54px !important;
+    font-size: 16px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-primary {
+    min-height: 56px !important;
+    font-size: 14px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-alternatives {
+    grid-template-columns: 1fr !important;
+    margin: 13px 0 !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-note {
+    margin-bottom: 0 !important;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .dn-driver-login-page.dn-portal-auth-page {
+    position: absolute !important;
+    min-height: 100% !important;
+    height: auto !important;
+  }
+
+  .dn-driver-login-page .dn-driver-auth-card {
+    max-width: 720px !important;
+    padding: 15px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-card > header {
+    margin-bottom: 10px !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-form {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-primary,
+  .dn-driver-login-page .dn-portal-auth-message {
+    grid-column: 1 / -1 !important;
+  }
+}
