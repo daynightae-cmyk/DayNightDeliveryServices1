@@ -2,7 +2,7 @@
 
 This pack verifies the production data chain without demo rows or fabricated GPS:
 
-`Merchant → Admin → Assigned Driver → Live Location → Delivery → COD → Settlement → Customer History → Email`
+`Merchant → Admin → Assigned Driver → Live Location → Delivery → COD → Settlement → Customer History → Gmail`
 
 ## Included production changes
 
@@ -13,6 +13,7 @@ This pack verifies the production data chain without demo rows or fabricated GPS
 - Final history includes the terminal status and persisted `delivered_at` timestamp.
 - Delivery confirmation API validates the Supabase session before sending a summary.
 - Durable `delivery_confirmation_outbox` records automatic confirmations at order creation.
+- Gmail SMTP sends from the protected server identity `daynightae@gmail.com`; no Gmail or SMTP secret is exposed to the browser.
 - Admin runtime snapshot exposes one auditable view of order, merchant, driver, GPS, status history, COD, settlement, and email outbox.
 
 ## Required deployment order
@@ -39,8 +40,9 @@ These values must be configured for Production and Preview as appropriate. Never
 | `SUPABASE_URL` | Approved DAY NIGHT Supabase URL |
 | `SUPABASE_ANON_KEY` | Public anon key used when validating user access tokens |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only order/outbox access |
-| `RESEND_API_KEY` | Server-only email provider key |
-| `DELIVERY_EMAIL_FROM` | Verified sender, such as `DAY NIGHT DELIVERY SERVICES <notifications@daynightae.com>` |
+| `GMAIL_USER` | Gmail sender account; production value is `daynightae@gmail.com` |
+| `GMAIL_APP_PASSWORD` | Server-only Google App Password for Gmail SMTP; never use the normal Gmail password |
+| `GMAIL_FROM_NAME` | Display name, normally `DAY NIGHT DELIVERY SERVICES` |
 | `DELIVERY_EMAIL_WEBHOOK_SECRET` | Protects Supabase database webhook calls |
 | `CRON_SECRET` | Protects the daily fallback outbox processor |
 
@@ -63,9 +65,17 @@ Create a Supabase **Database Webhook** with these exact settings:
 - Header: `x-day-night-webhook-secret: <same value as DELIVERY_EMAIL_WEBHOOK_SECRET>`
 - Timeout: at least 10 seconds
 
-Supabase sends the inserted order as `record`. The API validates the webhook secret, resolves the registered email, sends the bilingual summary through Resend, and marks the matching outbox row as sent.
+Supabase sends the inserted order as `record`. The API validates the webhook secret, resolves the registered recipient, sends the bilingual summary through Gmail SMTP, and marks the matching outbox row as sent.
 
 The Vercel Hobby-compatible cron runs once daily at `02:00 UTC` only as a retry mechanism for pending or failed outbox rows. It is not the primary delivery path.
+
+## Gmail requirements
+
+- Enable Google two-step verification on `daynightae@gmail.com`.
+- Create a dedicated Google App Password for the production delivery service.
+- Store that 16-character App Password only in Vercel as `GMAIL_APP_PASSWORD`.
+- Do not add Resend DNS, MX, SPF, DKIM, or sender-domain records for this Gmail transport.
+- Do not place Gmail credentials in GitHub, source files, logs, screenshots, or chat messages.
 
 ## GitHub Actions protected secrets
 
@@ -104,7 +114,7 @@ Use dedicated test identities with the same real roles and RLS rules as producti
 | Pickup request | Merchant pickup RPC creates and reloads the request |
 | Branch/document persistence | Records reload through `merchant_portal_business_center` |
 | Customer history | Delivered order appears with terminal status and final date |
-| Automatic email | Outbox row exists; deployed API returns a provider message ID |
+| Automatic email | Outbox row exists; deployed Gmail API route returns a message ID |
 
 ## Running locally
 
@@ -121,7 +131,7 @@ The test deletes the temporary order, branch, pickup request, and document by de
 RUNTIME_E2E_KEEP_DATA=true pnpm --dir artifacts/day-night-delivery run runtime:e2e
 ```
 
-To test actual provider delivery, also set:
+To test actual Gmail delivery, also set:
 
 `RUNTIME_CONFIRMATION_API_URL=https://daynightae.com/api/delivery-confirmation`
 
@@ -131,5 +141,5 @@ To test actual provider delivery, also set:
 - The live E2E creates real records and must use dedicated test identities.
 - A missing COD or settlement record is a failure, not a derived or invented success.
 - Live tracking never generates estimated driver coordinates.
-- Service-role and email-provider secrets remain server-side.
-- The migration, webhook, and Vercel variables must be deployed before automatic emails can be considered operational.
+- Service-role and Gmail secrets remain server-side.
+- The migration, webhook, Gmail App Password, and Vercel variables must be deployed before automatic emails can be considered operational.
