@@ -1,9 +1,9 @@
 name: Runtime PR Debug
 
 on:
-  push:
+  pull_request:
     branches:
-      - runtime-e2e-live-features
+      - main
   workflow_dispatch:
 
 permissions:
