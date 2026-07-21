@@ -6,6 +6,7 @@ import { reportError } from "./lib/monitoring";
 import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
 import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
 import ProductionExperience from "./components/ProductionExperience";
+import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -20,6 +21,7 @@ import "./styles/dn-native-android.css";
 import "./styles/dn-portal-figma-reference-v6.css";
 import "./styles/dn-portal-figma-final-v7.css";
 import "./styles/dn-portal-notification-final.css";
+import "./styles/dn-operations-control-rescue.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 
@@ -64,6 +66,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppProvider>
       <App />
+      <ProductionOrderRealtimeBridge />
       <ProductionExperience />
     </AppProvider>
   </StrictMode>,

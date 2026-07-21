@@ -40,13 +40,79 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        id: install
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee pnpm-install.log
+
+      - name: Upload pnpm install diagnostics
+        if: steps.install.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-install-diagnostic
+          path: pnpm-install.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when dependency installation failed
+        if: steps.install.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "pnpm installation failed. Last 140 log lines:"
+          tail -n 140 pnpm-install.log
+          exit 1
 
       - name: TypeScript check
-        run: pnpm run web:typecheck
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:typecheck 2>&1 | tee typescript-check.log
+
+      - name: Upload TypeScript diagnostics
+        if: steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-check-diagnostic
+          path: typescript-check.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when TypeScript validation failed
+        if: steps.typecheck.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "TypeScript validation failed. Last 180 log lines:"
+          tail -n 180 typescript-check.log
+          exit 1
 
       - name: Production hardening gate
-        run: pnpm run web:gate
+        id: production_gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:gate 2>&1 | tee production-gate.log
+
+      - name: Upload production gate diagnostics
+        if: steps.production_gate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-gate-diagnostic
+          path: production-gate.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when production gate failed
+        if: steps.production_gate.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Production gate failed. Last 220 log lines:"
+          tail -n 220 production-gate.log
+          exit 1
 
       - name: Build production app
         run: pnpm run web:build

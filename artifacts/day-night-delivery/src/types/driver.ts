@@ -143,7 +143,7 @@ export type DriverOverviewRow = DriverProfile & {
 };
 
 export type DriverStatusAction = {
-  value: "accepted" | "picked_up" | "in_transit" | "delivered" | "cancelled" | "returned";
+  value: "confirmed" | "accepted" | "picked_up" | "in_transit" | "delivered" | "cancelled" | "returned";
   ar: string;
   en: string;
   requiresNote?: boolean;

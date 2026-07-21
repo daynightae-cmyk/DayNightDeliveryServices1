@@ -26,25 +26,28 @@ type Props = {
 };
 
 const actions: DriverStatusAction[] = [
-  { value: "accepted", ar: "قبول وبدء المهمة", en: "Accept job" },
+  { value: "confirmed", ar: "تأكيد استلام المهمة", en: "Confirm assignment" },
+  { value: "accepted", ar: "بدء تنفيذ المهمة", en: "Start job" },
   { value: "picked_up", ar: "تم استلام الشحنة", en: "Picked up" },
   { value: "in_transit", ar: "في الطريق للتسليم", en: "In transit" },
   { value: "delivered", ar: "تأكيد التسليم", en: "Confirm delivery", requiresNote: true },
-  { value: "cancelled", ar: "تعذر التسليم / مشكلة", en: "Delivery issue", requiresNote: true },
+  { value: "cancelled", ar: "تعذر التسليم / إلغاء", en: "Delivery issue / cancel", requiresNote: true },
   { value: "returned", ar: "إرجاع للتاجر", en: "Return to merchant", requiresNote: true },
 ];
 
-const progressStatuses = ["assigned", "accepted", "picked_up", "in_transit", "delivered"];
+const progressStatuses = ["assigned", "confirmed", "accepted", "picked_up", "in_transit", "delivered"];
 const cleanPhone = (value?: string) => String(value || "").replace(/[^+\d]/g, "");
 const statusText = (status: string, isArabic: boolean) => {
   const normalized = String(status || "").toLowerCase();
   const labels: Record<string, [string, string]> = {
     assigned: ["مسند للمندوب", "Assigned"],
-    accepted: ["تم القبول", "Accepted"],
+    confirmed: ["تم تأكيد المهمة", "Confirmed"],
+    accepted: ["بدأ التنفيذ", "Started"],
     picked_up: ["تم الاستلام", "Picked up"],
     in_transit: ["في الطريق", "In transit"],
+    out_for_delivery: ["خرج للتسليم", "Out for delivery"],
     delivered: ["تم التسليم", "Delivered"],
-    cancelled: ["تعذر التسليم", "Issue"],
+    cancelled: ["ملغي / متعذر", "Cancelled / issue"],
     returned: ["راجع", "Returned"],
     postponed: ["مؤجل", "Postponed"],
   };
@@ -53,10 +56,11 @@ const statusText = (status: string, isArabic: boolean) => {
 
 function nextActions(status: string) {
   const normalized = String(status || "assigned").toLowerCase();
-  if (normalized === "assigned") return actions.filter((action) => action.value === "accepted" || action.value === "cancelled");
+  if (normalized === "assigned") return actions.filter((action) => action.value === "confirmed" || action.value === "cancelled");
+  if (normalized === "confirmed") return actions.filter((action) => action.value === "accepted" || action.value === "cancelled");
   if (normalized === "accepted") return actions.filter((action) => action.value === "picked_up" || action.value === "cancelled");
   if (normalized === "picked_up") return actions.filter((action) => action.value === "in_transit" || action.value === "returned");
-  if (normalized === "in_transit") return actions.filter((action) => action.value === "delivered" || action.value === "cancelled" || action.value === "returned");
+  if (normalized === "in_transit" || normalized === "out_for_delivery") return actions.filter((action) => action.value === "delivered" || action.value === "cancelled" || action.value === "returned");
   return [];
 }
 
@@ -170,7 +174,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
                 else void runAction(action);
               }}
             >
-              {action.value === "delivered" ? <CheckCircle2 /> : action.value === "cancelled" || action.value === "returned" ? <TriangleAlert /> : <Send />}
+              {action.value === "delivered" || action.value === "confirmed" ? <CheckCircle2 /> : action.value === "cancelled" || action.value === "returned" ? <TriangleAlert /> : <Send />}
               {isArabic ? action.ar : action.en}
             </button>
           ))}

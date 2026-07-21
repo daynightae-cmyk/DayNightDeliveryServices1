@@ -1,0 +1,265 @@
+/* DAY NIGHT — production operations visibility rescue.
+   Scoped to admin/merchant portals; no data or business logic changes. */
+
+.dn-admin-fullscreen .dn-section-workspace,
+.dn-admin-fullscreen .dn-section-table-card,
+.dn-admin-fullscreen .dn-section-panels > article {
+  color: #f8fafc !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-card {
+  background: linear-gradient(145deg, #07172c 0%, #0a203a 100%) !important;
+  border-color: rgba(70, 174, 255, 0.28) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34) !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap {
+  border: 1px solid rgba(99, 179, 237, 0.2) !important;
+  background: #061426 !important;
+  scrollbar-color: #d4af37 #07172c;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap table {
+  background: #061426 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap thead,
+.dn-admin-fullscreen .dn-section-table-wrap thead tr,
+.dn-admin-fullscreen .dn-section-table-wrap th {
+  background: #0b2948 !important;
+  color: #ffe18a !important;
+  border-color: rgba(255, 225, 138, 0.22) !important;
+  opacity: 1 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr {
+  background: #0a1d34 !important;
+  color: #f8fafc !important;
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr:nth-child(even) {
+  background: #0d2743 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr:hover,
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr:focus-within {
+  background: #12385d !important;
+  box-shadow: inset 4px 0 0 #d4af37 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td,
+.dn-admin-fullscreen .dn-section-table-wrap td strong,
+.dn-admin-fullscreen .dn-section-table-wrap td span,
+.dn-admin-fullscreen .dn-section-table-wrap td small {
+  color: #f8fafc !important;
+  opacity: 1 !important;
+  border-color: rgba(148, 197, 239, 0.16) !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td small {
+  color: #b9cbe0 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td .text-brand-gold,
+.dn-admin-fullscreen .dn-section-table-wrap td .dn-order-track-ref {
+  color: #ffe18a !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td .text-brand-sky {
+  color: #77d5ff !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td .text-emerald-200 {
+  color: #8ff0ba !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap td .text-rose-200 {
+  color: #ffb5c0 !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap select,
+.dn-admin-fullscreen .dn-section-table-wrap input,
+.dn-admin-fullscreen .dn-admin-bulk-console select,
+.dn-admin-fullscreen .dn-admin-bulk-console input {
+  background: #061426 !important;
+  color: #f8fafc !important;
+  border-color: rgba(99, 179, 237, 0.38) !important;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap option,
+.dn-admin-fullscreen .dn-admin-bulk-console option {
+  background: #07172c;
+  color: #f8fafc;
+}
+
+.dn-admin-bulk-console {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(7, 30, 55, 0.98), rgba(10, 47, 82, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+  color: #f8fafc;
+}
+
+.dn-admin-bulk-console-head,
+.dn-admin-bulk-console-actions,
+.dn-admin-bulk-filter-grid,
+.dn-admin-bulk-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dn-admin-bulk-console-head {
+  justify-content: space-between;
+}
+
+.dn-admin-bulk-console-head h3,
+.dn-admin-bulk-console-head p {
+  margin: 0;
+}
+
+.dn-admin-bulk-console-head p,
+.dn-admin-bulk-summary {
+  color: #c6d8eb;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dn-admin-bulk-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.8fr) minmax(260px, 1.2fr);
+}
+
+.dn-admin-bulk-filter-grid label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #c6d8eb;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.dn-admin-bulk-filter-grid input,
+.dn-admin-bulk-filter-grid select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(99, 179, 237, 0.32);
+  border-radius: 13px;
+  padding: 0 12px;
+  font-weight: 850;
+  outline: none;
+}
+
+.dn-admin-bulk-console-actions button,
+.dn-admin-bulk-console .dn-admin-pdf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-weight: 900;
+}
+
+.dn-admin-bulk-console-actions button.is-primary {
+  background: linear-gradient(135deg, #d4af37, #ffe18a);
+  color: #091525;
+  border-color: transparent;
+}
+
+.dn-admin-bulk-selector {
+  overflow: hidden;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+  border-radius: 16px;
+  background: rgba(2, 12, 25, 0.46);
+}
+
+.dn-admin-bulk-selector summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: #ffe18a;
+  font-weight: 950;
+}
+
+.dn-admin-bulk-selector-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 290px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.dn-admin-bulk-order-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(148, 197, 239, 0.16);
+  border-radius: 13px;
+  background: #0a1d34;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.dn-admin-bulk-order-option.is-selected {
+  border-color: rgba(212, 175, 55, 0.7);
+  background: #173b5f;
+}
+
+.dn-admin-bulk-order-option strong,
+.dn-admin-bulk-order-option small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dn-admin-bulk-order-option small {
+  color: #b9cbe0;
+  margin-top: 3px;
+}
+
+/* The mobile sheet must never coexist with the desktop merchant sidebar. */
+@media (min-width: 1024px) {
+  .dn-merchant-mobile-sheet-backdrop {
+    display: none !important;
+  }
+
+  .dn-merchant-app {
+    display: grid !important;
+    grid-template-columns: minmax(250px, 280px) minmax(0, 1fr) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .dn-merchant-app[dir="rtl"] {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 280px) !important;
+  }
+
+  .dn-merchant-main-column,
+  .dn-merchant-content,
+  .dn-merchant-content-inner {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .dn-admin-bulk-filter-grid,
+  .dn-admin-bulk-selector-list {
+    grid-template-columns: 1fr;
+  }
+}
