@@ -100,9 +100,6 @@ function Install-WorkspaceDependencies {
   $PackageOriginal = Get-Content -LiteralPath $PackageFile -Raw
 
   try {
-    # The production Linux workspace strips unused platform binaries. For a
-    # Windows validation build we remove only the four exact x64 exclusion
-    # lines. Filtering line-by-line preserves all YAML indentation.
     $ExcludedKeys = @(
       '"esbuild>@esbuild/win32-x64":',
       '"lightningcss>lightningcss-win32-x64-msvc":',
@@ -133,7 +130,6 @@ function Install-WorkspaceDependencies {
       [System.Text.UTF8Encoding]::new($false)
     )
 
-    # Fail immediately if the temporary YAML was malformed.
     Invoke-Checked -Name "Validate temporary Windows pnpm workspace" -Command {
       pnpm config get minimumReleaseAge --location project | Out-Null
     }
@@ -216,19 +212,20 @@ Invoke-Checked -Name "Validate production web application" -Command {
 
 $MigrationOne = Join-Path $RepoPath "supabase\migrations\20260722013000_merchant_multi_account_link_and_core_repair.sql"
 $MigrationTwo = Join-Path $RepoPath "supabase\migrations\20260722013100_merchant_link_grants_and_health.sql"
+$MigrationThree = Join-Path $RepoPath "supabase\migrations\20260722023000_restore_merchant_create_order_rpc.sql"
 
-if (-not (Test-Path -LiteralPath $MigrationOne)) {
-  throw "Merchant linkage repair migration is missing."
-}
-
-if (-not (Test-Path -LiteralPath $MigrationTwo)) {
-  throw "Merchant linkage grants migration is missing."
+foreach ($Migration in @($MigrationOne, $MigrationTwo, $MigrationThree)) {
+  if (-not (Test-Path -LiteralPath $Migration)) {
+    throw "Required merchant production migration is missing: $Migration"
+  }
 }
 
 $Sql = @(
   Get-Content -LiteralPath $MigrationOne -Raw
   "`r`n"
   Get-Content -LiteralPath $MigrationTwo -Raw
+  "`r`n"
+  Get-Content -LiteralPath $MigrationThree -Raw
 ) -join "`r`n"
 
 $Sql | Set-Clipboard
@@ -240,7 +237,7 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host "1. Supabase SQL Editor will open." -ForegroundColor White
 Write-Host "2. Press Ctrl+V." -ForegroundColor White
 Write-Host "3. Press Run once." -ForegroundColor White
-Write-Host "4. Every verification row must show passed = true." -ForegroundColor White
+Write-Host "4. Every verification row must show true." -ForegroundColor White
 Write-Host "5. Refresh /merchant with Ctrl+Shift+R." -ForegroundColor White
 
 Start-Process "https://supabase.com/dashboard/project/ngdwybpgacauorygoedi/sql/new"
@@ -251,4 +248,4 @@ Start-Process "https://daynightae.com/driver"
 
 Write-Host ""
 Write-Host "No orders, expenses, statements, COD rows, or fake driver locations were created." -ForegroundColor Green
-Write-Host "The repair only links approved real accounts and verifies the real merchant → admin → driver chain." -ForegroundColor Green
+Write-Host "The repair links approved real accounts and restores the real merchant -> admin -> driver chain." -ForegroundColor Green
