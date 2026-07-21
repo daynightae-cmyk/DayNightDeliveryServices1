@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { Crosshair, Flag, Layers, Navigation, Radio, Satellite, X } from "lucide-react";
+import { Crosshair, Flag, Layers, Navigation, Radio, X } from "lucide-react";
 import { defaultLocations } from "../../data/defaultLocations";
 import { translations } from "../../data/translations";
 import { useAppContext } from "../../lib/AppContext";
@@ -41,7 +41,6 @@ type LiveDriverLocation = {
 };
 
 type CityPoint = { labelEn: string; labelAr: string; lat: number; lng: number };
-
 type RouteSummary = { distanceMeters: number; durationSeconds: number; roadName: string };
 
 const cityPoints: Record<string, CityPoint> = {
@@ -309,7 +308,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
 
     <div className={`absolute right-3 z-[650] flex items-center gap-1 rounded-2xl border border-white/10 bg-[#071A33]/86 p-1 text-[10px] font-black text-white/70 backdrop-blur-xl ${navigationMode ? "top-28" : "top-24"}`} dir={isArabic ? "rtl" : "ltr"}>
       <Layers className="mx-1 h-3.5 w-3.5 text-brand-gold" />
-      {([['standard', isArabic ? 'عادي' : 'Standard'], ['satellite', isArabic ? 'ساتلايت' : 'Satellite'], ['terrain', isArabic ? 'تضاريس' : 'Terrain']] as [MapMode, string][]).map(([mode, label]) => <button key={mode} type="button" onClick={() => { setTileFailed(false); setMapMode(mode); }} className={`rounded-full px-2.5 py-1 ${mapMode === mode ? "bg-brand-gold text-brand-deep" : "hover:bg-white/10"}`}>{label}</button>)}
+      {([["standard", isArabic ? "عادي" : "Standard"], ["satellite", isArabic ? "ساتلايت" : "Satellite"], ["terrain", isArabic ? "تضاريس" : "Terrain"]] as [MapMode, string][]).map(([mode, label]) => <button key={mode} type="button" onClick={() => { setTileFailed(false); setMapMode(mode); }} className={`rounded-full px-2.5 py-1 ${mapMode === mode ? "bg-brand-gold text-brand-deep" : "hover:bg-white/10"}`}>{label}</button>)}
     </div>
 
     <MapContainer key={mapMode} center={center} zoom={navigationMode ? 16 : 10} style={{ height: "100%", width: "100%" }} scrollWheelZoom={navigationMode} zoomControl>
@@ -319,7 +318,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
       {(routePoints.length ? routePoints : [routeStart, routeTarget]).filter((_, index) => index % Math.max(1, Math.floor((routePoints.length || 2) / 10)) === 0).map((point, index) => <CircleMarker key={`${point[0]}-${point[1]}-${index}`} center={point} radius={2.8} pathOptions={{ color: "#F5B700", fillColor: "#F5B700", fillOpacity: 0.75, opacity: 0.55 }} />)}
       <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{getString(activeOrder, ["sender_address", "pickup_address"]) || (isArabic ? pickup.labelAr : pickup.labelEn)}</p></div></Popup></Marker>
       {showLiveVehicle && driverPos && <DayNightVehicleMarker position={driverPos} bearing={bearing} state="driving" label={isArabic ? "الموقع الحالي للمندوب" : "Current driver location"}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold">DAY NIGHT</p><p>{isArabic ? "الموقع المباشر للمندوب المعيّن" : "Live position of the assigned driver"}</p></div></Popup></DayNightVehicleMarker>}
-      <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.deliveryPoint}</p><p>{getString(activeOrder, ["receiver_address", "delivery_address"]) || (isArabic ? destination.labelAr : destination.labelEn)}</p></div></Popup></Marker>
+      <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{getString(activeOrder, ["receiver_address", "delivery_address"]) || (isArabic ? destination.labelAr : destination.labelEn)}</p></div></Popup></Marker>
     </MapContainer>
   </div>;
 }
