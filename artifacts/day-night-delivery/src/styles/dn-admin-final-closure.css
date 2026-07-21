@@ -1,0 +1,248 @@
+/* DAY NIGHT Admin — final closure layer
+   Loaded last. It normalizes operational readability and honest support states
+   without changing the existing data or mutation layer. */
+
+.dncc-shell {
+  --dn-final-surface: #ffffff;
+  --dn-final-surface-soft: #f6f8fb;
+  --dn-final-border: rgba(7, 26, 51, 0.12);
+  --dn-final-text: #10213a;
+  --dn-final-muted: #64748b;
+  --dn-final-shadow: 0 12px 34px rgba(7, 26, 51, 0.07);
+  font-size: 14px;
+}
+
+.dncc-shell[data-theme="dark"] {
+  --dn-final-surface: #0b1d34;
+  --dn-final-surface-soft: #07182c;
+  --dn-final-border: rgba(148, 180, 215, 0.15);
+  --dn-final-text: #f4f8ff;
+  --dn-final-muted: #a4b2c5;
+  --dn-final-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* Operational text must remain readable. */
+.dncc-shell .text-\[9px\],
+.dncc-shell .text-\[10px\],
+.dncc-shell .text-\[11px\],
+.dncc-shell .text-xs {
+  font-size: 0.8125rem !important;
+  line-height: 1.45 !important;
+}
+
+.dncc-shell button,
+.dncc-shell input,
+.dncc-shell select,
+.dncc-shell textarea,
+.dncc-shell table {
+  font-size: 0.875rem;
+}
+
+.dncc-shell .dn-admin-workspace-host,
+.dncc-shell .dn-admin-center-zone,
+.dncc-shell .dn-section-workspace,
+.dncc-shell .dn-ops-layer {
+  width: 100%;
+  min-width: 0;
+}
+
+.dncc-shell .dn-section-hero,
+.dncc-shell .dn-section-panels > article,
+.dncc-shell .dn-section-table-card,
+.dncc-shell .dn-ops-layer > header,
+.dncc-shell .dn-ops-table,
+.dncc-shell .dn-admin-driver-hero,
+.dncc-shell .dn-admin-driver-toolbar,
+.dncc-shell .dn-admin-driver-kpis > article {
+  border-color: var(--dn-final-border) !important;
+  box-shadow: var(--dn-final-shadow);
+}
+
+.dncc-shell[data-theme="light"] .dn-section-workspace,
+.dncc-shell[data-theme="light"] .dn-ops-layer,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command {
+  color: var(--dn-final-text);
+}
+
+.dncc-shell[data-theme="light"] .dn-section-hero,
+.dncc-shell[data-theme="light"] .dn-section-panels > article,
+.dncc-shell[data-theme="light"] .dn-section-table-card,
+.dncc-shell[data-theme="light"] .dn-ops-layer > header,
+.dncc-shell[data-theme="light"] .dn-ops-table,
+.dncc-shell[data-theme="light"] .dn-admin-driver-hero,
+.dncc-shell[data-theme="light"] .dn-admin-driver-toolbar,
+.dncc-shell[data-theme="light"] .dn-admin-driver-kpis > article {
+  background: var(--dn-final-surface) !important;
+  color: var(--dn-final-text) !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-hero h1,
+.dncc-shell[data-theme="light"] .dn-section-hero h2,
+.dncc-shell[data-theme="light"] .dn-section-hero h3,
+.dncc-shell[data-theme="light"] .dn-section-panels h3,
+.dncc-shell[data-theme="light"] .dn-section-table-card h3,
+.dncc-shell[data-theme="light"] .dn-ops-layer h1,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command h1,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command h2,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command h3 {
+  color: var(--dn-final-text) !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-hero p,
+.dncc-shell[data-theme="light"] .dn-section-hero span,
+.dncc-shell[data-theme="light"] .dn-section-panels p,
+.dncc-shell[data-theme="light"] .dn-section-table-card small,
+.dncc-shell[data-theme="light"] .dn-clean-note,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command p,
+.dncc-shell[data-theme="light"] .dn-admin-driver-command small {
+  color: var(--dn-final-muted) !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-form input,
+.dncc-shell[data-theme="light"] .dn-section-form select,
+.dncc-shell[data-theme="light"] .dn-section-form textarea,
+.dncc-shell[data-theme="light"] .dn-admin-center-zone input,
+.dncc-shell[data-theme="light"] .dn-admin-center-zone select,
+.dncc-shell[data-theme="light"] .dn-admin-center-zone textarea,
+.dncc-shell[data-theme="light"] .dn-ops-filters input,
+.dncc-shell[data-theme="light"] .dn-ops-filters select {
+  border-color: var(--dn-final-border) !important;
+  background: #f8fafc !important;
+  color: var(--dn-final-text) !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-form input::placeholder,
+.dncc-shell[data-theme="light"] .dn-section-form textarea::placeholder,
+.dncc-shell[data-theme="light"] .dn-admin-center-zone input::placeholder,
+.dncc-shell[data-theme="light"] .dn-admin-center-zone textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-table-wrap table,
+.dncc-shell[data-theme="light"] .dn-ops-table table {
+  color: var(--dn-final-text);
+}
+
+.dncc-shell[data-theme="light"] .dn-section-table-wrap th,
+.dncc-shell[data-theme="light"] .dn-ops-table th {
+  background: #eef3f8 !important;
+  color: #334155 !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-table-wrap td,
+.dncc-shell[data-theme="light"] .dn-ops-table td {
+  border-color: rgba(7, 26, 51, 0.08) !important;
+  background: #fff !important;
+  color: var(--dn-final-text) !important;
+}
+
+.dncc-shell[data-theme="light"] .dn-section-table-wrap tr:hover td,
+.dncc-shell[data-theme="light"] .dn-ops-table tr:hover td {
+  background: #f7fafc !important;
+}
+
+/* The global notification control is a real action, not decorative content. */
+.dncc-notification-slot > button {
+  position: relative;
+  cursor: pointer;
+}
+
+/* Support note persistence states. */
+.dn-support-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--dn-final-border);
+  border-radius: 14px;
+  background: var(--dn-final-surface);
+  color: var(--dn-final-text);
+  font-weight: 800;
+  box-shadow: var(--dn-final-shadow);
+}
+
+.dn-support-notice svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+}
+
+.dn-support-notice.is-success {
+  border-color: rgba(22, 163, 74, 0.3);
+  background: rgba(22, 163, 74, 0.08);
+  color: #15803d;
+}
+
+.dn-support-notice.is-warning {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+  color: #a16207;
+}
+
+.dn-support-notice.is-error {
+  border-color: rgba(220, 38, 38, 0.32);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+}
+
+.dncc-shell[data-theme="dark"] .dn-support-notice.is-success { color: #86efac; }
+.dncc-shell[data-theme="dark"] .dn-support-notice.is-warning { color: #fde68a; }
+.dncc-shell[data-theme="dark"] .dn-support-notice.is-error { color: #fca5a5; }
+
+.dn-support-source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dn-support-source.is-db {
+  border-color: rgba(22, 163, 74, 0.26);
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.dn-support-source.is-local {
+  border-color: rgba(217, 119, 6, 0.32);
+  background: rgba(245, 158, 11, 0.11);
+  color: #a16207;
+}
+
+.dncc-shell[data-theme="dark"] .dn-support-source.is-db { color: #86efac; }
+.dncc-shell[data-theme="dark"] .dn-support-source.is-local { color: #fde68a; }
+
+.dn-section-table-wrap tr.is-pending-local td {
+  background: rgba(245, 158, 11, 0.055) !important;
+}
+
+/* Clear disabled states for unavailable production actions. */
+.dncc-shell button:disabled,
+.dncc-shell input:disabled,
+.dncc-shell select:disabled,
+.dncc-shell textarea:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.48 !important;
+}
+
+@media (max-width: 760px) {
+  .dncc-shell .dn-section-hero,
+  .dncc-shell .dn-admin-driver-hero {
+    padding: 1rem !important;
+  }
+
+  .dncc-shell .dn-section-table-wrap,
+  .dncc-shell .dn-ops-table {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .dn-support-notice {
+    align-items: flex-start;
+  }
+}
