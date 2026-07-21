@@ -24,8 +24,9 @@ This pack verifies the production data chain without demo rows or fabricated GPS
 
 3. Reload the PostgREST schema or wait for the migration's `notify pgrst` operation.
 4. Configure the Vercel server environment variables below.
-5. Add the protected GitHub Actions secrets below.
-6. Run **Runtime Delivery E2E** manually from GitHub Actions.
+5. Configure the immediate Supabase Database Webhook described below.
+6. Add the protected GitHub Actions secrets below.
+7. Run **Runtime Delivery E2E** manually from GitHub Actions.
 
 The live E2E must not be run before the migration is applied. It intentionally fails when a required RPC, trigger, COD row, settlement row, permission, or email configuration is missing.
 
@@ -40,14 +41,31 @@ These values must be configured for Production and Preview as appropriate. Never
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only order/outbox access |
 | `RESEND_API_KEY` | Server-only email provider key |
 | `DELIVERY_EMAIL_FROM` | Verified sender, such as `DAY NIGHT DELIVERY SERVICES <notifications@daynightae.com>` |
-| `DELIVERY_EMAIL_WEBHOOK_SECRET` | Protects optional Supabase database webhook calls |
-| `CRON_SECRET` | Protects scheduled outbox processing |
+| `DELIVERY_EMAIL_WEBHOOK_SECRET` | Protects Supabase database webhook calls |
+| `CRON_SECRET` | Protects the daily fallback outbox processor |
 
 The API route is:
 
 `POST /api/delivery-confirmation`
 
 Authenticated client requests send a Supabase Bearer token and `{ "orderId": "..." }`.
+
+## Immediate automatic confirmation webhook
+
+The immediate confirmation is triggered from Supabase, not from the browser and not from the daily fallback cron.
+
+Create a Supabase **Database Webhook** with these exact settings:
+
+- Table: `public.orders`
+- Event: `INSERT`
+- Method: `POST`
+- URL: `https://daynightae.com/api/delivery-confirmation`
+- Header: `x-day-night-webhook-secret: <same value as DELIVERY_EMAIL_WEBHOOK_SECRET>`
+- Timeout: at least 10 seconds
+
+Supabase sends the inserted order as `record`. The API validates the webhook secret, resolves the registered email, sends the bilingual summary through Resend, and marks the matching outbox row as sent.
+
+The Vercel Hobby-compatible cron runs once daily at `02:00 UTC` only as a retry mechanism for pending or failed outbox rows. It is not the primary delivery path.
 
 ## GitHub Actions protected secrets
 
@@ -86,7 +104,7 @@ Use dedicated test identities with the same real roles and RLS rules as producti
 | Pickup request | Merchant pickup RPC creates and reloads the request |
 | Branch/document persistence | Records reload through `merchant_portal_business_center` |
 | Customer history | Delivered order appears with terminal status and final date |
-| Automatic email | Outbox row exists; optional deployed API call returns a provider message ID |
+| Automatic email | Outbox row exists; deployed API returns a provider message ID |
 
 ## Running locally
 
@@ -114,4 +132,4 @@ To test actual provider delivery, also set:
 - A missing COD or settlement record is a failure, not a derived or invented success.
 - Live tracking never generates estimated driver coordinates.
 - Service-role and email-provider secrets remain server-side.
-- The migration and Vercel variables must be deployed before automatic emails can be considered operational.
+- The migration, webhook, and Vercel variables must be deployed before automatic emails can be considered operational.
