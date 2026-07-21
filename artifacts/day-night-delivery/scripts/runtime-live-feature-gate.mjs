@@ -56,11 +56,19 @@ expect(emailService, /\/api\/delivery-confirmation/, "Client email service calls
 expect(emailService, /access_token/, "Client email service forwards the authenticated Supabase token");
 
 const api = read("api/delivery-confirmation.js", true);
-expect(api, /RESEND_API_KEY/, "Email API uses server-only Resend credentials");
+expect(api, /GMAIL_USER/, "Email API uses a server-only Gmail sender account");
+expect(api, /GMAIL_APP_PASSWORD/, "Email API uses a server-only Gmail App Password");
+expect(api, /smtp\.gmail\.com/, "Email API delivers through Gmail SMTP");
 expect(api, /SUPABASE_SERVICE_ROLE_KEY/, "Email API uses the service role only on the server");
 expect(api, /verifyUser/, "Email API validates authenticated users");
 expect(api, /delivery_confirmation_outbox/, "Email API processes the durable email outbox");
 expect(api, /CRON_SECRET/, "Email outbox processor is protected by the Vercel cron secret");
+if (/RESEND_API_KEY|api\.resend\.com/.test(api)) {
+  console.error("FAIL: Email API still contains Resend credentials or endpoints");
+  failed = true;
+} else {
+  console.log("PASS: Email API no longer depends on Resend");
+}
 
 const migration = read("supabase/migrations/20260721190000_runtime_delivery_verification_and_email.sql", true);
 expect(migration, /tracking_live_driver_location/, "Migration defines secure live-driver location access");
