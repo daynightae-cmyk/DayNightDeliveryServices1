@@ -65,7 +65,29 @@ jobs:
           exit 1
 
       - name: TypeScript check
-        run: pnpm run web:typecheck
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:typecheck 2>&1 | tee typescript-check.log
+
+      - name: Upload TypeScript diagnostics
+        if: steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-check-diagnostic
+          path: typescript-check.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when TypeScript validation failed
+        if: steps.typecheck.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "TypeScript validation failed. Last 180 log lines:"
+          tail -n 180 typescript-check.log
+          exit 1
 
       - name: Production hardening gate
         run: pnpm run web:gate
