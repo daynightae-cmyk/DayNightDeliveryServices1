@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(process.cwd());
-const src = path.join(root, "src");
 
 function read(relative) {
   const file = path.join(root, relative);
@@ -82,8 +81,9 @@ includesAll(legacyPanel, [
 includesAll(commandCenter, [
   "useNavigate", "toggleTheme", "toggleLanguage", "onOpenWebsite", "onBack",
   "onToggleKhalifa", "openNotifications", "fetchAdminOrders", "fetchMerchants",
+  "selectSearchItem", "applyWorkspaceSearch",
 ], "command-center controls");
-assert(!commandCenter.includes("notificationSlot={<Bell aria-hidden=\"true\" />}") , "notification control is not a dead decorative bell");
+assert(!commandCenter.includes("notificationSlot={<Bell aria-hidden=\"true\" />}"), "notification control is not a dead decorative bell");
 includesAll(commandShell, ["onToggleTheme", "onToggleKhalifa", "onBack", "onOpenWebsite"], "shell control contracts");
 
 includesAll(orderForm, [
@@ -98,13 +98,13 @@ includesAll(workspace, [
   "AdminDriverAssignmentModal", "financialsFromOrder", "AdminPdfExportButton",
 ], "order workspace operations");
 assert(!workspace.includes("onClick={() => {}}"), "order workspace has no empty click handlers");
-includesAll(assignment, ["assign", "driver", "onSaved"], "driver assignment modal is connected");
+includesAll(assignment, ["dispatchOrderRuntime", "fetchDispatchCandidates", "driverId", "onSaved"], "driver assignment modal is connected");
 
 includesAll(drivers, [
   "useAdminDrivers", "DriverLiveMap", "DriverDispatchCenter", "setAdminDriverStatus",
   "updateAdminDriverProfile", "uploadDriverAvatarFile",
 ], "live-driver operations");
-includesAll(driverHook, ["driver_profiles", "driver_locations", "orders", "channel("], "driver data and realtime sources");
+includesAll(driverHook, ["driver_profiles", "driver_locations", "orders", ".channel("], "driver data and realtime sources");
 assert(!drivers.includes("Math.random("), "driver operations contain no random live data");
 includesAll(map, ["react-leaflet", "MapContainer", "TileLayer"], "Admin map uses real Leaflet components");
 assert(!map.includes("Math.random("), "Admin map contains no random coordinates");
@@ -130,11 +130,11 @@ includesAll(operationsLayer, [
 includesAll(support, [
   "createAdminAuditEvent", "fetchAdminAuditEvents", "pending_local", "retryPendingNotes",
 ], "support persistence and retry semantics");
-assert(!support.includes('setSaved(true); window.setTimeout'), "support does not claim unconditional database success");
+assert(!support.includes("Saved.") && !support.includes("تم الحفظ."), "support does not show an ambiguous unconditional saved message");
 includesAll(health, ["fetchAdminDatabaseHealth", "fetchFinanceHardeningHealth", "import_batches", "print_jobs"], "database health coverage");
 includesAll(readiness, ["fetchAdminProductionReadiness", "fetchFinanceHardeningHealth", "blocked", "needs_review"], "production readiness gate");
-includesAll(settings, ["theme", "language", "mapMode", "notifications"], "Admin settings coverage");
-includesAll(pdf, ["AdminPdfPreviewModal", "generate"], "PDF export flow");
+includesAll(settings, ["theme", "mapMode", "AdminAudioSettings", "Bell"], "Admin settings coverage");
+includesAll(pdf, ["AdminPdfPreviewModal", "buildAdminPdf", "buildAdminCsv", "buildAdminDoc"], "PDF/CSV/DOC export flow");
 
 for (const objectName of [
   "admin_expenses", "admin_adjustments", "cod_collections", "merchant_statement_entries",
