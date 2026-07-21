@@ -118,7 +118,7 @@ includesAll(financeLedger, [
   "admin_finance_operations_snapshot", "order_financial_settlements",
   "financial_account_entries", "admin_finance_budget_status",
 ], "authoritative finance sources");
-includesAll(dailyClosing, ["saveAdminDailyClosing", "financeSummary", "onNavigate"], "daily closing operation");
+includesAll(dailyClosing, ["fetchAuthoritativeDailyClosing", "saveAuthoritativeDailyClosing", "financeSummary", "onNavigate"], "daily closing operation");
 
 includesAll(productionData, [
   'id === "import"', 'table: "import_batches"', 'table: "print_jobs"',
