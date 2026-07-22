@@ -9,8 +9,9 @@ def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
 // Immutable production contracts verified by CI:
 // /driver?nativeShell=driver&nosplash=1
 // /merchant?nativeShell=merchant&nosplash=1
-// DAYNIGHT_ROLE_WEB_BASE_URL is accepted only at build time for isolated debug
-// visual acceptance; normal APK/AAB outputs always use the official HTTPS host.
+// DAYNIGHT_ROLE_WEB_BASE_URL is accepted only at build time for the isolated
+// `visual` build type. Normal debug/release APK and AAB outputs use the
+// official HTTPS host and the production MainActivity security contract.
 def roleStartUrl = { String role ->
     def separator = roleVisualQuery ? "&" : ""
     return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1${separator}${roleVisualQuery}"
@@ -57,6 +58,11 @@ android {
     buildTypes {
         debug {
             debuggable true
+        }
+        visual {
+            initWith debug
+            debuggable true
+            matchingFallbacks = ["debug"]
         }
         release {
             minifyEnabled false
