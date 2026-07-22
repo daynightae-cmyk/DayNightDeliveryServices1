@@ -1,3 +1,6 @@
+-- CORRECT FILE: DRIVER START + IN-APP NAVIGATION + PRIVATE CHAT + PAYROLL.
+-- If the SQL Editor title/body says "Order & Merchant Fee Accounting Repair",
+-- that is the earlier pricing migration and it will NOT activate this runtime.
 -- DAY NIGHT: driver mission status, private order chat, and real driver payroll.
 -- Additive production migration; no demo rows and no destructive data rewrite.
 
@@ -5,10 +8,162 @@ begin;
 
 create extension if not exists pgcrypto;
 
+-- Production has used both text and ENUM-backed status columns. Extend every
+-- detected ENUM with the canonical driver workflow before the RPCs are used.
+-- The new labels are only consumed after this transaction commits.
+do $dn_enum$
+declare
+  v_row record;
+  v_value text;
+begin
+  for v_row in
+    select distinct type_ns.nspname as schema_name, typ.typname as type_name
+    from pg_attribute att
+    join pg_class cls on cls.oid=att.attrelid
+    join pg_namespace table_ns on table_ns.oid=cls.relnamespace
+    join pg_type typ on typ.oid=att.atttypid and typ.typtype='e'
+    join pg_namespace type_ns on type_ns.oid=typ.typnamespace
+    where table_ns.nspname='public'
+      and ((cls.relname='orders' and att.attname='status')
+        or (cls.relname='order_status_history' and att.attname='status'))
+      and att.attnum>0 and not att.attisdropped
+  loop
+    foreach v_value in array array['pending','review','assigned','confirmed','accepted','picked_up','in_transit','delivered','postponed','returned','cancelled'] loop
+      execute format('alter type %I.%I add value if not exists %L',v_row.schema_name,v_row.type_name,v_value);
+    end loop;
+  end loop;
+
+  for v_row in
+    select distinct type_ns.nspname as schema_name, typ.typname as type_name
+    from pg_attribute att
+    join pg_class cls on cls.oid=att.attrelid
+    join pg_namespace table_ns on table_ns.oid=cls.relnamespace
+    join pg_type typ on typ.oid=att.atttypid and typ.typtype='e'
+    join pg_namespace type_ns on type_ns.oid=typ.typnamespace
+    where table_ns.nspname='public' and cls.relname='driver_profiles'
+      and att.attname='shift_status' and att.attnum>0 and not att.attisdropped
+  loop
+    foreach v_value in array array['offline','available','busy','paused'] loop
+      execute format('alter type %I.%I add value if not exists %L',v_row.schema_name,v_row.type_name,v_value);
+    end loop;
+  end loop;
+end
+$dn_enum$;
+
 -- ---------------------------------------------------------------------------
 -- 1) Driver mission status: accepted is a legacy UI alias for confirmed.
 --    Cast dynamically so this works with both text and production order_status.
 -- ---------------------------------------------------------------------------
+create or replace function public.driver_start_mission(
+  p_order_id text,
+  p_note text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $dn$
+declare
+  v_driver public.driver_profiles%rowtype;
+  v_order public.orders%rowtype;
+  v_order_status_type text;
+  v_order_status_oid oid;
+  v_order_status_is_enum boolean := false;
+  v_history_status_type text;
+  v_history_status_oid oid;
+  v_history_status_is_enum boolean := false;
+  v_storage_status text := 'confirmed';
+  v_history_status text;
+  v_current_status text;
+begin
+  if auth.uid() is null then raise exception 'not_authenticated'; end if;
+
+  select * into v_driver
+  from public.driver_profiles
+  where (id=auth.uid() or user_id=auth.uid()) and status::text='active'
+  order by case when id=auth.uid() then 0 else 1 end,created_at desc nulls last
+  limit 1;
+  if not found then raise exception 'driver_setup_required_or_inactive'; end if;
+
+  select * into v_order
+  from public.orders
+  where (id::text=p_order_id or tracking_number=p_order_id or invoice_number=p_order_id or coupon_number=p_order_id)
+    and (driver_id=v_driver.id or assigned_driver_id=v_driver.id)
+  limit 1;
+  if not found then raise exception 'order_not_assigned_to_driver'; end if;
+
+  v_current_status := lower(coalesce(to_jsonb(v_order)->>'status','assigned'));
+  if v_current_status in ('confirmed','accepted','picked_up','in_transit') then
+    return jsonb_build_object('ok',true,'order_id',v_order.id,'status',v_current_status,'canonical_status','confirmed','already_started',true);
+  end if;
+  if v_current_status<>'assigned' then raise exception 'mission_start_invalid_from_status: %',v_current_status; end if;
+
+  select format('%I.%I',type_ns.nspname,typ.typname),typ.oid,typ.typtype='e'
+    into v_order_status_type,v_order_status_oid,v_order_status_is_enum
+  from pg_attribute att
+  join pg_class cls on cls.oid=att.attrelid
+  join pg_namespace table_ns on table_ns.oid=cls.relnamespace
+  join pg_type typ on typ.oid=att.atttypid
+  join pg_namespace type_ns on type_ns.oid=typ.typnamespace
+  where table_ns.nspname='public' and cls.relname='orders' and att.attname='status'
+    and att.attnum>0 and not att.attisdropped;
+
+  if v_order_status_is_enum then
+    select candidate into v_storage_status
+    from unnest(array['confirmed','accepted','in_transit']) with ordinality as wanted(candidate,priority)
+    where exists(select 1 from pg_enum where enumtypid=v_order_status_oid and enumlabel=candidate)
+    order by priority limit 1;
+    if v_storage_status is null then raise exception 'driver_start_status_enum_missing'; end if;
+    execute format(
+      'update public.orders set status=$1::%s,driver_id=$2,assigned_driver_id=$2,driver_name=coalesce($3,driver_name),driver_phone=coalesce($4,driver_phone),updated_at=now() where id=$5 returning *',
+      v_order_status_type
+    ) into v_order using v_storage_status,v_driver.id,v_driver.full_name,v_driver.phone,v_order.id;
+  else
+    update public.orders set status=v_storage_status,driver_id=v_driver.id,assigned_driver_id=v_driver.id,
+      driver_name=coalesce(v_driver.full_name,driver_name),driver_phone=coalesce(v_driver.phone,driver_phone),updated_at=now()
+    where id=v_order.id returning * into v_order;
+  end if;
+
+  if to_regclass('public.order_status_history') is not null then
+    select format('%I.%I',type_ns.nspname,typ.typname),typ.oid,typ.typtype='e'
+      into v_history_status_type,v_history_status_oid,v_history_status_is_enum
+    from pg_attribute att
+    join pg_class cls on cls.oid=att.attrelid
+    join pg_namespace table_ns on table_ns.oid=cls.relnamespace
+    join pg_type typ on typ.oid=att.atttypid
+    join pg_namespace type_ns on type_ns.oid=typ.typnamespace
+    where table_ns.nspname='public' and cls.relname='order_status_history' and att.attname='status'
+      and att.attnum>0 and not att.attisdropped;
+
+    v_history_status := v_storage_status;
+    if v_history_status_is_enum and not exists(select 1 from pg_enum where enumtypid=v_history_status_oid and enumlabel=v_history_status) then
+      select candidate into v_history_status
+      from unnest(array['confirmed','accepted','in_transit','assigned']) with ordinality as wanted(candidate,priority)
+      where exists(select 1 from pg_enum where enumtypid=v_history_status_oid and enumlabel=candidate)
+      order by priority limit 1;
+    end if;
+    if v_history_status_is_enum then
+      execute format('insert into public.order_status_history(order_id,status,note,driver_id,changed_by,created_at) values($1,$2::%s,$3,$4,$5,now())',v_history_status_type)
+      using v_order.id,v_history_status,coalesce(nullif(btrim(coalesce(p_note,'')),''),'Driver started mission'),v_driver.id,auth.uid();
+    else
+      insert into public.order_status_history(order_id,status,note,driver_id,changed_by,created_at)
+      values(v_order.id,v_history_status,coalesce(nullif(btrim(coalesce(p_note,'')),''),'Driver started mission'),v_driver.id,auth.uid(),now());
+    end if;
+  end if;
+
+  insert into public.driver_locations(driver_id,current_order_id,is_online,last_seen_at,created_at,updated_at)
+  values(v_driver.id,v_order.id,true,now(),now(),now())
+  on conflict(driver_id) do update set current_order_id=excluded.current_order_id,is_online=true,last_seen_at=now(),updated_at=now();
+  update public.driver_profiles set shift_status='busy',updated_at=now() where id=v_driver.id;
+  perform public.driver_audit(v_driver.id,'mission_started',v_order.id,jsonb_build_object('status',v_storage_status,'note',p_note,'source','driver_portal'));
+
+  return jsonb_build_object('ok',true,'order_id',v_order.id,'status',v_storage_status,'canonical_status','confirmed','already_started',false);
+end
+$dn$;
+
+revoke all on function public.driver_start_mission(text,text) from public,anon;
+grant execute on function public.driver_start_mission(text,text) to authenticated;
+
 create or replace function public.driver_update_order_status(
   p_order_id text,
   p_status text,
@@ -31,6 +186,7 @@ begin
   if auth.uid() is null then raise exception 'not_authenticated'; end if;
   if v_status in ('accepted','approved') then v_status := 'confirmed'; end if;
   if v_status='failed' then v_status := 'cancelled'; end if;
+  if v_status='confirmed' then return public.driver_start_mission(p_order_id,p_note); end if;
   if v_status not in ('confirmed','picked_up','in_transit','delivered','cancelled','returned','postponed') then
     raise exception 'unsupported_driver_status: %',p_status;
   end if;
@@ -474,11 +630,13 @@ security definer
 set search_path = public
 as $dn$
   select jsonb_build_object(
-    'ok',to_regprocedure('public.driver_update_order_status(text,text,text)') is not null
+    'ok',to_regprocedure('public.driver_start_mission(text,text)') is not null
+      and to_regprocedure('public.driver_update_order_status(text,text,text)') is not null
       and to_regprocedure('public.order_chat_list(text)') is not null
       and to_regprocedure('public.order_chat_send(text,text,text,double precision,double precision)') is not null
       and to_regprocedure('public.admin_driver_payroll_snapshot(uuid,date,date)') is not null,
     'mission_status','confirmed',
+    'mission_rpc',to_regprocedure('public.driver_start_mission(text,text)') is not null,
     'chat_table',to_regclass('public.order_conversation_messages') is not null,
     'payroll_table',to_regclass('public.driver_payroll_entries') is not null,
     'generated_at',now()
@@ -486,6 +644,13 @@ as $dn$
 $dn$;
 
 revoke all on function public.driver_chat_payroll_runtime_health() from public, anon;
-grant execute on function public.driver_chat_payroll_runtime_health() to authenticated;
+grant execute on function public.driver_chat_payroll_runtime_health() to anon, authenticated;
+
+-- Force PostgREST to discover the repaired RPCs immediately. The SQL editor
+-- also displays one definitive health row so the operator can verify the run.
+select pg_notify('pgrst','reload schema');
+select pg_notify('pgrst','reload config');
 
 commit;
+
+select public.driver_chat_payroll_runtime_health();

@@ -23,6 +23,16 @@ expect(overlay,/!isMerchant && !isDriver/,"Global floating controls cannot cover
 const exactCss=read("src/styles/dn-driver-figma-exact.css");
 expect(exactCss,/dn-driver-exact-rail\{display:none !important\}/,"Duplicate desktop rail is removed on mobile");
 expect(exactCss,/dn-driver-mobile-dock-v3\{display:grid !important/,"Purpose-built mobile dock stays active");
+const portalEntry=read("src/components/driver/DriverPortal.tsx");
+expect(portalEntry,/dn-driver-mobile-runtime-final\.css/,"Final mobile runtime CSS loads after the driver design layers");
+const mobileRuntime=read("src/styles/dn-driver-mobile-runtime-final.css");
+expect(mobileRuntime,/body:has\(\.dn-driver-exact-shell\) \.dn-portal-auth-page/,"Authenticated driver shell removes any stale white auth cover");
+expect(mobileRuntime,/overflow-y:\s*auto !important/,"Authenticated driver page remains vertically scrollable on phones");
+expect(mobileRuntime,/dn-driver-exact-rail[\s\S]*display:\s*none !important/,"Desktop driver rail cannot cover the mobile app");
+
+const driverData=read("src/lib/driverData.ts");
+expect(driverData,/rpc\(["']driver_start_mission["']/,"Mission start uses the dedicated production RPC");
+expect(driverData,/DN-DB-START/,"Driver sees an actionable database diagnostic instead of a generic failure");
 
 const customer=read("src/components/customer/CustomerOrderHistory.tsx");
 expect(customer,/actorRole=["']customer["']/,"Customer can join the private order conversation");
@@ -43,6 +53,10 @@ expect(migration,/order_chat_can_access/,"Chat access is enforced at the databas
 expect(migration,/driver_payroll_entries/,"Migration creates the audited payroll ledger");
 expect(migration,/admin_driver_payroll_snapshot/,"Migration calculates the real net and outstanding salary");
 expect(migration,/v_status in \('accepted','approved'\).*confirmed/s,"Database normalizes legacy mission starts to confirmed");
+expect(migration,/function public\.driver_start_mission/ ,"Migration defines a dedicated idempotent mission-start RPC");
+expect(migration,/alter type[\s\S]*add value if not exists/s,"Migration reconciles production ENUM labels before mission updates");
+expect(migration,/pg_notify\('pgrst','reload schema'\)/,"Migration reloads the live PostgREST schema immediately");
+expect(migration,/grant execute on function public\.driver_chat_payroll_runtime_health\(\) to anon, authenticated/,"Runtime health is remotely verifiable after SQL execution");
 
 if(failed){console.error("Driver chat & payroll production gate FAILED.");process.exit(1);}
 console.log("Driver chat & payroll production gate PASSED.\n");
