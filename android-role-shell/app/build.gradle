@@ -11,8 +11,8 @@ android {
     defaultConfig {
         minSdk 24
         targetSdk 36
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.1.0"
     }
 
     signingConfigs {
@@ -68,8 +68,8 @@ android {
     lint {
         abortOnError true
         checkReleaseBuilds true
-        // v1.0.1 explicitly opts out of predictive back in the manifest so
-        // role-isolated WebView history keeps using Activity.onBackPressed().
+        // v1.1.0 keeps the isolated WebView history contract while the app
+        // dispatches drawer/modal back navigation through same-document history.
         disable "GestureBackNavigation"
     }
 
