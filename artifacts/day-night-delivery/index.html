@@ -20,6 +20,7 @@
     <script>
       (function () {
         var LANGUAGE_KEY = "dn_lang_preference";
+        var LANGUAGE_EXPLICIT_KEY = "dn_lang_explicit_v2";
         var params = new URLSearchParams(window.location.search || "");
         var normalizeLanguage = function (value) {
           value = String(value || "").trim().toLowerCase();
@@ -29,7 +30,11 @@
         };
 
         var savedLanguage = null;
-        try { savedLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY)); } catch (_) {}
+        try {
+          if (localStorage.getItem(LANGUAGE_EXPLICIT_KEY) === "1") {
+            savedLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY));
+          }
+        } catch (_) {}
         var queryLanguage = normalizeLanguage(params.get("lang"));
         var browserLanguages = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
         var browserLanguage = null;
@@ -129,7 +134,6 @@
       @media(prefers-reduced-motion:reduce){.dn-role-boot-logo-wrap,.dn-role-boot-logo-wrap::after,.dn-role-boot-progress i{animation:none}}
     </style>
 
-    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DAY NIGHT DELIVERY SERVICES" />
     <meta property="og:locale" content="ar_AE" />
