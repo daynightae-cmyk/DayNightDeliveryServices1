@@ -11,7 +11,7 @@ import { pageCopy } from "../data/pageCopy";
 import { coverageAreas } from "../data/coverage";
 import companyMeta from "../data/companyMeta";
 
-const CITY_ROUTE_PRICE = 30;
+const CITY_ROUTE_PRICE = 25;
 const SPECIAL_ROUTE_PRICE = 50;
 
 function areaPrice(zoneType: string) {

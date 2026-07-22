@@ -111,7 +111,7 @@ function normalizePublicOrderPayload(payload: Record<string, unknown>) {
 function buildPublicOrderInsertPayload(payload: Record<string, unknown>) {
   const description = cleanText(String(payload.package_description || payload.package_type || "Local delivery item"));
   const createdAt = cleanText(String(payload.created_at || "")) || new Date().toISOString();
-  const total = normalizeNumber(payload.total_price ?? payload.total ?? payload.delivery_price ?? payload.price ?? payload.amount, 30);
+  const total = normalizeNumber(payload.total_price ?? payload.total ?? payload.delivery_price ?? payload.price ?? payload.amount, 25);
   const invoiceNumber = cleanText(String(payload.invoice_number || payload.invoiceNumber || "")) || createInvoiceNumber(payload.tracking_code || payload.tracking_number || payload.id || undefined, new Date(createdAt));
 
   const directPayload: Record<string, unknown> = {

@@ -33,7 +33,7 @@ interface RequestDeliveryProps {
   onNavigate: (tab: string, trackingId?: string) => void;
 }
 
-const LOCAL_DELIVERY_PRICE = 30;
+const LOCAL_DELIVERY_PRICE = 25;
 const LOCAL_PACKAGE_WEIGHT = 1;
 const LOCAL_PACKAGE_PIECES = 1;
 const LOCAL_SERVICE_TYPE = "standard" as const;

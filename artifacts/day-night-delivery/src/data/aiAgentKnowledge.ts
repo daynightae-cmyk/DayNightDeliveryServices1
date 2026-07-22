@@ -113,8 +113,8 @@ export const chatKnowledgeEntries = [
   /* ─── Express ─── */
   {
     keys: ["express", "urgent", "fast", "quick", "priority", "سريع", "عاجل", "أولوية", "خدمة سريعة"],
-    en: "Express delivery: +15 AED surcharge on top of base price.\nMain express: 30 + 15 = 45 AED.\nExtended express: 50 + 15 = 65 AED.",
-    ar: "التوصيل السريع: +15 درهم إضافة على السعر الأساسي.\nسريع مناطق رئيسية: 30 + 15 = 45 درهم.\nسريع مناطق ممتدة: 50 + 15 = 65 درهم."
+    en: "Express delivery: +15 AED surcharge on top of base price.\nMain express: 25 + 15 = 40 AED.\nExtended express: 50 + 15 = 65 AED.",
+    ar: "التوصيل السريع: +15 درهم إضافة على السعر الأساسي.\nسريع مناطق رئيسية: 25 + 15 = 40 درهم.\nسريع مناطق ممتدة: 50 + 15 = 65 درهم."
   },
 
   /* ─── Al Ain ─── */
