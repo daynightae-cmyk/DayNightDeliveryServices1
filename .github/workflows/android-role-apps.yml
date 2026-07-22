@@ -173,10 +173,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p android-role-shell/emulator
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+
           echo no | avdmanager create avd \
             --force \
             --name daynight_api36 \
-            --package "system-images;android-36;google_apis;x86_64"
+            --package "system-images;android-36;google_apis;x86_64" \
+            --path "$ANDROID_AVD_HOME/daynight_api36.avd" \
+            | tee android-role-shell/emulator/avdmanager-create.log
+
+          avdmanager list avd | tee android-role-shell/emulator/avdmanager-list.log
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee android-role-shell/emulator/emulator-list-avds.log
+          grep -Fx "daynight_api36" android-role-shell/emulator/emulator-list-avds.log
 
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd daynight_api36 \
