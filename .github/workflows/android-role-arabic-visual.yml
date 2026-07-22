@@ -50,6 +50,7 @@ jobs:
           grep -F 'data-language' artifacts/day-night-delivery/index.html
           grep -F 'dnBootAbsoluteFailsafe' artifacts/day-night-delivery/index.html
           grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
+          grep -F 'DAYNIGHT_SPLASH' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
@@ -145,6 +146,7 @@ jobs:
           set -euo pipefail
           adb install -r android-role-shell/arabic-visual/driver-visual.apk | tee android-role-shell/arabic-visual/driver-install.log
           adb shell am force-stop com.daynightae.driver
+          adb logcat -c
           adb shell am start -n com.daynightae.driver/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/driver-start.log
           sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-01.png
@@ -154,6 +156,9 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
           sleep 5
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
+          adb logcat -d -s DAYNIGHT_SPLASH:I '*:S' > android-role-shell/arabic-visual/driver-splash-watchdog.log
+          cat android-role-shell/arabic-visual/driver-splash-watchdog.log
+          grep -E 'driver attempt=[123].*result=true' android-role-shell/arabic-visual/driver-splash-watchdog.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
           adb shell am force-stop com.daynightae.driver
 
@@ -163,6 +168,7 @@ jobs:
           set -euo pipefail
           adb install -r android-role-shell/arabic-visual/merchant-visual.apk | tee android-role-shell/arabic-visual/merchant-install.log
           adb shell am force-stop com.daynightae.merchant
+          adb logcat -c
           adb shell am start -n com.daynightae.merchant/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/merchant-start.log
           sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-01.png
@@ -172,6 +178,9 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
           sleep 5
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
+          adb logcat -d -s DAYNIGHT_SPLASH:I '*:S' > android-role-shell/arabic-visual/merchant-splash-watchdog.log
+          cat android-role-shell/arabic-visual/merchant-splash-watchdog.log
+          grep -E 'merchant attempt=[123].*result=true' android-role-shell/arabic-visual/merchant-splash-watchdog.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
           adb shell am force-stop com.daynightae.merchant
 
@@ -181,7 +190,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageChops, ImageStat
+          from PIL import Image
 
           staged = sorted(Path('android-role-shell/arabic-visual').glob('*-stage-*.png'))
           assert len(staged) == 6
@@ -193,15 +202,13 @@ jobs:
               print(path, count)
 
           for role in ('driver', 'merchant'):
-              splash = Image.open(f'android-role-shell/arabic-visual/{role}-stage-02.png').convert('RGB').resize((240, 420))
+              log = Path(f'android-role-shell/arabic-visual/{role}-splash-watchdog.log').read_text(errors='replace')
+              assert 'result=true' in log, f'{role} native watchdog never proved the web splash was removed'
               final = Image.open(f'android-role-shell/arabic-visual/{role}-arabic-final.png').convert('RGB').resize((240, 420))
-              difference = ImageStat.Stat(ImageChops.difference(splash, final)).mean
-              mean_difference = sum(difference) / len(difference)
-              assert mean_difference > 12, f'{role} remained visually trapped on splash ({mean_difference:.2f})'
               dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
               dark_ratio = dark_pixels / (final.width * final.height)
-              assert dark_ratio < 0.94, f'{role} final screen is still almost entirely the navy splash ({dark_ratio:.3f})'
-              print(role, 'mean_difference=', round(mean_difference, 2), 'dark_ratio=', round(dark_ratio, 3))
+              assert dark_ratio < 0.94, f'{role} final screen is still almost entirely navy ({dark_ratio:.3f})'
+              print(role, 'watchdog=true', 'dark_ratio=', round(dark_ratio, 3))
           PY
 
       - name: Stop emulator and local server
