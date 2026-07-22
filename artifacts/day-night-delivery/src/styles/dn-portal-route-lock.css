@@ -55,12 +55,14 @@ html[data-portal-route="true"] .dn-official-shell-frame + div[aria-hidden="true"
   display: none !important;
 }
 
-html[data-portal-route="true"] #root main,
-body:has(.dn-merchant-login-v3) #root main,
-body:has(.dn-merchant-state-v3) #root main,
-body:has(.dn-merchant-shell-v3) #root main,
-body:has(.dn-driver-login-page) #root main,
-body:has(.dn-driver-shell) #root main {
+/* Scope full-viewport reset to the public AppContent main only. Never target
+   nested <main> elements inside Driver or Merchant dashboards. */
+html[data-portal-route="true"] #root > div > main,
+body:has(.dn-merchant-login-v3) #root > div > main,
+body:has(.dn-merchant-state-v3) #root > div > main,
+body:has(.dn-merchant-shell-v3) #root > div > main,
+body:has(.dn-driver-login-page) #root > div > main,
+body:has(.dn-driver-shell) #root > div > main {
   width: 100% !important;
   max-width: none !important;
   min-height: 100dvh !important;
@@ -69,12 +71,12 @@ body:has(.dn-driver-shell) #root main {
 }
 
 /* Footer is the final direct child of the public AppContent shell. */
-html[data-portal-route="true"] #root main ~ footer,
-body:has(.dn-merchant-login-v3) #root main ~ footer,
-body:has(.dn-merchant-state-v3) #root main ~ footer,
-body:has(.dn-merchant-shell-v3) #root main ~ footer,
-body:has(.dn-driver-login-page) #root main ~ footer,
-body:has(.dn-driver-shell) #root main ~ footer {
+html[data-portal-route="true"] #root > div > main ~ footer,
+body:has(.dn-merchant-login-v3) #root > div > main ~ footer,
+body:has(.dn-merchant-state-v3) #root > div > main ~ footer,
+body:has(.dn-merchant-shell-v3) #root > div > main ~ footer,
+body:has(.dn-driver-login-page) #root > div > main ~ footer,
+body:has(.dn-driver-shell) #root > div > main ~ footer {
   display: none !important;
 }
 
