@@ -39,8 +39,14 @@ expect(workspace, /merchantFilterId[\s\S]{0,120}clean\(order\.merchant_id\) !== 
 expect(workspace, /matchesAdminSection/, "Bulk list respects the active operational order section");
 
 const driver = read("src/components/driver/DriverOrderCard.tsx");
-for (const status of ["confirmed", "accepted", "picked_up", "in_transit", "delivered", "cancelled", "returned"]) {
+for (const status of ["confirmed", "picked_up", "in_transit", "delivered", "cancelled", "returned"]) {
   expect(driver, new RegExp(`value: [\"']${status}[\"']`), `Driver card exposes ${status} action`);
+}
+if (/value: ["']accepted["']/.test(driver)) {
+  console.error("FAIL: Driver card persists the legacy accepted value instead of canonical confirmed");
+  failed = true;
+} else {
+  console.log("PASS: Driver card does not persist the legacy accepted enum value");
 }
 expect(driver, /requiresNote: true/, "Risk/closure driver actions require an operational note");
 expect(driver, /wa\.me\/[\s\S]*encodeURIComponent\(whatsappMessage\)/, "Driver WhatsApp action includes a prefilled production message");

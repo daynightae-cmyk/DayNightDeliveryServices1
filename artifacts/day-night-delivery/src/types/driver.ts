@@ -38,6 +38,10 @@ export type DriverProfile = {
   preferred_language?: string | null;
   license_expiry?: string | null;
   vehicle_registration_expiry?: string | null;
+  base_salary?: number | null;
+  salary_currency?: string | null;
+  salary_cycle?: string | null;
+  salary_effective_from?: string | null;
   joined_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -143,7 +147,7 @@ export type DriverOverviewRow = DriverProfile & {
 };
 
 export type DriverStatusAction = {
-  value: "confirmed" | "accepted" | "picked_up" | "in_transit" | "delivered" | "cancelled" | "returned";
+  value: "confirmed" | "picked_up" | "in_transit" | "delivered" | "cancelled" | "returned";
   ar: string;
   en: string;
   requiresNote?: boolean;

@@ -6,6 +6,7 @@ import {
   Clock3,
   MapPin,
   MessageCircle,
+  MessagesSquare,
   Navigation,
   PackageCheck,
   Phone,
@@ -23,11 +24,11 @@ type Props = {
   navigationActive?: boolean;
   onStatus: (status: string, note?: string) => Promise<boolean>;
   onNavigate?: (acceptIfAssigned?: boolean) => void;
+  onChat?: () => void;
 };
 
 const actions: DriverStatusAction[] = [
-  { value: "confirmed", ar: "تأكيد استلام المهمة", en: "Confirm assignment" },
-  { value: "accepted", ar: "بدء تنفيذ المهمة", en: "Start job" },
+  { value: "confirmed", ar: "بدء تنفيذ المهمة", en: "Start job" },
   { value: "picked_up", ar: "تم استلام الشحنة", en: "Picked up" },
   { value: "in_transit", ar: "في الطريق للتسليم", en: "In transit" },
   { value: "delivered", ar: "تأكيد التسليم", en: "Confirm delivery", requiresNote: true },
@@ -35,7 +36,7 @@ const actions: DriverStatusAction[] = [
   { value: "returned", ar: "إرجاع للتاجر", en: "Return to merchant", requiresNote: true },
 ];
 
-const progressStatuses = ["assigned", "confirmed", "accepted", "picked_up", "in_transit", "delivered"];
+const progressStatuses = ["assigned", "confirmed", "picked_up", "in_transit", "delivered"];
 const cleanPhone = (value?: string) => String(value || "").replace(/[^+\d]/g, "");
 const whatsAppPhone = (value?: string) => {
   let digits = String(value || "").replace(/\D/g, "");
@@ -63,14 +64,13 @@ const statusText = (status: string, isArabic: boolean) => {
 function nextActions(status: string) {
   const normalized = String(status || "assigned").toLowerCase();
   if (normalized === "assigned") return actions.filter((action) => action.value === "confirmed" || action.value === "cancelled");
-  if (normalized === "confirmed") return actions.filter((action) => action.value === "accepted" || action.value === "cancelled");
-  if (normalized === "accepted") return actions.filter((action) => action.value === "picked_up" || action.value === "cancelled");
+  if (normalized === "confirmed" || normalized === "accepted") return actions.filter((action) => action.value === "picked_up" || action.value === "cancelled");
   if (normalized === "picked_up") return actions.filter((action) => action.value === "in_transit" || action.value === "returned");
   if (normalized === "in_transit" || normalized === "out_for_delivery") return actions.filter((action) => action.value === "delivered" || action.value === "cancelled" || action.value === "returned");
   return [];
 }
 
-export default function DriverOrderCard({ order, isArabic, busy, navigationActive = false, onStatus, onNavigate }: Props) {
+export default function DriverOrderCard({ order, isArabic, busy, navigationActive = false, onStatus, onNavigate, onChat }: Props) {
   const [note, setNote] = useState("");
   const [selectedAction, setSelectedAction] = useState<DriverStatusAction | null>(null);
   const [copied, setCopied] = useState(false);
@@ -80,7 +80,8 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
   const deliveryAddress = [order.receiver_city, order.receiver_address].filter(Boolean).join("، ");
   const reference = order.tracking_number || order.tracking_code || order.invoice_number || order.id;
   const availableActions = nextActions(order.status);
-  const normalizedStatus = String(order.status || "assigned").toLowerCase();
+  const rawStatus = String(order.status || "assigned").toLowerCase();
+  const normalizedStatus = rawStatus === "accepted" ? "confirmed" : rawStatus;
   const activeStep = Math.max(0, progressStatuses.indexOf(normalizedStatus));
   const isClosed = ["delivered", "cancelled", "returned"].includes(normalizedStatus);
   const whatsappMessage = isArabic
@@ -105,7 +106,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
 
   async function runAction(action: DriverStatusAction, actionNote?: string) {
     const succeeded = await onStatus(action.value, actionNote);
-    if (succeeded && action.value === "accepted") onNavigate?.(false);
+    if (succeeded && action.value === "confirmed") onNavigate?.(false);
     return succeeded;
   }
 
@@ -181,6 +182,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
       <div className="dn-driver-contact-grid">
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone}><Phone /> <span>{isArabic ? "اتصال" : "Call"}</span></a>
         <a href={whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!whatsappPhone}><MessageCircle /> <span>{isArabic ? "رسالة واتساب" : "WhatsApp message"}</span></a>
+        <button type="button" onClick={onChat} disabled={!onChat}><MessagesSquare /><span>{isArabic ? "محادثة العميل" : "Customer chat"}</span></button>
         <button type="button" className={navigationActive ? "is-navigation-active" : ""} onClick={() => onNavigate?.(true)} disabled={!onNavigate || navigationActive}>
           <Navigation />
           <span>{navigationActive ? (isArabic ? "الملاحة تعمل" : "Navigation active") : (isArabic ? "الملاحة داخل التطبيق" : "In-app navigation")}</span>

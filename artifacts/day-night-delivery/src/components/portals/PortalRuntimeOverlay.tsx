@@ -124,7 +124,7 @@ export default function PortalRuntimeOverlay() {
 
   return (
     <>
-      {!isMerchant && (
+      {!isMerchant && !isDriver && (
         <div className="dn-portal-floating-tools" dir={isArabic ? "rtl" : "ltr"}>
           <button type="button" onClick={toggleTheme} title={isArabic ? `المظهر: ${themeLabel}` : `Appearance: ${themeLabel}`}>
             <ThemeIcon />

@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Archive, CalendarCheck, Mail, PackageCheck, RefreshCw, Truck } from "lucide-react";
+import { Archive, CalendarCheck, Mail, MessageCircle, PackageCheck, RefreshCw, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Order } from "../../types";
 import { sendDeliveryConfirmationEmail } from "../../lib/deliveryConfirmationEmail";
+import OrderChatDialog from "../shared/OrderChatDialog";
 
 const FINAL_STATUSES = new Set(["delivered", "cancelled", "canceled", "returned", "failed", "delivery_failed"]);
 
@@ -59,6 +60,7 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   async function sendEmail() {
     setSending(true);
@@ -88,7 +90,7 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
           </p>
         </div>
 
-        <div className="grid min-w-[280px] grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid min-w-[280px] grid-cols-2 gap-2 sm:grid-cols-5">
           <div className="rounded-xl bg-white/5 px-3 py-2 text-center">
             <CalendarCheck className="mx-auto mb-1 h-4 w-4 text-brand-gold" />
             <p className="text-[10px] text-white/45">{historical ? (isArabic ? "تاريخ الإغلاق" : "Final date") : (isArabic ? "تاريخ الطلب" : "Created")}</p>
@@ -101,6 +103,7 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
           <Link to={`/tracking?code=${encodeURIComponent(tracking)}`} className="flex items-center justify-center rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-3 py-2 text-[11px] font-black text-brand-gold">
             {isArabic ? "التتبع" : "Track"}
           </Link>
+          {!historical ? <button type="button" onClick={() => setChatOpen(true)} className="flex items-center justify-center gap-1 rounded-xl border border-brand-sky/25 bg-brand-sky/10 px-3 py-2 text-[11px] font-black text-brand-sky"><MessageCircle className="h-3.5 w-3.5" />{isArabic ? "المندوب" : "Driver chat"}</button> : null}
           <button type="button" onClick={() => void sendEmail()} disabled={sending || !row.id} className="flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black text-white hover:bg-white/10 disabled:opacity-50">
             <Mail className="h-3.5 w-3.5" /> {sending ? (isArabic ? "إرسال..." : "Sending...") : (isArabic ? "إرسال التأكيد" : "Email summary")}
           </button>
@@ -108,6 +111,7 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
       </div>
       {notice && <p className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200">{notice}</p>}
       {error && <p className="mt-3 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-[11px] font-bold text-rose-200">{error}</p>}
+      <OrderChatDialog open={chatOpen} order={order} actorRole="customer" isArabic={isArabic} onClose={() => setChatOpen(false)} />
     </article>
   );
 }
