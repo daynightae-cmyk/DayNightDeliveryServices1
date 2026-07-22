@@ -105,7 +105,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     applyLanguageToDocument(language);
-    saveLanguage(language);
     window.dispatchEvent(new CustomEvent("dn-language-change", { detail: { language } }));
   }, [language]);
 
@@ -116,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   const setLanguage = (lang: Language) => {
     applyLanguageToDocument(lang);
+    saveLanguage(lang);
     setLanguageState(lang);
   };
   const toggleLanguage = () => setLanguage(language === "ar" ? "en" : "ar");
