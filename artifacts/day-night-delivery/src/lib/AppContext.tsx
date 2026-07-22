@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { detectBrowserLanguage, getSavedLanguage, saveLanguage } from "../i18n";
+import { applyLanguageToDocument, getInitialLanguage, saveLanguage, type Lang } from "../i18n";
 
 type Theme = "dark" | "light";
 type ThemeMode = Theme | "system";
-type Language = "ar" | "en";
+type Language = Lang;
 
 interface AppContextType {
   theme: Theme;
@@ -18,6 +18,11 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 const THEME_MODE_KEY = "dn_theme_mode";
 const ADMIN_SETTINGS_KEY = "dn_admin_control_settings_v2";
+
+// index.html resolves the language before React downloads. Re-applying it at
+// module evaluation keeps direct Vite/dev entries flicker-free as well.
+const BOOT_LANGUAGE = getInitialLanguage();
+applyLanguageToDocument(BOOT_LANGUAGE);
 
 function savedThemeMode(): ThemeMode {
   try {
@@ -52,7 +57,7 @@ function persistAdminTheme(theme: Theme) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(savedThemeMode);
   const [systemPreference, setSystemPreference] = useState<Theme>(systemTheme);
-  const [language, setLanguageState] = useState<Language>(() => getSavedLanguage() || detectBrowserLanguage());
+  const [language, setLanguageState] = useState<Language>(BOOT_LANGUAGE);
 
   const theme = useMemo<Theme>(
     () => (themeMode === "system" ? systemPreference : themeMode),
@@ -99,9 +104,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
-    document.documentElement.lang = language;
+    applyLanguageToDocument(language);
     saveLanguage(language);
+    window.dispatchEvent(new CustomEvent("dn-language-change", { detail: { language } }));
   }, [language]);
 
   const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
@@ -109,8 +114,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setThemeModeState((current) =>
       current === "dark" ? "light" : current === "light" ? "system" : "dark",
     );
-  const setLanguage = (lang: Language) => setLanguageState(lang);
-  const toggleLanguage = () => setLanguageState((current) => (current === "ar" ? "en" : "ar"));
+  const setLanguage = (lang: Language) => {
+    applyLanguageToDocument(lang);
+    setLanguageState(lang);
+  };
+  const toggleLanguage = () => setLanguage(language === "ar" ? "en" : "ar");
 
   return (
     <AppContext.Provider value={{ theme, themeMode, toggleTheme, setThemeMode, language, setLanguage, toggleLanguage }}>
