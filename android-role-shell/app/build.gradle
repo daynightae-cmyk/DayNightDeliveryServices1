@@ -2,6 +2,8 @@ plugins {
     id "com.android.application"
 }
 
+def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
+
 android {
     namespace "com.daynightae.shell"
     compileSdk 35
@@ -11,6 +13,17 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            if (releaseKeystorePath) {
+                storeFile file(releaseKeystorePath)
+                storePassword System.getenv("DAYNIGHT_ANDROID_STORE_PASSWORD")
+                keyAlias System.getenv("DAYNIGHT_ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("DAYNIGHT_ANDROID_KEY_PASSWORD")
+            }
+        }
     }
 
     flavorDimensions += "role"
@@ -40,6 +53,9 @@ android {
         release {
             minifyEnabled false
             shrinkResources false
+            if (releaseKeystorePath) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
