@@ -7,7 +7,9 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -16,7 +18,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -32,6 +36,8 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import org.json.JSONObject;
@@ -41,8 +47,11 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int LOCATION_PERMISSION_REQUEST = 4001;
     private static final int FILE_CHOOSER_REQUEST = 4002;
+    private static final String WEB_CACHE_PREFERENCES = "daynight_web_cache";
+    private static final String WEB_CACHE_VERSION_KEY = "version_name";
 
     private WebView webView;
+    private ProgressBar loadingIndicator;
     private ValueCallback<Uri[]> fileChooserCallback;
     private GeolocationPermissions.Callback pendingGeoCallback;
     private String pendingGeoOrigin;
@@ -57,15 +66,36 @@ public final class MainActivity extends Activity {
         window.setStatusBarColor(Color.rgb(7, 26, 51));
         window.setNavigationBarColor(Color.rgb(7, 26, 51));
 
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(7, 26, 51));
+
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(7, 26, 51));
+        webView.setBackgroundColor(Color.TRANSPARENT);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        setContentView(webView);
+        root.addView(
+                webView,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                )
+        );
+
+        loadingIndicator = new ProgressBar(this);
+        loadingIndicator.setIndeterminate(true);
+        FrameLayout.LayoutParams loadingLayout = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        loadingLayout.gravity = Gravity.CENTER;
+        root.addView(loadingIndicator, loadingLayout);
+        setContentView(root);
 
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         configureWebView();
+        clearWebCacheAfterUpgrade();
 
         if (savedInstanceState != null && webView.restoreState(savedInstanceState) != null) {
+            hideLoadingIndicator();
             return;
         }
         openStartRoute();
@@ -170,9 +200,27 @@ public final class MainActivity extends Activity {
         }
 
         @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            super.onPageStarted(view, url, favicon);
+            if (!offlineVisible) {
+                showLoadingIndicator();
+            }
+        }
+
+        @Override
+        public void onPageCommitVisible(WebView view, String url) {
+            super.onPageCommitVisible(view, url);
+            if (!offlineVisible) {
+                injectNativeRoleShell();
+                hideLoadingIndicator();
+            }
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             if (offlineVisible) {
+                hideLoadingIndicator();
                 return;
             }
 
@@ -182,6 +230,7 @@ public final class MainActivity extends Activity {
                 return;
             }
             injectNativeRoleShell();
+            hideLoadingIndicator();
         }
 
         @Override
@@ -308,6 +357,7 @@ public final class MainActivity extends Activity {
 
     private void openStartRoute() {
         offlineVisible = false;
+        showLoadingIndicator();
         if (!isOnline()) {
             showOfflinePage("offline");
             return;
@@ -320,6 +370,7 @@ public final class MainActivity extends Activity {
             return;
         }
         offlineVisible = true;
+        hideLoadingIndicator();
         String title = isArabic() ? "لا يوجد اتصال بالإنترنت" : "No internet connection";
         String body = isArabic()
                 ? "تحقق من الشبكة ثم اضغط إعادة المحاولة. ستظل جلسة حسابك محفوظة بأمان داخل التطبيق."
@@ -340,10 +391,13 @@ public final class MainActivity extends Activity {
 
     private void injectNativeRoleShell() {
         String css = "html,body,#root{width:100%!important;min-height:100%!important;min-height:100dvh!important;overflow-x:hidden!important;}"
-                + "html{background:#071a33!important;}body{margin:0!important;padding:0!important;background:#071a33!important;overscroll-behavior-y:none!important;-webkit-text-size-adjust:100%;}"
-                + "#root>div{width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;background:#071a33!important;}"
-                + "#root>div>main,main{display:block!important;width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:visible!important;}"
-                + ".dn-official-shell-frame,footer{display:none!important;}input,select,textarea{font-size:16px!important;}"
+                + "html,body{margin:0!important;padding:0!important;overscroll-behavior-y:none!important;-webkit-text-size-adjust:100%;}"
+                + "#root>div{width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;justify-content:flex-start!important;}"
+                + ".dn-official-shell-frame{display:none!important;}"
+                + "#root>div>[aria-hidden=\"true\"]{display:none!important;}"
+                + "#root>div>main{display:block!important;width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:visible!important;}"
+                + "#root>div>main~*,#root>div>footer{display:none!important;}"
+                + "input,select,textarea{font-size:16px!important;}"
                 + "button,a,input,select,textarea{touch-action:manipulation;}";
 
         String script = "(function(){try{"
@@ -351,11 +405,31 @@ public final class MainActivity extends Activity {
                 + "window.__DAY_NIGHT_NATIVE_ROLE__=role;document.documentElement.setAttribute('data-native-shell',role);"
                 + "var style=document.getElementById('dn-native-shell-style');if(!style){style=document.createElement('style');style.id='dn-native-shell-style';document.head.appendChild(style);}"
                 + "style.textContent=" + JSONObject.quote(css) + ";"
-                + "var apply=function(){var main=document.querySelector('main');if(!main)return;var shell=main.parentElement;if(shell){Array.prototype.forEach.call(shell.children,function(child){if(child!==main){child.style.setProperty('display','none','important');}});}"
-                + "main.style.setProperty('display','block','important');main.style.setProperty('width','100%','important');main.style.setProperty('max-width','none','important');main.style.setProperty('margin','0','important');main.style.setProperty('padding','0','important');};"
-                + "apply();if(!window.__dnNativeObserver){window.__dnNativeObserver=new MutationObserver(apply);window.__dnNativeObserver.observe(document.documentElement,{childList:true,subtree:true});}"
+                + "document.body&&document.body.setAttribute('data-native-role',role);"
                 + "}catch(error){console.error('DAY_NIGHT_NATIVE_SHELL',error);}})();";
         webView.evaluateJavascript(script, null);
+    }
+
+    private void clearWebCacheAfterUpgrade() {
+        SharedPreferences preferences = getSharedPreferences(WEB_CACHE_PREFERENCES, MODE_PRIVATE);
+        String previousVersion = preferences.getString(WEB_CACHE_VERSION_KEY, "");
+        if (!BuildConfig.VERSION_NAME.equals(previousVersion)) {
+            webView.clearCache(true);
+            preferences.edit().putString(WEB_CACHE_VERSION_KEY, BuildConfig.VERSION_NAME).apply();
+        }
+    }
+
+    private void showLoadingIndicator() {
+        if (loadingIndicator != null) {
+            loadingIndicator.setVisibility(View.VISIBLE);
+            loadingIndicator.bringToFront();
+        }
+    }
+
+    private void hideLoadingIndicator() {
+        if (loadingIndicator != null) {
+            loadingIndicator.setVisibility(View.GONE);
+        }
     }
 
     private boolean isOnline() {
