@@ -3,6 +3,7 @@ name: Android Role Apps
 on:
   push:
     branches:
+      - main
       - agent/mobile-role-apks
     paths:
       - "android-role-shell/**"
@@ -40,12 +41,12 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android platform and build tools
+      - name: Install Android 16 platform and build tools
         shell: bash
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -61,15 +62,17 @@ jobs:
           test -s android-role-shell/app/src/driver/res/drawable-nodpi/app_icon.png
           test -s android-role-shell/app/src/merchant/res/drawable-nodpi/app_icon.png
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
       - name: Validate role isolation contract
         shell: bash
         run: |
           set -euo pipefail
+          grep -F 'compileSdk 36' android-role-shell/app/build.gradle
+          grep -F 'targetSdk 36' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
           grep -F '/driver?nativeShell=driver&nosplash=1' android-role-shell/app/build.gradle
