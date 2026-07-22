@@ -41,12 +41,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android 16 platform and build tools
+      - name: Install Android 16 SDK, emulator, and system image
         shell: bash
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" \
+            "emulator" \
+            "system-images;android-36;google_apis;x86_64"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -156,32 +161,95 @@ jobs:
       - name: Enable KVM for Android emulator
         shell: bash
         run: |
+          set -euo pipefail
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+
+      - name: Create and boot Android 16 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p android-role-shell/emulator
+          echo no | avdmanager create avd \
+            --force \
+            --name daynight_api36 \
+            --package "system-images;android-36;google_apis;x86_64"
+
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd daynight_api36 \
+            -no-window \
+            -gpu swiftshader_indirect \
+            -noaudio \
+            -no-boot-anim \
+            -no-snapshot \
+            -no-metrics \
+            -wipe-data \
+            > android-role-shell/emulator/emulator-api36.log 2>&1 &
+          echo $! > android-role-shell/emulator/emulator.pid
+
+          timeout 180 adb wait-for-device
+          booted=""
+          for attempt in $(seq 1 180); do
+            booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [ "$booted" = "1" ]; then
+              break
+            fi
+            if ! kill -0 "$(cat android-role-shell/emulator/emulator.pid)" 2>/dev/null; then
+              echo "Android emulator process exited before boot completed."
+              tail -n 400 android-role-shell/emulator/emulator-api36.log || true
+              exit 1
+            fi
+            sleep 5
+          done
+
+          if [ "$booted" != "1" ]; then
+            echo "Android 16 emulator did not finish booting within 15 minutes."
+            adb devices -l || true
+            tail -n 400 android-role-shell/emulator/emulator-api36.log || true
+            exit 1
+          fi
+
+          adb devices -l | tee android-role-shell/emulator/adb-devices.log
+          adb shell getprop ro.build.version.release | tee android-role-shell/emulator/android-release.log
+          adb shell getprop ro.build.version.sdk | tee android-role-shell/emulator/android-sdk.log
+          grep -Fx "16" android-role-shell/emulator/android-release.log
+          grep -Fx "36" android-role-shell/emulator/android-sdk.log
 
       - name: Install and launch both APKs on Android 16
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          target: default
-          arch: x86_64
-          disable-animations: true
-          emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics
-          script: |
-            set -euo pipefail
-            adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.apk | tee android-role-shell/driver-install.log
-            adb shell am start -W -n com.daynightae.driver/com.daynightae.shell.MainActivity | tee android-role-shell/driver-launch.log
-            grep -F "Status: ok" android-role-shell/driver-launch.log
-            adb shell dumpsys package com.daynightae.driver | grep -F "versionName=1.0.0" | tee -a android-role-shell/driver-launch.log
-            adb shell am force-stop com.daynightae.driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.apk | tee android-role-shell/driver-install.log
+          grep -F "Success" android-role-shell/driver-install.log
+          adb shell am start -W -n com.daynightae.driver/com.daynightae.shell.MainActivity | tee android-role-shell/driver-launch.log
+          grep -F "Status: ok" android-role-shell/driver-launch.log
+          adb shell dumpsys package com.daynightae.driver | grep -F "versionName=1.0.0" | tee -a android-role-shell/driver-launch.log
+          sleep 5
+          adb shell pidof com.daynightae.driver | tee -a android-role-shell/driver-launch.log
+          test -s android-role-shell/driver-launch.log
+          adb shell am force-stop com.daynightae.driver
 
-            adb install -r android-role-shell/dist/DAY-NIGHT-Merchant-v1.0.0.apk | tee android-role-shell/merchant-install.log
-            adb shell am start -W -n com.daynightae.merchant/com.daynightae.shell.MainActivity | tee android-role-shell/merchant-launch.log
-            grep -F "Status: ok" android-role-shell/merchant-launch.log
-            adb shell dumpsys package com.daynightae.merchant | grep -F "versionName=1.0.0" | tee -a android-role-shell/merchant-launch.log
-            adb shell am force-stop com.daynightae.merchant
+          adb install -r android-role-shell/dist/DAY-NIGHT-Merchant-v1.0.0.apk | tee android-role-shell/merchant-install.log
+          grep -F "Success" android-role-shell/merchant-install.log
+          adb shell am start -W -n com.daynightae.merchant/com.daynightae.shell.MainActivity | tee android-role-shell/merchant-launch.log
+          grep -F "Status: ok" android-role-shell/merchant-launch.log
+          adb shell dumpsys package com.daynightae.merchant | grep -F "versionName=1.0.0" | tee -a android-role-shell/merchant-launch.log
+          sleep 5
+          adb shell pidof com.daynightae.merchant | tee -a android-role-shell/merchant-launch.log
+          test -s android-role-shell/merchant-launch.log
+          adb shell am force-stop com.daynightae.merchant
+
+      - name: Stop Android emulator
+        if: always()
+        shell: bash
+        run: |
+          adb emu kill || true
+          if [ -f android-role-shell/emulator/emulator.pid ]; then
+            kill "$(cat android-role-shell/emulator/emulator.pid)" 2>/dev/null || true
+          fi
 
       - name: Upload DAY NIGHT Driver builds
         if: always()
@@ -222,6 +290,7 @@ jobs:
             android-role-shell/*-build.log
             android-role-shell/*-install.log
             android-role-shell/*-launch.log
+            android-role-shell/emulator/
             android-role-shell/app/build/reports/
           if-no-files-found: warn
           retention-days: 14
