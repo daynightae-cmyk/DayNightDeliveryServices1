@@ -151,9 +151,14 @@ begin
     end if;
   end if;
 
-  insert into public.driver_locations(driver_id,current_order_id,is_online,last_seen_at,created_at,updated_at)
-  values(v_driver.id,v_order.id,true,now(),now(),now())
-  on conflict(driver_id) do update set current_order_id=excluded.current_order_id,is_online=true,last_seen_at=now(),updated_at=now();
+  -- Starting a mission must not manufacture coordinates. Some production
+  -- schemas keep legacy latitude/longitude columns NOT NULL, so inserting a
+  -- location row before the phone reports GPS aborts the whole transaction.
+  -- Link a real existing GPS row when present; driver_report_location creates
+  -- it later with genuine coordinates and the active order id.
+  update public.driver_locations
+  set current_order_id=v_order.id,is_online=true,last_seen_at=now(),updated_at=now()
+  where driver_id=v_driver.id;
   update public.driver_profiles set shift_status='busy',updated_at=now() where id=v_driver.id;
   perform public.driver_audit(v_driver.id,'mission_started',v_order.id,jsonb_build_object('status',v_storage_status,'note',p_note,'source','driver_portal'));
 
