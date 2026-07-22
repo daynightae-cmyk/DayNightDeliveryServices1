@@ -4,15 +4,18 @@ on:
   push:
     branches:
       - main
-      - fix/role-app-core-v1-1
     paths:
       - "android-role-shell/**"
       - "artifacts/day-night-delivery/index.html"
       - "artifacts/day-night-delivery/src/i18n/**"
       - "artifacts/day-night-delivery/src/lib/AppContext.tsx"
+      - "artifacts/day-night-delivery/src/lib/pwaRuntime.ts"
+      - "artifacts/day-night-delivery/src/components/ui/DNOfficialCursor.tsx"
       - "artifacts/day-night-delivery/src/portal-designs/merchant/**"
       - "artifacts/day-night-delivery/src/styles/dn-merchant-mobile-drawer-final.css"
       - "artifacts/day-night-delivery/src/styles/dn-driver-mobile-runtime-final.css"
+      - "artifacts/day-night-delivery/src/styles/dn-pointer-performance.css"
+      - "artifacts/day-night-delivery/src/main.tsx"
       - ".github/workflows/android-role-apps.yml"
   pull_request:
     paths:
@@ -20,9 +23,13 @@ on:
       - "artifacts/day-night-delivery/index.html"
       - "artifacts/day-night-delivery/src/i18n/**"
       - "artifacts/day-night-delivery/src/lib/AppContext.tsx"
+      - "artifacts/day-night-delivery/src/lib/pwaRuntime.ts"
+      - "artifacts/day-night-delivery/src/components/ui/DNOfficialCursor.tsx"
       - "artifacts/day-night-delivery/src/portal-designs/merchant/**"
       - "artifacts/day-night-delivery/src/styles/dn-merchant-mobile-drawer-final.css"
       - "artifacts/day-night-delivery/src/styles/dn-driver-mobile-runtime-final.css"
+      - "artifacts/day-night-delivery/src/styles/dn-pointer-performance.css"
+      - "artifacts/day-night-delivery/src/main.tsx"
       - ".github/workflows/android-role-apps.yml"
   workflow_dispatch:
 
@@ -35,7 +42,7 @@ concurrency:
 
 jobs:
   build-role-apps:
-    name: Build and visually verify Driver and Merchant v1.1.0
+    name: Build and visually verify Driver and Merchant v1.1.1
     runs-on: ubuntu-latest
     timeout-minutes: 80
 
@@ -85,20 +92,26 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Validate v1.1.0 role application contracts
+      - name: Validate v1.1.1 runtime contracts
         shell: bash
         run: |
           set -euo pipefail
           grep -F 'compileSdk 36' android-role-shell/app/build.gradle
           grep -F 'targetSdk 36' android-role-shell/app/build.gradle
-          grep -F 'versionCode 3' android-role-shell/app/build.gradle
-          grep -F 'versionName "1.1.0"' android-role-shell/app/build.gradle
+          grep -F 'versionCode 4' android-role-shell/app/build.gradle
+          grep -F 'versionName "1.1.1"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
-          grep -F '/driver?nativeShell=driver&nosplash=1' android-role-shell/app/build.gradle
-          grep -F '/merchant?nativeShell=merchant&nosplash=1' android-role-shell/app/build.gradle
-          grep -F 'data-language' artifacts/day-night-delivery/index.html
-          grep -F 'dn-role-boot' artifacts/day-night-delivery/index.html
+          grep -F '__dn_live=role-v1.1.1' android-role-shell/app/build.gradle
+          grep -F 'dnBootAbsoluteFailsafe' artifacts/day-night-delivery/index.html
+          grep -F 'window.__DAY_NIGHT_FINISH_ROLE_BOOT__' artifacts/day-night-delivery/index.html
+          grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
+          grep -F 'return <PortalRuntimeOverlay />' artifacts/day-night-delivery/src/components/ui/DNOfficialCursor.tsx
+          grep -F '.dn-cursor-ring' artifacts/day-night-delivery/src/styles/dn-pointer-performance.css
+          if grep -F 'pointermove' artifacts/day-night-delivery/src/components/ui/DNOfficialCursor.tsx; then
+            echo "The production cursor must not install a global pointermove listener."
+            exit 1
+          fi
           grep -F 'dn-merchant-mobile-drawer-group nav > button' artifacts/day-night-delivery/src/styles/dn-merchant-mobile-drawer-final.css
           grep -F 'grid-template-columns: minmax(0,1fr)' artifacts/day-night-delivery/src/styles/dn-driver-mobile-runtime-final.css
           grep -F 'background: #f7f5ea !important' artifacts/day-night-delivery/src/styles/dn-driver-mobile-runtime-final.css
@@ -141,23 +154,23 @@ jobs:
           DRIVER_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*driverRelease*' | head -n 1)"
           MERCHANT_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*merchantRelease*' | head -n 1)"
           test -s "$DRIVER_APK" && test -s "$MERCHANT_APK" && test -s "$DRIVER_AAB" && test -s "$MERCHANT_AAB"
-          cp "$DRIVER_APK" android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.apk
-          cp "$MERCHANT_APK" android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.apk
-          cp "$DRIVER_AAB" android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.aab
-          cp "$MERCHANT_AAB" android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.aab
+          cp "$DRIVER_APK" android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.apk
+          cp "$MERCHANT_APK" android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.apk
+          cp "$DRIVER_AAB" android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.aab
+          cp "$MERCHANT_AAB" android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.aab
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
-          "$AAPT" dump badging android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.apk | tee android-role-shell/dist/driver-badging.txt
-          "$AAPT" dump badging android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.apk | tee android-role-shell/dist/merchant-badging.txt
+          "$AAPT" dump badging android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.apk | tee android-role-shell/dist/driver-badging.txt
+          "$AAPT" dump badging android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.apk | tee android-role-shell/dist/merchant-badging.txt
           grep -F "package: name='com.daynightae.driver'" android-role-shell/dist/driver-badging.txt
-          grep -F "versionName='1.1.0'" android-role-shell/dist/driver-badging.txt
+          grep -F "versionName='1.1.1'" android-role-shell/dist/driver-badging.txt
           grep -F "application-label:'DAY NIGHT Driver'" android-role-shell/dist/driver-badging.txt
           grep -F "package: name='com.daynightae.merchant'" android-role-shell/dist/merchant-badging.txt
-          grep -F "versionName='1.1.0'" android-role-shell/dist/merchant-badging.txt
+          grep -F "versionName='1.1.1'" android-role-shell/dist/merchant-badging.txt
           grep -F "application-label:'DAY NIGHT Merchant'" android-role-shell/dist/merchant-badging.txt
-          unzip -t android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.aab >/dev/null
-          unzip -t android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.aab >/dev/null
-          (cd android-role-shell/dist && sha256sum DAY-NIGHT-Driver-v1.1.0.apk DAY-NIGHT-Driver-v1.1.0.aab > DAY-NIGHT-Driver-v1.1.0.sha256)
-          (cd android-role-shell/dist && sha256sum DAY-NIGHT-Merchant-v1.1.0.apk DAY-NIGHT-Merchant-v1.1.0.aab > DAY-NIGHT-Merchant-v1.1.0.sha256)
+          unzip -t android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.aab >/dev/null
+          unzip -t android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.aab >/dev/null
+          (cd android-role-shell/dist && sha256sum DAY-NIGHT-Driver-v1.1.1.apk DAY-NIGHT-Driver-v1.1.1.aab > DAY-NIGHT-Driver-v1.1.1.sha256)
+          (cd android-role-shell/dist && sha256sum DAY-NIGHT-Merchant-v1.1.1.apk DAY-NIGHT-Merchant-v1.1.1.aab > DAY-NIGHT-Merchant-v1.1.1.sha256)
 
       - name: Configure KVM
         shell: bash
@@ -198,40 +211,40 @@ jobs:
           grep -Fx "16" android-role-shell/emulator/android-release.log
           grep -Fx "36" android-role-shell/emulator/android-sdk.log
 
-      - name: Install and inspect Driver v1.1.0
+      - name: Install and inspect Driver v1.1.1
         shell: bash
         run: |
           set -euo pipefail
-          adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.apk | tee android-role-shell/driver-install.log
+          adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.apk | tee android-role-shell/driver-install.log
           grep -F "Success" android-role-shell/driver-install.log
           adb shell am force-stop com.daynightae.driver
           adb shell monkey -p com.daynightae.driver 1 >/dev/null
           sleep 1
-          adb exec-out screencap -p > android-role-shell/screens/driver-splash-v1.1.0.png
-          adb shell dumpsys package com.daynightae.driver | grep -F "versionName=1.1.0" | tee android-role-shell/driver-launch.log
-          sleep 24
+          adb exec-out screencap -p > android-role-shell/screens/driver-splash-v1.1.1.png
+          adb shell dumpsys package com.daynightae.driver | grep -F "versionName=1.1.1" | tee android-role-shell/driver-launch.log
+          sleep 16
           adb shell pidof com.daynightae.driver | tee -a android-role-shell/driver-launch.log
-          adb exec-out screencap -p > android-role-shell/screens/driver-v1.1.0.png
-          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/screens/driver-v1.1.0.png --report android-role-shell/screens/driver-v1.1.0.json --role driver
+          adb exec-out screencap -p > android-role-shell/screens/driver-v1.1.1.png
+          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/screens/driver-v1.1.1.png --report android-role-shell/screens/driver-v1.1.1.json --role driver
           adb shell uiautomator dump /sdcard/driver-window.xml || true
           adb pull /sdcard/driver-window.xml android-role-shell/screens/driver-window.xml || true
           adb shell am force-stop com.daynightae.driver
 
-      - name: Install and inspect Merchant v1.1.0
+      - name: Install and inspect Merchant v1.1.1
         shell: bash
         run: |
           set -euo pipefail
-          adb install -r android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.apk | tee android-role-shell/merchant-install.log
+          adb install -r android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.apk | tee android-role-shell/merchant-install.log
           grep -F "Success" android-role-shell/merchant-install.log
           adb shell am force-stop com.daynightae.merchant
           adb shell monkey -p com.daynightae.merchant 1 >/dev/null
           sleep 1
-          adb exec-out screencap -p > android-role-shell/screens/merchant-splash-v1.1.0.png
-          adb shell dumpsys package com.daynightae.merchant | grep -F "versionName=1.1.0" | tee android-role-shell/merchant-launch.log
-          sleep 24
+          adb exec-out screencap -p > android-role-shell/screens/merchant-splash-v1.1.1.png
+          adb shell dumpsys package com.daynightae.merchant | grep -F "versionName=1.1.1" | tee android-role-shell/merchant-launch.log
+          sleep 16
           adb shell pidof com.daynightae.merchant | tee -a android-role-shell/merchant-launch.log
-          adb exec-out screencap -p > android-role-shell/screens/merchant-v1.1.0.png
-          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/screens/merchant-v1.1.0.png --report android-role-shell/screens/merchant-v1.1.0.json --role merchant
+          adb exec-out screencap -p > android-role-shell/screens/merchant-v1.1.1.png
+          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/screens/merchant-v1.1.1.png --report android-role-shell/screens/merchant-v1.1.1.json --role merchant
           adb shell uiautomator dump /sdcard/merchant-window.xml || true
           adb pull /sdcard/merchant-window.xml android-role-shell/screens/merchant-window.xml || true
           adb shell am force-stop com.daynightae.merchant
@@ -242,8 +255,8 @@ jobs:
           python - <<'PY'
           from PIL import Image
           for path in [
-              'android-role-shell/screens/driver-splash-v1.1.0.png',
-              'android-role-shell/screens/merchant-splash-v1.1.0.png',
+              'android-role-shell/screens/driver-splash-v1.1.1.png',
+              'android-role-shell/screens/merchant-splash-v1.1.1.png',
           ]:
               image = Image.open(path).convert('RGB')
               colors = image.resize((160, 280)).getcolors(160 * 280)
@@ -258,30 +271,30 @@ jobs:
           adb emu kill || true
           if [ -f android-role-shell/emulator/emulator.pid ]; then kill "$(cat android-role-shell/emulator/emulator.pid)" 2>/dev/null || true; fi
 
-      - name: Upload Driver v1.1.0
+      - name: Upload Driver v1.1.1
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Driver-v1.1.0
+          name: DAY-NIGHT-Driver-v1.1.1
           path: |
-            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.apk
-            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.aab
-            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.0.sha256
+            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.apk
+            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.aab
+            android-role-shell/dist/DAY-NIGHT-Driver-v1.1.1.sha256
             android-role-shell/dist/driver-badging.txt
             android-role-shell/driver-*.log
             android-role-shell/screens/driver-*
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Merchant v1.1.0
+      - name: Upload Merchant v1.1.1
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Merchant-v1.1.0
+          name: DAY-NIGHT-Merchant-v1.1.1
           path: |
-            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.apk
-            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.aab
-            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.0.sha256
+            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.apk
+            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.aab
+            android-role-shell/dist/DAY-NIGHT-Merchant-v1.1.1.sha256
             android-role-shell/dist/merchant-badging.txt
             android-role-shell/merchant-*.log
             android-role-shell/screens/merchant-*
@@ -292,7 +305,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Android-Diagnostics-v1.1.0
+          name: DAY-NIGHT-Android-Diagnostics-v1.1.1
           path: |
             android-role-shell/*-build.log
             android-role-shell/*-install.log
