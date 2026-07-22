@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           pnpm install --frozen-lockfile
           pnpm run web:build
-          test -s artifacts/day-night-delivery/dist/index.html
+          test -s artifacts/day-night-delivery/dist/public/index.html
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
