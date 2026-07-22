@@ -118,8 +118,8 @@
       .dn-role-boot-card { position:relative;z-index:2;display:grid;justify-items:center;width:min(100%,440px); }
       .dn-role-boot-logo-wrap { position:relative;display:grid;place-items:center;width:128px;height:128px;margin-bottom:24px;border:1px solid rgba(212,175,55,.55);border-radius:38px;background:rgba(255,255,255,.08);box-shadow:0 28px 75px rgba(0,0,0,.34),inset 0 0 38px rgba(255,255,255,.05);animation:dnBootFloat 2.2s ease-in-out infinite; }
       .dn-role-boot-logo-wrap::after { content:"";position:absolute;inset:-9px;border:1px solid rgba(49,149,247,.25);border-radius:45px;animation:dnBootPulse 1.8s ease-out infinite; }
-      .dn-role-boot-logo { width:104px;height:104px;object-fit:contain;border-radius:28px; }
-      .dn-role-boot-fallback { display:none;place-items:center;width:92px;height:92px;border:3px solid #d4af37;border-radius:28px;color:#d4af37;font:900 30px/1 Inter,sans-serif; }
+      .dn-role-boot-logo { position:relative;z-index:2;width:104px;height:104px;object-fit:contain;border-radius:28px; }
+      .dn-role-boot-fallback { position:absolute;z-index:1;display:grid;place-items:center;width:92px;height:92px;border:3px solid #d4af37;border-radius:28px;color:#d4af37;font:900 30px/1 Inter,sans-serif; }
       .dn-role-boot-eyebrow { color:#f0d875;font:800 11px/1.4 Inter,Cairo,sans-serif;letter-spacing:.18em;text-transform:uppercase; }
       .dn-role-boot-title { margin:9px 0 7px;font:900 clamp(27px,7vw,38px)/1.25 Cairo,Poppins,sans-serif; }
       .dn-role-boot-subtitle { margin:0;color:#c4d4e8;font:700 14px/1.7 Cairo,Inter,sans-serif; }
@@ -228,20 +228,23 @@
         title.textContent = copy[0];
         subtitle.textContent = copy[1];
         status.textContent = copy[2];
-        logo.src = content.icon;
+        logo.src = "/logo-daynight.png";
         logo.onerror = function () { logo.style.display="none"; fallback.style.display="grid"; };
+        var remoteRoleIcon = new Image();
+        remoteRoleIcon.onload = function () { logo.src = content.icon; };
+        remoteRoleIcon.src = content.icon;
 
         var readySelectors = role === "driver"
-          ? ".dn-driver-login-page,.dn-driver-exact-shell,.dn-driver-state-card"
+          ? ".dn-driver-loading-card,.dn-driver-login-page,.dn-driver-exact-shell,.dn-driver-state-card"
           : ".dn-merchant-login-v3,.dn-merchant-app,.dn-merchant-state-v3";
         var startedAt = Date.now();
         function finishWhenReady() {
-          if (document.querySelector(readySelectors) && Date.now() - startedAt > 650) {
+          if (document.querySelector(readySelectors) && Date.now() - startedAt > 1000) {
             boot.classList.add("is-complete");
             window.setTimeout(function(){ boot.remove(); }, 520);
             return;
           }
-          if (Date.now() - startedAt > 12000) {
+          if (Date.now() - startedAt > 8000) {
             boot.classList.add("is-complete");
             window.setTimeout(function(){ boot.remove(); }, 520);
             return;
