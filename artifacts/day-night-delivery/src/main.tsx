@@ -7,6 +7,7 @@ import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
 import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
+import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -69,6 +70,7 @@ createRoot(document.getElementById("root")!).render(
     <AppProvider>
       <App />
       <ProductionOrderRealtimeBridge />
+      <AdminDeferredMerchantAccounting />
       <ProductionExperience />
     </AppProvider>
   </StrictMode>,
