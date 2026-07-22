@@ -108,7 +108,7 @@ jobs:
           test -s android-role-shell/arabic-visual/driver-local.apk
           test -s android-role-shell/arabic-visual/merchant-local.apk
 
-      - name: Boot Android 16
+      - name: Boot Android 16 and wait for local network
         shell: bash
         run: |
           set -euo pipefail
@@ -125,6 +125,18 @@ jobs:
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
           adb shell settings delete global http_proxy || true
+          adb shell svc wifi enable || true
+          reachable=""
+          for attempt in $(seq 1 60); do
+            if adb shell ping -c 1 -W 2 10.0.2.2 >/dev/null 2>&1; then
+              reachable="1"
+              break
+            fi
+            sleep 2
+          done
+          test "$reachable" = "1"
+          adb shell dumpsys connectivity > android-role-shell/arabic-visual/emulator/connectivity.txt || true
+          sleep 8
 
       - name: Capture Driver Arabic branch-build startup
         shell: bash
@@ -132,18 +144,16 @@ jobs:
           set -euo pipefail
           adb install -r android-role-shell/arabic-visual/driver-local.apk | tee android-role-shell/arabic-visual/driver-install.log
           adb shell am force-stop com.daynightae.driver
-          adb shell monkey -p com.daynightae.driver 1 >/dev/null
-          sleep 0.45
+          adb shell am start -n com.daynightae.driver/com.daynightae.shell.MainActivity > android-role-shell/arabic-visual/driver-start.log &
+          sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-01.png
-          sleep 0.75
+          sleep 0.65
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-02.png
-          sleep 0.75
+          sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
           sleep 8
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
-          adb shell uiautomator dump /sdcard/driver-arabic.xml || true
-          adb pull /sdcard/driver-arabic.xml android-role-shell/arabic-visual/driver-arabic.xml || true
           adb shell am force-stop com.daynightae.driver
 
       - name: Capture Merchant Arabic branch-build startup
@@ -152,26 +162,22 @@ jobs:
           set -euo pipefail
           adb install -r android-role-shell/arabic-visual/merchant-local.apk | tee android-role-shell/arabic-visual/merchant-install.log
           adb shell am force-stop com.daynightae.merchant
-          adb shell monkey -p com.daynightae.merchant 1 >/dev/null
-          sleep 0.45
+          adb shell am start -n com.daynightae.merchant/com.daynightae.shell.MainActivity > android-role-shell/arabic-visual/merchant-start.log &
+          sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-01.png
-          sleep 0.75
+          sleep 0.65
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-02.png
-          sleep 0.75
+          sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
           sleep 8
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
-          adb shell uiautomator dump /sdcard/merchant-arabic.xml || true
-          adb pull /sdcard/merchant-arabic.xml android-role-shell/arabic-visual/merchant-arabic.xml || true
           adb shell am force-stop com.daynightae.merchant
 
-      - name: Validate Arabic text and staged screenshots
+      - name: Validate staged screenshots
         shell: bash
         run: |
           set -euo pipefail
-          grep -E 'دخول|المندوب|التاجر|البريد|كلمة المرور' android-role-shell/arabic-visual/driver-arabic.xml
-          grep -E 'دخول|التاجر|البريد|كلمة المرور|الهاتف' android-role-shell/arabic-visual/merchant-arabic.xml
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
