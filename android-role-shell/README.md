@@ -18,7 +18,7 @@ This directory contains one thin native Android shell with two isolated product 
 
 ## Local build
 
-Requirements: Java 17, Android SDK 35, Gradle 8.9, and Python 3 with Pillow.
+Requirements: Java 17, Android SDK/API 36, Android Gradle Plugin 8.11.1, Gradle 8.13, and Python 3 with Pillow.
 
 ```bash
 python -m pip install pillow
