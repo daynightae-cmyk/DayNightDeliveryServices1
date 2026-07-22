@@ -77,8 +77,27 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "logout", ar: "تسجيل الخروج", en: "Logout", groupAr: "الحساب", groupEn: "Account", Icon: LogOut },
 ];
 
+function normalizeMenuText(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
 function legacySidebarButtons() {
   return Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-admin-side-nav button"));
+}
+
+function menuItemFromLegacyButton(button: HTMLButtonElement | null) {
+  if (!button) return null;
+  const text = normalizeMenuText(button.textContent);
+  return menu.find((item) => text === normalizeMenuText(item.ar) || text === normalizeMenuText(item.en)) ?? null;
+}
+
+function legacySidebarButtonFor(id: AdminSectionId) {
+  const item = menu.find((entry) => entry.id === id);
+  if (!item) return null;
+  return legacySidebarButtons().find((button) => {
+    const text = normalizeMenuText(button.textContent);
+    return text === normalizeMenuText(item.ar) || text === normalizeMenuText(item.en);
+  }) ?? null;
 }
 
 function legacyRefreshAction() {
@@ -183,9 +202,9 @@ export default function AdminPanelCommandCenter() {
 
   useEffect(() => {
     const syncFromLegacyPanel = () => {
-      const buttons = legacySidebarButtons();
-      const selectedIndex = buttons.findIndex((button) => button.classList.contains("is-active"));
-      if (selectedIndex >= 0 && menu[selectedIndex]) setActive(menu[selectedIndex].id);
+      const selectedButton = legacySidebarButtons().find((button) => button.classList.contains("is-active")) ?? null;
+      const selectedItem = menuItemFromLegacyButton(selectedButton);
+      if (selectedItem) setActive(selectedItem.id);
       const isLoading = Boolean(document.querySelector(".dn-admin-loading-banner"));
       const errorNode = document.querySelector<HTMLElement>(".dn-admin-error-banner");
       setLoading(isLoading);
@@ -199,8 +218,7 @@ export default function AdminPanelCommandCenter() {
   }, []);
 
   const navigate = (id: AdminSectionId) => {
-    const index = menu.findIndex((item) => item.id === id);
-    const button = legacySidebarButtons()[index];
+    const button = legacySidebarButtonFor(id);
     if (button) button.click();
     else if (id === "logout") navigateRouter("/auth");
     setActive(id);
