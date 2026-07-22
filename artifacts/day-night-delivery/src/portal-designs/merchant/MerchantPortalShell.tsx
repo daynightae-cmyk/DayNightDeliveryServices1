@@ -33,7 +33,7 @@ export function MerchantPortalShell({ currentSection, data, callbacks, isArabic,
   }
 
   return (
-    <div className={`dn-merchant-app ${isDark ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"}>
+    <div className={`dn-merchant-app ${isDark ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"} data-merchant-authenticated="true">
       <MerchantDesktopSidebar
         currentSection={currentSection}
         merchant={data.merchant}
@@ -68,7 +68,16 @@ export function MerchantPortalShell({ currentSection, data, callbacks, isArabic,
         <main className="dn-merchant-content"><div className="dn-merchant-content-inner">{children}</div></main>
       </div>
       <MerchantBottomNavigation currentSection={currentSection} isArabic={isArabic} onNavigate={callbacks.onNavigate} />
-      <MerchantMobileMoreSheet open={mobileMenuOpen} currentSection={currentSection} merchant={data.merchant} isArabic={isArabic} onClose={() => setMobileMenuOpen(false)} onNavigate={callbacks.onNavigate} />
+      <MerchantMobileMoreSheet
+        open={mobileMenuOpen}
+        currentSection={currentSection}
+        merchant={data.merchant}
+        isArabic={isArabic}
+        companyLogoUrl={companyLogoUrl}
+        onClose={() => setMobileMenuOpen(false)}
+        onNavigate={callbacks.onNavigate}
+        onLogout={callbacks.onLogout}
+      />
       <MerchantCommandPalette open={searchOpen} isArabic={isArabic} onClose={() => setSearchOpen(false)} onSearch={callbacks.onGlobalSearch} onOpenResult={openSearchResult} />
     </div>
   );
