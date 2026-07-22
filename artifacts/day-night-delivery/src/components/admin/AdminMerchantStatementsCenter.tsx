@@ -280,7 +280,7 @@ export default function AdminMerchantStatementsCenter({ isArabic, merchants, ord
             const delivered = itemOrders.filter((order) => clean(order.status).toLowerCase() === "delivered").length;
             const due = itemOrders.reduce((sum, order) => sum + merchantValue(order), 0);
             return (
-              <button key={item.id} type="button" onClick={() => openMerchant(item.id)} className="group rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-4 text-start transition hover:-translate-y-0.5 hover:border-brand-gold/35 hover:bg-brand-gold/[0.06]">
+              <article key={item.id} className="dn-admin-merchant-directory-card rounded-[1.4rem] border border-white/10 bg-[#071a33] p-4 text-start transition hover:-translate-y-0.5 hover:border-brand-gold/35">
                 <div className="flex items-start justify-between gap-3">
                   <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-brand-gold/25 bg-brand-gold/10 text-brand-gold">
                     {item.logo_url ? <img src={item.logo_url} alt="" className="h-full w-full object-cover" /> : <Store className="h-5 w-5" />}
@@ -296,7 +296,8 @@ export default function AdminMerchantStatementsCenter({ isArabic, merchants, ord
                   <span><b className="block text-sm text-emerald-200">{delivered}</b><small className="text-[9px] font-bold text-white/38">{isArabic ? "مُسلّم" : "delivered"}</small></span>
                   <span><b className="block text-sm text-brand-gold" dir="ltr">{due.toFixed(2)}</b><small className="text-[9px] font-bold text-white/38">{isArabic ? "مستحق" : "due"}</small></span>
                 </div>
-              </button>
+                <button type="button" onClick={() => openMerchant(item.id)} className="mt-4 w-full rounded-xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2.5 text-xs font-black text-brand-gold transition hover:bg-brand-gold hover:text-[#071a33]">{isArabic ? "فتح كشف التاجر" : "Open merchant statement"}</button>
+              </article>
             );
           })}
         </div>

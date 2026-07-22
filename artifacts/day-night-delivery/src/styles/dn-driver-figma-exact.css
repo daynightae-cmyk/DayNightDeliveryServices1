@@ -151,6 +151,7 @@ body:has(.dn-driver-exact-shell),
   padding-inline:9px !important;
 }
 .dn-driver-language-button span{font-size:10px;font-weight:950}
+.dn-driver-portal-links-v3{display:flex;align-items:center;gap:5px}.dn-driver-portal-links-v3 :is(button,a){display:grid;place-items:center;width:42px;height:42px;border:1px solid rgba(7,26,51,.1);border-radius:13px;color:#071a33;background:#f7f5ea}.dn-driver-portal-links-v3 svg{width:17px}
 
 .dn-driver-exact-board{
   direction:ltr;
@@ -830,20 +831,7 @@ html .dn-driver-exact-shell .dn-driver-profile-save{color:#111111 !important;bac
     display:block !important;
     min-height:100dvh !important;
   }
-  .dn-driver-shell-v3 .dn-driver-exact-rail{
-    position:fixed !important;
-    inset:auto 8px 8px !important;
-    z-index:2147483000 !important;
-    display:flex !important;
-    flex-direction:row !important;
-    justify-content:center !important;
-    width:auto !important;
-    height:72px !important;
-    min-height:72px !important;
-    padding:7px 10px !important;
-    border-radius:24px !important;
-    box-shadow:0 18px 45px rgba(17,17,17,.28) !important;
-  }
+  .dn-driver-shell-v3 .dn-driver-exact-rail{display:none !important}
   .dn-driver-exact-rail .dn-driver-brand-mark-v3{display:none !important}
   .dn-driver-exact-rail nav{flex:1 !important;flex-direction:row !important;justify-content:center !important;gap:6px !important}
   .dn-driver-exact-rail .dn-driver-rail-tools-v3{flex-direction:row !important;gap:4px !important}
@@ -851,7 +839,7 @@ html .dn-driver-exact-shell .dn-driver-profile-save{color:#111111 !important;bac
   .dn-driver-exact-rail .dn-driver-rail-tools-v3 button,
   .dn-driver-exact-rail .dn-driver-rail-tools-v3 a{width:48px !important;height:48px !important}
   .dn-driver-exact-shell .dn-driver-workspace-v3{padding:8px 8px 92px !important}
-  .dn-driver-exact-shell .dn-driver-mobile-dock-v3{display:none !important}
+  .dn-driver-exact-shell .dn-driver-mobile-dock-v3{display:grid !important;z-index:2147483000 !important}
   .dn-driver-exact-board{grid-template-columns:1fr;grid-template-areas:"jobs" "map" "vehicle";gap:8px}
   .dn-driver-exact-jobs{min-height:0;max-height:none;padding:10px}
   .dn-driver-exact-job-list{grid-template-columns:repeat(5,minmax(220px,1fr));overflow-x:auto;overflow-y:hidden}
@@ -867,6 +855,9 @@ html .dn-driver-exact-shell .dn-driver-profile-save{color:#111111 !important;bac
 }
 
 @media(max-width:680px){
+  .dn-driver-portal-links-v3 :is(button,a){width:39px;height:39px}
+  .dn-driver-exact-header .dn-driver-profile-chip-v3,
+  .dn-driver-exact-header .dn-driver-refresh-button-v3{display:none !important}
   .dn-driver-exact-shell .dn-driver-exact-header{align-items:flex-start !important;padding:10px !important;border-radius:18px !important}
   .dn-driver-exact-header .dn-driver-heading-v3 h1{font-size:21px !important}
   .dn-driver-exact-header .dn-driver-profile-chip-v3{max-width:160px !important}

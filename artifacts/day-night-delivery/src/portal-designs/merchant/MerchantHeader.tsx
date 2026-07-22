@@ -1,4 +1,5 @@
-import { Bell, Languages, LogOut, Menu, MoonStar, RefreshCw, Search, SunMedium } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, Home, Languages, LogOut, Menu, MoonStar, RefreshCw, Search, SunMedium } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import type { MerchantConnectionViewModel, MerchantProfileViewModel, MerchantSectionId } from "./merchantViewModels";
 
 const sectionTitles: Record<MerchantSectionId, { ar: string; en: string }> = {
@@ -55,6 +56,7 @@ export interface MerchantHeaderProps {
 }
 
 export function MerchantHeader(props: MerchantHeaderProps) {
+  const navigate = useNavigate();
   const {
     section,
     merchant,
@@ -95,6 +97,8 @@ export function MerchantHeader(props: MerchantHeaderProps) {
         </div>
       </div>
       <div className="dn-merchant-header-actions">
+        <button type="button" onClick={() => navigate(-1)} aria-label={isArabic ? "رجوع" : "Back"}>{isArabic ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}</button>
+        <Link to="/" aria-label={isArabic ? "الموقع الرئيسي" : "Main website"}><Home className="h-5 w-5" /></Link>
         <button type="button" onClick={onOpenSearch} aria-label={isArabic ? "البحث" : "Search"}><Search className="h-5 w-5" /></button>
         <button type="button" onClick={onRefresh} aria-label={isArabic ? "تحديث البيانات" : "Refresh data"}><RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} /></button>
         <button type="button" onClick={onOpenNotifications} className="is-notification" aria-label={isArabic ? "الإشعارات" : "Notifications"}>

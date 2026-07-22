@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote,
+  ArrowLeft,
+  ArrowRight,
   BatteryCharging,
   Bell,
   Clock3,
@@ -26,6 +28,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabase";
 import { driverErrorMessage, setDriverPresence, updateDriverOrderStatus } from "../../lib/driverData";
 import type { DriverOrder, DriverProfile, DriverShiftStatus, ProfileRole } from "../../types/driver";
@@ -36,6 +39,7 @@ import DriverOrderCard from "./DriverOrderCard";
 import DriverProfilePanel from "./DriverProfilePanel";
 import TrackingMap from "../tracking/TrackingMap";
 import { useAppContext } from "../../lib/AppContext";
+import OrderChatDialog from "../shared/OrderChatDialog";
 
 const ADMIN_PHONE = "+971568757331";
 const closedStatuses = ["delivered", "cancelled", "returned"];
@@ -78,7 +82,7 @@ function progressIndex(value?: string | null) {
   if (status === "delivered") return 4;
   if (["in_transit", "out_for_delivery"].includes(status)) return 3;
   if (status === "picked_up") return 2;
-  if (status === "accepted") return 1;
+  if (status === "accepted" || status === "confirmed") return 1;
   return 0;
 }
 
@@ -101,6 +105,7 @@ export default function DriverDashboard({
   onProfileUpdated: () => Promise<void> | void;
 }) {
   const { toggleLanguage } = useAppContext();
+  const navigate = useNavigate();
   const {
     activeOrders,
     completedOrders,
@@ -122,6 +127,7 @@ export default function DriverDashboard({
   );
   const [tab, setTab] = useState<DriverTab>("home");
   const [busyOrder, setBusyOrder] = useState("");
+  const [chatOrder, setChatOrder] = useState<DriverOrder | null>(null);
   const [actionError, setActionError] = useState("");
   const [shiftBusy, setShiftBusy] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now());
@@ -232,8 +238,8 @@ export default function DriverDashboard({
     }
 
     if (acceptIfAssigned && normalizeStatus(order.status) === "assigned") {
-      const accepted = await updateStatus(order.id, "accepted", isArabic ? "بدأ المندوب المهمة من ملاحة DAY NIGHT الداخلية" : "Driver started the mission from DAY NIGHT in-app navigation");
-      if (!accepted) return;
+      const started = await updateStatus(order.id, "confirmed", isArabic ? "بدأ المندوب المهمة من ملاحة DAY NIGHT الداخلية" : "Driver started the mission from DAY NIGHT in-app navigation");
+      if (!started) return;
     }
 
     setNavigationOrderId(order.id);
@@ -275,6 +281,10 @@ export default function DriverDashboard({
           </div>
 
           <div className="dn-driver-topbar-actions-v3">
+            <div className="dn-driver-portal-links-v3">
+              <button type="button" onClick={() => navigate(-1)} aria-label={isArabic ? "رجوع" : "Back"}>{isArabic ? <ArrowRight /> : <ArrowLeft />}</button>
+              <Link to="/" aria-label={isArabic ? "الموقع الرئيسي" : "Main website"}><Home /></Link>
+            </div>
             <div className="dn-driver-profile-chip-v3">
               <span className={`dn-driver-avatar ${driver.avatar_url ? "has-photo" : ""}`}>
                 {driver.avatar_url ? <img src={driver.avatar_url} alt={name} /> : <Truck />}
@@ -291,7 +301,7 @@ export default function DriverDashboard({
               {shiftStarted ? <PauseCircle /> : <PlayCircle />}
               <span>{shiftStarted ? (isArabic ? "إنهاء الوردية" : "End shift") : (isArabic ? "بدء الوردية" : "Start shift")}</span>
             </button>
-            <button type="button" className="dn-driver-icon-button-v3" onClick={() => void refresh()} aria-label={isArabic ? "تحديث" : "Refresh"}>
+            <button type="button" className="dn-driver-icon-button-v3 dn-driver-refresh-button-v3" onClick={() => void refresh()} aria-label={isArabic ? "تحديث" : "Refresh"}>
               <RefreshCw className={loading ? "animate-spin" : ""} />
             </button>
             <button type="button" className="dn-driver-icon-button-v3 dn-driver-language-button" onClick={toggleLanguage} aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"} title={isArabic ? "English" : "العربية"}>
@@ -336,6 +346,7 @@ export default function DriverDashboard({
                   navigationActive
                   onStatus={(status, note) => updateStatus(currentOrder.id, status, note)}
                   onNavigate={() => undefined}
+                  onChat={() => setChatOrder(currentOrder)}
                 />
               </aside>
             </div>
@@ -441,7 +452,7 @@ export default function DriverDashboard({
         {tab === "active" && (
           <div className="dn-driver-order-list dn-driver-order-list-v3">
             {!loading && activeOrders.length === 0 && <div className="dn-driver-empty dn-driver-empty-v3"><Truck /><h3>{isArabic ? "لا توجد مهام مسندة الآن" : "No active jobs"}</h3><p>{isArabic ? "ستظهر الطلبات فور إسنادها من لوحة الإدارة." : "Orders appear immediately after dispatch assignment."}</p></div>}
-            {activeOrders.map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={busyOrder === order.id} onStatus={(status, note) => updateStatus(order.id, status, note)} onNavigate={(acceptIfAssigned) => void startInAppNavigation(order, acceptIfAssigned)} />)}
+            {activeOrders.map((order) => <DriverOrderCard key={order.id} order={order} isArabic={isArabic} busy={busyOrder === order.id} onStatus={(status, note) => updateStatus(order.id, status, note)} onNavigate={(acceptIfAssigned) => void startInAppNavigation(order, acceptIfAssigned)} onChat={() => setChatOrder(order)} />)}
           </div>
         )}
 
@@ -460,6 +471,7 @@ export default function DriverDashboard({
           <button type="button" className={tab === "history" ? "is-active" : ""} onClick={() => setTab("history")}><History /><span>{isArabic ? "السجل" : "History"}</span></button>
           <button type="button" className={tab === "profile" ? "is-active" : ""} onClick={() => setTab("profile")}><UserRound /><span>{isArabic ? "ملفي" : "Profile"}</span></button>
         </nav>
+        <OrderChatDialog open={Boolean(chatOrder)} order={chatOrder} isArabic={isArabic} actorRole="driver" onClose={() => setChatOrder(null)} />
       </main>
     </section>
   );

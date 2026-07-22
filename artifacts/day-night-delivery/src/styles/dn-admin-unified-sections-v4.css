@@ -226,8 +226,8 @@ html[data-dn-admin-theme="day"] body:has(.dn-admin-fullscreen) .dn-admin-fullscr
 
 html[data-dn-admin-theme="day"] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-admin-core-full :is(
   .bg-white\/5,
-  .bg-white\/[0\.035],
-  .bg-white\/[0\.045]
+  .bg-white\/\[0\.035\],
+  .bg-white\/\[0\.045\]
 ) {
   background-color: rgba(255,255,255,.05) !important;
 }

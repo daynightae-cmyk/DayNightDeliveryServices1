@@ -140,9 +140,10 @@ export async function setDriverPresence(online: boolean, shiftStatus: string, no
 
 export async function updateDriverOrderStatus(orderId: string, status: string, note?: string) {
   const client = requireClient();
+  const canonicalStatus = String(status || "").trim().toLowerCase() === "accepted" ? "confirmed" : status;
   const { error } = await client.rpc("driver_update_order_status", {
     p_order_id: orderId,
-    p_status: status,
+    p_status: canonicalStatus,
     p_note: note || null,
   });
   if (error) throw new Error(error.message);
@@ -301,6 +302,17 @@ export function dispatchErrorMessage(error: unknown, isArabic: boolean) {
 
 export function driverErrorMessage(error: unknown, isArabic: boolean) {
   const raw = messageOf(error);
+  if (/invalid input value for enum.*accepted|unsupported_driver_status/i.test(raw)) {
+    return isArabic
+      ? "تعذر بدء المهمة بسبب حالة قديمة للطلب. حدّث الصفحة ثم ابدأ المهمة مرة أخرى."
+      : "The order has a legacy status. Refresh the page, then start the mission again.";
+  }
+  if (/order_not_assigned_to_driver/i.test(raw)) {
+    return isArabic ? "هذه الطلبية لم تعد مسندة إلى حسابك. حدّث قائمة المهام." : "This order is no longer assigned to your account. Refresh the jobs list.";
+  }
+  if (/status_note_required/i.test(raw)) {
+    return isArabic ? "اكتب سبباً واضحاً قبل إغلاق أو إرجاع الطلبية." : "Add a clear reason before closing or returning the order.";
+  }
   if (/permissions policy|disabled in this document/i.test(raw)) {
     return isArabic
       ? "تعذر تشغيل الموقع من المتصفح الحالي. حدّث الصفحة أو اسمح بالموقع من إعدادات المتصفح."
