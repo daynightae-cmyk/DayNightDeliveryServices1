@@ -71,13 +71,11 @@ public final class DayNightApplication extends Application {
                 + "var rendered=!!(root&&root.childElementCount>0);"
                 + "var force=" + (force ? "true" : "false") + ";"
                 + "if(boot&&(rendered||force)){boot.classList.add('is-complete');boot.remove();}"
-                + "return JSON.stringify({"
-                + "removed:!document.getElementById('dn-role-boot'),"
-                + "rendered:rendered,"
-                + "rootChildren:root?root.childElementCount:-1,"
-                + "ready:document.readyState,"
-                + "href:String(location.href)"
-                + "});"
+                + "return 'removed='+(!document.getElementById('dn-role-boot'))"
+                + "+',rendered='+rendered"
+                + "+',rootChildren='+(root?root.childElementCount:-1)"
+                + "+',ready='+document.readyState"
+                + "+',href='+String(location.href);"
                 + "})()";
 
         webView.evaluateJavascript(script, result -> Log.i(
