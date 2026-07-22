@@ -20,6 +20,9 @@ jobs:
     name: Arabic splash handoff and branch-build visual acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 70
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ngdwybpgacauorygoedi.supabase.co' }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
     steps:
       - name: Checkout
@@ -42,6 +45,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -n "${VITE_SUPABASE_URL:-}"
+          test -n "${VITE_SUPABASE_ANON_KEY:-}"
           pnpm install --frozen-lockfile
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
@@ -155,11 +160,12 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-02.png
           sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
-          sleep 5
+          sleep 6
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
           adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/driver-runtime.log
           cat android-role-shell/arabic-visual/driver-runtime.log
           grep -E 'driver attempt=[123].*removed=true' android-role-shell/arabic-visual/driver-runtime.log
+          grep -E 'driver phase=(commit|finished).*rootChildren[^0]' android-role-shell/arabic-visual/driver-runtime.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
           adb shell am force-stop com.daynightae.driver
 
@@ -177,11 +183,12 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-02.png
           sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
-          sleep 5
+          sleep 6
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
           adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/merchant-runtime.log
           cat android-role-shell/arabic-visual/merchant-runtime.log
           grep -E 'merchant attempt=[123].*removed=true' android-role-shell/arabic-visual/merchant-runtime.log
+          grep -E 'merchant phase=(commit|finished).*rootChildren[^0]' android-role-shell/arabic-visual/merchant-runtime.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
           adb shell am force-stop com.daynightae.merchant
 
@@ -205,6 +212,7 @@ jobs:
           for role in ('driver', 'merchant'):
               log = Path(f'android-role-shell/arabic-visual/{role}-runtime.log').read_text(errors='replace')
               assert 'removed=true' in log, f'{role} native watchdog never proved the web splash was removed'
+              assert 'rootChildren=0' not in log.splitlines()[-1:], f'{role} React root remained empty'
               final = Image.open(f'android-role-shell/arabic-visual/{role}-arabic-final.png').convert('RGB').resize((240, 420))
               dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
               dark_ratio = dark_pixels / (final.width * final.height)
