@@ -13,8 +13,8 @@ const faqList: FaqEntry[] = [
   {
     questionEn: "How much does standard UAE delivery cost?",
     questionAr: "كم تكلفة التوصيل العادي داخل الإمارات؟",
-    answerEn: "Main UAE areas are served at a final price of 30 AED. Extended UAE areas are served at a final price of 50 AED.",
-    answerAr: "المناطق الرئيسية داخل الإمارات بسعر نهائي 30 درهم. المناطق الممتدة داخل الإمارات بسعر نهائي 50 درهم."
+    answerEn: "Main UAE areas are served at a final price of 25 AED. Extended UAE areas are served at a final price of 50 AED.",
+    answerAr: "المناطق الرئيسية داخل الإمارات بسعر نهائي 25 درهم. المناطق الممتدة داخل الإمارات بسعر نهائي 50 درهم."
   },
   {
     questionEn: "Is express delivery available?",

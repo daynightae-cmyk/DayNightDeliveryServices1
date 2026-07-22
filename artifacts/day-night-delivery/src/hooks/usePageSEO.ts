@@ -19,11 +19,11 @@ const routeMeta: Record<string, RouteMeta> = {
   },
   "/pricing": {
     title: "أسعار التوصيل والشحن | DAY NIGHT DELIVERY SERVICES",
-    description: "Official prices: UAE main areas 30 AED, UAE extended areas 50 AED, GCC 95 AED first kg plus 45 AED additional kg, worldwide 190 AED first kg plus 90 AED additional kg.",
+    description: "Official prices: UAE main areas 25 AED, UAE extended areas 50 AED, GCC 95 AED first kg plus 45 AED additional kg, worldwide 190 AED first kg plus 90 AED additional kg.",
   },
   "/uae-delivery": {
     title: "التوصيل المحلي داخل الإمارات | DAY NIGHT DELIVERY SERVICES",
-    description: "Local delivery across all UAE emirates. Main cities 30 AED and extended areas 50 AED, with express surcharge shown clearly when selected.",
+    description: "Local delivery across all UAE emirates. Main cities 25 AED and extended areas 50 AED, with express surcharge shown clearly when selected.",
   },
   "/international-shipping": {
     title: "الشحن الدولي من الإمارات | DAY NIGHT DELIVERY SERVICES",

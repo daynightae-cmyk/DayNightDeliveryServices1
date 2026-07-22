@@ -136,13 +136,13 @@ export default function AdminDeferredMerchantAccounting() {
         "admin_close_merchant_order_accounting",
         {
           p_order_id: order.id,
-          p_delivery_fee: 30,
+          p_delivery_fee: 25,
         },
       );
       if (rpcError) throw rpcError;
       const saved = (Array.isArray(data) ? data[0] : data) as DeferredOrder | null;
       setMessage(
-        `تم قفل حساب الطلب ${referenceOf(saved || order)}: العميل 0.00 درهم، التاجر مدين 30.00 درهم، ودخل داي نايت 30.00 درهم.`,
+        `تم قفل حساب الطلب ${referenceOf(saved || order)}: العميل 0.00 درهم، التاجر مدين 25.00 درهم، ودخل داي نايت 25.00 درهم.`,
       );
       await load();
     } catch (cause) {
@@ -170,10 +170,10 @@ export default function AdminDeferredMerchantAccounting() {
               قفل حساب التاجر
             </span>
             <h2 className="mt-1 text-xl font-black text-white">
-              طلبات مسلّمة بقيمة صفر بانتظار ترحيل 30 درهم
+              طلبات مسلّمة بقيمة صفر بانتظار ترحيل 25 درهم
             </h2>
             <p className="mt-1 text-xs font-bold leading-6 text-white/55">
-              الطلب يبقى مرتبطًا بالتاجر بقيمة صفر أثناء التشغيل. عند قفل الحساب يُسجّل 30 درهم مدينًا على التاجر ودخلًا لداي نايت مرة واحدة فقط.
+              الطلب يبقى مرتبطًا بالتاجر بقيمة صفر أثناء التشغيل. عند قفل الحساب يُسجّل 25 درهم مدينًا على التاجر ودخلًا لداي نايت مرة واحدة فقط.
             </p>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function AdminDeferredMerchantAccounting() {
                 </td>
                 <td className="p-3 text-emerald-200">مسلّمة · غير مُرحّلة</td>
                 <td className="p-3 font-black" dir="ltr">0.00 AED</td>
-                <td className="p-3 font-black text-brand-gold" dir="ltr">-30.00 AED على التاجر</td>
+                <td className="p-3 font-black text-brand-gold" dir="ltr">-25.00 AED على التاجر</td>
                 <td className="p-3">
                   <button
                     type="button"
@@ -231,7 +231,7 @@ export default function AdminDeferredMerchantAccounting() {
                     className="inline-flex min-w-[190px] items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-3 font-black text-brand-deep disabled:opacity-50"
                   >
                     {closingId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-                    قفل الحساب وخصم 30
+                    قفل الحساب وخصم 25
                   </button>
                 </td>
               </tr>

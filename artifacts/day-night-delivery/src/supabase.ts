@@ -255,8 +255,9 @@ export async function calculateDeliveryPrice(payload: {
   weight?: number | string | null;
   serviceType?: string | null;
 }): Promise<any> {
+  const officialLocalPrice = calculateDomesticPrice(payload);
   if (!supabase) {
-    return calculateDomesticPrice(payload);
+    return officialLocalPrice;
   }
 
   const { data, error } = await supabase.rpc("calculate_delivery_price", {
@@ -267,15 +268,29 @@ export async function calculateDeliveryPrice(payload: {
 
   if (error) {
     console.warn("calculate_delivery_price RPC failed. Using local pricing engine.");
-    return calculateDomesticPrice(payload);
+    return officialLocalPrice;
   }
 
-  return data;
+  const serverRow = Array.isArray(data) ? data[0] : data;
+  return {
+    ...(serverRow && typeof serverRow === "object" ? serverRow : {}),
+    base_fee: officialLocalPrice.subtotal,
+    base_price: officialLocalPrice.subtotal,
+    delivery_price: officialLocalPrice.total,
+    total_price: officialLocalPrice.total,
+    price: officialLocalPrice.total,
+    total: officialLocalPrice.total,
+    tax: 0,
+    vat: 0,
+    currency: officialLocalPrice.currency,
+    source: "daynight_official_local_price_25",
+  };
 }
 
 export async function calculateDeliveryPriceRpc(city: string, weight: number): Promise<any> {
+  const officialLocalPrice = calculateLocalPrice(city, weight);
   if (!supabase) {
-    return calculateLocalPrice(city, weight);
+    return officialLocalPrice;
   }
 
   const { data, error } = await supabase.rpc("calculate_delivery_price", {
@@ -285,10 +300,23 @@ export async function calculateDeliveryPriceRpc(city: string, weight: number): P
 
   if (error) {
     console.warn("calculate_delivery_price(city, weight) RPC failed. Using local pricing engine.");
-    return calculateLocalPrice(city, weight);
+    return officialLocalPrice;
   }
 
-  return data;
+  const serverRow = Array.isArray(data) ? data[0] : data;
+  return {
+    ...(serverRow && typeof serverRow === "object" ? serverRow : {}),
+    base_fee: officialLocalPrice.subtotal,
+    base_price: officialLocalPrice.subtotal,
+    delivery_price: officialLocalPrice.total,
+    total_price: officialLocalPrice.total,
+    price: officialLocalPrice.total,
+    total: officialLocalPrice.total,
+    tax: 0,
+    vat: 0,
+    currency: officialLocalPrice.currency,
+    source: "daynight_official_local_price_25",
+  };
 }
 
 export async function calculateInternationalPrice(payload: {

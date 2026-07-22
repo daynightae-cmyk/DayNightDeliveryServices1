@@ -27,7 +27,7 @@ export default function ECommerce({ onNavigate }: ECommerceProps) {
       title_en: "Starter Plan",
       desc_ar: "مناسبة للمتاجر متناهية الصغر والطلبات غير اليومية والمشاريع المنزلية.",
       desc_en: "Perfect for nano outlets, remote projects, and occasional courier shipments.",
-      features_ar: ["شحن مرن بدفع فوري", "المدن والمناطق الرئيسية 30 درهم", "دعم الدفع عند الاستلام COD", "متابعة الطلبات المباشرة"],
+      features_ar: ["شحن مرن بدفع فوري", "المدن والمناطق الرئيسية 25 درهم", "دعم الدفع عند الاستلام COD", "متابعة الطلبات المباشرة"],
       price_ar: "حسب الاستخدام"
     },
     {

@@ -54,7 +54,7 @@ export default function Pricing() {
   const intlTxt = () => exportQuoteTXT("international", { Destination: dest ? (isArabic ? dest.countryNameAr : dest.countryNameEn) : internationalDestination, Weight: `${internationalWeight} kg`, Zone: international.pricingCategory, Total: formatAED(international.total) });
 
   const renderAreaOptions = () => <>
-    <optgroup label={isArabic ? "المسارات الأساسية — 30 درهم" : "Standard routes — 30 AED"}>{cityRoutes.map((c) => <option key={c.id} value={c.nameEn}>{isArabic ? `${c.nameAr} — 30 درهم` : `${c.nameEn} — 30 AED`}</option>)}</optgroup>
+    <optgroup label={isArabic ? "المسارات الأساسية — 25 درهم" : "Standard routes — 25 AED"}>{cityRoutes.map((c) => <option key={c.id} value={c.nameEn}>{isArabic ? `${c.nameAr} — 25 درهم` : `${c.nameEn} — 25 AED`}</option>)}</optgroup>
     <optgroup label={isArabic ? "المسارات الخاصة — 50 درهم" : "Special routes — 50 AED"}>{specialRoutes.map((c) => <option key={c.id} value={c.nameEn}>{isArabic ? `${c.nameAr} — 50 درهم` : `${c.nameEn} — 50 AED`}</option>)}</optgroup>
   </>;
 
@@ -65,7 +65,7 @@ export default function Pricing() {
 
     <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <DNCard premium className="p-5 sm:p-6">
-        <div className="mb-5 flex items-center justify-between gap-4 border-b border-white/10 pb-4"><div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}><Truck className="h-8 w-8 text-brand-gold" /><div><h3 className="text-xl font-black text-white">{isArabic ? "حاسبة التوصيل داخل الإمارات" : "UAE delivery calculator"}</h3><p className="text-xs font-bold text-white/45">{isArabic ? "المسارات الأساسية 30 درهم للطلب، والمسارات الخاصة 50 درهم للطلب." : "Standard routes are 30 AED per order; special routes are 50 AED per order."}</p></div></div><button onClick={resetDomestic} className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/45 hover:text-brand-gold"><RefreshCw className="h-4 w-4" /></button></div>
+        <div className="mb-5 flex items-center justify-between gap-4 border-b border-white/10 pb-4"><div className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse" : ""}`}><Truck className="h-8 w-8 text-brand-gold" /><div><h3 className="text-xl font-black text-white">{isArabic ? "حاسبة التوصيل داخل الإمارات" : "UAE delivery calculator"}</h3><p className="text-xs font-bold text-white/45">{isArabic ? "المسارات الأساسية 25 درهم للطلب، والمسارات الخاصة 50 درهم للطلب." : "Standard routes are 25 AED per order; special routes are 50 AED per order."}</p></div></div><button onClick={resetDomestic} className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/45 hover:text-brand-gold"><RefreshCw className="h-4 w-4" /></button></div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة الاستلام" : "Pickup area"}</span><DNSelect value={domesticPickupCity} onChange={(e) => setDomesticPickupCity(e.target.value)}>{renderAreaOptions()}</DNSelect></label>
           <label className="space-y-1.5"><span className="text-xs font-black text-white/50">{isArabic ? "منطقة التسليم" : "Delivery area"}</span><DNSelect value={domesticDeliveryCity} onChange={(e) => setDomesticDeliveryCity(e.target.value)}>{renderAreaOptions()}</DNSelect></label>

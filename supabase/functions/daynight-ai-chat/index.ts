@@ -18,7 +18,7 @@ Official company data:
 - Email: Admin@daynightae.com
 - Phone: +971 56 875 7331
 - Local UAE shipping: charged by order count and route, not by kilograms.
-- Standard UAE city routes: 30 AED per order.
+- Standard UAE city routes: 25 AED per order.
 - Special UAE routes: 50 AED per order.
 - International GCC: 95 AED first kg, then 45 AED per extra kg.
 - International worldwide: 190 AED first kg, then 90 AED per extra kg.

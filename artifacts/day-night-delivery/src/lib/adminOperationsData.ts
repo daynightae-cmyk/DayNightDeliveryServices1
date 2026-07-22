@@ -623,6 +623,24 @@ function buildOrderPayload(
     input.cod_amount,
   );
   const deliveryFee = pricing.total;
+  const merchantPaysDelivery = ["merchant_pays", "sender_pays"].includes(
+    uiPaymentMethod,
+  );
+  const deliveryFeeMode = merchantPaysDelivery
+    ? "deduct_from_merchant"
+    : "customer_pays";
+  const goodsValue =
+    uiPaymentMethod === "cod"
+      ? Math.max(0, Number((codAmount - deliveryFee).toFixed(2)))
+      : 0;
+  const customerTotal = Number(
+    (
+      merchantPaysDelivery ? goodsValue : goodsValue + deliveryFee
+    ).toFixed(2),
+  );
+  const merchantDue = Number(
+    (goodsValue - (merchantPaysDelivery ? deliveryFee : 0)).toFixed(2),
+  );
   const merchantNet = merchantNetForPayment(
     uiPaymentMethod,
     codAmount,
@@ -674,14 +692,23 @@ function buildOrderPayload(
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
-    cod_amount: codAmount,
+    cod_amount: uiPaymentMethod === "cod" ? customerTotal : 0,
+    goods_value: goodsValue,
+    delivery_fee: deliveryFee,
+    discount_amount: 0,
+    delivery_fee_mode: deliveryFeeMode,
+    customer_total: customerTotal,
+    merchant_due: merchantDue,
+    company_revenue: deliveryFee,
+    collected_amount: 0,
+    financial_version: 1,
     delivery_price: deliveryFee,
-    subtotal: deliveryFee,
+    subtotal: customerTotal,
     base_price: deliveryFee,
-    total: deliveryFee,
-    total_price: deliveryFee,
-    amount: deliveryFee,
-    price: deliveryFee,
+    total: customerTotal,
+    total_price: customerTotal,
+    amount: customerTotal,
+    price: customerTotal,
     manual_delivery_price:
       pricing.priceSource === "manual" ? deliveryFee : null,
     price_source: pricing.priceSource,

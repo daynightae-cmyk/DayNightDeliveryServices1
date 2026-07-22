@@ -5,8 +5,8 @@ export const domesticPricing = {
     id: "uae-main",
     labelEn: "UAE City Routes",
     labelAr: "مسارات المدن داخل الإمارات",
-    base: 30,
-    total: 30
+    base: 25,
+    total: 25
   },
   extended: {
     id: "uae-special-routes",

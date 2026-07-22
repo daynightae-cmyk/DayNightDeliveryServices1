@@ -59,7 +59,7 @@ if (fs.existsSync(indexPath)) {
 const seoPath = path.join(src, "lib", "seo.ts");
 if (fs.existsSync(seoPath)) {
   const seo = read(seoPath);
-  assert(!seo.includes("31.50 AED") && !seo.includes("52.50 AED"), "SEO prices use correct pricing (30/50 AED)");
+  assert(!seo.includes("31.50 AED") && !seo.includes("52.50 AED"), "SEO prices use correct pricing (25/50 AED)");
 }
 
 /* ── AI knowledge ── */
@@ -67,7 +67,7 @@ const aiKnowledgePath = path.join(src, "data", "aiAgentKnowledge.ts");
 if (fs.existsSync(aiKnowledgePath)) {
   const knowledge = read(aiKnowledgePath);
   assert(!knowledge.includes("31.50") && !knowledge.includes("52.50"), "AI agent knowledge uses correct pricing");
-  assert(knowledge.includes("30 AED") || knowledge.includes("30 درهم"), "AI agent knowledge has correct domestic price");
+  assert(knowledge.includes("25 AED") || knowledge.includes("25 درهم"), "AI agent knowledge has correct domestic price");
   assert(!knowledge.includes("Each extra piece") && !knowledge.includes("لكل قطعة إضافية") && !knowledge.includes("القطعة الأولى"), "AI agent knowledge treats UAE local delivery as one order");
   assert(knowledge.includes("95") && knowledge.includes("45"), "AI agent knowledge has GCC pricing");
   assert(knowledge.includes("190") && knowledge.includes("90"), "AI agent knowledge has worldwide pricing");
@@ -78,7 +78,7 @@ if (fs.existsSync(aiKnowledgePath)) {
 const pricingDataPath = path.join(src, "data", "pricingData.ts");
 if (fs.existsSync(pricingDataPath)) {
   const pricingData = read(pricingDataPath);
-  assert(pricingData.includes("base: 30"), "pricingData main base is 30 AED");
+  assert(pricingData.includes("base: 25"), "pricingData main base is 25 AED");
   assert(pricingData.includes("base: 50"), "pricingData extended base is 50 AED");
   assert(!pricingData.includes("????"), "pricingData has no garbled Arabic labels");
 }

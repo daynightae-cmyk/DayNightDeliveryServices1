@@ -161,7 +161,7 @@ const UI = {
     orderSaved: "تم إنشاء الطلبية بنجاح.",
     merchantRequired: "اسم التاجر ورقم الهاتف مطلوبان.",
     orderRequired: "اختر تاجر أو اكتب بيانات مرسل، ثم أدخل الكوبون وبيانات المستلم ومحتوى الشحنة.",
-    localRule: "محلي: 30 درهم لكل طلبية في المناطق الرئيسية. 2 = 60، 3 = 90. لا توجد زيادة بالكيلو محلياً.",
+    localRule: "محلي: 25 درهم لكل طلبية في المناطق الرئيسية. 2 = 50، 3 = 75. لا توجد زيادة بالكيلو محلياً.",
     internationalRule: "دولي: يتم الحساب بالكيلو حسب الوجهة، والكيلو الإضافي للدولي فقط.",
     stats: {
       total: "إجمالي الطلبات",
@@ -221,7 +221,7 @@ const UI = {
     orderSaved: "Order created successfully.",
     merchantRequired: "Merchant trade name and phone are required.",
     orderRequired: "Choose a merchant or sender, then enter coupon, receiver details, and shipment content.",
-    localRule: "Local: 30 AED per order in main areas. 2 = 60, 3 = 90. No local kg surcharge.",
+    localRule: "Local: 25 AED per order in main areas. 2 = 50, 3 = 75. No local kg surcharge.",
     internationalRule: "International: calculated by kg and destination. Extra kg applies only internationally.",
     stats: {
       total: "Total Orders",

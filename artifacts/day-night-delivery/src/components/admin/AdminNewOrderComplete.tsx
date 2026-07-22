@@ -127,21 +127,52 @@ export default function AdminNewOrderComplete({
     () => calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }),
     [form, selectedMerchant],
   );
+  const authoritativeDeliveryFeeMode =
+    form.payment_method === "merchant_pays" || form.payment_method === "sender_pays"
+      ? "deduct_from_merchant"
+      : form.delivery_fee_mode;
   const financials = useMemo(() => {
     try {
       return calculateOrderFinancials({
         goodsValue: form.goods_value,
         deliveryFee: pricing.total,
         discountAmount: form.discount_amount,
-        deliveryFeeMode: form.delivery_fee_mode,
+        deliveryFeeMode: authoritativeDeliveryFeeMode,
       });
     } catch {
       return null;
     }
-  }, [form.goods_value, form.discount_amount, form.delivery_fee_mode, pricing.total]);
+  }, [form.goods_value, form.discount_amount, authoritativeDeliveryFeeMode, pricing.total]);
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setSource("pending");
+    setMessage("");
+    setError("");
+  }
+
+  function setPaymentMethod(value: string) {
+    setForm((current) => ({
+      ...current,
+      payment_method: value,
+      delivery_fee_mode:
+        value === "merchant_pays" || value === "sender_pays"
+          ? "deduct_from_merchant"
+          : "customer_pays",
+    }));
+    setSource("pending");
+    setMessage("");
+    setError("");
+  }
+
+  function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
+    setForm((current) => ({
+      ...current,
+      delivery_fee_mode:
+        current.payment_method === "merchant_pays" || current.payment_method === "sender_pays"
+          ? "deduct_from_merchant"
+          : value,
+    }));
     setSource("pending");
     setMessage("");
     setError("");
@@ -336,13 +367,13 @@ export default function AdminNewOrderComplete({
 
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2"><span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة *" : "Goods value *"}</span><input type="number" min={0} step="0.01" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required /><small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small></label>
-          <label className="space-y-2"><span className="flex items-center gap-2 text-xs font-black text-white"><Calculator className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة التوصيل" : "Delivery fee"}</span><div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 p-2"><button type="button" onClick={() => { setField("price_mode", "system"); setField("manual_delivery_price", ""); }} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button><button type="button" onClick={() => setField("price_mode", "manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button></div>{form.price_mode === "manual" ? <input type="number" min={0} step="0.01" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="30.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}</label>
+          <label className="space-y-2"><span className="flex items-center gap-2 text-xs font-black text-white"><Calculator className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة التوصيل" : "Delivery fee"}</span><div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 p-2"><button type="button" onClick={() => { setField("price_mode", "system"); setField("manual_delivery_price", ""); }} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button><button type="button" onClick={() => setField("price_mode", "manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button></div>{form.price_mode === "manual" ? <input type="number" min={0} step="0.01" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}</label>
           <label className="space-y-2"><span className="flex items-center gap-2 text-xs font-black text-white"><Landmark className="h-4 w-4 text-brand-sky" />{isArabic ? "الخصم" : "Discount"}</span><input type="number" min={0} step="0.01" value={form.discount_amount ?? 0} onChange={(event) => setField("discount_amount", event.target.value)} placeholder="0.00" className={inputClass()} /><small className="text-[10px] font-bold text-white/40">{isArabic ? "يخصم من المبلغ ومستحق التاجر" : "Reduces total and merchant due"}</small></label>
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <button type="button" onClick={() => setField("delivery_fee_mode", "customer_pays")} className={`rounded-2xl border p-4 text-start transition ${form.delivery_fee_mode === "customer_pays" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}><strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل تُضاف على العميل" : "Customer pays delivery fee"}</strong><small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "الإجمالي = البضاعة + التوصيل − الخصم" : "Total = goods + delivery − discount"}</small></button>
-          <button type="button" onClick={() => setField("delivery_fee_mode", "deduct_from_merchant")} className={`rounded-2xl border p-4 text-start transition ${form.delivery_fee_mode === "deduct_from_merchant" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}><strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل تُخصم من مستحق التاجر" : "Deduct delivery from merchant"}</strong><small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "العميل يدفع البضاعة بعد الخصم، والتوصيل يخصم من التاجر" : "Customer pays discounted goods; delivery is deducted from merchant"}</small></button>
+          <button type="button" onClick={() => setDeliveryFeeMode("customer_pays")} className={`rounded-2xl border p-4 text-start transition ${authoritativeDeliveryFeeMode === "customer_pays" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}><strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل تُضاف على العميل" : "Customer pays delivery fee"}</strong><small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "الإجمالي = البضاعة + التوصيل − الخصم" : "Total = goods + delivery − discount"}</small></button>
+          <button type="button" onClick={() => setDeliveryFeeMode("deduct_from_merchant")} className={`rounded-2xl border p-4 text-start transition ${authoritativeDeliveryFeeMode === "deduct_from_merchant" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}><strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل تُخصم من مستحق التاجر" : "Deduct delivery from merchant"}</strong><small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "العميل يدفع البضاعة بعد الخصم، والتوصيل يخصم من التاجر" : "Customer pays discounted goods; delivery is deducted from merchant"}</small></button>
         </div>
 
         {financials ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><FinancialMetric label={isArabic ? "قيمة البضاعة" : "Goods"} value={financials.goodsValue} /><FinancialMetric label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} /><FinancialMetric label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} /><FinancialMetric label={isArabic ? "المطلوب من العميل" : "Customer total"} value={financials.customerTotal} accent /><FinancialMetric label={isArabic ? "مستحق التاجر" : "Merchant due"} value={financials.merchantDue} /><FinancialMetric label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} /></div> : <div className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/8 p-3 text-xs font-bold text-rose-100">{isArabic ? "راجع الخصم والقيم المالية لإظهار الإجمالي." : "Check the discount and financial values to display totals."}</div>}
@@ -351,7 +382,7 @@ export default function AdminNewOrderComplete({
       <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4 rounded-[1.5rem] border border-white/10 bg-brand-deep/35 p-4">
           <h3 className="text-sm font-black text-white">{isArabic ? "طريقة التحصيل والتفاصيل" : "Collection method and details"}</h3>
-          <select value={form.payment_method} onChange={(event) => setField("payment_method", event.target.value)} className={inputClass()}><option value="cod">{isArabic ? "تحصيل المبلغ النهائي من العميل عند التسليم" : "Collect final total from customer on delivery"}</option><option value="receiver_pays">{isArabic ? "مدفوع من المستلم" : "Receiver paid"}</option><option value="merchant_pays">{isArabic ? "مدفوع أو مسجل على حساب التاجر" : "Paid/charged to merchant account"}</option></select>
+          <select value={form.payment_method} onChange={(event) => setPaymentMethod(event.target.value)} className={inputClass()}><option value="cod">{isArabic ? "تحصيل المبلغ النهائي من العميل عند التسليم" : "Collect final total from customer on delivery"}</option><option value="receiver_pays">{isArabic ? "مدفوع من المستلم" : "Receiver paid"}</option><option value="merchant_pays">{isArabic ? `على حساب التاجر — رسوم التوصيل ${pricing.total.toFixed(2)} درهم` : `Charge merchant account — ${pricing.total.toFixed(2)} AED delivery fee`}</option></select>
           <details className="rounded-2xl border border-white/10 bg-black/10 p-4 text-white/70"><summary className="cursor-pointer text-xs font-black text-brand-gold">{isArabic ? "بيانات الشحنة الاختيارية" : "Optional shipment details"}</summary><div className="mt-4 space-y-3"><input value={form.package_type} onChange={(event) => { setField("package_type", event.target.value); setField("package_description", event.target.value); }} placeholder={isArabic ? "محتوى الشحنة" : "Package content"} className={inputClass()} /><div className="grid gap-3 sm:grid-cols-2"><input type="number" min={1} value={form.order_count} onChange={(event) => setField("order_count", Math.max(1, Number(event.target.value) || 1))} placeholder={isArabic ? "عدد القطع" : "Pieces"} className={inputClass()} /><input type="number" min={0.1} step="0.1" value={form.weight || 1} onChange={(event) => setField("weight", Math.max(0.1, Number(event.target.value) || 1))} placeholder={isArabic ? "الوزن" : "Weight"} className={inputClass()} /></div><textarea rows={3} value={form.notes || ""} onChange={(event) => setField("notes", event.target.value)} placeholder={isArabic ? "ملاحظات" : "Notes"} className={inputClass()} /></div></details>
         </div>
 
