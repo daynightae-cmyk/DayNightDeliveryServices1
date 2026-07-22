@@ -25,7 +25,7 @@ jobs:
   build-role-apps:
     name: Build, install, and verify Driver and Merchant apps
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 80
 
     steps:
       - name: Checkout repository
@@ -164,11 +164,11 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
-          target: google_apis
+          target: default
           arch: x86_64
-          profile: pixel_6
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics
           script: |
             set -euo pipefail
             adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.apk | tee android-role-shell/driver-install.log
@@ -184,6 +184,7 @@ jobs:
             adb shell am force-stop com.daynightae.merchant
 
       - name: Upload DAY NIGHT Driver builds
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-Driver-v1.0.0
@@ -198,6 +199,7 @@ jobs:
           retention-days: 30
 
       - name: Upload DAY NIGHT Merchant builds
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-Merchant-v1.0.0
