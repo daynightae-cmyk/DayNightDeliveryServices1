@@ -11,6 +11,5 @@
         <item name="android:windowSplashScreenBackground">@color/deep_navy</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/app_icon</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/transparent</item>
-        <item name="android:postSplashScreenTheme">@style/Theme.DayNight</item>
     </style>
 </resources>
