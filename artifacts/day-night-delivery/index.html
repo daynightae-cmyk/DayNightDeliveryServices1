@@ -20,9 +20,57 @@
     <script>
       (function () {
         var path = window.location.pathname || "/";
-        if (/^\/(merchant|driver)(?:\/|$)/.test(path)) {
-          document.documentElement.setAttribute("data-portal-route", "true");
+        var roleMatch = path.match(/^\/(merchant|driver)(?:\/|$)/);
+        if (!roleMatch) return;
+
+        var routeRole = roleMatch[1];
+        document.documentElement.setAttribute("data-portal-route", "true");
+
+        var params = new URLSearchParams(window.location.search || "");
+        var nativeRole = params.get("nativeShell");
+        if (nativeRole !== routeRole) return;
+
+        document.documentElement.setAttribute("data-native-shell", nativeRole);
+        window.__DAY_NIGHT_NATIVE_ROLE__ = nativeRole;
+
+        /* APK v1.0.0 injected an over-broad `main` rule after page load. Keep
+           the same style id but force it back to selectors that only touch the
+           public application shell. This repairs already-installed APKs as soon
+           as the hosted web build updates, while v1.0.1 no longer injects the
+           destructive rule at all. */
+        var safeNativeCss = [
+          "html,body,#root{width:100%!important;min-height:100%!important;min-height:100dvh!important;overflow-x:hidden!important}",
+          "html,body{margin:0!important;padding:0!important;overscroll-behavior-y:none!important;-webkit-text-size-adjust:100%}",
+          "#root>div{width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;justify-content:flex-start!important}",
+          ".dn-official-shell-frame{display:none!important}",
+          "#root>div>[aria-hidden=\"true\"]{display:none!important}",
+          "#root>div>main{display:block!important;width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:visible!important}",
+          "#root>div>main~*,#root>div>footer{display:none!important}",
+          "input,select,textarea{font-size:16px!important}",
+          "button,a,input,select,textarea{touch-action:manipulation}"
+        ].join("");
+
+        var applying = false;
+        function enforceSafeNativeStyle() {
+          if (applying) return;
+          applying = true;
+          var style = document.getElementById("dn-native-shell-style");
+          if (!style) {
+            style = document.createElement("style");
+            style.id = "dn-native-shell-style";
+            document.head.appendChild(style);
+          }
+          if (style.textContent !== safeNativeCss) {
+            style.textContent = safeNativeCss;
+          }
+          applying = false;
         }
+
+        enforceSafeNativeStyle();
+        new MutationObserver(function () {
+          window.requestAnimationFrame(enforceSafeNativeStyle);
+        }).observe(document.head, { childList: true, subtree: true, characterData: true });
+        document.addEventListener("DOMContentLoaded", enforceSafeNativeStyle, { once: true });
       })();
     </script>
 
