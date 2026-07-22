@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   arabic-visual:
-    name: Arabic pre-render and branch-build visual acceptance
+    name: Arabic splash handoff and branch-build visual acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 70
 
@@ -48,6 +48,8 @@ jobs:
           grep -F 'LANGUAGE_EXPLICIT_KEY' artifacts/day-night-delivery/src/i18n/index.ts
           grep -F 'navigator.languages' artifacts/day-night-delivery/src/i18n/index.ts
           grep -F 'data-language' artifacts/day-night-delivery/index.html
+          grep -F 'dnBootAbsoluteFailsafe' artifacts/day-night-delivery/index.html
+          grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
@@ -137,7 +139,7 @@ jobs:
           adb shell dumpsys connectivity > android-role-shell/arabic-visual/emulator/connectivity.txt || true
           sleep 8
 
-      - name: Capture Driver Arabic branch-build startup
+      - name: Capture Driver Arabic splash handoff
         shell: bash
         run: |
           set -euo pipefail
@@ -150,12 +152,12 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-02.png
           sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
-          sleep 8
+          sleep 5
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
           adb shell am force-stop com.daynightae.driver
 
-      - name: Capture Merchant Arabic branch-build startup
+      - name: Capture Merchant Arabic splash handoff
         shell: bash
         run: |
           set -euo pipefail
@@ -168,26 +170,38 @@ jobs:
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-02.png
           sleep 0.9
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
-          sleep 8
+          sleep 5
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
           adb shell am force-stop com.daynightae.merchant
 
-      - name: Validate staged screenshots
+      - name: Validate splash handoff and staged screenshots
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image
-          files = sorted(Path('android-role-shell/arabic-visual').glob('*-stage-*.png'))
-          assert len(files) == 6
-          for path in files:
+          from PIL import Image, ImageChops, ImageStat
+
+          staged = sorted(Path('android-role-shell/arabic-visual').glob('*-stage-*.png'))
+          assert len(staged) == 6
+          for path in staged:
               image = Image.open(path).convert('RGB').resize((160, 280))
               colors = image.getcolors(160 * 280)
               count = len(colors or [])
               assert count > 25, f'{path} is visually empty ({count} colors)'
               print(path, count)
+
+          for role in ('driver', 'merchant'):
+              splash = Image.open(f'android-role-shell/arabic-visual/{role}-stage-02.png').convert('RGB').resize((240, 420))
+              final = Image.open(f'android-role-shell/arabic-visual/{role}-arabic-final.png').convert('RGB').resize((240, 420))
+              difference = ImageStat.Stat(ImageChops.difference(splash, final)).mean
+              mean_difference = sum(difference) / len(difference)
+              assert mean_difference > 12, f'{role} remained visually trapped on splash ({mean_difference:.2f})'
+              dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
+              dark_ratio = dark_pixels / (final.width * final.height)
+              assert dark_ratio < 0.94, f'{role} final screen is still almost entirely the navy splash ({dark_ratio:.3f})'
+              print(role, 'mean_difference=', round(mean_difference, 2), 'dark_ratio=', round(dark_ratio, 3))
           PY
 
       - name: Stop emulator and local server
@@ -202,7 +216,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Arabic-Branch-Visual-v1.1.0
+          name: DAY-NIGHT-Arabic-Branch-Visual-v1.1.1
           path: android-role-shell/arabic-visual/
           if-no-files-found: error
           retention-days: 30
