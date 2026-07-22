@@ -54,9 +54,16 @@ expect(migration,/driver_payroll_entries/,"Migration creates the audited payroll
 expect(migration,/admin_driver_payroll_snapshot/,"Migration calculates the real net and outstanding salary");
 expect(migration,/v_status in \('accepted','approved'\).*confirmed/s,"Database normalizes legacy mission starts to confirmed");
 expect(migration,/function public\.driver_start_mission/ ,"Migration defines a dedicated idempotent mission-start RPC");
+reject(migration,/insert into public\.driver_locations\(driver_id,current_order_id,is_online/ ,"Mission start never inserts a location row before the first real GPS fix");
+expect(migration,/update public\.driver_locations[\s\S]*where driver_id=v_driver\.id/ ,"Mission start links only an existing real driver location");
 expect(migration,/alter type[\s\S]*add value if not exists/s,"Migration reconciles production ENUM labels before mission updates");
 expect(migration,/pg_notify\('pgrst','reload schema'\)/,"Migration reloads the live PostgREST schema immediately");
 expect(migration,/grant execute on function public\.driver_chat_payroll_runtime_health\(\) to anon, authenticated/,"Runtime health is remotely verifiable after SQL execution");
+
+const missionLocationHotfix=read("supabase/migrations/20260722094500_driver_start_mission_location_not_null_hotfix.sql",true);
+expect(missionLocationHotfix,/driver_start_mission_location_hotfix_health/,"23502 location hotfix publishes a remotely verifiable health RPC");
+expect(missionLocationHotfix,/location_insert_removed/,"23502 hotfix proves the premature location insert was removed");
+expect(missionLocationHotfix,/gps_source','driver_report_location_only'/,"GPS rows remain sourced exclusively from real phone coordinates");
 
 if(failed){console.error("Driver chat & payroll production gate FAILED.");process.exit(1);}
 console.log("Driver chat & payroll production gate PASSED.\n");
