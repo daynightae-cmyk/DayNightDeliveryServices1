@@ -94,19 +94,19 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Build Arabic local visual-only debug APKs
+      - name: Build isolated Arabic visual APKs
         shell: bash
         env:
           DAYNIGHT_ROLE_WEB_BASE_URL: http://10.0.2.2:4173
           DAYNIGHT_ROLE_VISUAL_QUERY: lang=ar
         run: |
           set -euo pipefail
-          gradle -p android-role-shell --no-daemon --console=plain assembleDriverDebug assembleMerchantDebug
+          gradle -p android-role-shell --no-daemon --console=plain assembleDriverVisual assembleMerchantVisual
           grep -R -F 'lang=ar' android-role-shell/app/build/generated/source/buildConfig || true
-          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' -exec cp {} android-role-shell/arabic-visual/driver-local.apk \;
-          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' -exec cp {} android-role-shell/arabic-visual/merchant-local.apk \;
-          test -s android-role-shell/arabic-visual/driver-local.apk
-          test -s android-role-shell/arabic-visual/merchant-local.apk
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*visual*' -exec cp {} android-role-shell/arabic-visual/driver-visual.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*visual*' -exec cp {} android-role-shell/arabic-visual/merchant-visual.apk \;
+          test -s android-role-shell/arabic-visual/driver-visual.apk
+          test -s android-role-shell/arabic-visual/merchant-visual.apk
 
       - name: Boot Android 16 and wait for local network
         shell: bash
@@ -125,7 +125,6 @@ jobs:
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
           adb shell settings delete global http_proxy || true
-          adb shell svc wifi enable || true
           reachable=""
           for attempt in $(seq 1 60); do
             if adb shell ping -c 1 -W 2 10.0.2.2 >/dev/null 2>&1; then
@@ -142,9 +141,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          adb install -r android-role-shell/arabic-visual/driver-local.apk | tee android-role-shell/arabic-visual/driver-install.log
+          adb install -r android-role-shell/arabic-visual/driver-visual.apk | tee android-role-shell/arabic-visual/driver-install.log
           adb shell am force-stop com.daynightae.driver
-          adb shell am start -n com.daynightae.driver/com.daynightae.shell.MainActivity > android-role-shell/arabic-visual/driver-start.log &
+          adb shell am start -n com.daynightae.driver/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/driver-start.log
           sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-01.png
           sleep 0.65
@@ -160,9 +159,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          adb install -r android-role-shell/arabic-visual/merchant-local.apk | tee android-role-shell/arabic-visual/merchant-install.log
+          adb install -r android-role-shell/arabic-visual/merchant-visual.apk | tee android-role-shell/arabic-visual/merchant-install.log
           adb shell am force-stop com.daynightae.merchant
-          adb shell am start -n com.daynightae.merchant/com.daynightae.shell.MainActivity > android-role-shell/arabic-visual/merchant-start.log &
+          adb shell am start -n com.daynightae.merchant/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/merchant-start.log
           sleep 0.35
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-01.png
           sleep 0.65
