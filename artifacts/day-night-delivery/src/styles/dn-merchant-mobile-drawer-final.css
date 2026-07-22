@@ -1,0 +1,266 @@
+/* DAY NIGHT Merchant — final mobile drawer. Imported last so legacy grid/sheet
+   rules cannot collapse navigation labels into overlapping columns. */
+
+.dn-merchant-mobile-drawer-backdrop {
+  position: fixed;
+  z-index: 2147483400;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: rgba(2, 11, 25, .7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: dnMerchantDrawerBackdrop .18s ease-out both;
+}
+
+[dir="rtl"] .dn-merchant-mobile-drawer-backdrop { justify-content: flex-end; }
+
+.dn-merchant-mobile-drawer {
+  width: min(89vw, 430px);
+  height: 100dvh;
+  max-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 8% 0, rgba(49,149,247,.19), transparent 24rem),
+    linear-gradient(180deg, #0b2a4e 0%, #071a33 42%, #051426 100%);
+  border-inline-end: 1px solid rgba(255,255,255,.1);
+  box-shadow: 28px 0 80px rgba(0,0,0,.42);
+  animation: dnMerchantDrawerInLtr .26s cubic-bezier(.2,.8,.2,1) both;
+  isolation: isolate;
+}
+
+[dir="rtl"] .dn-merchant-mobile-drawer {
+  border-inline-end: 0;
+  border-inline-start: 1px solid rgba(255,255,255,.1);
+  box-shadow: -28px 0 80px rgba(0,0,0,.42);
+  animation-name: dnMerchantDrawerInRtl;
+}
+
+.dn-merchant-mobile-drawer *,
+.dn-merchant-mobile-drawer *::before,
+.dn-merchant-mobile-drawer *::after { box-sizing: border-box; }
+
+.dn-merchant-mobile-drawer-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 96px;
+  padding: calc(15px + env(safe-area-inset-top)) 16px 15px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.035);
+}
+
+.dn-merchant-mobile-drawer-appmark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(212,175,55,.58);
+  border-radius: 19px;
+  color: #071a33;
+  background: linear-gradient(145deg,#fff,#f4df86);
+  box-shadow: 0 12px 30px rgba(0,0,0,.23);
+}
+
+.dn-merchant-mobile-drawer-appmark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 15px;
+}
+
+.dn-merchant-mobile-drawer-appmark strong { font-size: 18px; font-weight: 1000; }
+.dn-merchant-mobile-drawer-identity { min-width: 0; }
+.dn-merchant-mobile-drawer-identity small {
+  display: block;
+  color: #f2d66d;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .13em;
+}
+.dn-merchant-mobile-drawer-identity h2 {
+  margin: 4px 0 2px;
+  overflow: hidden;
+  color: #fff;
+  font: 900 17px/1.35 Cairo,Poppins,system-ui,sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dn-merchant-mobile-drawer-identity span {
+  display: block;
+  overflow: hidden;
+  color: #a9bdd4;
+  font: 700 10px/1.4 Inter,Cairo,sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dn-merchant-mobile-drawer-close {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 15px;
+  color: #fff;
+  background: rgba(255,255,255,.07);
+  cursor: pointer;
+}
+.dn-merchant-mobile-drawer-close svg { width: 21px; height: 21px; }
+
+.dn-merchant-mobile-drawer-intro {
+  display: grid;
+  gap: 3px;
+  padding: 13px 17px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  background: rgba(212,175,55,.07);
+}
+.dn-merchant-mobile-drawer-intro strong { color: #f6e5a6; font-size: 13px; font-weight: 900; }
+.dn-merchant-mobile-drawer-intro span { color: #a9bdd4; font-size: 10px; font-weight: 650; }
+
+.dn-merchant-mobile-drawer-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 12px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212,175,55,.45) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dn-merchant-mobile-drawer-group { display: block; margin: 0 0 17px; }
+.dn-merchant-mobile-drawer-group h3 {
+  margin: 0 6px 7px;
+  color: #7690ad;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.dn-merchant-mobile-drawer-group nav {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 5px !important;
+  width: 100%;
+}
+
+.dn-merchant-mobile-drawer-group nav > button {
+  position: relative;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 62px !important;
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) 20px !important;
+  align-items: center !important;
+  gap: 11px !important;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  overflow: hidden;
+  border: 1px solid transparent !important;
+  border-radius: 16px !important;
+  color: #e9f1fa !important;
+  text-align: start !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dn-merchant-mobile-drawer-group nav > button:hover,
+.dn-merchant-mobile-drawer-group nav > button:focus-visible {
+  border-color: rgba(255,255,255,.1) !important;
+  background: rgba(255,255,255,.065) !important;
+  outline: none;
+}
+
+.dn-merchant-mobile-drawer-group nav > button.is-active {
+  border-color: rgba(212,175,55,.35) !important;
+  color: #fff !important;
+  background: linear-gradient(105deg,rgba(212,175,55,.17),rgba(49,149,247,.08)) !important;
+  box-shadow: inset 3px 0 0 #d4af37 !important;
+}
+[dir="rtl"] .dn-merchant-mobile-drawer-group nav > button.is-active { box-shadow: inset -3px 0 0 #d4af37 !important; }
+
+.dn-merchant-mobile-drawer-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: #8ec8ff;
+  background: rgba(49,149,247,.11);
+}
+.dn-merchant-mobile-drawer-icon svg { width: 21px; height: 21px; }
+.is-active > .dn-merchant-mobile-drawer-icon { color: #071a33; background: linear-gradient(145deg,#f5df83,#d4af37); }
+
+.dn-merchant-mobile-drawer-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+.dn-merchant-mobile-drawer-copy strong {
+  overflow: hidden;
+  color: inherit;
+  font: 850 13px/1.45 Cairo,Inter,system-ui,sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dn-merchant-mobile-drawer-copy small {
+  overflow: hidden;
+  color: #8fa6bf;
+  font: 650 9px/1.5 Cairo,Inter,system-ui,sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dn-merchant-mobile-drawer-chevron { color: #7189a4; font-size: 23px; line-height: 1; }
+
+.dn-merchant-mobile-drawer-footer {
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,.1);
+  background: rgba(2,11,25,.34);
+}
+.dn-merchant-mobile-drawer-footer button {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(248,113,113,.25);
+  border-radius: 15px;
+  color: #fecaca;
+  background: rgba(239,68,68,.08);
+  font: 850 13px Cairo,Inter,sans-serif;
+  cursor: pointer;
+}
+.dn-merchant-mobile-drawer-footer svg { width: 19px; }
+
+@keyframes dnMerchantDrawerBackdrop { from { opacity:0; } to { opacity:1; } }
+@keyframes dnMerchantDrawerInLtr { from { transform:translateX(-104%); } to { transform:translateX(0); } }
+@keyframes dnMerchantDrawerInRtl { from { transform:translateX(104%); } to { transform:translateX(0); } }
+
+@media (min-width: 901px) {
+  .dn-merchant-mobile-drawer-backdrop { display: none !important; }
+}
+
+@media (max-width: 380px) {
+  .dn-merchant-mobile-drawer { width: 94vw; }
+  .dn-merchant-mobile-drawer-header { padding-inline: 12px; gap: 9px; }
+  .dn-merchant-mobile-drawer-appmark { width: 52px; height: 52px; }
+  .dn-merchant-mobile-drawer-group nav > button { min-height: 58px !important; grid-template-columns: 40px minmax(0,1fr) 16px !important; padding-inline: 7px !important; }
+  .dn-merchant-mobile-drawer-icon { width: 40px; height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dn-merchant-mobile-drawer-backdrop,
+  .dn-merchant-mobile-drawer { animation: none !important; }
+}
