@@ -1,0 +1,9 @@
+.gradle/
+local.properties
+**/build/
+*.jks
+*.keystore
+*.p12
+keystore.properties
+app/src/driver/res/drawable-nodpi/app_icon.png
+app/src/merchant/res/drawable-nodpi/app_icon.png
