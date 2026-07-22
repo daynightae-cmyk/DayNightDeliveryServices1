@@ -255,8 +255,13 @@ export async function calculateDeliveryPrice(payload: {
   weight?: number | string | null;
   serviceType?: string | null;
 }): Promise<any> {
+  const serviceType = String(payload.serviceType || "standard").trim().toLowerCase();
+  const isInternational = serviceType === "international";
   const officialLocalPrice = calculateDomesticPrice(payload);
   if (!supabase) {
+    if (isInternational) {
+      throw new Error("International pricing requires the production pricing service.");
+    }
     return officialLocalPrice;
   }
 
@@ -267,11 +272,13 @@ export async function calculateDeliveryPrice(payload: {
   });
 
   if (error) {
+    if (isInternational) throw error;
     console.warn("calculate_delivery_price RPC failed. Using local pricing engine.");
     return officialLocalPrice;
   }
 
   const serverRow = Array.isArray(data) ? data[0] : data;
+  if (isInternational) return serverRow;
   return {
     ...(serverRow && typeof serverRow === "object" ? serverRow : {}),
     base_fee: officialLocalPrice.subtotal,
