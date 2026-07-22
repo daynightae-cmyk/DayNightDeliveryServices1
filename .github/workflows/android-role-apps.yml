@@ -77,15 +77,35 @@ jobs:
           grep -F 'android:usesCleartextTraffic="false"' android-role-shell/app/src/main/AndroidManifest.xml
           grep -F 'request.deny()' android-role-shell/app/src/main/java/com/daynightae/shell/MainActivity.java
 
-      - name: Lint and build Android variants
+      - name: Build Driver debug APK
         shell: bash
         run: |
           set -euo pipefail
-          gradle -p android-role-shell --no-daemon --stacktrace \
-            clean \
-            lintDriverRelease lintMerchantRelease \
-            assembleDriverDebug assembleMerchantDebug \
-            bundleDriverRelease bundleMerchantRelease
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace clean assembleDriverDebug 2>&1 | tee android-role-shell/driver-debug-build.log
+
+      - name: Build Merchant debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace assembleMerchantDebug 2>&1 | tee android-role-shell/merchant-debug-build.log
+
+      - name: Build Driver release AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace bundleDriverRelease 2>&1 | tee android-role-shell/driver-release-build.log
+
+      - name: Build Merchant release AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace bundleMerchantRelease 2>&1 | tee android-role-shell/merchant-release-build.log
+
+      - name: Run Android lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace lintDriverRelease lintMerchantRelease 2>&1 | tee android-role-shell/android-lint-build.log
 
       - name: Verify packages and stage release files
         id: verify
@@ -154,11 +174,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload lint reports
+      - name: Upload Android diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Android-Lint-Reports
-          path: android-role-shell/app/build/reports/
-          if-no-files-found: ignore
+          name: DAY-NIGHT-Android-Diagnostics
+          path: |
+            android-role-shell/*-build.log
+            android-role-shell/app/build/reports/
+          if-no-files-found: warn
           retention-days: 14
