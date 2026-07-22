@@ -358,7 +358,7 @@ public final class MainActivity extends Activity {
     private void openStartRoute() {
         offlineVisible = false;
         showLoadingIndicator();
-        if (!isOnline()) {
+        if (!hasInternetTransport()) {
             showOfflinePage("offline");
             return;
         }
@@ -432,7 +432,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private boolean isOnline() {
+    private boolean hasInternetTransport() {
         ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (manager == null) {
             return true;
@@ -442,9 +442,12 @@ public final class MainActivity extends Activity {
             return false;
         }
         NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+        // NET_CAPABILITY_VALIDATED can arrive late or be absent on otherwise
+        // working Wi-Fi/mobile networks. Let WebView attempt the HTTPS request
+        // whenever an Internet-capable transport exists, then rely on the real
+        // main-frame loading callback to decide whether Offline UI is needed.
         return capabilities != null
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     }
 
     private boolean isOfficialHost(String host) {
@@ -525,7 +528,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         webView.onResume();
-        if (offlineVisible && isOnline()) {
+        if (offlineVisible && hasInternetTransport()) {
             openStartRoute();
         }
     }
