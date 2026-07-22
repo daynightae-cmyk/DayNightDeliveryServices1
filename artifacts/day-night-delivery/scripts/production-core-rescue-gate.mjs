@@ -65,6 +65,13 @@ expect(financialOperations, /paymentMethod === "merchant_pays"/, "Merchant-paid 
 const pricingData = read("src/data/pricingData.ts");
 expect(pricingData, /base:\s*25/, "Official main-route price is 25 AED");
 
+const pricingEngine = read("src/lib/pricing.ts");
+expect(pricingEngine, /serviceSurcharge[\s\S]*expressSurcharge\.amount/, "Express quote includes the same 15 AED service surcharge as order creation");
+
+const supabaseClient = read("src/supabase.ts");
+expect(supabaseClient, /if \(isInternational\) return serverRow/, "International merchant quotes preserve the authoritative server price");
+expect(supabaseClient, /if \(isInternational\) throw error/, "International pricing failures cannot fall back to an incorrect local fee");
+
 const orderHotfix = read("../../supabase/migrations/20260722054500_order_creation_enum_price25_final.sql");
 expect(orderHotfix, /to_jsonb\(new\)/, "Order lifecycle trigger reads ENUM status safely through JSON");
 expect(orderHotfix, /status::text/, "Database status comparisons cast ENUM values to text");

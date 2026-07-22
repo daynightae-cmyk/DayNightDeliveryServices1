@@ -59,7 +59,9 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
   const billableWeight = normalizeWeight(input.weight);
   const zone = resolveDomesticZone(input);
   const unitPrice = zone === "extended" ? domesticPricing.extended.base : domesticPricing.main.base;
-  const subtotal = unitPrice;
+  const isExpress = String(input.serviceType || "standard").trim().toLowerCase() === "express";
+  const serviceSurcharge = isExpress ? domesticPricing.expressSurcharge.amount : 0;
+  const subtotal = unitPrice + serviceSurcharge;
   const total = Number(subtotal.toFixed(2));
   const category = zone === "extended" ? domesticPricing.extended.labelEn : domesticPricing.main.labelEn;
   const requiresCustomQuote = false;
@@ -73,11 +75,12 @@ export function calculateDomesticPrice(input: DomesticPriceInput): PricingResult
     requiresCustomQuote,
     breakdown: [
       `${category}: ${formatAED(unitPrice)}`,
-      `Single local order: ${formatAED(unitPrice)}`
+      ...(isExpress ? [`Express surcharge: ${formatAED(serviceSurcharge)}`] : []),
+      `Single local order: ${formatAED(total)}`
     ],
     notes: zone === "extended"
-      ? "Special UAE route price. Local delivery is charged per order, not per kilogram."
-      : "UAE city route price. Local delivery is charged per order, not per kilogram."
+      ? `Special UAE route price${isExpress ? " with express service" : ""}. Local delivery is charged per order, not per kilogram.`
+      : `UAE city route price${isExpress ? " with express service" : ""}. Local delivery is charged per order, not per kilogram.`
   };
 }
 
