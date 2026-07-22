@@ -68,6 +68,9 @@ android {
     lint {
         abortOnError true
         checkReleaseBuilds true
+        // v1.0.0 explicitly opts out of predictive back in the manifest so
+        // role-isolated WebView history keeps using Activity.onBackPressed().
+        disable "GestureBackNavigation"
     }
 
     packaging {
