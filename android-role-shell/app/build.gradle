@@ -3,6 +3,13 @@ plugins {
 }
 
 def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
+def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
+def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
+
+def roleStartUrl = { String role ->
+    def separator = roleVisualQuery ? "&" : ""
+    return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1${separator}${roleVisualQuery}"
+}
 
 android {
     namespace "com.daynightae.shell"
@@ -32,13 +39,13 @@ android {
             dimension "role"
             applicationId "com.daynightae.driver"
             buildConfigField "String", "ROLE", '"driver"'
-            buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver&nosplash=1"'
+            buildConfigField "String", "START_URL", "\"${roleStartUrl('driver')}\""
         }
         merchant {
             dimension "role"
             applicationId "com.daynightae.merchant"
             buildConfigField "String", "ROLE", '"merchant"'
-            buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant&nosplash=1"'
+            buildConfigField "String", "START_URL", "\"${roleStartUrl('merchant')}\""
         }
     }
 
