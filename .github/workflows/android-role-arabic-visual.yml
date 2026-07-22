@@ -1,0 +1,167 @@
+name: Android Role Arabic Visual Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "artifacts/day-night-delivery/**"
+      - "android-role-shell/**"
+      - ".github/workflows/android-role-arabic-visual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-role-arabic-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arabic-visual:
+    name: Arabic locale and branded splash acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+
+      - name: Python and official icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "pillow>=10,<13"
+          python android-role-shell/scripts/prepare_icons.py
+
+      - name: Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Build debug role APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain assembleDriverDebug assembleMerchantDebug
+          mkdir -p android-role-shell/arabic-visual
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' -exec cp {} android-role-shell/arabic-visual/driver.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' -exec cp {} android-role-shell/arabic-visual/merchant.apk \;
+          test -s android-role-shell/arabic-visual/driver.apk
+          test -s android-role-shell/arabic-visual/merchant.apk
+
+      - name: Boot Android 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-arabic-avd"
+          mkdir -p "$ANDROID_AVD_HOME" android-role-shell/arabic-visual/emulator
+          echo no | avdmanager create avd --force --name daynight_arabic_api36 --package "system-images;android-36;google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_arabic_api36.avd"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          nohup "$ANDROID_HOME/emulator/emulator" -avd daynight_arabic_api36 -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data > android-role-shell/arabic-visual/emulator/boot.log 2>&1 &
+          echo $! > android-role-shell/arabic-visual/emulator/pid
+          timeout 180 adb wait-for-device
+          for attempt in $(seq 1 180); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
+
+      - name: Change emulator locale to Arabic using Android test contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb root
+          adb wait-for-device
+          adb shell 'setprop persist.sys.locale ar-AE; stop; sleep 5; start'
+          timeout 180 adb wait-for-device
+          for attempt in $(seq 1 180); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 3
+          done
+          LOCALE="$(adb shell getprop persist.sys.locale | tr -d '\r')"
+          echo "$LOCALE" | tee android-role-shell/arabic-visual/emulator/locale.log
+          test "$LOCALE" = "ar-AE"
+
+      - name: Capture Driver Arabic startup stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb install -r android-role-shell/arabic-visual/driver.apk | tee android-role-shell/arabic-visual/driver-install.log
+          adb shell am force-stop com.daynightae.driver
+          adb shell monkey -p com.daynightae.driver 1 >/dev/null
+          sleep 0.45
+          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-01.png
+          sleep 0.75
+          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-02.png
+          sleep 0.75
+          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
+          sleep 22
+          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
+          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
+          adb shell am force-stop com.daynightae.driver
+
+      - name: Capture Merchant Arabic startup stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb install -r android-role-shell/arabic-visual/merchant.apk | tee android-role-shell/arabic-visual/merchant-install.log
+          adb shell am force-stop com.daynightae.merchant
+          adb shell monkey -p com.daynightae.merchant 1 >/dev/null
+          sleep 0.45
+          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-01.png
+          sleep 0.75
+          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-02.png
+          sleep 0.75
+          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
+          sleep 22
+          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
+          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
+          adb shell am force-stop com.daynightae.merchant
+
+      - name: Validate startup stages are visually populated
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          files = sorted(Path('android-role-shell/arabic-visual').glob('*-stage-*.png'))
+          assert len(files) == 6
+          for path in files:
+              image = Image.open(path).convert('RGB').resize((160, 280))
+              colors = image.getcolors(160 * 280)
+              count = len(colors or [])
+              assert count > 25, f'{path} is visually empty ({count} colors)'
+              print(path, count)
+          PY
+
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: |
+          adb emu kill || true
+          if [ -f android-role-shell/arabic-visual/emulator/pid ]; then kill "$(cat android-role-shell/arabic-visual/emulator/pid)" 2>/dev/null || true; fi
+
+      - name: Upload Arabic visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Arabic-Visual-Acceptance-v1.1.0
+          path: android-role-shell/arabic-visual/
+          if-no-files-found: error
+          retention-days: 30
