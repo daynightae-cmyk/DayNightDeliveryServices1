@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   arabic-visual:
-    name: Arabic locale and branch-build visual acceptance
+    name: Arabic pre-render and branch-build visual acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 70
 
@@ -45,12 +45,15 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
+          grep -F 'LANGUAGE_EXPLICIT_KEY' artifacts/day-night-delivery/src/i18n/index.ts
+          grep -F 'navigator.languages' artifacts/day-night-delivery/src/i18n/index.ts
+          grep -F 'data-language' artifacts/day-night-delivery/index.html
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
           ready=""
           for attempt in $(seq 1 45); do
-            if curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver" | grep -F 'id="root"' >/dev/null; then
+            if curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&lang=ar" | grep -F 'id="root"' >/dev/null; then
               ready="1"
               break
             fi
@@ -60,7 +63,7 @@ jobs:
             cat android-role-shell/arabic-visual/local-web.log || true
             exit 1
           fi
-          curl -fsS "http://127.0.0.1:4173/merchant?nativeShell=merchant" | grep -F 'id="root"' >/dev/null
+          curl -fsS "http://127.0.0.1:4173/merchant?nativeShell=merchant&lang=ar" | grep -F 'id="root"' >/dev/null
 
       - name: Java 17
         uses: actions/setup-java@v4
@@ -91,13 +94,15 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Build local visual-only debug APKs
+      - name: Build Arabic local visual-only debug APKs
         shell: bash
         env:
           DAYNIGHT_ROLE_WEB_BASE_URL: http://10.0.2.2:4173
+          DAYNIGHT_ROLE_VISUAL_QUERY: lang=ar
         run: |
           set -euo pipefail
           gradle -p android-role-shell --no-daemon --console=plain assembleDriverDebug assembleMerchantDebug
+          grep -R -F 'lang=ar' android-role-shell/app/build/generated/source/buildConfig || true
           find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' -exec cp {} android-role-shell/arabic-visual/driver-local.apk \;
           find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' -exec cp {} android-role-shell/arabic-visual/merchant-local.apk \;
           test -s android-role-shell/arabic-visual/driver-local.apk
@@ -119,22 +124,6 @@ jobs:
             sleep 5
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
-
-      - name: Change emulator locale to Arabic
-        shell: bash
-        run: |
-          set -euo pipefail
-          adb root
-          adb wait-for-device
-          adb shell 'setprop persist.sys.locale ar-AE; stop; sleep 5; start'
-          timeout 180 adb wait-for-device
-          for attempt in $(seq 1 180); do
-            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
-            sleep 3
-          done
-          LOCALE="$(adb shell getprop persist.sys.locale | tr -d '\r')"
-          echo "$LOCALE" | tee android-role-shell/arabic-visual/emulator/locale.log
-          test "$LOCALE" = "ar-AE"
           adb shell settings delete global http_proxy || true
 
       - name: Capture Driver Arabic branch-build startup
@@ -153,6 +142,8 @@ jobs:
           sleep 8
           adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
+          adb shell uiautomator dump /sdcard/driver-arabic.xml || true
+          adb pull /sdcard/driver-arabic.xml android-role-shell/arabic-visual/driver-arabic.xml || true
           adb shell am force-stop com.daynightae.driver
 
       - name: Capture Merchant Arabic branch-build startup
@@ -171,11 +162,16 @@ jobs:
           sleep 8
           adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
+          adb shell uiautomator dump /sdcard/merchant-arabic.xml || true
+          adb pull /sdcard/merchant-arabic.xml android-role-shell/arabic-visual/merchant-arabic.xml || true
           adb shell am force-stop com.daynightae.merchant
 
-      - name: Validate staged screenshots
+      - name: Validate Arabic text and staged screenshots
         shell: bash
         run: |
+          set -euo pipefail
+          grep -E 'دخول|المندوب|التاجر|البريد|كلمة المرور' android-role-shell/arabic-visual/driver-arabic.xml
+          grep -E 'دخول|التاجر|البريد|كلمة المرور|الهاتف' android-role-shell/arabic-visual/merchant-arabic.xml
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
