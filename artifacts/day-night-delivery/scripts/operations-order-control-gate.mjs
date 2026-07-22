@@ -43,6 +43,30 @@ for (const status of ["confirmed", "accepted", "picked_up", "in_transit", "deliv
   expect(driver, new RegExp(`value: [\"']${status}[\"']`), `Driver card exposes ${status} action`);
 }
 expect(driver, /requiresNote: true/, "Risk/closure driver actions require an operational note");
+expect(driver, /wa\.me\/[\s\S]*encodeURIComponent\(whatsappMessage\)/, "Driver WhatsApp action includes a prefilled production message");
+expect(driver, /معكم مندوب DAY NIGHT/, "Driver customer message carries the DAY NIGHT professional identity");
+
+const driverDashboard = read("src/components/driver/DriverDashboard.tsx");
+expect(driverDashboard, /updateDriverOrderStatus\(orderId, status, note\)/, "Driver status controls persist through the authoritative RPC helper");
+expect(driverDashboard, /<TrackingMap[\s\S]*navigationMode/, "Driver orders open in the in-app navigation map");
+
+const driverData = read("src/lib/driverData.ts");
+expect(driverData, /rpc\(["']driver_update_order_status["']/, "Driver status helper writes through driver_update_order_status");
+
+const statements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
+expect(statements, /merchants\.map/, "Merchant statements list every registered merchant");
+expect(statements, /selectedOrderIds/, "Merchant statements support exact multi-order selection");
+expect(statements, /AdminPdfExportButton/, "Selected merchant orders use the real PDF/CSV/Word exporter");
+expect(statements, /wa\.me\/[\s\S]*merchantWhatsAppMessage/, "Selected merchant orders have a prefilled merchant WhatsApp statement");
+expect(statements, /allTime/, "Merchant statement can show the merchant's complete order history");
+
+const portalRuntime = read("src/components/portals/PortalRuntimeOverlay.tsx");
+expect(portalRuntime, /dn-portal-mobile-scroll-fix\.css/, "Portal runtime imports the final mobile scroll contract last");
+
+const portalScroll = read("src/styles/dn-portal-mobile-scroll-fix.css");
+expect(portalScroll, /dn-driver-shell-v3\.dn-driver-exact-shell/, "Driver dashboard mobile scroll is explicitly unlocked");
+expect(portalScroll, /dn-merchant-app/, "Merchant dashboard mobile scroll is explicitly unlocked");
+expect(portalScroll, /touch-action:\s*pan-y/, "Touch vertical panning is explicitly enabled");
 
 const realtime = read("src/components/ProductionOrderRealtimeBridge.tsx");
 expect(realtime, /table: [\"']orders[\"']/, "Admin subscribes to real order changes");
@@ -54,7 +78,22 @@ expect(styles, /dn-section-table-wrap tbody tr/, "Admin order rows have explicit
 expect(styles, /dn-admin-bulk-console/, "Bulk operations console has production styling");
 expect(styles, /dn-merchant-mobile-sheet-backdrop/, "Merchant desktop/mobile navigation collision is guarded");
 
-const combined = `${bulk}\n${workspace}\n${driver}\n${realtime}`;
+const pricingFiles = [
+  "src/components/DeliveryUAE.tsx",
+  "src/components/RequestDelivery.tsx",
+  "src/components/SmartChat.tsx",
+  "src/data/pricingEstimate.ts",
+  "src/data/aiAgentKnowledge.ts",
+  "src/supabase.ts",
+].map(read).join("\n");
+if (/(?:PRICE|Price|price|سعر|درهم|AED).{0,55}\b30\b|\b30\b.{0,55}(?:PRICE|Price|price|سعر|درهم|AED)/s.test(pricingFiles)) {
+  console.error("FAIL: a customer-facing local price still references 30 AED");
+  failed = true;
+} else {
+  console.log("PASS: all customer-facing local price paths are clear of 30 AED");
+}
+
+const combined = `${bulk}\n${workspace}\n${driver}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
 if (/Math\.random|demoOrders|mockOrders|localStorage\.setItem\([^)]*order/i.test(combined)) {
   console.error("FAIL: operational controls contain mock/random/local order persistence");
   failed = true;

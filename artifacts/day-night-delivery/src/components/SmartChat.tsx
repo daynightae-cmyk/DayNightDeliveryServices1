@@ -13,7 +13,7 @@ const GREETED_KEY = "dn_chat_greeted";
 const AUTO_OPEN_KEY = "dn_chat_auto_opened";
 const HISTORY_KEY = "dn_smart_chat_live_v3";
 const HIDDEN_ROUTES = ["/admin", "/driver", "/customer", "/auth", "/update-password"];
-const CITY_ROUTE_PRICE = 30;
+const CITY_ROUTE_PRICE = 25;
 const SPECIAL_ROUTE_PRICE = 50;
 
 function normalizeArabicDigits(value: string) {

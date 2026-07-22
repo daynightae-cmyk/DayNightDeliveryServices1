@@ -11,6 +11,7 @@ import "../../styles/dn-portal-route-lock.css";
 import "../../styles/dn-portal-overlay.css";
 import "../../styles/dn-portal-auth-v5.css";
 import "../../styles/dn-driver-mobile-auth-hotfix.css";
+import "../../styles/dn-portal-mobile-scroll-fix.css";
 
 export const PORTAL_NOTIFICATIONS_OPEN_EVENT = "daynight:portal-notifications-open";
 const DRIVER_BELL_SELECTOR = ".dn-driver-topbar-actions-v3 .dn-driver-icon-button-v3:last-child";

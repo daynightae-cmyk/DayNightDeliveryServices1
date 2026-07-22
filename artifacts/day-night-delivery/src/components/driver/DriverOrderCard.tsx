@@ -37,6 +37,12 @@ const actions: DriverStatusAction[] = [
 
 const progressStatuses = ["assigned", "confirmed", "accepted", "picked_up", "in_transit", "delivered"];
 const cleanPhone = (value?: string) => String(value || "").replace(/[^+\d]/g, "");
+const whatsAppPhone = (value?: string) => {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = `971${digits.slice(1)}`;
+  return digits;
+};
 const statusText = (status: string, isArabic: boolean) => {
   const normalized = String(status || "").toLowerCase();
   const labels: Record<string, [string, string]> = {
@@ -69,6 +75,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
   const [selectedAction, setSelectedAction] = useState<DriverStatusAction | null>(null);
   const [copied, setCopied] = useState(false);
   const phone = cleanPhone(order.receiver_phone || order.customer_phone);
+  const whatsappPhone = whatsAppPhone(order.receiver_phone || order.customer_phone);
   const pickupAddress = [order.sender_city, order.sender_address].filter(Boolean).join("، ");
   const deliveryAddress = [order.receiver_city, order.receiver_address].filter(Boolean).join("، ");
   const reference = order.tracking_number || order.tracking_code || order.invoice_number || order.id;
@@ -76,6 +83,25 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
   const normalizedStatus = String(order.status || "assigned").toLowerCase();
   const activeStep = Math.max(0, progressStatuses.indexOf(normalizedStatus));
   const isClosed = ["delivered", "cancelled", "returned"].includes(normalizedStatus);
+  const whatsappMessage = isArabic
+    ? [
+        `السلام عليكم ${order.receiver_name || order.customer_name || "عميلنا الكريم"}،`,
+        "معكم مندوب DAY NIGHT لخدمات التوصيل والشحن.",
+        `لديكم طلبية رقم ${reference}.`,
+        `حالة الطلبية: ${statusText(order.status, true)}.`,
+        deliveryAddress ? `عنوان التسليم المسجل: ${deliveryAddress}.` : "",
+        Number(order.cod_amount || 0) > 0 ? `المبلغ المطلوب عند الاستلام: ${Number(order.cod_amount).toFixed(2)} درهم.` : "",
+        "نرجو تأكيد تواجدكم ومشاركة موقعكم عند الحاجة، وشكراً لتعاونكم.",
+      ].filter(Boolean).join("\n")
+    : [
+        `Hello ${order.receiver_name || order.customer_name || "valued customer"},`,
+        "This is your DAY NIGHT delivery driver.",
+        `Your order reference is ${reference}.`,
+        `Current status: ${statusText(order.status, false)}.`,
+        deliveryAddress ? `Registered delivery address: ${deliveryAddress}.` : "",
+        Number(order.cod_amount || 0) > 0 ? `Amount due on delivery: ${Number(order.cod_amount).toFixed(2)} AED.` : "",
+        "Please confirm your availability and share your location if needed. Thank you.",
+      ].filter(Boolean).join("\n");
 
   async function runAction(action: DriverStatusAction, actionNote?: string) {
     const succeeded = await onStatus(action.value, actionNote);
@@ -154,7 +180,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
 
       <div className="dn-driver-contact-grid">
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone}><Phone /> <span>{isArabic ? "اتصال" : "Call"}</span></a>
-        <a href={phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!phone}><MessageCircle /> <span>WhatsApp</span></a>
+        <a href={whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}` : undefined} target="_blank" rel="noreferrer" aria-disabled={!whatsappPhone}><MessageCircle /> <span>{isArabic ? "رسالة واتساب" : "WhatsApp message"}</span></a>
         <button type="button" className={navigationActive ? "is-navigation-active" : ""} onClick={() => onNavigate?.(true)} disabled={!onNavigate || navigationActive}>
           <Navigation />
           <span>{navigationActive ? (isArabic ? "الملاحة تعمل" : "Navigation active") : (isArabic ? "الملاحة داخل التطبيق" : "In-app navigation")}</span>

@@ -19,7 +19,7 @@ export type WeightSurchargeEstimate = {
   noteAr: string;
 };
 
-const MAIN_AREA_PRICE = 30;
+const MAIN_AREA_PRICE = 25;
 const EXTENDED_AREA_PRICE = 50;
 const INCLUDED_WEIGHT_KG = 1;
 const ESTIMATED_EXTRA_KG_MIN = 3;

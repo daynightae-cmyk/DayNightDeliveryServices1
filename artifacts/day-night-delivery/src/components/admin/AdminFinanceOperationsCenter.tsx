@@ -38,6 +38,7 @@ import {
 } from "../../lib/adminFinanceLedger";
 import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import AdminPdfExportButton from "./AdminPdfExportButton";
+import AdminMerchantStatementsCenter from "./AdminMerchantStatementsCenter";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 
 export type FinanceArea =
@@ -344,9 +345,11 @@ export default function AdminFinanceOperationsCenter({
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold"><Landmark className="h-7 w-7" /></span>
             <div>
               <span className="text-xs font-black uppercase tracking-[0.2em] text-brand-gold">DAY NIGHT FINANCE CONTROL</span>
-              <h1 className="mt-2 text-3xl font-black text-white">{isArabic ? "مركز المالية والميزانية" : "Finance & Budget Control Center"}</h1>
+              <h1 className="mt-2 text-3xl font-black text-white">{view === "merchant_statements" ? (isArabic ? "كشوفات التجار والطلبيات" : "Merchant Order Statements") : (isArabic ? "مركز المالية والميزانية" : "Finance & Budget Control Center")}</h1>
               <p className="mt-2 max-w-3xl text-sm font-bold leading-7 text-white/55">
-                {isArabic
+                {view === "merchant_statements"
+                  ? (isArabic ? "اختر أي تاجر مسجل، راجع طلباته كاملة، حدّد المطلوب ثم اطبع كشفاً احترافياً أو أرسله مباشرة إلى رقم واتساب المسجل." : "Choose any registered merchant, review the full order history, select exact orders, then export a professional statement or send it to the saved WhatsApp number.")
+                  : isArabic
                   ? "مصدر واحد للحقيقة: ترحيلات الطلبات المسلّمة، مستحقات التجار، دخل داي نايت، المصروفات، التسويات والميزانية — بدون أرقام وهمية أو معادلات COD قديمة."
                   : "One source of truth for delivered settlements, merchant liabilities, DAY NIGHT revenue, expenses, adjustments, and budgets—without fake rows or legacy COD formulas."}
               </p>
@@ -361,27 +364,27 @@ export default function AdminFinanceOperationsCenter({
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               {isArabic ? "تحديث شامل" : "Full refresh"}
             </button>
-            <AdminPdfExportButton payload={pdfPayload} />
+            {view !== "merchant_statements" && <AdminPdfExportButton payload={pdfPayload} />}
           </div>
         </div>
       </header>
 
       {message && <p className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-xs font-bold leading-6 text-brand-gold">{message}</p>}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {view !== "merchant_statements" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label={isArabic ? "المحصل من العملاء" : "Collected from customers"} value={money(summary?.collectedAmount, isArabic)} hint={isArabic ? "من الطلبات المُرحّلة" : "Posted settlements"} />
         <MetricCard label={isArabic ? "مستحق التجار" : "Merchant due"} value={money(summary?.merchantDue, isArabic)} hint={isArabic ? "بعد التوصيل والخصم" : "After fee and discount"} />
         <MetricCard label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={money(summary?.deliveryRevenue, isArabic)} hint={isArabic ? "رسوم التوصيل" : "Delivery fees"} />
         <MetricCard label={isArabic ? "المصروفات المعتمدة" : "Approved expenses"} value={money(summary?.approvedExpenses, isArabic)} hint={isArabic ? "المسودات لا تخصم" : "Drafts excluded"} />
         <MetricCard label={isArabic ? "صافي التشغيل" : "Operating net"} value={money(summary?.operatingNet, isArabic)} hint={isArabic ? "الدخل − المصروف + التسويات" : "Revenue − expense + adjustments"} warning={numberValue(summary?.operatingNet) < 0} />
-      </div>
+      </div>}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {view !== "merchant_statements" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label={isArabic ? "قيمة البضاعة" : "Goods value"} value={money(summary?.goodsValue, isArabic)} hint={isArabic ? "طلبات مسلّمة" : "Delivered orders"} />
         <MetricCard label={isArabic ? "الخصومات" : "Discounts"} value={money(summary?.discounts, isArabic)} hint={isArabic ? "مسجلة عند الإدخال" : "Fixed at entry"} />
         <MetricCard label={isArabic ? "تحصيل معلق" : "Pending collection"} value={money(summary?.pendingCollection, isArabic)} hint={isArabic ? "يحتاج متابعة" : "Needs follow-up"} warning={numberValue(summary?.pendingCollection) > 0} />
         <MetricCard label={isArabic ? "مُسلّم غير مُرحّل" : "Delivered, not posted"} value={String(summary?.unpostedDeliveredOrders ?? 0)} hint={isArabic ? "يجب أن يكون صفر" : "Must be zero"} warning={numberValue(summary?.unpostedDeliveredOrders) > 0} />
-      </div>
+      </div>}
 
       <nav className="grid gap-2 rounded-[1.5rem] border border-white/10 bg-[#031226] p-2 sm:grid-cols-2 lg:grid-cols-5">
         {views.map(({ id, ar, en, icon: Icon }) => (
@@ -417,6 +420,18 @@ export default function AdminFinanceOperationsCenter({
           </span>
         </label>
       </section>
+
+      {view === "merchant_statements" && (
+        <AdminMerchantStatementsCenter
+          isArabic={isArabic}
+          merchants={merchants}
+          orders={orders}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          query={query}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {view === "expenses" && (
         <section className="rounded-[1.8rem] border border-white/10 bg-[#031226] p-5">
@@ -470,7 +485,7 @@ export default function AdminFinanceOperationsCenter({
         </section>
       )}
 
-      {(view === "finance_dashboard" || view === "merchant_statements" || view === "income" || view === "cod") && (
+      {(view === "finance_dashboard" || view === "income" || view === "cod") && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard label={isArabic ? "البضاعة الظاهرة" : "Visible goods"} value={money(settlementTotals.goods, isArabic)} hint={`${visibleRows.length} ${isArabic ? "صف" : "rows"}`} />
           <MetricCard label={isArabic ? "التوصيل الظاهر" : "Visible delivery"} value={money(settlementTotals.delivery, isArabic)} hint={isArabic ? "دخل الشركة" : "Company income"} />
@@ -480,7 +495,7 @@ export default function AdminFinanceOperationsCenter({
         </div>
       )}
 
-      <section className="overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#031226]">
+      {view !== "merchant_statements" && <section className="overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#031226]">
         <header className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-black text-brand-gold">{isArabic ? activeView.ar : activeView.en}</p>
@@ -554,7 +569,7 @@ export default function AdminFinanceOperationsCenter({
             </div>
           )}
         </div>
-      </section>
+      </section>}
 
       <footer className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-3">
         <div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-brand-gold" /><div><span className="text-[10px] font-black text-white/40">{isArabic ? "الفترة" : "Period"}</span><strong className="block text-xs text-white">{dateFrom} → {dateTo}</strong></div></div>
