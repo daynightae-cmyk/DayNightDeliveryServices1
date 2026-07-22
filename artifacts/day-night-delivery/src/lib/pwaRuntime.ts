@@ -4,6 +4,7 @@ declare global {
   interface Window {
     __DAY_NIGHT_PWA_RUNTIME__?: boolean;
     __DAY_NIGHT_SW_REGISTRATION__?: ServiceWorkerRegistration;
+    __DAY_NIGHT_NATIVE_ROLE__?: string;
   }
 
   interface Navigator {
@@ -20,6 +21,11 @@ function isNativeCapacitor() {
   if (!bridge) return false;
   if (typeof bridge.isNativePlatform === "function") return bridge.isNativePlatform();
   return Boolean(bridge.getPlatform?.());
+}
+
+function isNativeRoleShell() {
+  const role = document.documentElement.dataset.nativeShell || window.__DAY_NIGHT_NATIVE_ROLE__;
+  return role === "driver" || role === "merchant" || /DAYNIGHT\/\d+(?:\.\d+)*\s+(?:driver|merchant)/i.test(navigator.userAgent);
 }
 
 function isStandaloneDisplay() {
@@ -42,6 +48,22 @@ function applyRuntimeClasses() {
   root.dataset.dayNightBuild = DAY_NIGHT_BUILD_ID;
 }
 
+async function removeNativeRoleCaches() {
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations?.();
+    await Promise.all((registrations || []).map((registration) => registration.unregister()));
+  } catch {
+    // A missing/locked service-worker store must never block the live role app.
+  }
+
+  try {
+    const keys = await window.caches?.keys?.();
+    await Promise.all((keys || []).filter((key) => key.startsWith("day-night-")).map((key) => window.caches.delete(key)));
+  } catch {
+    // Cache cleanup is best-effort; the role navigation also carries a cache-bust.
+  }
+}
+
 function announceUpdate(registration: ServiceWorkerRegistration) {
   window.__DAY_NIGHT_SW_REGISTRATION__ = registration;
   window.dispatchEvent(
@@ -52,7 +74,7 @@ function announceUpdate(registration: ServiceWorkerRegistration) {
 }
 
 async function registerServiceWorker() {
-  if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isNativeCapacitor()) return;
+  if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isNativeCapacitor() || isNativeRoleShell()) return;
 
   try {
     const workerUrl = `/sw.js?v=${encodeURIComponent(DAY_NIGHT_BUILD_ID)}`;
@@ -94,6 +116,12 @@ export function initializeDayNightPwaRuntime() {
   window.__DAY_NIGHT_PWA_RUNTIME__ = true;
 
   applyRuntimeClasses();
+
+  if (isNativeRoleShell()) {
+    void removeNativeRoleCaches();
+    return;
+  }
+
   window.matchMedia?.("(display-mode: standalone)").addEventListener?.("change", applyRuntimeClasses);
 
   navigator.serviceWorker?.addEventListener("controllerchange", () => {
