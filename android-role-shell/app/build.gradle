@@ -21,7 +21,7 @@ android {
             resValue "string", "app_name", "DAY NIGHT Driver"
             resValue "string", "app_name_ar", "داي نايت للمندوب"
             buildConfigField "String", "ROLE", '"driver"'
-            buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver"'
+            buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver&nosplash=1"'
         }
         merchant {
             dimension "role"
@@ -29,7 +29,7 @@ android {
             resValue "string", "app_name", "DAY NIGHT Merchant"
             resValue "string", "app_name_ar", "داي نايت للتاجر"
             buildConfigField "String", "ROLE", '"merchant"'
-            buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant"'
+            buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant&nosplash=1"'
         }
     }
 
