@@ -23,9 +23,9 @@ concurrency:
 
 jobs:
   build-role-apps:
-    name: Build Driver and Merchant APK/AAB
+    name: Build, install, and verify Driver and Merchant apps
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 70
 
     steps:
       - name: Checkout repository
@@ -153,6 +153,36 @@ jobs:
 
           ls -lh android-role-shell/dist
 
+      - name: Enable KVM for Android emulator
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install and launch both APKs on Android 16
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -euo pipefail
+            adb install -r android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.apk | tee android-role-shell/driver-install.log
+            adb shell am start -W -n com.daynightae.driver/com.daynightae.shell.MainActivity | tee android-role-shell/driver-launch.log
+            grep -F "Status: ok" android-role-shell/driver-launch.log
+            adb shell dumpsys package com.daynightae.driver | grep -F "versionName=1.0.0" | tee -a android-role-shell/driver-launch.log
+            adb shell am force-stop com.daynightae.driver
+
+            adb install -r android-role-shell/dist/DAY-NIGHT-Merchant-v1.0.0.apk | tee android-role-shell/merchant-install.log
+            adb shell am start -W -n com.daynightae.merchant/com.daynightae.shell.MainActivity | tee android-role-shell/merchant-launch.log
+            grep -F "Status: ok" android-role-shell/merchant-launch.log
+            adb shell dumpsys package com.daynightae.merchant | grep -F "versionName=1.0.0" | tee -a android-role-shell/merchant-launch.log
+            adb shell am force-stop com.daynightae.merchant
+
       - name: Upload DAY NIGHT Driver builds
         uses: actions/upload-artifact@v4
         with:
@@ -162,6 +192,8 @@ jobs:
             android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.aab
             android-role-shell/dist/DAY-NIGHT-Driver-v1.0.0.sha256
             android-role-shell/dist/driver-badging.txt
+            android-role-shell/driver-install.log
+            android-role-shell/driver-launch.log
           if-no-files-found: error
           retention-days: 30
 
@@ -174,6 +206,8 @@ jobs:
             android-role-shell/dist/DAY-NIGHT-Merchant-v1.0.0.aab
             android-role-shell/dist/DAY-NIGHT-Merchant-v1.0.0.sha256
             android-role-shell/dist/merchant-badging.txt
+            android-role-shell/merchant-install.log
+            android-role-shell/merchant-launch.log
           if-no-files-found: error
           retention-days: 30
 
@@ -184,6 +218,8 @@ jobs:
           name: DAY-NIGHT-Android-Diagnostics
           path: |
             android-role-shell/*-build.log
+            android-role-shell/*-install.log
+            android-role-shell/*-launch.log
             android-role-shell/app/build/reports/
           if-no-files-found: warn
           retention-days: 14
