@@ -1,0 +1,66 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.daynightae.shell"
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    flavorDimensions += "role"
+    productFlavors {
+        driver {
+            dimension "role"
+            applicationId "com.daynightae.driver"
+            resValue "string", "app_name", "DAY NIGHT Driver"
+            resValue "string", "app_name_ar", "داي نايت للمندوب"
+            buildConfigField "String", "ROLE", '"driver"'
+            buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver"'
+        }
+        merchant {
+            dimension "role"
+            applicationId "com.daynightae.merchant"
+            resValue "string", "app_name", "DAY NIGHT Merchant"
+            resValue "string", "app_name_ar", "داي نايت للتاجر"
+            buildConfigField "String", "ROLE", '"merchant"'
+            buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant"'
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds true
+    }
+
+    packaging {
+        resources {
+            excludes += ["META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*"]
+        }
+    }
+}
