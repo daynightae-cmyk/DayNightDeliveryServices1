@@ -1,0 +1,245 @@
+/* DAY NIGHT — ADMIN UNIFIED SECTIONS V4
+   High-specificity production override. Keeps every operational section on the
+   same navy/gold visual system as the finance/adjustments center, including
+   when the toolbar theme is set to day. No business logic is changed. */
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen {
+  --dn-v4-bg: #061426;
+  --dn-v4-panel: #0a1d34;
+  --dn-v4-panel-2: #0d2743;
+  --dn-v4-panel-3: #12385d;
+  --dn-v4-line: rgba(99, 179, 237, 0.22);
+  --dn-v4-gold: #f5bd36;
+  --dn-v4-gold-soft: #ffe18a;
+  --dn-v4-text: #f8fafc;
+  --dn-v4-muted: #b9cbe0;
+}
+
+/* Never allow the legacy day stylesheet to wash out operational workspaces. */
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-admin-workspace-host,
+  .dn-admin-center-zone,
+  .dn-admin-core-full,
+  .dn-section-workspace
+) {
+  color: var(--dn-v4-text) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-admin-core-full {
+  border-color: var(--dn-v4-line) !important;
+  background:
+    radial-gradient(circle at 10% 0, rgba(49,149,247,.13), transparent 28rem),
+    radial-gradient(circle at 92% 100%, rgba(212,175,55,.10), transparent 24rem),
+    linear-gradient(145deg, #07172c, #0b2948) !important;
+  color: var(--dn-v4-text) !important;
+  box-shadow: 0 22px 58px rgba(0,0,0,.25) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-workspace {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  color: var(--dn-v4-text) !important;
+  background: transparent !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-hero,
+  .dn-section-kpis > article,
+  .dn-section-panels > article,
+  .dn-section-table-card
+) {
+  border: 1px solid var(--dn-v4-line) !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.025), transparent 42%),
+    linear-gradient(145deg, var(--dn-v4-panel), #07172c) !important;
+  color: var(--dn-v4-text) !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,.24) !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-hero {
+  border-color: rgba(212,175,55,.32) !important;
+  background:
+    radial-gradient(circle at 12% 0, rgba(49,149,247,.17), transparent 27rem),
+    radial-gradient(circle at 90% 100%, rgba(212,175,55,.13), transparent 24rem),
+    linear-gradient(145deg, #07172c, #0c2a4a) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-hero h1,
+  .dn-section-hero h2,
+  .dn-section-hero h3,
+  .dn-section-kpis strong,
+  .dn-section-kpis span,
+  .dn-section-panels h3,
+  .dn-section-table-card h3,
+  .dn-section-table-card td,
+  .dn-section-table-card td strong,
+  .dn-section-table-card td span
+) {
+  color: var(--dn-v4-text) !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-hero p,
+  .dn-section-hero span,
+  .dn-section-kpis small,
+  .dn-section-panels p,
+  .dn-section-panels label > span,
+  .dn-clean-note,
+  .dn-section-table-card td small
+) {
+  color: var(--dn-v4-muted) !important;
+  opacity: 1 !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-kpis > article {
+  min-height: 112px !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-kpis > article:hover,
+  .dn-section-panels > article:hover
+) {
+  border-color: rgba(212,175,55,.45) !important;
+  background: linear-gradient(145deg, var(--dn-v4-panel-3), #0a213b) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-form input,
+  .dn-section-form select,
+  .dn-section-form textarea,
+  .dn-section-panels input,
+  .dn-section-panels select,
+  .dn-section-panels textarea,
+  .dn-section-table-card input,
+  .dn-section-table-card select,
+  .dn-section-table-card textarea
+) {
+  border: 1px solid rgba(99,179,237,.38) !important;
+  background: var(--dn-v4-bg) !important;
+  color: var(--dn-v4-text) !important;
+  box-shadow: none !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-form input,
+  .dn-section-form textarea,
+  .dn-section-panels input,
+  .dn-section-panels textarea,
+  .dn-section-table-card input,
+  .dn-section-table-card textarea
+)::placeholder {
+  color: #8fa8c2 !important;
+  opacity: 1 !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-form option,
+  .dn-section-panels option,
+  .dn-section-table-card option
+) {
+  background: #07172c !important;
+  color: var(--dn-v4-text) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-hero-actions button,
+  .dn-section-panels button,
+  .dn-section-table-card button
+) {
+  border-color: rgba(255,255,255,.14) !important;
+  background: rgba(255,255,255,.07) !important;
+  color: var(--dn-v4-text) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen :is(
+  .dn-section-hero-actions button,
+  .dn-section-panels button,
+  .dn-section-table-card button
+):hover:not(:disabled) {
+  border-color: rgba(212,175,55,.62) !important;
+  background: linear-gradient(135deg, var(--dn-v4-gold), var(--dn-v4-gold-soft)) !important;
+  color: #07172c !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-card {
+  overflow: hidden !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap {
+  border: 1px solid var(--dn-v4-line) !important;
+  background: var(--dn-v4-bg) !important;
+  scrollbar-color: var(--dn-v4-gold) #07172c;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap :is(table, tbody) {
+  background: var(--dn-v4-bg) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap :is(thead, thead tr, th) {
+  background: #0b2948 !important;
+  color: var(--dn-v4-gold-soft) !important;
+  border-color: rgba(255,225,138,.2) !important;
+  opacity: 1 !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap tbody tr {
+  background: var(--dn-v4-panel) !important;
+  color: var(--dn-v4-text) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap tbody tr:nth-child(even) {
+  background: var(--dn-v4-panel-2) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap tbody tr:hover {
+  background: var(--dn-v4-panel-3) !important;
+  box-shadow: inset 4px 0 0 var(--dn-v4-gold) !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap :is(td, td strong, td span) {
+  background: transparent !important;
+  color: var(--dn-v4-text) !important;
+  border-color: rgba(148,197,239,.15) !important;
+  opacity: 1 !important;
+}
+
+html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-table-wrap td small {
+  color: var(--dn-v4-muted) !important;
+}
+
+/* Merchant intelligence remains dark and readable even in toolbar day mode. */
+html[data-dn-admin-theme="day"] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-admin-core-full :is(
+  .text-white,
+  .text-white\/70,
+  .text-white\/65,
+  .text-white\/55,
+  .text-white\/50
+) {
+  color: var(--dn-v4-text) !important;
+}
+
+html[data-dn-admin-theme="day"] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-admin-core-full :is(
+  .bg-white\/5,
+  .bg-white\/[0\.035],
+  .bg-white\/[0\.045]
+) {
+  background-color: rgba(255,255,255,.05) !important;
+}
+
+@media (max-width: 900px) {
+  html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-kpis {
+    grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .dn-section-kpis {
+    grid-template-columns: 1fr !important;
+  }
+}
