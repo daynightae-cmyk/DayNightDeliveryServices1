@@ -6,11 +6,11 @@ def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 
 android {
     namespace "com.daynightae.shell"
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode 1
         versionName "1.0.0"
     }
@@ -32,7 +32,6 @@ android {
             dimension "role"
             applicationId "com.daynightae.driver"
             resValue "string", "app_name", "DAY NIGHT Driver"
-            resValue "string", "app_name_ar", "داي نايت للمندوب"
             buildConfigField "String", "ROLE", '"driver"'
             buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver&nosplash=1"'
         }
@@ -40,7 +39,6 @@ android {
             dimension "role"
             applicationId "com.daynightae.merchant"
             resValue "string", "app_name", "DAY NIGHT Merchant"
-            resValue "string", "app_name_ar", "داي نايت للتاجر"
             buildConfigField "String", "ROLE", '"merchant"'
             buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant&nosplash=1"'
         }
