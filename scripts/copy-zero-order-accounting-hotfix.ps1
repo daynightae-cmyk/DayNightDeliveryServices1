@@ -7,7 +7,8 @@ $ErrorActionPreference = "Stop"
 $ResolvedRepo = (Resolve-Path -LiteralPath $RepoPath).Path
 $MigrationFiles = @(
     "supabase\migrations\20260722043000_zero_order_deferred_merchant_accounting_hotfix.sql",
-    "supabase\migrations\20260722044000_zero_order_delivery_mode_correction.sql"
+    "supabase\migrations\20260722044000_zero_order_delivery_mode_correction.sql",
+    "supabase\migrations\20260722054500_order_creation_enum_price25_final.sql"
 )
 
 $SqlParts = foreach ($RelativePath in $MigrationFiles) {
@@ -34,8 +35,8 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host ""
 Write-Host "1. Supabase SQL Editor is opening." -ForegroundColor Cyan
 Write-Host "2. Click inside the empty editor and press Ctrl+V." -ForegroundColor Cyan
-Write-Host "3. Press Run once. Both required migrations are included." -ForegroundColor Cyan
+Write-Host "3. Press Run once. All required migrations are included." -ForegroundColor Cyan
 Write-Host "4. Then run: select public.zero_order_accounting_hotfix_health();" -ForegroundColor Yellow
-Write-Host "5. The result must contain ok=true and default_merchant_delivery_fee=30." -ForegroundColor Yellow
+Write-Host "5. The result must contain ok=true and default_merchant_delivery_fee=25." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "No merchant, order, expense, driver, or fake row is created by this script." -ForegroundColor DarkGray

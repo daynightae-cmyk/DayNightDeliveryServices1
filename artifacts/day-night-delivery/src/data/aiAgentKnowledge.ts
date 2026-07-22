@@ -18,8 +18,8 @@ export const aiAgentKnowledge = {
     maps: companyMeta.mapUrl
   },
   prices: {
-    domesticMain: "Main UAE city routes: 30 AED per local order.",
-    domesticMainAr: "المناطق الرئيسية داخل الإمارات: 30 درهم للطلب المحلي الواحد.",
+    domesticMain: "Main UAE city routes: 25 AED per local order.",
+    domesticMainAr: "المناطق الرئيسية داخل الإمارات: 25 درهم للطلب المحلي الواحد.",
     domesticExtended: "Special UAE routes such as Al Ain and Western Region: 50 AED per local order.",
     domesticExtendedAr: "المسارات الخاصة داخل الإمارات مثل العين والمنطقة الغربية: 50 درهم للطلب المحلي الواحد.",
     alAin: "Al Ain: special UAE route — 50 AED per local order.",
@@ -99,8 +99,8 @@ export const chatKnowledgeEntries = [
   /* ─── Local pricing ─── */
   {
     keys: ["price", "pricing", "cost", "سعر", "أسعار", "تكلفة", "كم", "how much", "كلفة", "رسوم", "تعرفة", "fee", "charge", "rate"],
-    en: "UAE main routes (Abu Dhabi, Dubai, Sharjah, etc.): 30 AED per local order.\nSpecial UAE routes (Al Ain, Western Region): 50 AED per local order.\nExpress service: +15 AED when selected.\nCOD: separate from delivery fee.\n\nSee full calculator at /pricing",
-    ar: "المسارات الرئيسية داخل الإمارات (أبوظبي، دبي، الشارقة...): 30 درهم للطلب المحلي الواحد.\nالمسارات الخاصة (العين، المنطقة الغربية): 50 درهم للطلب المحلي الواحد.\nالخدمة السريعة: +15 درهم عند اختيارها.\nمبلغ COD: منفصل تماماً عن رسوم التوصيل.\n\nاحسب سعرك على /pricing"
+    en: "UAE main routes (Abu Dhabi, Dubai, Sharjah, etc.): 25 AED per local order.\nSpecial UAE routes (Al Ain, Western Region): 50 AED per local order.\nExpress service: +15 AED when selected.\nCOD: separate from delivery fee.\n\nSee full calculator at /pricing",
+    ar: "المسارات الرئيسية داخل الإمارات (أبوظبي، دبي، الشارقة...): 25 درهم للطلب المحلي الواحد.\nالمسارات الخاصة (العين، المنطقة الغربية): 50 درهم للطلب المحلي الواحد.\nالخدمة السريعة: +15 درهم عند اختيارها.\nمبلغ COD: منفصل تماماً عن رسوم التوصيل.\n\nاحسب سعرك على /pricing"
   },
 
   /* ─── Local order quantity ─── */

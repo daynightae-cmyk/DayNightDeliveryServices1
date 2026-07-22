@@ -34,7 +34,7 @@ export default function HomePremium({ onNavigate }: HomePremiumProps) {
 
   const stats = [
     { icon: Zap, value: "24/7", title: isArabic ? "خدمة على مدار الساعة" : "Around the clock", body: isArabic ? "طوال أيام الأسبوع" : "Every day of the week" },
-    { icon: Calculator, value: "30 AED", title: isArabic ? "سعر الطلبيات المحلية" : "Local order pricing", body: isArabic ? "تسعير واضح ومباشر" : "Clear and direct pricing" },
+    { icon: Calculator, value: "25 AED", title: isArabic ? "سعر الطلبيات المحلية" : "Local order pricing", body: isArabic ? "تسعير واضح ومباشر" : "Clear and direct pricing" },
     { icon: MapPin, value: "7+", title: isArabic ? "إمارات مغطاة" : "Emirates covered", body: isArabic ? "تغطية شاملة" : "Full UAE coverage" },
     { icon: ShieldCheck, value: "100%", title: isArabic ? "أمان وثقة" : "Safe and trusted", body: isArabic ? "فريق محترف" : "Professional team" },
   ];

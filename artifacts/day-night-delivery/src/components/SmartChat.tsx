@@ -39,8 +39,8 @@ function localQuote(input: string, isArabic: boolean) {
   if (!hasAny(input, ["local", "uae", "delivery", "order", "price", "cost", "سعر", "محلي", "توصيل", "طلب", "طلبات", "الإمارات", "الامارات", "داخل دبي", "أبوظبي"])) return null;
   const unit = isSpecialRoute(input) ? SPECIAL_ROUTE_PRICE : CITY_ROUTE_PRICE;
   return isArabic
-    ? `تقدير DAY NIGHT داخل الإمارات للطلبية الواحدة: ${unit} درهم.\n\nالمناطق الرئيسية: 30 درهم للطلبية.\nالمناطق الممتدة: 50 درهم للطلبية.\n\nكل أوردر محلي يمثل طلبية واحدة، ويمكنك إنشاء الطلب من صفحة اطلب توصيل أو فتح صفحة الأسعار.`
-    : `DAY NIGHT UAE estimate for one local order: ${unit} AED.\n\nMain areas: 30 AED per order.\nExtended areas: 50 AED per order.\n\nEach local order is calculated as one delivery request. You can create it from Request Delivery or open Pricing.`;
+    ? `تقدير DAY NIGHT داخل الإمارات للطلبية الواحدة: ${unit} درهم.\n\nالمناطق الرئيسية: 25 درهم للطلبية.\nالمناطق الممتدة: 50 درهم للطلبية.\n\nكل أوردر محلي يمثل طلبية واحدة، ويمكنك إنشاء الطلب من صفحة اطلب توصيل أو فتح صفحة الأسعار.`
+    : `DAY NIGHT UAE estimate for one local order: ${unit} AED.\n\nMain areas: 25 AED per order.\nExtended areas: 50 AED per order.\n\nEach local order is calculated as one delivery request. You can create it from Request Delivery or open Pricing.`;
 }
 
 function internationalQuote(input: string, isArabic: boolean) {

@@ -53,6 +53,25 @@ expect(adminData, /admin_create_coupon_order/, "Order creation uses the protecte
 expect(adminData, /from\(["']orders["']\)[\s\S]*insert/, "Order creation has a real database write fallback");
 expect(adminData, /merchant_id:/, "Orders persist the merchant relationship");
 
+const financialAdminOrder = read("src/components/admin/AdminNewOrderComplete.tsx");
+expect(financialAdminOrder, /setPaymentMethod/, "Financial order form synchronizes payment and fee treatment");
+expect(financialAdminOrder, /deduct_from_merchant/, "Merchant-paid selection deducts delivery from merchant");
+expect(financialAdminOrder, /placeholder="25\.00"/, "Manual delivery field presents the official 25 AED fee");
+
+const financialOperations = read("src/lib/orderFinancialOperations.ts");
+expect(financialOperations, /effectiveDeliveryFeeMode/, "Financial payload enforces merchant-paid delivery mode below the UI");
+expect(financialOperations, /paymentMethod === "merchant_pays"/, "Merchant-paid payload cannot silently become customer-paid");
+
+const pricingData = read("src/data/pricingData.ts");
+expect(pricingData, /base:\s*25/, "Official main-route price is 25 AED");
+
+const orderHotfix = read("../../supabase/migrations/20260722054500_order_creation_enum_price25_final.sql");
+expect(orderHotfix, /to_jsonb\(new\)/, "Order lifecycle trigger reads ENUM status safely through JSON");
+expect(orderHotfix, /status::text/, "Database status comparisons cast ENUM values to text");
+expect(orderHotfix, /default 25/, "Zero-value merchant close defaults to 25 AED");
+expect(orderHotfix, /admin_dispatch_order_runtime/, "Hotfix health covers admin-to-driver dispatch");
+expect(orderHotfix, /driver_update_order_status/, "Hotfix health covers driver receipt and status updates");
+
 const driverLogin = read("src/components/driver/DriverLogin.tsx");
 expect(driverLogin, /signInWithPassword/, "Driver login uses Supabase authentication");
 expect(driverLogin, /type=[{]showPassword \? ["']text["'] : ["']password["'][}]/, "Driver login includes a real password input");

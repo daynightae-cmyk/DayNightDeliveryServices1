@@ -316,10 +316,10 @@ The platform supports UAE domestic and international pricing logic.
 
 ### UAE Domestic
 
-| Type            |   Base |   VAT 5% |     Total |
-| --------------- | -----: | -------: | --------: |
-| Main UAE Cities | 30 AED | 1.50 AED | 31.50 AED |
-| Extended Areas  | 50 AED | 2.50 AED | 52.50 AED |
+| Type            | Final public price |
+| --------------- | -----------------: |
+| Main UAE Cities |             25 AED |
+| Extended Areas  |             50 AED |
 
 ### GCC
 

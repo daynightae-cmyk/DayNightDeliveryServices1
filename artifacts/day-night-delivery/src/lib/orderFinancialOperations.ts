@@ -43,6 +43,14 @@ function normalizePaymentMethod(value: unknown) {
   return "cod";
 }
 
+function effectiveDeliveryFeeMode(input: FinancialOpsOrderInput): DeliveryFeeMode {
+  const paymentMethod = clean(input.payment_method).toLowerCase();
+  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") {
+    return "deduct_from_merchant";
+  }
+  return normalizeDeliveryFeeMode(input.delivery_fee_mode);
+}
+
 function operationError(error: unknown, fallback: string) {
   const detail = opsErrorDetail(error);
   const wrapped = new Error(detail || fallback) as Error & { dbDetail?: string };
@@ -55,11 +63,12 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
   priceSource: "system" | "manual";
 } {
   const pricing = calculateOpsOrderPrice(input);
+  const deliveryFeeMode = effectiveDeliveryFeeMode(input);
   const validation = orderFinancialValidation({
     goodsValue: input.goods_value,
     deliveryFee: pricing.total,
     discountAmount: input.discount_amount,
-    deliveryFeeMode: input.delivery_fee_mode,
+    deliveryFeeMode,
   });
   if (validation) throw new Error(validation);
 
@@ -68,7 +77,7 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
       goodsValue: input.goods_value,
       deliveryFee: pricing.total,
       discountAmount: input.discount_amount,
-      deliveryFeeMode: input.delivery_fee_mode,
+      deliveryFeeMode,
     }),
     systemDeliveryFee: pricing.systemTotal,
     priceSource: pricing.priceSource,
@@ -269,7 +278,7 @@ export async function updateFinancialOpsOrder(
         goods_value: financials.goodsValue,
         delivery_fee: financials.deliveryFee,
         discount_amount: financials.discountAmount,
-        delivery_fee_mode: normalizeDeliveryFeeMode(input.delivery_fee_mode),
+        delivery_fee_mode: financials.deliveryFeeMode,
       },
       reason: clean(input.edit_reason) || "Updated from admin financial order editor",
     },

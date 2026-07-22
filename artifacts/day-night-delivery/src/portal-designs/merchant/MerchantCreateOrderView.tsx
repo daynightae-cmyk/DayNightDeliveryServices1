@@ -60,6 +60,18 @@ export function MerchantCreateOrderView({ merchant, branches, callbacks, isArabi
     if (["pickupCity", "deliveryCity", "weight", "serviceType", "deliveryFeeMode"].includes(key)) setPricing(null);
   }
 
+  function updatePaymentMethod(paymentMethod: string) {
+    setDraft((current) => ({
+      ...current,
+      paymentMethod,
+      deliveryFeeMode:
+        paymentMethod === "sender_pays"
+          ? "deduct_from_merchant"
+          : "customer_pays",
+    }));
+    setPricing(null);
+  }
+
   const validation = useMemo(() => {
     if (step === "pickup") {
       if (!draft.senderName?.trim() || !draft.senderPhone?.trim() || !draft.pickupAddress?.trim() || !draft.pickupCity?.trim()) return isArabic ? "أكمل اسم المرسل والهاتف ومدينة وعنوان الاستلام." : "Complete sender name, phone, pickup city, and pickup address.";
@@ -203,7 +215,7 @@ export function MerchantCreateOrderView({ merchant, branches, callbacks, isArabi
         <MerchantCard><header className="dn-merchant-card-header"><div><span>04</span><h3>{isArabic ? "الخدمة وطريقة الدفع" : "Service and payment"}</h3></div></header><div className="dn-merchant-choice-grid">
           {[{ value: "standard", ar: "توصيل عادي", en: "Standard delivery" }, { value: "express", ar: "توصيل سريع", en: "Express delivery" }, { value: "scheduled", ar: "موعد مجدول", en: "Scheduled delivery" }, { value: "international", ar: "شحن دولي", en: "International shipping" }].map((item) => <button type="button" key={item.value} className={draft.serviceType === item.value ? "is-selected" : ""} onClick={() => update("serviceType", item.value)}><ShieldCheck className="h-5 w-5" /><strong>{isArabic ? item.ar : item.en}</strong></button>)}
         </div><div className="dn-merchant-form-grid">
-          <MerchantField label={isArabic ? "طريقة الدفع" : "Payment method"} required><select value={draft.paymentMethod || "sender_pays"} onChange={(event) => update("paymentMethod", event.target.value)}><option value="sender_pays">{isArabic ? "المرسل يدفع" : "Sender pays"}</option><option value="receiver_pays">{isArabic ? "المستلم يدفع الرسوم" : "Receiver pays fee"}</option><option value="cod">COD</option><option value="prepaid">{isArabic ? "مدفوع مسبقاً" : "Prepaid"}</option></select></MerchantField>
+          <MerchantField label={isArabic ? "طريقة الدفع" : "Payment method"} required><select value={draft.paymentMethod || "sender_pays"} onChange={(event) => updatePaymentMethod(event.target.value)}><option value="sender_pays">{isArabic ? "على حساب التاجر — تخصم رسوم التوصيل تلقائياً" : "Merchant account — deduct delivery automatically"}</option><option value="receiver_pays">{isArabic ? "المستلم يدفع الرسوم" : "Receiver pays fee"}</option><option value="cod">COD</option><option value="prepaid">{isArabic ? "مدفوع مسبقاً" : "Prepaid"}</option></select></MerchantField>
           <MerchantField label={isArabic ? "معالجة رسوم التوصيل" : "Delivery-fee treatment"}><select value={draft.deliveryFeeMode || "sender_pays"} onChange={(event) => update("deliveryFeeMode", event.target.value)}><option value="sender_pays">{isArabic ? "تُدفع من التاجر" : "Merchant pays"}</option><option value="receiver_pays">{isArabic ? "يدفعها المستلم" : "Receiver pays"}</option><option value="deduct_from_merchant">{isArabic ? "تُخصم من مستحق التاجر" : "Deduct from merchant due"}</option></select></MerchantField>
           {draft.paymentMethod === "cod" ? <MerchantField label="COD (AED)" required><input type="number" min="0" step="0.01" value={draft.codAmount ?? ""} onChange={(event) => update("codAmount", Number(event.target.value) || 0)} dir="ltr" /></MerchantField> : null}
         </div></MerchantCard>
