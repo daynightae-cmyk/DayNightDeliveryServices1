@@ -19,28 +19,48 @@
 
     <script>
       (function () {
+        var LANGUAGE_KEY = "dn_lang_preference";
+        var params = new URLSearchParams(window.location.search || "");
+        var normalizeLanguage = function (value) {
+          value = String(value || "").trim().toLowerCase();
+          if (value === "ar" || value.indexOf("ar-") === 0) return "ar";
+          if (value === "en" || value.indexOf("en-") === 0) return "en";
+          return null;
+        };
+
+        var savedLanguage = null;
+        try { savedLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_KEY)); } catch (_) {}
+        var queryLanguage = normalizeLanguage(params.get("lang"));
+        var browserLanguages = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+        var browserLanguage = null;
+        for (var languageIndex = 0; languageIndex < browserLanguages.length; languageIndex += 1) {
+          browserLanguage = normalizeLanguage(browserLanguages[languageIndex]);
+          if (browserLanguage) break;
+        }
+        var language = savedLanguage || queryLanguage || browserLanguage || "ar";
+        document.documentElement.lang = language;
+        document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+        document.documentElement.setAttribute("data-language", language);
+        document.documentElement.classList.add(language === "ar" ? "dn-language-ar" : "dn-language-en");
+
         var path = window.location.pathname || "/";
         var roleMatch = path.match(/^\/(merchant|driver)(?:\/|$)/);
         if (!roleMatch) return;
 
         var routeRole = roleMatch[1];
         document.documentElement.setAttribute("data-portal-route", "true");
-
-        var params = new URLSearchParams(window.location.search || "");
         var nativeRole = params.get("nativeShell");
         if (nativeRole !== routeRole) return;
 
         document.documentElement.setAttribute("data-native-shell", nativeRole);
         window.__DAY_NIGHT_NATIVE_ROLE__ = nativeRole;
 
-        /* APK v1.0.0 injected an over-broad `main` rule after page load. Keep
-           the same style id but force it back to selectors that only touch the
-           public application shell. This repairs already-installed APKs as soon
-           as the hosted web build updates, while v1.0.1 no longer injects the
-           destructive rule at all. */
+        /* Neutralize the destructive CSS injected by the first APK release.
+           Only the direct public-site shell may be reset; nested dashboard main
+           elements are never selected. */
         var safeNativeCss = [
           "html,body,#root{width:100%!important;min-height:100%!important;min-height:100dvh!important;overflow-x:hidden!important}",
-          "html,body{margin:0!important;padding:0!important;overscroll-behavior-y:none!important;-webkit-text-size-adjust:100%}",
+          "html,body{margin:0!important;padding:0!important;-webkit-text-size-adjust:100%}",
           "#root>div{width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;justify-content:flex-start!important}",
           ".dn-official-shell-frame{display:none!important}",
           "#root>div>[aria-hidden=\"true\"]{display:none!important}",
@@ -60,9 +80,7 @@
             style.id = "dn-native-shell-style";
             document.head.appendChild(style);
           }
-          if (style.textContent !== safeNativeCss) {
-            style.textContent = safeNativeCss;
-          }
+          if (style.textContent !== safeNativeCss) style.textContent = safeNativeCss;
           applying = false;
         }
 
@@ -73,6 +91,43 @@
         document.addEventListener("DOMContentLoaded", enforceSafeNativeStyle, { once: true });
       })();
     </script>
+
+    <style>
+      html[data-native-shell] { background:#071a33; }
+      html[data-native-shell] body { margin:0; min-height:100dvh; background:#071a33; }
+      #dn-role-boot { display:none; }
+      html[data-native-shell] #dn-role-boot {
+        position:fixed; z-index:2147483646; inset:0; display:grid; place-items:center;
+        padding:calc(28px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
+        overflow:hidden; color:#fff; text-align:center;
+        background:radial-gradient(circle at 18% 10%,rgba(49,149,247,.3),transparent 34%),radial-gradient(circle at 86% 92%,rgba(212,175,55,.2),transparent 34%),linear-gradient(145deg,#020b18,#071a33 54%,#0b4db2);
+        opacity:1; visibility:visible; transition:opacity .42s ease,visibility .42s ease;
+      }
+      html[data-native-shell] #dn-role-boot::before,
+      html[data-native-shell] #dn-role-boot::after {
+        content:""; position:absolute; border:1px solid rgba(255,255,255,.09); border-radius:50%; pointer-events:none;
+      }
+      html[data-native-shell] #dn-role-boot::before { width:420px;height:420px;top:-240px;inset-inline-end:-170px;box-shadow:0 0 0 55px rgba(255,255,255,.025),0 0 0 110px rgba(255,255,255,.018); }
+      html[data-native-shell] #dn-role-boot::after { width:310px;height:310px;bottom:-200px;inset-inline-start:-130px;box-shadow:0 0 0 42px rgba(212,175,55,.025); }
+      #dn-role-boot.is-complete { opacity:0; visibility:hidden; pointer-events:none; }
+      .dn-role-boot-card { position:relative;z-index:2;display:grid;justify-items:center;width:min(100%,440px); }
+      .dn-role-boot-logo-wrap { position:relative;display:grid;place-items:center;width:128px;height:128px;margin-bottom:24px;border:1px solid rgba(212,175,55,.55);border-radius:38px;background:rgba(255,255,255,.08);box-shadow:0 28px 75px rgba(0,0,0,.34),inset 0 0 38px rgba(255,255,255,.05);animation:dnBootFloat 2.2s ease-in-out infinite; }
+      .dn-role-boot-logo-wrap::after { content:"";position:absolute;inset:-9px;border:1px solid rgba(49,149,247,.25);border-radius:45px;animation:dnBootPulse 1.8s ease-out infinite; }
+      .dn-role-boot-logo { width:104px;height:104px;object-fit:contain;border-radius:28px; }
+      .dn-role-boot-fallback { display:none;place-items:center;width:92px;height:92px;border:3px solid #d4af37;border-radius:28px;color:#d4af37;font:900 30px/1 Inter,sans-serif; }
+      .dn-role-boot-eyebrow { color:#f0d875;font:800 11px/1.4 Inter,Cairo,sans-serif;letter-spacing:.18em;text-transform:uppercase; }
+      .dn-role-boot-title { margin:9px 0 7px;font:900 clamp(27px,7vw,38px)/1.25 Cairo,Poppins,sans-serif; }
+      .dn-role-boot-subtitle { margin:0;color:#c4d4e8;font:700 14px/1.7 Cairo,Inter,sans-serif; }
+      .dn-role-boot-progress { width:min(250px,70vw);height:4px;margin-top:28px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.12); }
+      .dn-role-boot-progress i { display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#3195f7,#fff3a0,#d4af37);animation:dnBootProgress 1.35s ease-in-out infinite; }
+      .dn-role-boot-status { margin-top:12px;color:#91a8c3;font:700 10px/1.5 Cairo,Inter,sans-serif; }
+      @keyframes dnBootFloat { 0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-7px) scale(1.015)} }
+      @keyframes dnBootPulse { from{opacity:.75;transform:scale(.94)}to{opacity:0;transform:scale(1.14)} }
+      @keyframes dnBootProgress { 0%{transform:translateX(-130%)}50%{transform:translateX(70%)}100%{transform:translateX(245%)} }
+      [dir="rtl"] .dn-role-boot-progress i { animation-name:dnBootProgressRtl; }
+      @keyframes dnBootProgressRtl { 0%{transform:translateX(130%)}50%{transform:translateX(-70%)}100%{transform:translateX(-245%)} }
+      @media(prefers-reduced-motion:reduce){.dn-role-boot-logo-wrap,.dn-role-boot-logo-wrap::after,.dn-role-boot-progress i{animation:none}}
+    </style>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -87,20 +142,17 @@
     <meta property="og:image:height" content="800" />
     <meta property="og:image:alt" content="DAY NIGHT DELIVERY SERVICES official logo" />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://daynightae.com/" />
     <meta name="twitter:title" content="DAY NIGHT DELIVERY SERVICES | توصيل داخل الإمارات وشحن دولي" />
     <meta name="twitter:description" content="داي نايت لخدمات التوصيل والشحن تقدم حلول غاية في السرعة والتكامل اللوجستي والتسليم على مدار الساعة." />
     <meta name="twitter:image" content="https://daynightae.com/logo-daynight.png" />
 
-    <!-- App identity and PWA -->
     <link rel="icon" type="image/png" href="/logo-daynight.png" />
     <link rel="apple-touch-icon" sizes="800x800" href="/logo-daynight.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" href="/assets/daynight/logo.png" as="image" type="image/png" />
 
-    <!-- Google Fonts: Cairo (Arabic) + Inter/Poppins (English) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -119,24 +171,10 @@
         "logo": "https://daynightae.com/logo-daynight.png",
         "email": "Admin@daynightae.com",
         "telephone": "+971568757331",
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "Mussafah 40",
-          "addressLocality": "Abu Dhabi",
-          "addressCountry": "AE"
-        },
-        "areaServed": {
-          "@type": "Country",
-          "name": "United Arab Emirates"
-        },
+        "address": { "@type": "PostalAddress", "streetAddress": "Mussafah 40", "addressLocality": "Abu Dhabi", "addressCountry": "AE" },
+        "areaServed": { "@type": "Country", "name": "United Arab Emirates" },
         "availableLanguage": ["Arabic", "English"],
-        "contactPoint": {
-          "@type": "ContactPoint",
-          "telephone": "+971568757331",
-          "contactType": "customer service",
-          "availableLanguage": ["Arabic", "English"],
-          "areaServed": "AE"
-        },
+        "contactPoint": { "@type": "ContactPoint", "telephone": "+971568757331", "contactType": "customer service", "availableLanguage": ["Arabic", "English"], "areaServed": "AE" },
         "sameAs": [
           "https://www.instagram.com/day_night_delivery_services",
           "https://www.tiktok.com/@daynight4767",
@@ -146,6 +184,69 @@
     </script>
   </head>
   <body>
+    <div id="dn-role-boot" aria-live="polite" aria-label="DAY NIGHT loading">
+      <div class="dn-role-boot-card">
+        <div class="dn-role-boot-logo-wrap">
+          <img class="dn-role-boot-logo" alt="DAY NIGHT" />
+          <span class="dn-role-boot-fallback">DN</span>
+        </div>
+        <span class="dn-role-boot-eyebrow">DAY NIGHT DELIVERY SERVICES</span>
+        <h1 class="dn-role-boot-title"></h1>
+        <p class="dn-role-boot-subtitle"></p>
+        <div class="dn-role-boot-progress"><i></i></div>
+        <small class="dn-role-boot-status"></small>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var role = document.documentElement.getAttribute("data-native-shell");
+        if (role !== "driver" && role !== "merchant") return;
+        var language = document.documentElement.getAttribute("data-language") === "ar" ? "ar" : "en";
+        var boot = document.getElementById("dn-role-boot");
+        var logo = boot.querySelector(".dn-role-boot-logo");
+        var fallback = boot.querySelector(".dn-role-boot-fallback");
+        var title = boot.querySelector(".dn-role-boot-title");
+        var subtitle = boot.querySelector(".dn-role-boot-subtitle");
+        var status = boot.querySelector(".dn-role-boot-status");
+        var content = {
+          driver: {
+            ar:["داي نايت للمندوب","المهام والملاحة المباشرة","جاري تجهيز مساحة العمل الآمنة"],
+            en:["DAY NIGHT Driver","Live missions and navigation","Preparing your secure workspace"],
+            icon:"https://i.postimg.cc/htdnDjJv/cropped-circle-image-(1).png"
+          },
+          merchant: {
+            ar:["داي نايت للتاجر","مركز إدارة الطلبات والأعمال","جاري تجهيز مساحة العمل الآمنة"],
+            en:["DAY NIGHT Merchant","Orders and business control center","Preparing your secure workspace"],
+            icon:"https://i.postimg.cc/RC29jKht/cropped-circle-image.png"
+          }
+        }[role];
+        var copy = content[language];
+        title.textContent = copy[0];
+        subtitle.textContent = copy[1];
+        status.textContent = copy[2];
+        logo.src = content.icon;
+        logo.onerror = function () { logo.style.display="none"; fallback.style.display="grid"; };
+
+        var readySelectors = role === "driver"
+          ? ".dn-driver-login-page,.dn-driver-exact-shell,.dn-driver-state-card"
+          : ".dn-merchant-login-v3,.dn-merchant-app,.dn-merchant-state-v3";
+        var startedAt = Date.now();
+        function finishWhenReady() {
+          if (document.querySelector(readySelectors) && Date.now() - startedAt > 650) {
+            boot.classList.add("is-complete");
+            window.setTimeout(function(){ boot.remove(); }, 520);
+            return;
+          }
+          if (Date.now() - startedAt > 12000) {
+            boot.classList.add("is-complete");
+            window.setTimeout(function(){ boot.remove(); }, 520);
+            return;
+          }
+          window.requestAnimationFrame(finishWhenReady);
+        }
+        window.requestAnimationFrame(finishWhenReady);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
