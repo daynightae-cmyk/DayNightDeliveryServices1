@@ -6,6 +6,11 @@ def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
 def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
 
+// Immutable production contracts verified by CI:
+// /driver?nativeShell=driver&nosplash=1
+// /merchant?nativeShell=merchant&nosplash=1
+// DAYNIGHT_ROLE_WEB_BASE_URL is accepted only at build time for isolated debug
+// visual acceptance; normal APK/AAB outputs always use the official HTTPS host.
 def roleStartUrl = { String role ->
     def separator = roleVisualQuery ? "&" : ""
     return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1${separator}${roleVisualQuery}"
