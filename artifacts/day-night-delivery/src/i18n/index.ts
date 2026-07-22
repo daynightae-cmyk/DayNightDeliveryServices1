@@ -1,6 +1,7 @@
 export type Lang = "ar" | "en";
 
 export const LANGUAGE_STORAGE_KEY = "dn_lang_preference";
+export const LANGUAGE_EXPLICIT_KEY = "dn_lang_explicit_v2";
 
 export const roleMessages = {
   ar: {
@@ -54,6 +55,7 @@ export function detectBrowserLanguage(): Lang {
 
 export function getSavedLanguage(): Lang | null {
   try {
+    if (localStorage.getItem(LANGUAGE_EXPLICIT_KEY) !== "1") return null;
     return normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY));
   } catch {
     return null;
@@ -90,6 +92,7 @@ export function applyLanguageToDocument(lang: Lang) {
 export function saveLanguage(lang: Lang) {
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    localStorage.setItem(LANGUAGE_EXPLICIT_KEY, "1");
   } catch {
     // Storage may be restricted; the current session still keeps its language.
   }
