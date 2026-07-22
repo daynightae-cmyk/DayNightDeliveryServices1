@@ -31,14 +31,12 @@ android {
         driver {
             dimension "role"
             applicationId "com.daynightae.driver"
-            resValue "string", "app_name", "DAY NIGHT Driver"
             buildConfigField "String", "ROLE", '"driver"'
             buildConfigField "String", "START_URL", '"https://www.daynightae.com/driver?nativeShell=driver&nosplash=1"'
         }
         merchant {
             dimension "role"
             applicationId "com.daynightae.merchant"
-            resValue "string", "app_name", "DAY NIGHT Merchant"
             buildConfigField "String", "ROLE", '"merchant"'
             buildConfigField "String", "START_URL", '"https://www.daynightae.com/merchant?nativeShell=merchant&nosplash=1"'
         }
