@@ -1,0 +1,45 @@
+/* DAY NIGHT desktop pointer performance contract.
+   Uses the operating-system cursor to avoid global pointermove work and a
+   permanent animation frame loop on administration and operations screens. */
+
+.dn-cursor-ring,
+.dn-cursor-dot {
+  display: none !important;
+}
+
+html,
+body {
+  cursor: default !important;
+}
+
+:where(a, button, [role="button"], summary, label[for], input[type="button"], input[type="submit"], input[type="reset"], [data-cursor="interactive"]) {
+  cursor: pointer !important;
+}
+
+:where(input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]) {
+  cursor: text !important;
+}
+
+:where(select, input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  cursor: pointer !important;
+}
+
+:where(button, input, select, textarea, [role="button"]):disabled,
+:where([aria-disabled="true"]) {
+  cursor: not-allowed !important;
+}
+
+html.dn-custom-cursor-enabled body,
+html.dn-custom-cursor-enabled a,
+html.dn-custom-cursor-enabled button,
+html.dn-custom-cursor-enabled [role="button"] {
+  cursor: revert !important;
+}
+
+@media (pointer: coarse) {
+  html,
+  body,
+  :where(a, button, input, textarea, select, [role="button"]) {
+    cursor: auto !important;
+  }
+}
