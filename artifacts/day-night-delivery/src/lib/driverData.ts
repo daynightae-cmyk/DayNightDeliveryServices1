@@ -23,6 +23,20 @@ function messageOf(error: unknown) {
   return String(error || "Unknown driver operation error");
 }
 
+function databaseOperationError(operation: string, error: unknown) {
+  const value = (typeof error === "object" && error ? error : {}) as Record<string, unknown>;
+  const details = [value.code, value.message, value.details, value.hint]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join(" | ");
+  return new Error(`${operation}: ${details || messageOf(error)}`);
+}
+
+function missingRpc(error: unknown, functionName: string) {
+  const raw = messageOf(error);
+  return /PGRST202|schema cache|could not find the function/i.test(raw) && raw.toLowerCase().includes(functionName.toLowerCase());
+}
+
 function extensionFor(file: File) {
   if (file.type === "image/png") return "png";
   if (file.type === "image/webp") return "webp";
@@ -141,12 +155,24 @@ export async function setDriverPresence(online: boolean, shiftStatus: string, no
 export async function updateDriverOrderStatus(orderId: string, status: string, note?: string) {
   const client = requireClient();
   const canonicalStatus = String(status || "").trim().toLowerCase() === "accepted" ? "confirmed" : status;
+
+  if (String(canonicalStatus || "").trim().toLowerCase() === "confirmed") {
+    const mission = await client.rpc("driver_start_mission", {
+      p_order_id: orderId,
+      p_note: note || null,
+    });
+    if (!mission.error) return mission.data;
+    if (!missingRpc(mission.error, "driver_start_mission")) {
+      throw databaseOperationError("DN-START-MISSION", mission.error);
+    }
+  }
+
   const { error } = await client.rpc("driver_update_order_status", {
     p_order_id: orderId,
     p_status: canonicalStatus,
     p_note: note || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw databaseOperationError("DN-DRIVER-STATUS", error);
 }
 
 export type DriverOwnProfileInput = {
@@ -302,6 +328,14 @@ export function dispatchErrorMessage(error: unknown, isArabic: boolean) {
 
 export function driverErrorMessage(error: unknown, isArabic: boolean) {
   const raw = messageOf(error);
+  if (/PGRST202|driver_start_mission|driver_start_status_enum_missing|column .*status.*order_status.*text|operator does not exist.*order_status/i.test(raw)) {
+    return isArabic
+      ? "تحديث تشغيل مهمة المندوب غير مُفعّل في قاعدة البيانات. شغّل ملف DRIVER MISSION الصحيح ثم أعد المحاولة. رمز: DN-DB-START"
+      : "The driver mission database repair is not active. Run the correct DRIVER MISSION SQL, then retry. Code: DN-DB-START";
+  }
+  if (/mission_start_invalid_from_status/i.test(raw)) {
+    return isArabic ? "لا يمكن بدء المهمة من حالتها الحالية. حدّث الطلبية ثم راجع الإسناد. رمز: DN-START-STATE" : "This mission cannot start from its current status. Refresh the order and review its assignment. Code: DN-START-STATE";
+  }
   if (/invalid input value for enum.*accepted|unsupported_driver_status/i.test(raw)) {
     return isArabic
       ? "تعذر بدء المهمة بسبب حالة قديمة للطلب. حدّث الصفحة ثم ابدأ المهمة مرة أخرى."
@@ -333,5 +367,8 @@ export function driverErrorMessage(error: unknown, isArabic: boolean) {
       ? "تعذر تحديث البيانات حالياً. أعد المحاولة أو تواصل مع الدعم."
       : "We could not refresh the data right now. Please retry or contact support.";
   }
-  return isArabic ? "تعذر إكمال الطلب حالياً. أعد المحاولة." : "The request could not be completed right now. Please retry.";
+  const diagnostic = raw.replace(/\s+/g, " ").slice(0, 180);
+  return isArabic
+    ? `تعذر إكمال الطلب حالياً. رمز التشخيص: ${diagnostic || "DN-UNKNOWN"}`
+    : `The request could not be completed. Diagnostic: ${diagnostic || "DN-UNKNOWN"}`;
 }
