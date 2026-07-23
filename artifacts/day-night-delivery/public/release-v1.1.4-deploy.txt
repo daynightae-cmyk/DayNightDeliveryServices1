@@ -1,0 +1,4 @@
+DAY NIGHT Android role applications v1.1.4
+Production deployment trigger: 2026-07-23T09:45:00Z
+Driver runtime: isolated BrowserRouter + real Supabase auth, no injected credential bridge.
+Merchant branding: official local DAY NIGHT logo restored.
