@@ -11,6 +11,9 @@ const requireFile = (relative) => {
 const requireText = (content, needle, file) => {
   if (!content.includes(needle)) throw new Error(`${file} is missing required contract: ${needle}`);
 };
+const rejectText = (content, needle, file) => {
+  if (content.includes(needle)) throw new Error(`${file} contains forbidden contract: ${needle}`);
+};
 
 const company = requireFile("src/config/companyContact.ts");
 for (const value of [
@@ -69,6 +72,23 @@ for (const value of [
   "أوافق على عرض تقييمي",
 ]) requireText(feedback, value, "FeedbackPage.tsx");
 
+const customerService = requireFile("src/services/customerExperienceService.ts");
+for (const value of [
+  "setFeedbackReview",
+  "convertFeedbackToComplaint",
+  "suspendDriverForComplaint",
+  "loadDriverFeedbackSummary",
+  "orderHistory",
+  "contactAttempts",
+]) requireText(customerService, value, "customerExperienceService.ts");
+const publicContextType = customerService.slice(
+  customerService.indexOf("export type FeedbackContext"),
+  customerService.indexOf("export type FeedbackSubmission"),
+);
+for (const forbidden of ["order_id", "customer_id", "merchant_id", "driver_id"]) {
+  rejectText(publicContextType, forbidden, "FeedbackContext public type");
+}
+
 const admin = requireFile("src/components/admin/AdminCustomerExperiencePage.tsx");
 for (const value of [
   'id: "overview"',
@@ -83,10 +103,21 @@ for (const value of [
   "merchant_orders_today",
 ]) requireText(admin, value, "AdminCustomerExperiencePage.tsx");
 
+const adminActions = requireFile("src/components/admin/AdminCustomerExperienceActions.tsx");
+for (const value of [
+  "setFeedbackReview",
+  "convertFeedbackToComplaint",
+  "suspendDriverForComplaint",
+  "orderHistory",
+  "contactAttempts",
+  "window.confirm",
+]) requireText(adminActions, value, "AdminCustomerExperienceActions.tsx");
+
 const main = requireFile("src/main.tsx");
 for (const value of [
   "FeedbackPage",
   "AdminCustomerExperiencePage",
+  "AdminCustomerExperienceActions",
   "ProtectedAdminRoute",
   "WhatsAppRuntimeGuard",
   "normalizeTrackingNumberQuery",
@@ -126,6 +157,20 @@ for (const contract of [
   "attachment_bucket",
   "pg_notify('pgrst','reload schema')",
 ]) requireText(health, contract, path.basename(healthPath));
+
+const privacyPath = path.resolve(root, "../../supabase/migrations/20260723141000_customer_experience_privacy_actions.sql");
+const privacy = fs.readFileSync(privacyPath, "utf8");
+for (const contract of [
+  "review_status",
+  "driver_feedback_summary",
+  "admin_set_feedback_review",
+  "admin_create_complaint_from_feedback",
+  "admin_suspend_driver_for_complaint",
+  "Deliberately excludes order_id, customer_id, merchant_id and driver_id",
+  "drop policy if exists ce_feedback_admin_read",
+  "create policy ce_feedback_scoped_read",
+  "dn_ce_audit",
+]) requireText(privacy, contract, path.basename(privacyPath));
 
 const runtimeGuard = requireFile("src/components/WhatsAppRuntimeGuard.tsx");
 requireText(runtimeGuard, "hasMessageText", "WhatsAppRuntimeGuard.tsx");
