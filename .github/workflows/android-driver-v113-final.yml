@@ -1,0 +1,140 @@
+name: Driver v1.1.3 Final Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "android-role-shell/**"
+      - ".github/workflows/android-driver-v113-final.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: driver-v113-final-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  driver-v113-final:
+    name: Build and prove Driver v1.1.3 credential surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK, emulator, and Pillow
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          python -m pip install --disable-pip-version-check "pillow>=10,<13"
+          python android-role-shell/scripts/prepare_icons.py
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Build Driver v1.1.3 APK and AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'versionCode 6' android-role-shell/app/build.gradle
+          grep -F 'versionName "1.1.3"' android-role-shell/app/build.gradle
+          grep -F 'dnNativeRole=driver' android-role-shell/app/build.gradle
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace clean assembleDriverDebug bundleDriverRelease lintDriverRelease
+          mkdir -p android-role-shell/driver-v113-final
+          DRIVER_APK="$(find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' | head -n 1)"
+          DRIVER_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*driverRelease*' | head -n 1)"
+          cp "$DRIVER_APK" android-role-shell/driver-v113-final/DAY-NIGHT-Driver-v1.1.3.apk
+          cp "$DRIVER_AAB" android-role-shell/driver-v113-final/DAY-NIGHT-Driver-v1.1.3.aab
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          "$AAPT" dump badging android-role-shell/driver-v113-final/DAY-NIGHT-Driver-v1.1.3.apk > android-role-shell/driver-v113-final/driver-badging.txt
+          grep -F "package: name='com.daynightae.driver'" android-role-shell/driver-v113-final/driver-badging.txt
+          grep -F "versionName='1.1.3'" android-role-shell/driver-v113-final/driver-badging.txt
+          unzip -t android-role-shell/driver-v113-final/DAY-NIGHT-Driver-v1.1.3.aab >/dev/null
+          (cd android-role-shell/driver-v113-final && sha256sum DAY-NIGHT-Driver-v1.1.3.apk DAY-NIGHT-Driver-v1.1.3.aab > DAY-NIGHT-Driver-v1.1.3.sha256)
+
+      - name: Boot Android 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-driver-v113-avd"
+          mkdir -p "$ANDROID_AVD_HOME" android-role-shell/driver-v113-final/emulator
+          echo no | avdmanager create avd --force --name driver_v113_api36 --package "system-images;android-36;google_apis;x86_64" --path "$ANDROID_AVD_HOME/driver_v113_api36.avd"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          nohup "$ANDROID_HOME/emulator/emulator" -avd driver_v113_api36 -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data > android-role-shell/driver-v113-final/emulator/boot.log 2>&1 &
+          echo $! > android-role-shell/driver-v113-final/emulator/pid
+          timeout 180 adb wait-for-device
+          for attempt in $(seq 1 180); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
+          adb shell settings delete global http_proxy || true
+          sleep 8
+
+      - name: Prove the real Driver credential card paints
+        id: driver_live
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=android-role-shell/driver-v113-final
+          adb install -r "$out/DAY-NIGHT-Driver-v1.1.3.apk" | tee "$out/install.txt"
+          grep -F 'Success' "$out/install.txt"
+          adb shell am force-stop com.daynightae.driver
+          adb logcat -c
+          adb shell monkey -p com.daynightae.driver 1 > "$out/launch.txt"
+          ready=""
+          for attempt in $(seq 1 75); do
+            adb logcat -d -s DAYNIGHT_SPLASH:I chromium:I '*:S' > "$out/runtime.log" || true
+            if grep -E 'driver attempt=[0-9]+.*card=true.*roleVisible=true.*roleReady=true' "$out/runtime.log" >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          cat "$out/runtime.log"
+          test "$ready" = "1"
+          adb shell pidof com.daynightae.driver > "$out/pid.txt"
+          test -s "$out/pid.txt"
+          sleep 2
+          adb exec-out screencap -p > "$out/DAY-NIGHT-Driver-v1.1.3-Live-Credential-Test.png"
+          python android-role-shell/scripts/assert_portal_screen.py "$out/DAY-NIGHT-Driver-v1.1.3-Live-Credential-Test.png" --report "$out/live-screen.json" --role driver
+
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: |
+          adb emu kill || true
+          if [ -f android-role-shell/driver-v113-final/emulator/pid ]; then kill "$(cat android-role-shell/driver-v113-final/emulator/pid)" 2>/dev/null || true; fi
+
+      - name: Upload Driver v1.1.3 final evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Driver-v1.1.3-FINAL
+          path: android-role-shell/driver-v113-final/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail when credential card was not proven
+        if: steps.driver_live.outcome == 'failure'
+        shell: bash
+        run: |
+          echo 'Driver credential card was not proven. Uploaded logs and screenshots contain the exact failure.'
+          exit 1
