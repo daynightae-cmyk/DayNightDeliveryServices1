@@ -7,7 +7,7 @@ returns text
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
 declare
   v_headers jsonb := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::jsonb;
@@ -23,9 +23,12 @@ begin
   from public.customer_experience_settings
   where id=true;
   if v_salt is null then
-    v_salt := digest('DAY-NIGHT-CUSTOMER-EXPERIENCE-FALLBACK', 'sha256');
+    v_salt := extensions.digest('DAY-NIGHT-CUSTOMER-EXPERIENCE-FALLBACK'::text, 'sha256'::text);
   end if;
-  return encode(hmac(convert_to(v_ip,'UTF8'), v_salt, 'sha256'), 'hex');
+  return encode(
+    extensions.hmac(convert_to(v_ip,'UTF8'), v_salt, 'sha256'::text),
+    'hex'
+  );
 end;
 $$;
 
