@@ -1,5 +1,6 @@
--- DAY NIGHT Customer Experience production pgcrypto runtime hotfix.
--- Required for Supabase projects where pgcrypto is installed in the extensions schema.
+-- DAY NIGHT Customer Experience production runtime hotfix.
+-- Required for Supabase projects where pgcrypto is installed in extensions
+-- and notifications.type is an enum rather than text.
 
 begin;
 
@@ -127,11 +128,110 @@ begin
 end;
 $$;
 
+create or replace function public.dn_ce_notify_admins(
+  p_title text,
+  p_message text,
+  p_type text,
+  p_metadata jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth, pg_catalog, pg_temp
+as $$
+declare
+  v_user record;
+  v_type_schema text;
+  v_type_name text;
+  v_type_kind "char";
+  v_type_value text;
+  v_has_metadata boolean;
+begin
+  if to_regclass('public.notifications') is null then
+    return;
+  end if;
+
+  select type_ns.nspname, type_def.typname, type_def.typtype
+  into v_type_schema, v_type_name, v_type_kind
+  from pg_class table_def
+  join pg_namespace table_ns on table_ns.oid=table_def.relnamespace
+  join pg_attribute column_def on column_def.attrelid=table_def.oid
+  join pg_type type_def on type_def.oid=column_def.atttypid
+  join pg_namespace type_ns on type_ns.oid=type_def.typnamespace
+  where table_ns.nspname='public'
+    and table_def.relname='notifications'
+    and column_def.attname='type'
+    and column_def.attnum>0
+    and not column_def.attisdropped
+  limit 1;
+
+  select exists(
+    select 1
+    from information_schema.columns
+    where table_schema='public'
+      and table_name='notifications'
+      and column_name='metadata'
+  ) into v_has_metadata;
+
+  if v_type_kind='e' then
+    select enum_value.enumlabel
+    into v_type_value
+    from pg_enum enum_value
+    join pg_type enum_type on enum_type.oid=enum_value.enumtypid
+    join pg_namespace enum_ns on enum_ns.oid=enum_type.typnamespace
+    where enum_ns.nspname=v_type_schema
+      and enum_type.typname=v_type_name
+    order by case
+      when enum_value.enumlabel=coalesce(nullif(btrim(p_type),''),'info') then 0
+      when enum_value.enumlabel='info' then 1
+      when enum_value.enumlabel='system' then 2
+      else 3
+    end,
+    enum_value.enumsortorder
+    limit 1;
+  else
+    v_type_value := coalesce(nullif(btrim(p_type),''),'info');
+  end if;
+
+  for v_user in
+    select profile_row.id
+    from public.profiles profile_row
+    where lower(coalesce(profile_row.role::text,'')) in ('admin','support')
+  loop
+    if v_type_kind='e' then
+      if v_has_metadata then
+        execute format(
+          'insert into public.notifications(user_id,title,message,type,metadata) values ($1,$2,$3,$4::%I.%I,$5)',
+          v_type_schema,
+          v_type_name
+        ) using v_user.id,p_title,p_message,v_type_value,coalesce(p_metadata,'{}'::jsonb);
+      else
+        execute format(
+          'insert into public.notifications(user_id,title,message,type) values ($1,$2,$3,$4::%I.%I)',
+          v_type_schema,
+          v_type_name
+        ) using v_user.id,p_title,p_message,v_type_value;
+      end if;
+    elsif v_has_metadata then
+      insert into public.notifications(user_id,title,message,type,metadata)
+      values(v_user.id,p_title,p_message,v_type_value,coalesce(p_metadata,'{}'::jsonb));
+    else
+      insert into public.notifications(user_id,title,message,type)
+      values(v_user.id,p_title,p_message,v_type_value);
+    end if;
+  end loop;
+exception when others then
+  raise notice 'Admin notification skipped: %',sqlerrm;
+end;
+$$;
+
 revoke all on function public.dn_ce_request_ip_hash() from public;
 revoke all on function public.get_feedback_context(text) from public;
+revoke all on function public.dn_ce_notify_admins(text,text,text,jsonb) from public;
 
 grant execute on function public.dn_ce_request_ip_hash() to anon, authenticated;
 grant execute on function public.get_feedback_context(text) to anon, authenticated;
+grant execute on function public.dn_ce_notify_admins(text,text,text,jsonb) to authenticated;
 
 select pg_notify('pgrst','reload schema');
 
