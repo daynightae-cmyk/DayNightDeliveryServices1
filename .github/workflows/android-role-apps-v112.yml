@@ -67,9 +67,11 @@ jobs:
           grep -F '__dn_live=role-v1.1.2' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
-          grep -F 'data-native-driver-router-ready' artifacts/day-night-delivery/src/components/native/NativeDriverRuntimeAcceptance.tsx
+          grep -F 'data-driver-runtime-acceptance="ready"' artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
           grep -F 'data-driver-map-ready' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
-          grep -F 'data-driver-vehicle-ready' artifacts/day-night-delivery/src/components/native/NativeDriverRuntimeAcceptance.tsx
+          grep -F 'DayNightVehicleMarker' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
+          grep -F 'BrowserRouter' artifacts/day-night-delivery/src/main.tsx
+          grep -F 'NativeRoleErrorBoundary' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
 
       - name: Build APK and AAB packages
         shell: bash
