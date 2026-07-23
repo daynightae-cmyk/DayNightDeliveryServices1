@@ -55,6 +55,8 @@ jobs:
           grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
           grep -F 'DAYNIGHT_SPLASH' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
           grep -F 'DAYNIGHT_CONSOLE' android-role-shell/app/src/visual/java/com/daynightae/shell/VisualTestActivity.java
+          grep -F 'dn-role-auth-mobile-final.css' artifacts/day-night-delivery/src/main.tsx
+          grep -F 'align-content: start !important' artifacts/day-night-delivery/src/styles/dn-role-auth-mobile-final.css
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
@@ -162,7 +164,7 @@ jobs:
           adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/driver-runtime.log
           cat android-role-shell/arabic-visual/driver-runtime.log
           grep -E 'driver attempt=[123].*removed=true' android-role-shell/arabic-visual/driver-runtime.log
-          grep -E 'driver phase=(commit|finished).*rootChildren[^0]' android-role-shell/arabic-visual/driver-runtime.log
+          grep -E 'driver attempt=[123].*rootChildren=[1-9]' android-role-shell/arabic-visual/driver-runtime.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
           adb shell am force-stop com.daynightae.driver
 
@@ -185,7 +187,7 @@ jobs:
           adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/merchant-runtime.log
           cat android-role-shell/arabic-visual/merchant-runtime.log
           grep -E 'merchant attempt=[123].*removed=true' android-role-shell/arabic-visual/merchant-runtime.log
-          grep -E 'merchant phase=(commit|finished).*rootChildren[^0]' android-role-shell/arabic-visual/merchant-runtime.log
+          grep -E 'merchant attempt=[123].*rootChildren=[1-9]' android-role-shell/arabic-visual/merchant-runtime.log
           python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
           adb shell am force-stop com.daynightae.merchant
 
@@ -207,11 +209,12 @@ jobs:
           for role in ('driver', 'merchant'):
               log = Path(f'android-role-shell/arabic-visual/{role}-runtime.log').read_text(errors='replace')
               assert 'removed=true' in log, f'{role} splash removal was not proven'
+              assert any(f'rootChildren={value}' in log for value in range(1, 10)), f'{role} React root did not render'
               final = Image.open(f'android-role-shell/arabic-visual/{role}-arabic-final.png').convert('RGB').resize((240, 420))
               dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
               dark_ratio = dark_pixels / (final.width * final.height)
               assert dark_ratio < 0.94, f'{role} final screen is still almost entirely navy ({dark_ratio:.3f})'
-              print(role, 'watchdog=true', 'dark_ratio=', round(dark_ratio, 3))
+              print(role, 'watchdog=true', 'root=true', 'dark_ratio=', round(dark_ratio, 3))
           PY
 
       - name: Stop emulator and local server
