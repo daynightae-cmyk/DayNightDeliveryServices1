@@ -1,5 +1,46 @@
 const PHONE_PATTERN = /^\d{8,15}$/;
 
+const WINDOWS_1252_REVERSE = new Map([
+  [0x20ac, 0x80], [0x201a, 0x82], [0x0192, 0x83], [0x201e, 0x84],
+  [0x2026, 0x85], [0x2020, 0x86], [0x2021, 0x87], [0x02c6, 0x88],
+  [0x2030, 0x89], [0x0160, 0x8a], [0x2039, 0x8b], [0x0152, 0x8c],
+  [0x017d, 0x8e], [0x2018, 0x91], [0x2019, 0x92], [0x201c, 0x93],
+  [0x201d, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
+  [0x02dc, 0x98], [0x2122, 0x99], [0x0161, 0x9a], [0x203a, 0x9b],
+  [0x0153, 0x9c], [0x017e, 0x9e], [0x0178, 0x9f],
+]);
+
+export function isLikelyMojibake(value) {
+  const text = String(value || "");
+  if (!text) return false;
+  return /(?:[ØÙ].){2,}|ðŸ|â(?:€|œ|­|†|„|˜|™)|ï¸/u.test(text);
+}
+
+export function repairLikelyMojibake(value) {
+  const text = String(value || "");
+  if (!isLikelyMojibake(text) || typeof TextDecoder === "undefined") return text;
+
+  const bytes = [];
+  for (const character of text) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint <= 0xff) {
+      bytes.push(codePoint);
+      continue;
+    }
+    const mapped = WINDOWS_1252_REVERSE.get(codePoint);
+    if (mapped === undefined) return text;
+    bytes.push(mapped);
+  }
+
+  try {
+    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes));
+    if (!repaired || isLikelyMojibake(repaired)) return text;
+    return repaired;
+  } catch {
+    return text;
+  }
+}
+
 export function sanitizeWhatsAppPhone(value, defaultCountryCode = "971") {
   let digits = String(value || "").replace(/\D/g, "");
   if (digits.startsWith("00")) digits = digits.slice(2);
@@ -40,7 +81,8 @@ export function compactMessage(message) {
 }
 
 export function interpolateTemplate(template, variables) {
-  const rendered = String(template || "").replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
+  const safeTemplate = repairLikelyMojibake(template);
+  const rendered = safeTemplate.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => {
     const value = variables?.[key];
     return value === null || value === undefined ? "" : String(value);
   });
@@ -49,7 +91,7 @@ export function interpolateTemplate(template, variables) {
 
 export function buildWhatsAppUrl(phone, message) {
   const sanitizedPhone = sanitizeWhatsAppPhone(phone);
-  const cleanMessage = compactMessage(message);
+  const cleanMessage = compactMessage(repairLikelyMojibake(message));
   if (!sanitizedPhone) throw new Error("invalid_whatsapp_phone");
   if (!cleanMessage) throw new Error("empty_whatsapp_message");
   return `https://wa.me/${sanitizedPhone}?text=${encodeURIComponent(cleanMessage)}`;
