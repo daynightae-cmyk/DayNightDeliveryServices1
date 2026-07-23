@@ -11,6 +11,7 @@ type NavSurface = "legacy" | "command";
 type NavTarget = { element: HTMLElement; surface: NavSurface };
 
 const CUSTOMER_EXPERIENCE_PATH = "/admin/customer-experience";
+const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
 const RETURNED_LABELS = ["الطلبات الراجعة", "Returned Orders"];
 
 function currentPathname() {
@@ -149,6 +150,8 @@ export default function AdminCustomerExperienceLauncher() {
     }
 
     const syncTargets = () => {
+      const livePath = currentPathname();
+      setPathname((current) => (current === livePath ? current : livePath));
       const nextTargets = ensureNavigationTargets();
       setNavTargets((current) => (sameTargets(current, nextTargets) ? current : nextTargets));
       const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
@@ -168,8 +171,16 @@ export default function AdminCustomerExperienceLauncher() {
 
   useEffect(() => {
     const syncPath = () => setPathname(currentPathname());
+    const syncCustomPath = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      setPathname(detail || currentPathname());
+    };
     window.addEventListener("popstate", syncPath);
-    return () => window.removeEventListener("popstate", syncPath);
+    window.addEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncCustomPath);
+    return () => {
+      window.removeEventListener("popstate", syncPath);
+      window.removeEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncCustomPath);
+    };
   }, []);
 
   useEffect(() => {
