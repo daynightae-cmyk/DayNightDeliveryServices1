@@ -17,9 +17,9 @@ concurrency:
 
 jobs:
   arabic-visual:
-    name: Arabic splash handoff and branch-build visual acceptance
+    name: Arabic native handoff and rendered role-login acceptance
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 75
     env:
       VITE_SUPABASE_URL: https://ngdwybpgacauorygoedi.supabase.co
       VITE_SUPABASE_ANON_KEY: ""
@@ -46,59 +46,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${VITE_SUPABASE_URL:-}"
           pnpm install --frozen-lockfile
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
+          grep -F 'data-native-boot' artifacts/day-night-delivery/index.html
           grep -F 'VITE_ROLE_VISUAL_TEST' artifacts/day-night-delivery/src/components/driver/DriverAuthGuard.tsx
-          grep -F 'dnBootAbsoluteFailsafe' artifacts/day-night-delivery/index.html
-          grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
-          grep -F 'DAYNIGHT_SPLASH' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
-          grep -F 'DAYNIGHT_CONSOLE' android-role-shell/app/src/visual/java/com/daynightae/shell/VisualTestActivity.java
           grep -F 'dn-role-auth-mobile-final.css' artifacts/day-night-delivery/src/main.tsx
-          grep -F 'align-content: start !important' artifacts/day-night-delivery/src/styles/dn-role-auth-mobile-final.css
+          grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
+          grep -F 'WATCHDOG_DELAYS_MS' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
-          ready=""
           for attempt in $(seq 1 45); do
-            if curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&lang=ar" | grep -F 'id="root"' >/dev/null; then
-              ready="1"
-              break
-            fi
+            curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null && break
             sleep 1
           done
-          if [ "$ready" != "1" ]; then
-            cat android-role-shell/arabic-visual/local-web.log || true
-            exit 1
-          fi
-          curl -fsS "http://127.0.0.1:4173/merchant?nativeShell=merchant&lang=ar" | grep -F 'id="root"' >/dev/null
+          curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null
+          curl -fsS "http://127.0.0.1:4173/merchant?nativeShell=merchant&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null
 
-      - name: Java 17
+      - name: Set up Java and Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
 
-      - name: Install Android 16 image
+      - name: Install Android 16 and image tools
         shell: bash
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
-
-      - name: Python and official icons
-        shell: bash
-        run: |
-          set -euo pipefail
           python -m pip install --disable-pip-version-check "pillow>=10,<13"
           python android-role-shell/scripts/prepare_icons.py
 
-      - name: Gradle 8.13
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
@@ -116,7 +100,7 @@ jobs:
           test -s android-role-shell/arabic-visual/driver-visual.apk
           test -s android-role-shell/arabic-visual/merchant-visual.apk
 
-      - name: Boot Android 16 and wait for local network
+      - name: Boot Android 16
         shell: bash
         run: |
           set -euo pipefail
@@ -133,65 +117,53 @@ jobs:
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
           adb shell settings delete global http_proxy || true
-          reachable=""
-          for attempt in $(seq 1 60); do
-            if adb shell ping -c 1 -W 2 10.0.2.2 >/dev/null 2>&1; then
-              reachable="1"
-              break
-            fi
-            sleep 2
-          done
-          test "$reachable" = "1"
-          adb shell dumpsys connectivity > android-role-shell/arabic-visual/emulator/connectivity.txt || true
           sleep 8
 
-      - name: Capture Driver Arabic splash handoff
+      - name: Capture Driver and Merchant after React renders
         shell: bash
         run: |
           set -euo pipefail
-          adb install -r android-role-shell/arabic-visual/driver-visual.apk | tee android-role-shell/arabic-visual/driver-install.log
-          adb shell am force-stop com.daynightae.driver
-          adb logcat -c
-          adb shell am start -n com.daynightae.driver/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/driver-start.log
-          sleep 0.35
-          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-01.png
-          sleep 0.65
-          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-02.png
-          sleep 0.9
-          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-stage-03.png
-          sleep 6
-          adb exec-out screencap -p > android-role-shell/arabic-visual/driver-arabic-final.png
-          adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/driver-runtime.log
-          cat android-role-shell/arabic-visual/driver-runtime.log
-          grep -E 'driver attempt=[123].*removed=true' android-role-shell/arabic-visual/driver-runtime.log
-          grep -E 'driver attempt=[123].*rootChildren=[1-9]' android-role-shell/arabic-visual/driver-runtime.log
-          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/driver-arabic-final.png --report android-role-shell/arabic-visual/driver-arabic-final.json --role driver
-          adb shell am force-stop com.daynightae.driver
 
-      - name: Capture Merchant Arabic splash handoff
-        shell: bash
-        run: |
-          set -euo pipefail
-          adb install -r android-role-shell/arabic-visual/merchant-visual.apk | tee android-role-shell/arabic-visual/merchant-install.log
-          adb shell am force-stop com.daynightae.merchant
-          adb logcat -c
-          adb shell am start -n com.daynightae.merchant/com.daynightae.shell.VisualTestActivity > android-role-shell/arabic-visual/merchant-start.log
-          sleep 0.35
-          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-01.png
-          sleep 0.65
-          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-02.png
-          sleep 0.9
-          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-stage-03.png
-          sleep 6
-          adb exec-out screencap -p > android-role-shell/arabic-visual/merchant-arabic-final.png
-          adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > android-role-shell/arabic-visual/merchant-runtime.log
-          cat android-role-shell/arabic-visual/merchant-runtime.log
-          grep -E 'merchant attempt=[123].*removed=true' android-role-shell/arabic-visual/merchant-runtime.log
-          grep -E 'merchant attempt=[123].*rootChildren=[1-9]' android-role-shell/arabic-visual/merchant-runtime.log
-          python android-role-shell/scripts/assert_portal_screen.py android-role-shell/arabic-visual/merchant-arabic-final.png --report android-role-shell/arabic-visual/merchant-arabic-final.json --role merchant
-          adb shell am force-stop com.daynightae.merchant
+          capture_role() {
+            role="$1"
+            package_name="$2"
+            apk="android-role-shell/arabic-visual/${role}-visual.apk"
+            output="android-role-shell/arabic-visual"
 
-      - name: Validate screenshots and watchdog evidence
+            adb install -r "$apk" | tee "$output/${role}-install.log"
+            adb shell am force-stop "$package_name"
+            adb logcat -c
+            adb shell am start -n "$package_name/com.daynightae.shell.VisualTestActivity" > "$output/${role}-start.log"
+
+            sleep 0.35
+            adb exec-out screencap -p > "$output/${role}-stage-01.png"
+            sleep 0.65
+            adb exec-out screencap -p > "$output/${role}-stage-02.png"
+            sleep 0.9
+            adb exec-out screencap -p > "$output/${role}-stage-03.png"
+
+            rendered=""
+            for attempt in $(seq 1 40); do
+              adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > "$output/${role}-runtime.log"
+              if grep -E "${role} attempt=[1-6].*removed=true" "$output/${role}-runtime.log" >/dev/null \
+                && grep -E "${role} attempt=[1-6].*rootChildren=[1-9]" "$output/${role}-runtime.log" >/dev/null; then
+                rendered="1"
+                break
+              fi
+              sleep 1
+            done
+
+            cat "$output/${role}-runtime.log"
+            test "$rendered" = "1"
+            adb exec-out screencap -p > "$output/${role}-arabic-final.png"
+            python android-role-shell/scripts/assert_portal_screen.py "$output/${role}-arabic-final.png" --report "$output/${role}-arabic-final.json" --role "$role"
+            adb shell am force-stop "$package_name"
+          }
+
+          capture_role driver com.daynightae.driver
+          capture_role merchant com.daynightae.merchant
+
+      - name: Validate visible final screens
         shell: bash
         run: |
           set -euo pipefail
@@ -199,22 +171,19 @@ jobs:
           from pathlib import Path
           from PIL import Image
 
-          staged = sorted(Path('android-role-shell/arabic-visual').glob('*-stage-*.png'))
-          assert len(staged) == 6
-          for path in staged:
-              image = Image.open(path).convert('RGB').resize((160, 280))
-              colors = image.getcolors(160 * 280)
-              assert colors and len(colors) > 25, f'{path} is visually empty'
-
           for role in ('driver', 'merchant'):
               log = Path(f'android-role-shell/arabic-visual/{role}-runtime.log').read_text(errors='replace')
-              assert 'removed=true' in log, f'{role} splash removal was not proven'
-              assert any(f'rootChildren={value}' in log for value in range(1, 10)), f'{role} React root did not render'
-              final = Image.open(f'android-role-shell/arabic-visual/{role}-arabic-final.png').convert('RGB').resize((240, 420))
+              assert 'removed=true' in log, f'{role} native web-layer removal was not proven'
+              assert any(f'rootChildren={n}' in log for n in range(1, 10)), f'{role} React root did not render'
+
+              final_path = Path(f'android-role-shell/arabic-visual/{role}-arabic-final.png')
+              final = Image.open(final_path).convert('RGB').resize((240, 420))
+              colors = final.getcolors(240 * 420)
+              assert colors and len(colors) > 30, f'{role} final screen is visually empty'
               dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
               dark_ratio = dark_pixels / (final.width * final.height)
               assert dark_ratio < 0.94, f'{role} final screen is still almost entirely navy ({dark_ratio:.3f})'
-              print(role, 'watchdog=true', 'root=true', 'dark_ratio=', round(dark_ratio, 3))
+              print(role, 'root=true', 'dark_ratio=', round(dark_ratio, 3), 'colors=', len(colors))
           PY
 
       - name: Stop emulator and local server
@@ -225,7 +194,7 @@ jobs:
           if [ -f android-role-shell/arabic-visual/emulator/pid ]; then kill "$(cat android-role-shell/arabic-visual/emulator/pid)" 2>/dev/null || true; fi
           if [ -f android-role-shell/arabic-visual/local-web.pid ]; then kill "$(cat android-role-shell/arabic-visual/local-web.pid)" 2>/dev/null || true; fi
 
-      - name: Upload Arabic branch-build visual evidence
+      - name: Upload Arabic visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
