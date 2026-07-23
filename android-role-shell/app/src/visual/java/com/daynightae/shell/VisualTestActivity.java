@@ -5,8 +5,11 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
+import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -18,11 +21,12 @@ import android.widget.TextView;
  * CI-only visual harness for the `visual` build type.
  *
  * Production debug/release artifacts never include or launch this Activity.
- * It intentionally accepts the GitHub runner's local HTTP Vite server so the
- * exact pull-request build can be inspected inside Android WebView before the
- * production HTTPS deployment exists.
+ * The test WebView uses a software layer so `adb screencap` receives the same
+ * fully composed login surface instead of a stale GPU texture from the headless
+ * Android emulator.
  */
 public final class VisualTestActivity extends Activity {
+    private static final String TAG = "DAYNIGHT_VISUAL";
     private WebView webView;
 
     @Override
@@ -31,10 +35,13 @@ public final class VisualTestActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.rgb(7, 26, 51));
         getWindow().setNavigationBarColor(Color.rgb(7, 26, 51));
+        getWindow().getDecorView().setBackgroundColor(Color.rgb(7, 26, 51));
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(7, 26, 51));
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setAlpha(1f);
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
@@ -54,10 +61,40 @@ public final class VisualTestActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage message) {
+                Log.i(
+                        "DAYNIGHT_CONSOLE",
+                        BuildConfig.ROLE + " " + message.messageLevel() + " "
+                                + message.sourceId() + ":" + message.lineNumber() + " " + message.message()
+                );
+                return true;
+            }
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return false;
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                super.onPageCommitVisible(view, url);
+                settleCompositor(view);
+                logDomState(view, "commit", url);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                settleCompositor(view);
+                view.postDelayed(() -> {
+                    settleCompositor(view);
+                    logDomState(view, "settled", url);
+                }, 1200L);
+                logDomState(view, "finished", url);
             }
 
             @Override
@@ -69,7 +106,33 @@ public final class VisualTestActivity extends Activity {
             }
         });
 
+        Log.i(TAG, BuildConfig.ROLE + " start=" + BuildConfig.START_URL + " layer=software");
         webView.loadUrl(BuildConfig.START_URL);
+    }
+
+    private void settleCompositor(WebView view) {
+        if (view == null) return;
+        view.setAlpha(1f);
+        view.requestLayout();
+        view.invalidate();
+        view.postInvalidateOnAnimation();
+    }
+
+    private void logDomState(WebView view, String phase, String url) {
+        String script = "(function(){"
+                + "var root=document.getElementById('root');"
+                + "return JSON.stringify({"
+                + "ready:document.readyState,"
+                + "boot:!!document.getElementById('dn-role-boot'),"
+                + "rootChildren:root?root.childElementCount:-1,"
+                + "bodyChildren:document.body?document.body.childElementCount:-1,"
+                + "scripts:Array.from(document.scripts||[]).map(function(s){return s.src||'inline';})"
+                + "});"
+                + "})()";
+        view.evaluateJavascript(script, result -> Log.i(
+                TAG,
+                BuildConfig.ROLE + " phase=" + phase + " url=" + url + " diagnostics=" + result
+        ));
     }
 
     private void showFailure(String code) {
@@ -87,6 +150,7 @@ public final class VisualTestActivity extends Activity {
     protected void onDestroy() {
         if (webView != null) {
             webView.stopLoading();
+            webView.setWebChromeClient(null);
             webView.setWebViewClient(null);
             webView.destroy();
         }

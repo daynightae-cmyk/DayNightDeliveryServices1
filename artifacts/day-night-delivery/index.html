@@ -60,9 +60,33 @@
         document.documentElement.setAttribute("data-native-shell", nativeRole);
         window.__DAY_NIGHT_NATIVE_ROLE__ = nativeRole;
 
-        /* Neutralize the destructive CSS injected by the first APK release.
-           Only the direct public-site shell may be reset; nested dashboard main
-           elements are never selected. */
+        /* Android already owns the branded operating-system splash. `nosplash=1`
+           makes the web splash impossible to create or display, eliminating the
+           only full-screen layer that could remain over a loaded role portal. */
+        var nativeBootDisabled = params.has("nosplash");
+        if (nativeBootDisabled) {
+          document.documentElement.setAttribute("data-native-boot", "disabled");
+        }
+
+        /* Native role applications are live WebViews, not offline PWAs. Remove any
+           service worker/cache left by an older build so a stale app shell cannot
+           trap Driver or Merchant on a previous index or splash screen. */
+        try {
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+              registrations.forEach(function (registration) { registration.unregister(); });
+            }).catch(function () {});
+          }
+          if (window.caches && typeof window.caches.keys === "function") {
+            window.caches.keys().then(function (keys) {
+              return Promise.all(keys.filter(function (key) { return key.indexOf("day-night-") === 0; }).map(function (key) { return window.caches.delete(key); }));
+            }).catch(function () {});
+          }
+        } catch (_) {}
+
+        /* Neutralize destructive CSS injected by the first APK release. Only the
+           direct public-site shell is reset; nested dashboard main elements are
+           never selected. */
         var safeNativeCss = [
           "html,body,#root{width:100%!important;min-height:100%!important;min-height:100dvh!important;overflow-x:hidden!important}",
           "html,body{margin:0!important;padding:0!important;-webkit-text-size-adjust:100%}",
@@ -72,7 +96,8 @@
           "#root>div>main{display:block!important;width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:visible!important}",
           "#root>div>main~*,#root>div>footer{display:none!important}",
           "input,select,textarea{font-size:16px!important}",
-          "button,a,input,select,textarea{touch-action:manipulation}"
+          "button,a,input,select,textarea{touch-action:manipulation}",
+          nativeBootDisabled ? "#dn-role-boot{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important}" : ""
         ].join("");
 
         var applying = false;
@@ -101,12 +126,14 @@
       html[data-native-shell] { background:#071a33; }
       html[data-native-shell] body { margin:0; min-height:100dvh; background:#071a33; }
       #dn-role-boot { display:none; }
-      html[data-native-shell] #dn-role-boot {
+      html[data-native-boot="disabled"] #dn-role-boot { display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;animation:none!important; }
+      html[data-native-shell]:not([data-native-boot="disabled"]) #dn-role-boot {
         position:fixed; z-index:2147483646; inset:0; display:grid; place-items:center;
         padding:calc(28px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
         overflow:hidden; color:#fff; text-align:center;
         background:radial-gradient(circle at 18% 10%,rgba(49,149,247,.3),transparent 34%),radial-gradient(circle at 86% 92%,rgba(212,175,55,.2),transparent 34%),linear-gradient(145deg,#020b18,#071a33 54%,#0b4db2);
-        opacity:1; visibility:visible; transition:opacity .42s ease,visibility .42s ease;
+        opacity:1; visibility:visible; transition:opacity .32s ease,visibility .32s ease;
+        animation:dnBootAbsoluteFailsafe 0s linear 4s forwards;
       }
       html[data-native-shell] #dn-role-boot::before,
       html[data-native-shell] #dn-role-boot::after {
@@ -114,7 +141,7 @@
       }
       html[data-native-shell] #dn-role-boot::before { width:420px;height:420px;top:-240px;inset-inline-end:-170px;box-shadow:0 0 0 55px rgba(255,255,255,.025),0 0 0 110px rgba(255,255,255,.018); }
       html[data-native-shell] #dn-role-boot::after { width:310px;height:310px;bottom:-200px;inset-inline-start:-130px;box-shadow:0 0 0 42px rgba(212,175,55,.025); }
-      #dn-role-boot.is-complete { opacity:0; visibility:hidden; pointer-events:none; }
+      #dn-role-boot.is-complete { opacity:0; visibility:hidden; pointer-events:none; animation:none; }
       .dn-role-boot-card { position:relative;z-index:2;display:grid;justify-items:center;width:min(100%,440px); }
       .dn-role-boot-logo-wrap { position:relative;display:grid;place-items:center;width:128px;height:128px;margin-bottom:24px;border:1px solid rgba(212,175,55,.55);border-radius:38px;background:rgba(255,255,255,.08);box-shadow:0 28px 75px rgba(0,0,0,.34),inset 0 0 38px rgba(255,255,255,.05);animation:dnBootFloat 2.2s ease-in-out infinite; }
       .dn-role-boot-logo-wrap::after { content:"";position:absolute;inset:-9px;border:1px solid rgba(49,149,247,.25);border-radius:45px;animation:dnBootPulse 1.8s ease-out infinite; }
@@ -131,6 +158,7 @@
       @keyframes dnBootProgress { 0%{transform:translateX(-130%)}50%{transform:translateX(70%)}100%{transform:translateX(245%)} }
       [dir="rtl"] .dn-role-boot-progress i { animation-name:dnBootProgressRtl; }
       @keyframes dnBootProgressRtl { 0%{transform:translateX(130%)}50%{transform:translateX(-70%)}100%{transform:translateX(-245%)} }
+      @keyframes dnBootAbsoluteFailsafe { to{opacity:0;visibility:hidden;pointer-events:none} }
       @media(prefers-reduced-motion:reduce){.dn-role-boot-logo-wrap,.dn-role-boot-logo-wrap::after,.dn-role-boot-progress i{animation:none}}
     </style>
 
@@ -191,7 +219,7 @@
     <div id="dn-role-boot" aria-live="polite" aria-label="DAY NIGHT loading">
       <div class="dn-role-boot-card">
         <div class="dn-role-boot-logo-wrap">
-          <img class="dn-role-boot-logo" alt="DAY NIGHT" />
+          <img class="dn-role-boot-logo" src="/logo-daynight.png" alt="DAY NIGHT" />
           <span class="dn-role-boot-fallback">DN</span>
         </div>
         <span class="dn-role-boot-eyebrow">DAY NIGHT DELIVERY SERVICES</span>
@@ -205,8 +233,15 @@
       (function () {
         var role = document.documentElement.getAttribute("data-native-shell");
         if (role !== "driver" && role !== "merchant") return;
-        var language = document.documentElement.getAttribute("data-language") === "ar" ? "ar" : "en";
         var boot = document.getElementById("dn-role-boot");
+        if (!boot) return;
+
+        if (document.documentElement.getAttribute("data-native-boot") === "disabled") {
+          boot.remove();
+          return;
+        }
+
+        var language = document.documentElement.getAttribute("data-language") === "ar" ? "ar" : "en";
         var logo = boot.querySelector(".dn-role-boot-logo");
         var fallback = boot.querySelector(".dn-role-boot-fallback");
         var title = boot.querySelector(".dn-role-boot-title");
@@ -215,43 +250,51 @@
         var content = {
           driver: {
             ar:["داي نايت للمندوب","المهام والملاحة المباشرة","جاري تجهيز مساحة العمل الآمنة"],
-            en:["DAY NIGHT Driver","Live missions and navigation","Preparing your secure workspace"],
-            icon:"https://i.postimg.cc/htdnDjJv/cropped-circle-image-(1).png"
+            en:["DAY NIGHT Driver","Live missions and navigation","Preparing your secure workspace"]
           },
           merchant: {
             ar:["داي نايت للتاجر","مركز إدارة الطلبات والأعمال","جاري تجهيز مساحة العمل الآمنة"],
-            en:["DAY NIGHT Merchant","Orders and business control center","Preparing your secure workspace"],
-            icon:"https://i.postimg.cc/RC29jKht/cropped-circle-image.png"
+            en:["DAY NIGHT Merchant","Orders and business control center","Preparing your secure workspace"]
           }
         }[role];
         var copy = content[language];
         title.textContent = copy[0];
         subtitle.textContent = copy[1];
         status.textContent = copy[2];
-        logo.src = "/logo-daynight.png";
-        logo.onerror = function () { logo.style.display="none"; fallback.style.display="grid"; };
-        var remoteRoleIcon = new Image();
-        remoteRoleIcon.onload = function () { logo.src = content.icon; };
-        remoteRoleIcon.src = content.icon;
+
+        if (logo) {
+          logo.addEventListener("error", function () {
+            logo.style.display = "none";
+            if (fallback) fallback.style.display = "grid";
+          }, { once:true });
+        }
+
+        var finished = false;
+        var observer = null;
+        function finishBoot() {
+          if (finished) return;
+          finished = true;
+          if (observer) observer.disconnect();
+          boot.classList.add("is-complete");
+          window.setTimeout(function () { if (boot.parentNode) boot.parentNode.removeChild(boot); }, 380);
+        }
+        window.__DAY_NIGHT_FINISH_ROLE_BOOT__ = finishBoot;
 
         var readySelectors = role === "driver"
           ? ".dn-driver-loading-card,.dn-driver-login-page,.dn-driver-exact-shell,.dn-driver-state-card"
           : ".dn-merchant-login-v3,.dn-merchant-app,.dn-merchant-state-v3";
-        var startedAt = Date.now();
-        function finishWhenReady() {
-          if (document.querySelector(readySelectors) && Date.now() - startedAt > 1000) {
-            boot.classList.add("is-complete");
-            window.setTimeout(function(){ boot.remove(); }, 520);
-            return;
-          }
-          if (Date.now() - startedAt > 8000) {
-            boot.classList.add("is-complete");
-            window.setTimeout(function(){ boot.remove(); }, 520);
-            return;
-          }
-          window.requestAnimationFrame(finishWhenReady);
+        function finishIfReady() {
+          if (document.querySelector(readySelectors)) finishBoot();
         }
-        window.requestAnimationFrame(finishWhenReady);
+
+        var root = document.getElementById("root");
+        if (root && "MutationObserver" in window) {
+          observer = new MutationObserver(finishIfReady);
+          observer.observe(root, { childList:true, subtree:true });
+        }
+        document.addEventListener("DOMContentLoaded", function () { window.setTimeout(finishIfReady, 250); }, { once:true });
+        window.addEventListener("load", function () { window.setTimeout(finishBoot, 450); }, { once:true });
+        window.setTimeout(finishBoot, 2600);
       })();
     </script>
     <div id="root"></div>

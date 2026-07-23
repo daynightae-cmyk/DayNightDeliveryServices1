@@ -5,16 +5,20 @@ plugins {
 def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
 def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
+def roleRuntimeVersion = "1.1.1"
 
 // Immutable production contracts verified by CI:
-// /driver?nativeShell=driver&nosplash=1
-// /merchant?nativeShell=merchant&nosplash=1
+// /driver?nativeShell=driver&nosplash=1&__dn_live=role-v1.1.1
+// /merchant?nativeShell=merchant&nosplash=1&__dn_live=role-v1.1.1
+// The __dn_live query bypasses any service worker left by an older APK. The
+// application then removes role-shell service workers so future deployments
+// continue to arrive through the live deployment watcher.
 // DAYNIGHT_ROLE_WEB_BASE_URL is accepted only at build time for the isolated
 // `visual` build type. Normal debug/release APK and AAB outputs use the
 // official HTTPS host and the production MainActivity security contract.
 def roleStartUrl = { String role ->
-    def separator = roleVisualQuery ? "&" : ""
-    return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1${separator}${roleVisualQuery}"
+    def visualSuffix = roleVisualQuery ? "&${roleVisualQuery}" : ""
+    return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1&__dn_live=role-v${roleRuntimeVersion}${visualSuffix}"
 }
 
 android {
@@ -24,8 +28,8 @@ android {
     defaultConfig {
         minSdk 24
         targetSdk 36
-        versionCode 3
-        versionName "1.1.0"
+        versionCode 4
+        versionName "1.1.1"
     }
 
     signingConfigs {
@@ -86,7 +90,7 @@ android {
     lint {
         abortOnError true
         checkReleaseBuilds true
-        // v1.1.0 keeps the isolated WebView history contract while the app
+        // v1.1.1 keeps the isolated WebView history contract while the app
         // dispatches drawer/modal back navigation through same-document history.
         disable "GestureBackNavigation"
     }
