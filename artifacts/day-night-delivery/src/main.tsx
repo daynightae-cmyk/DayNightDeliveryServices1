@@ -149,13 +149,8 @@ async function mountStandaloneCustomerExperience() {
   }
 
   if (/^\/admin\/customer-experience\/?$/i.test(pathname)) {
-    const [
-      { default: AdminCustomerExperiencePage },
-      { default: AdminCustomerExperienceActions },
-      { default: ProtectedAdminRoute },
-    ] = await Promise.all([
-      import("./components/admin/AdminCustomerExperiencePage"),
-      import("./components/admin/AdminCustomerExperienceActions"),
+    const [{ default: AdminPanelLuxury }, { default: ProtectedAdminRoute }] = await Promise.all([
+      import("./components/AdminPanelLuxury"),
       import("./components/ProtectedAdminRoute"),
     ]);
     createRoot(rootElement()).render(
@@ -163,11 +158,9 @@ async function mountStandaloneCustomerExperience() {
         <BrowserRouter>
           <AppProvider>
             <ProtectedAdminRoute>
-              <>
-                <AdminCustomerExperiencePage />
-                <AdminCustomerExperienceActions />
-              </>
+              <AdminPanelLuxury />
             </ProtectedAdminRoute>
+            <AdminCustomerExperienceLauncher />
             <WhatsAppRuntimeGuard />
           </AppProvider>
         </BrowserRouter>
