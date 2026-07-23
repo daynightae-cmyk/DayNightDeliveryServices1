@@ -11,11 +11,9 @@ import android.webkit.WebView;
 /**
  * Native fail-safe for the live Driver and Merchant WebViews.
  *
- * The role splash is a web layer and must never be allowed to cover a loaded
- * login/dashboard indefinitely. Android schedules these checks directly on
- * the WebView, independently from JavaScript timers, requestAnimationFrame,
- * service workers, and cached page state. Later probes also provide evidence
- * that React rendered on slower phones and CI emulators.
+ * Android removes any obsolete web splash independently from JavaScript and
+ * probes until a real role surface exists. A generic React root or Suspense
+ * spinner is not treated as a completed Driver/Merchant startup.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
@@ -61,26 +59,33 @@ public final class DayNightApplication extends Application {
             final int attempt = index + 1;
             final boolean force = attempt > 1;
             webView.postDelayed(
-                    () -> removeRoleSplash(webView, attempt, force),
+                    () -> removeRoleSplashAndProbe(webView, attempt, force),
                     WATCHDOG_DELAYS_MS[index]
             );
         }
     }
 
-    private void removeRoleSplash(WebView webView, int attempt, boolean force) {
+    private void removeRoleSplashAndProbe(WebView webView, int attempt, boolean force) {
         if (webView == null || !webView.isAttachedToWindow()) {
             Log.w(TAG, BuildConfig.ROLE + " attempt=" + attempt + " webview=detached");
             return;
         }
 
+        String roleSelector = "driver".equals(BuildConfig.ROLE)
+                ? ".dn-driver-login-page,.dn-driver-exact-shell,.dn-driver-state-card"
+                : ".dn-merchant-login-v3,.dn-merchant-app,.dn-merchant-state-v3";
+
         String script = "(function(){"
                 + "var boot=document.getElementById('dn-role-boot');"
                 + "var root=document.getElementById('root');"
                 + "var rendered=!!(root&&root.childElementCount>0);"
+                + "var roleReady=!!document.querySelector(" + quoteForJavascript(roleSelector) + ");"
                 + "var force=" + (force ? "true" : "false") + ";"
                 + "if(boot&&(rendered||force)){boot.classList.add('is-complete');boot.remove();}"
+                + "if(roleReady){window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}}"
                 + "return 'removed='+(!document.getElementById('dn-role-boot'))"
                 + "+',rendered='+rendered"
+                + "+',roleReady='+roleReady"
                 + "+',rootChildren='+(root?root.childElementCount:-1)"
                 + "+',ready='+document.readyState"
                 + "+',href='+String(location.href);"
@@ -90,6 +95,10 @@ public final class DayNightApplication extends Application {
                 TAG,
                 BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result
         ));
+    }
+
+    private static String quoteForJavascript(String value) {
+        return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 
     private WebView findWebView(View view) {
