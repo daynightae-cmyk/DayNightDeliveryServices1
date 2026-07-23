@@ -30,31 +30,19 @@ import "./styles/dn-pointer-performance.css";
 import "./styles/dn-role-auth-mobile-final.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
+type NativeRole = "driver" | "merchant";
 
 function isMapTileImage(img: HTMLImageElement) {
   return img.classList.contains("leaflet-tile");
 }
 
-function nativeRoleFromLocation() {
+function nativeRoleFromLocation(): NativeRole | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const nativeRole = params.get("nativeShell");
   if (nativeRole === "driver" && /^\/driver(?:\/|$)/.test(window.location.pathname)) return "driver";
   if (nativeRole === "merchant" && /^\/merchant(?:\/|$)/.test(window.location.pathname)) return "merchant";
   return null;
-}
-
-async function preloadNativeRolePortal() {
-  const role = nativeRoleFromLocation();
-  if (role === "driver") {
-    await import("./components/driver/DriverPortal");
-    await import("./styles/dn-driver-native-auth-final.css");
-    return;
-  }
-  if (role === "merchant") {
-    await import("./components/merchant/MerchantPortalCommandCenter");
-    await import("./styles/dn-merchant-native-auth-final.css");
-  }
 }
 
 function installGlobalRuntimeHandlers() {
@@ -92,11 +80,14 @@ function installGlobalRuntimeHandlers() {
   });
 }
 
-function mountApplication() {
+function rootElement() {
   const root = document.getElementById("root");
   if (!root) throw new Error("DAY NIGHT root element is missing");
+  return root;
+}
 
-  createRoot(root).render(
+function mountPublicApplication() {
+  createRoot(rootElement()).render(
     <StrictMode>
       <AppProvider>
         <App />
@@ -108,16 +99,31 @@ function mountApplication() {
   );
 }
 
+async function mountNativeRoleApplication(role: NativeRole) {
+  const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot");
+  createRoot(rootElement()).render(
+    <StrictMode>
+      <AppProvider>
+        <NativeRoleRoot role={role} />
+      </AppProvider>
+    </StrictMode>,
+  );
+}
+
 async function bootstrapApplication() {
   installGlobalRuntimeHandlers();
 
-  try {
-    await preloadNativeRolePortal();
-  } catch (error) {
-    reportError(error, "native_role_preload");
+  const nativeRole = nativeRoleFromLocation();
+  if (nativeRole) {
+    try {
+      await mountNativeRoleApplication(nativeRole);
+      return;
+    } catch (error) {
+      reportError(error, "native_role_mount");
+    }
   }
 
-  mountApplication();
+  mountPublicApplication();
 }
 
 void bootstrapApplication();
