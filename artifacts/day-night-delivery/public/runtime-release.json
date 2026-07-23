@@ -1,0 +1,8 @@
+{
+  "release": "driver-runtime-v1.1.2",
+  "androidVersionCode": 5,
+  "driverBlankScreenFix": true,
+  "inAppNavigation": true,
+  "gpsVehicleMarker": true,
+  "publishedAt": "2026-07-23T04:45:00Z"
+}
