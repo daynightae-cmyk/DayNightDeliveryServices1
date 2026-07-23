@@ -48,10 +48,12 @@ async function preloadNativeRolePortal() {
   const role = nativeRoleFromLocation();
   if (role === "driver") {
     await import("./components/driver/DriverPortal");
+    await import("./styles/dn-driver-native-auth-final.css");
     return;
   }
   if (role === "merchant") {
     await import("./components/merchant/MerchantPortalCommandCenter");
+    await import("./styles/dn-merchant-native-auth-final.css");
   }
 }
 
