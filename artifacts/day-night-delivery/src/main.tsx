@@ -35,7 +35,29 @@ function isMapTileImage(img: HTMLImageElement) {
   return img.classList.contains("leaflet-tile");
 }
 
-if (typeof window !== "undefined") {
+function nativeRoleFromLocation() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const nativeRole = params.get("nativeShell");
+  if (nativeRole === "driver" && /^\/driver(?:\/|$)/.test(window.location.pathname)) return "driver";
+  if (nativeRole === "merchant" && /^\/merchant(?:\/|$)/.test(window.location.pathname)) return "merchant";
+  return null;
+}
+
+async function preloadNativeRolePortal() {
+  const role = nativeRoleFromLocation();
+  if (role === "driver") {
+    await import("./components/driver/DriverPortal");
+    return;
+  }
+  if (role === "merchant") {
+    await import("./components/merchant/MerchantPortalCommandCenter");
+  }
+}
+
+function installGlobalRuntimeHandlers() {
+  if (typeof window === "undefined") return;
+
   initializeDayNightNativeRuntime();
   initializeLiveDeploymentWatcher();
 
@@ -68,13 +90,32 @@ if (typeof window !== "undefined") {
   });
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <AppProvider>
-      <App />
-      <ProductionOrderRealtimeBridge />
-      <AdminDeferredMerchantAccounting />
-      <ProductionExperience />
-    </AppProvider>
-  </StrictMode>,
-);
+function mountApplication() {
+  const root = document.getElementById("root");
+  if (!root) throw new Error("DAY NIGHT root element is missing");
+
+  createRoot(root).render(
+    <StrictMode>
+      <AppProvider>
+        <App />
+        <ProductionOrderRealtimeBridge />
+        <AdminDeferredMerchantAccounting />
+        <ProductionExperience />
+      </AppProvider>
+    </StrictMode>,
+  );
+}
+
+async function bootstrapApplication() {
+  installGlobalRuntimeHandlers();
+
+  try {
+    await preloadNativeRolePortal();
+  } catch (error) {
+    reportError(error, "native_role_preload");
+  }
+
+  mountApplication();
+}
+
+void bootstrapApplication();
