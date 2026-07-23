@@ -1,0 +1,133 @@
+/* DAY NIGHT Driver v1.1.4 — authenticated Android visibility contract.
+   This file is imported last by DriverPortal. It scopes all corrections to the
+   real Driver role root and never injects or duplicates authentication UI. */
+
+html[data-native-shell="driver"],
+html[data-native-shell="driver"] body,
+html[data-native-shell="driver"] #root {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+}
+
+html[data-native-shell="driver"] body {
+  min-height: 100dvh !important;
+  overflow-y: auto !important;
+  background: #f7f5ea !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html[data-native-shell="driver"] #root,
+html[data-native-shell="driver"] #root > section,
+html[data-native-shell="driver"] .dn-driver-shell,
+html[data-native-shell="driver"] .dn-driver-exact-shell,
+html[data-native-shell="driver"] .dn-driver-workspace-v3 {
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 100dvh !important;
+  height: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  translate: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  filter: none !important;
+  contain: none !important;
+  isolation: auto !important;
+}
+
+html[data-native-shell="driver"] .dn-driver-workspace-v3 {
+  z-index: 1 !important;
+  overflow: visible !important;
+  color: #111827 !important;
+  background: #f7f5ea !important;
+}
+
+html[data-native-shell="driver"] .dn-driver-workspace-v3 > *,
+html[data-native-shell="driver"] .dn-driver-exact-board,
+html[data-native-shell="driver"] .dn-driver-exact-board > article,
+html[data-native-shell="driver"] .dn-driver-navigation-workspace,
+html[data-native-shell="driver"] .dn-driver-orders-grid-v3,
+html[data-native-shell="driver"] .dn-driver-history-grid-v3,
+html[data-native-shell="driver"] .dn-driver-profile-layout-v3 {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  translate: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+html[data-native-shell="driver"] .dn-driver-workspace-v3::before,
+html[data-native-shell="driver"] .dn-driver-workspace-v3::after,
+html[data-native-shell="driver"] .dn-driver-exact-shell::before,
+html[data-native-shell="driver"] .dn-driver-exact-shell::after {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  html[data-native-shell="driver"] .dn-driver-exact-rail {
+    display: none !important;
+  }
+
+  html[data-native-shell="driver"] .dn-driver-workspace-v3 {
+    padding: 8px 8px calc(108px + env(safe-area-inset-bottom)) !important;
+  }
+
+  html[data-native-shell="driver"] .dn-driver-exact-header {
+    position: relative !important;
+    top: auto !important;
+    z-index: 15 !important;
+    width: 100% !important;
+    margin: 0 0 8px !important;
+  }
+
+  html[data-native-shell="driver"] .dn-driver-exact-board {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "jobs" "map" "vehicle" !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-native-shell="driver"] .dn-driver-exact-board > article {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  html[data-native-shell="driver"] .dn-driver-mobile-dock-v3 {
+    position: fixed !important;
+    z-index: 100 !important;
+    inset-inline: 10px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: auto !important;
+    max-width: 620px !important;
+    margin-inline: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+}
