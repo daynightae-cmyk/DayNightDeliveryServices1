@@ -2,13 +2,10 @@ import { supabase } from "../supabase";
 
 export type FeedbackContext = {
   ok: boolean;
-  order_id: string;
   tracking_number: string;
   delivered_at?: string | null;
   service_type?: string | null;
-  driver_id?: string | null;
   driver_name?: string | null;
-  merchant_id?: string | null;
   merchant_name?: string | null;
   customer_name?: string | null;
   masked_phone?: string | null;
@@ -170,21 +167,39 @@ export async function loadAdminCustomerExperience(): Promise<AdminExperienceSnap
 
 export async function loadComplaintDetails(complaintId: string) {
   const client = requireSupabase();
-  const [complaintResult, eventsResult, attachmentsResult] = await Promise.all([
-    client.from("complaints").select("*").eq("id", complaintId).single(),
+  const complaintResult = await client.from("complaints").select("*").eq("id", complaintId).single();
+  if (complaintResult.error) throw complaintResult.error;
+  const complaint = complaintResult.data;
+
+  const emptyResult = Promise.resolve({ data: null, error: null });
+  const [eventsResult, attachmentsResult, orderResult, driverResult, merchantResult, historyResult, attemptsResult] = await Promise.all([
     client.from("complaint_events").select("*").eq("complaint_id", complaintId).order("created_at", { ascending: true }),
     client.from("complaint_attachments").select("*").eq("complaint_id", complaintId).order("uploaded_at", { ascending: true }),
+    client.from("orders").select("*").eq("id", complaint.order_id).maybeSingle(),
+    complaint.driver_id ? client.from("driver_profiles").select("*").eq("id", complaint.driver_id).maybeSingle() : emptyResult,
+    complaint.merchant_id ? client.from("merchants").select("*").eq("id", complaint.merchant_id).maybeSingle() : emptyResult,
+    client.from("order_status_history").select("*").eq("order_id", complaint.order_id).order("created_at", { ascending: true }),
+    client.from("order_contact_attempts").select("*").eq("order_id", complaint.order_id).order("created_at", { ascending: true }),
   ]);
-  if (complaintResult.error) throw complaintResult.error;
-  if (eventsResult.error) throw eventsResult.error;
-  if (attachmentsResult.error) throw attachmentsResult.error;
+
+  const firstError = [eventsResult.error, attachmentsResult.error, orderResult.error, driverResult.error, merchantResult.error, historyResult.error, attemptsResult.error].find(Boolean);
+  if (firstError) throw firstError;
 
   const attachments = await Promise.all((attachmentsResult.data || []).map(async (attachment: any) => {
     const { data } = await client.storage.from("complaint-attachments").createSignedUrl(attachment.storage_path, 900);
     return { ...attachment, signed_url: data?.signedUrl || "" };
   }));
 
-  return { complaint: complaintResult.data, events: eventsResult.data || [], attachments };
+  return {
+    complaint,
+    order: orderResult.data || null,
+    driver: driverResult.data || null,
+    merchant: merchantResult.data || null,
+    events: eventsResult.data || [],
+    orderHistory: historyResult.data || [],
+    contactAttempts: attemptsResult.data || [],
+    attachments,
+  };
 }
 
 export async function updateComplaint(input: {
@@ -208,6 +223,48 @@ export async function updateComplaint(input: {
   return unwrapRpc<any>(data);
 }
 
+export async function setFeedbackReview(input: {
+  feedbackId: string;
+  reviewStatus: "new" | "reviewed" | "published" | "hidden" | "converted_to_complaint";
+  allowPublicDisplay?: boolean;
+}) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("admin_set_feedback_review", {
+    p_feedback_id: input.feedbackId,
+    p_review_status: input.reviewStatus,
+    p_allow_public_display: input.allowPublicDisplay ?? null,
+  });
+  if (error) throw error;
+  return unwrapRpc<any>(data);
+}
+
+export async function convertFeedbackToComplaint(feedbackId: string, severity: "low" | "medium" | "high" | "critical" = "medium") {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("admin_create_complaint_from_feedback", {
+    p_feedback_id: feedbackId,
+    p_severity: severity,
+  });
+  if (error) throw error;
+  return unwrapRpc<any>(data);
+}
+
+export async function suspendDriverForComplaint(complaintId: string, note: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("admin_suspend_driver_for_complaint", {
+    p_complaint_id: complaintId,
+    p_note: note || null,
+  });
+  if (error) throw error;
+  return unwrapRpc<any>(data);
+}
+
+export async function loadDriverFeedbackSummary() {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("driver_feedback_summary");
+  if (error) throw error;
+  return unwrapRpc<any>(data);
+}
+
 export async function saveMessageTemplate(input: {
   id: string;
   body: string;
@@ -225,13 +282,14 @@ export async function saveMessageTemplate(input: {
 
 export function subscribeCustomerExperience(onChange: () => void) {
   if (!supabase) return () => undefined;
-  const channel = supabase
+  const client = supabase;
+  const channel = client
     .channel(`customer-experience-${Date.now()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "order_feedback" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "outbound_message_logs" }, onChange)
     .subscribe();
   return () => {
-    void supabase?.removeChannel(channel);
+    void client.removeChannel(channel);
   };
 }
