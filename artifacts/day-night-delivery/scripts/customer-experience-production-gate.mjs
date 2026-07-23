@@ -3,7 +3,6 @@ import path from "node:path";
 import process from "node:process";
 
 const root = path.resolve(process.cwd());
-const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const requireFile = (relative) => {
   const full = path.join(root, relative);
   if (!fs.existsSync(full)) throw new Error(`missing required file: ${relative}`);
@@ -116,6 +115,17 @@ for (const security of [
   "supabase_realtime",
   "generated','opened','copied','failed",
 ]) requireText(migration, security, path.basename(migrationPath));
+
+const healthPath = path.resolve(root, "../../supabase/migrations/20260723140500_customer_experience_runtime_health.sql");
+const health = fs.readFileSync(healthPath, "utf8");
+for (const contract of [
+  "customer_experience_runtime_health",
+  "missing_tables",
+  "rls_missing",
+  "realtime_missing",
+  "attachment_bucket",
+  "pg_notify('pgrst','reload schema')",
+]) requireText(health, contract, path.basename(healthPath));
 
 const runtimeGuard = requireFile("src/components/WhatsAppRuntimeGuard.tsx");
 requireText(runtimeGuard, "hasMessageText", "WhatsAppRuntimeGuard.tsx");
