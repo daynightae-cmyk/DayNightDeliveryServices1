@@ -1,0 +1,279 @@
+import { useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  ClipboardCopy,
+  ExternalLink,
+  MapPin,
+  MessageCircle,
+  Navigation,
+  Phone,
+  Send,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import type { DriverOrder } from "../../types/driver";
+import {
+  copyPreparedWhatsApp,
+  createFeedbackLinkForOrder,
+  openPreparedWhatsApp,
+  prepareWhatsAppMessage,
+  recordDriverContactAttempt,
+  type PreparedWhatsAppMessage,
+} from "../../services/whatsappMessageService";
+import { getTrackingUrl } from "../../config/companyContact";
+
+type Props = {
+  order: DriverOrder;
+  isArabic: boolean;
+};
+
+type MessageAction = {
+  key:
+    | "driver_on_the_way"
+    | "driver_request_location"
+    | "driver_arrived"
+    | "driver_unreachable"
+    | "driver_delivered_feedback";
+  ar: string;
+  en: string;
+  Icon: typeof Send;
+  tone?: "normal" | "warning" | "success";
+};
+
+const MESSAGE_ACTIONS: MessageAction[] = [
+  { key: "driver_on_the_way", ar: "أنا في الطريق", en: "I am on the way", Icon: Navigation },
+  { key: "driver_request_location", ar: "طلب إرسال الموقع", en: "Request location", Icon: MapPin },
+  { key: "driver_arrived", ar: "وصلت إلى الموقع", en: "I have arrived", Icon: MessageCircle },
+  { key: "driver_unreachable", ar: "تعذر التواصل", en: "Unable to contact", Icon: TriangleAlert, tone: "warning" },
+  { key: "driver_delivered_feedback", ar: "تم التسليم – طلب تقييم", en: "Delivered – request feedback", Icon: CheckCircle2, tone: "success" },
+];
+
+function trackingReference(order: DriverOrder) {
+  return String(order.tracking_number || order.tracking_code || order.invoice_number || order.id || "").trim();
+}
+
+function customerPhone(order: DriverOrder) {
+  return String(order.receiver_phone || order.customer_phone || "").trim();
+}
+
+function amountDue(order: DriverOrder) {
+  const cod = Number(order.cod_amount || 0);
+  if (Number.isFinite(cod) && cod > 0) return cod;
+  if (String(order.payment_method || "").toLowerCase() === "receiver_pays") {
+    const amount = Number(order.customer_total || order.total_amount || order.total || 0);
+    return Number.isFinite(amount) ? amount : 0;
+  }
+  return 0;
+}
+
+export default function DriverCustomerCommunication({ order, isArabic }: Props) {
+  const [prepared, setPrepared] = useState<PreparedWhatsAppMessage | null>(null);
+  const [preparing, setPreparing] = useState<string>("");
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [contactNote, setContactNote] = useState("");
+  const reference = useMemo(() => trackingReference(order), [order]);
+  const phone = useMemo(() => customerPhone(order), [order]);
+  const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
+
+  async function prepare(action: MessageAction) {
+    setPreparing(action.key);
+    setError("");
+    setCopied(false);
+    try {
+      let feedbackUrl = "";
+      if (action.key === "driver_on_the_way" || action.key === "driver_delivered_feedback") {
+        try {
+          feedbackUrl = await createFeedbackLinkForOrder(order.id);
+        } catch (feedbackError) {
+          if (action.key === "driver_delivered_feedback") throw feedbackError;
+        }
+      }
+
+      const result = await prepareWhatsAppMessage({
+        messageType: action.key,
+        orderId: order.id,
+        trackingNumber: reference,
+        customerName: order.receiver_name || order.customer_name,
+        customerPhone: phone,
+        customerCity: order.receiver_city,
+        merchantId: order.merchant_id,
+        merchantName: order.merchant_name,
+        driverId: order.assigned_driver_id || order.driver_id || undefined,
+        driverName: order.driver_name,
+        driverPhone: order.driver_phone,
+        amountDue: amountDue(order),
+        paymentMethod: order.payment_method,
+        pickupAddress: [order.sender_city, order.sender_address].filter(Boolean).join("، "),
+        deliveryAddress: [order.receiver_city, order.receiver_address].filter(Boolean).join("، "),
+        trackingUrl,
+        feedbackUrl,
+        orderStatus: order.status,
+        locale: isArabic ? "ar" : "en",
+        metadata: { surface: "driver_order_card", action: action.key },
+      });
+      setPrepared(result);
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "message_generation_failed";
+      setError(
+        isArabic
+          ? code === "invalid_whatsapp_phone"
+            ? "رقم هاتف العميل غير صالح لفتح واتساب. راجع بيانات الطلب أولًا."
+            : code === "feedback_service_unavailable" || code === "feedback_link_not_created"
+              ? "تعذر إنشاء رابط تقييم آمن لهذا الطلب. تأكد من تطبيق تحديث قاعدة البيانات."
+              : "تعذر تجهيز الرسالة. تأكد من اكتمال بيانات الطلب وحاول مجددًا."
+          : code === "invalid_whatsapp_phone"
+            ? "The customer phone is invalid for WhatsApp. Review the order first."
+            : "The message could not be prepared. Check the order data and try again.",
+      );
+    } finally {
+      setPreparing("");
+    }
+  }
+
+  async function recordUnreachable(result: "opened" | "copied") {
+    if (prepared?.templateKey !== "driver_unreachable") return;
+    try {
+      await recordDriverContactAttempt({
+        orderId: order.id,
+        driverId: order.assigned_driver_id || order.driver_id || undefined,
+        attemptType: "whatsapp_unreachable",
+        result,
+        note: contactNote.trim() || undefined,
+      });
+    } catch {
+      setError(isArabic ? "تم فتح الرسالة، لكن تعذر تسجيل محاولة التواصل في السجل." : "The message opened, but the contact attempt could not be logged.");
+    }
+  }
+
+  async function copyMessage() {
+    if (!prepared) return;
+    await copyPreparedWhatsApp(prepared);
+    await recordUnreachable("copied");
+    setCopied(true);
+  }
+
+  async function openWhatsApp() {
+    if (!prepared) return;
+    await recordUnreachable("opened");
+    await openPreparedWhatsApp(prepared);
+  }
+
+  async function copyReference() {
+    await navigator.clipboard.writeText(reference);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <section className="mt-4 rounded-3xl border border-[#0057B8]/20 bg-white/90 p-4 shadow-[0_18px_50px_rgba(7,26,51,0.08)]" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0057B8]">
+            {isArabic ? "DAY NIGHT SMART CONTACT" : "DAY NIGHT SMART CONTACT"}
+          </span>
+          <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل مع العميل" : "Customer communication"}</h4>
+          <p className="mt-1 text-xs leading-6 text-[#52627A]">
+            {isArabic ? "عاين الرسالة أولًا. فتح واتساب لا يغيّر حالة الطلب." : "Preview first. Opening WhatsApp never changes the order status."}
+          </p>
+        </div>
+        <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" aria-hidden="true" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {MESSAGE_ACTIONS.map(({ Icon, ...action }) => (
+          <button
+            type="button"
+            key={action.key}
+            disabled={Boolean(preparing)}
+            onClick={() => void prepare({ Icon, ...action })}
+            className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition active:scale-[0.98] disabled:opacity-50 ${
+              action.tone === "warning"
+                ? "border-amber-400/35 bg-amber-50 text-amber-900"
+                : action.tone === "success"
+                  ? "border-emerald-500/30 bg-emerald-50 text-emerald-900"
+                  : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"
+            }`}
+          >
+            <Icon className="mb-2 h-5 w-5" aria-hidden="true" />
+            <span>{isArabic ? action.ar : action.en}</span>
+            {preparing === action.key && <span className="mt-2 block text-[10px] opacity-60">{isArabic ? "جارٍ التجهيز…" : "Preparing…"}</span>}
+          </button>
+        ))}
+
+        <a
+          href={phone ? `tel:${phone}` : undefined}
+          aria-disabled={!phone}
+          className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-xs font-black text-[#071A33] aria-disabled:pointer-events-none aria-disabled:opacity-45"
+        >
+          <Phone className="mb-2 h-5 w-5" aria-hidden="true" />
+          {isArabic ? "اتصال بالعميل" : "Call customer"}
+        </a>
+        <a
+          href={trackingUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="min-h-20 rounded-2xl border border-[#D4AF37]/30 bg-[#FFF9E8] p-3 text-xs font-black text-[#735400]"
+        >
+          <ExternalLink className="mb-2 h-5 w-5" aria-hidden="true" />
+          {isArabic ? "فتح التتبع" : "Open tracking"}
+        </a>
+        <button
+          type="button"
+          onClick={() => void copyReference()}
+          className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-start text-xs font-black text-[#071A33]"
+        >
+          <ClipboardCopy className="mb-2 h-5 w-5" aria-hidden="true" />
+          {copied ? (isArabic ? "تم النسخ" : "Copied") : (isArabic ? "نسخ رقم الشحنة" : "Copy tracking number")}
+        </button>
+      </div>
+
+      {error && <p className="mt-3 rounded-2xl border border-red-500/20 bg-red-50 p-3 text-xs font-bold leading-6 text-red-800">{error}</p>}
+
+      {prepared && (
+        <div className="fixed inset-0 z-[100000] flex items-end justify-center bg-[#071A33]/70 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true">
+          <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-[28px] border border-white/10 bg-white p-5 shadow-2xl sm:rounded-[28px]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#25D366]">WhatsApp preview</span>
+                <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "معاينة الرسالة" : "Message preview"}</h4>
+                <p className="mt-1 text-xs text-[#52627A]" dir="ltr">{prepared.phone}</p>
+              </div>
+              <button type="button" onClick={() => setPrepared(null)} className="rounded-full bg-[#071A33]/5 p-2 text-[#071A33]" aria-label={isArabic ? "إغلاق" : "Close"}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {prepared.templateKey === "driver_unreachable" && (
+              <label className="mt-4 block text-xs font-black text-[#071A33]">
+                {isArabic ? "ملاحظة المندوب لمحاولة التواصل" : "Driver contact-attempt note"}
+                <textarea
+                  value={contactNote}
+                  onChange={(event) => setContactNote(event.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  className="mt-2 w-full rounded-2xl border border-[#071A33]/15 bg-[#F7FAFF] p-3 text-sm font-medium outline-none focus:border-[#0057B8]"
+                  placeholder={isArabic ? "مثال: الهاتف مغلق، والموقع غير واضح" : "Example: phone unavailable and location unclear"}
+                />
+              </label>
+            )}
+
+            <pre className="mt-4 whitespace-pre-wrap break-words rounded-2xl border border-[#071A33]/10 bg-[#F5F8FD] p-4 font-sans text-sm font-medium leading-7 text-[#071A33]">{prepared.message}</pre>
+
+            <div className="sticky bottom-0 mt-4 grid grid-cols-3 gap-2 bg-white pt-2">
+              <button type="button" onClick={() => setPrepared(null)} className="rounded-2xl border border-[#071A33]/15 px-3 py-3 text-xs font-black text-[#071A33]">
+                {isArabic ? "إلغاء" : "Cancel"}
+              </button>
+              <button type="button" onClick={() => void copyMessage()} className="rounded-2xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-3 text-xs font-black text-[#0057B8]">
+                {isArabic ? "نسخ الرسالة" : "Copy"}
+              </button>
+              <button type="button" onClick={() => void openWhatsApp()} className="rounded-2xl bg-[#25D366] px-3 py-3 text-xs font-black text-[#071A33] shadow-lg">
+                {isArabic ? "فتح واتساب" : "Open WhatsApp"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
