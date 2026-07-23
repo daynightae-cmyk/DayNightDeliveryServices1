@@ -60,9 +60,17 @@
         document.documentElement.setAttribute("data-native-shell", nativeRole);
         window.__DAY_NIGHT_NATIVE_ROLE__ = nativeRole;
 
+        /* Android already owns the branded operating-system splash. `nosplash=1`
+           makes the web splash impossible to create or display, eliminating the
+           only full-screen layer that could remain over a loaded role portal. */
+        var nativeBootDisabled = params.has("nosplash");
+        if (nativeBootDisabled) {
+          document.documentElement.setAttribute("data-native-boot", "disabled");
+        }
+
         /* Native role applications are live WebViews, not offline PWAs. Remove any
            service worker/cache left by an older build so a stale app shell cannot
-           trap Driver or Merchant on a previous splash screen. */
+           trap Driver or Merchant on a previous index or splash screen. */
         try {
           if ("serviceWorker" in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (registrations) {
@@ -88,7 +96,8 @@
           "#root>div>main{display:block!important;width:100%!important;max-width:none!important;min-height:100dvh!important;margin:0!important;padding:0!important;overflow:visible!important}",
           "#root>div>main~*,#root>div>footer{display:none!important}",
           "input,select,textarea{font-size:16px!important}",
-          "button,a,input,select,textarea{touch-action:manipulation}"
+          "button,a,input,select,textarea{touch-action:manipulation}",
+          nativeBootDisabled ? "#dn-role-boot{display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important}" : ""
         ].join("");
 
         var applying = false;
@@ -117,7 +126,8 @@
       html[data-native-shell] { background:#071a33; }
       html[data-native-shell] body { margin:0; min-height:100dvh; background:#071a33; }
       #dn-role-boot { display:none; }
-      html[data-native-shell] #dn-role-boot {
+      html[data-native-boot="disabled"] #dn-role-boot { display:none!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;animation:none!important; }
+      html[data-native-shell]:not([data-native-boot="disabled"]) #dn-role-boot {
         position:fixed; z-index:2147483646; inset:0; display:grid; place-items:center;
         padding:calc(28px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
         overflow:hidden; color:#fff; text-align:center;
@@ -223,9 +233,15 @@
       (function () {
         var role = document.documentElement.getAttribute("data-native-shell");
         if (role !== "driver" && role !== "merchant") return;
-        var language = document.documentElement.getAttribute("data-language") === "ar" ? "ar" : "en";
         var boot = document.getElementById("dn-role-boot");
         if (!boot) return;
+
+        if (document.documentElement.getAttribute("data-native-boot") === "disabled") {
+          boot.remove();
+          return;
+        }
+
+        var language = document.documentElement.getAttribute("data-language") === "ar" ? "ar" : "en";
         var logo = boot.querySelector(".dn-role-boot-logo");
         var fallback = boot.querySelector(".dn-role-boot-fallback");
         var title = boot.querySelector(".dn-role-boot-title");
