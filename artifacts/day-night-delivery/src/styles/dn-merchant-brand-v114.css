@@ -1,5 +1,6 @@
 /* DAY NIGHT Merchant v1.1.4 — local branding contract.
-   Critical Merchant branding must remain visible even when remote images fail. */
+   Critical Merchant branding must remain visible even when remote images fail.
+   Final acceptance target: Android 14/API 34 and Android 16/API 36. */
 
 .dn-merchant-login-v3 .dn-merchant-login-visual-v3 {
   background-image:
