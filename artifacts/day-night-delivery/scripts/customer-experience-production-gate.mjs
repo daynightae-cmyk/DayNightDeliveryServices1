@@ -8,6 +8,11 @@ const requireFile = (relative) => {
   if (!fs.existsSync(full)) throw new Error(`missing required file: ${relative}`);
   return fs.readFileSync(full, "utf8");
 };
+const requireRepoFile = (relative) => {
+  const full = path.resolve(root, "../..", relative);
+  if (!fs.existsSync(full)) throw new Error(`missing required repository file: ${relative}`);
+  return fs.readFileSync(full, "utf8");
+};
 const requireText = (content, needle, file) => {
   if (!content.includes(needle)) throw new Error(`${file} is missing required contract: ${needle}`);
 };
@@ -78,6 +83,8 @@ for (const value of [
   "convertFeedbackToComplaint",
   "suspendDriverForComplaint",
   "loadDriverFeedbackSummary",
+  "loadMerchantOrderFeedback",
+  "admin_order_feedback_rows",
   "orderHistory",
   "contactAttempts",
 ]) requireText(customerService, value, "customerExperienceService.ts");
@@ -113,11 +120,19 @@ for (const value of [
   "window.confirm",
 ]) requireText(adminActions, value, "AdminCustomerExperienceActions.tsx");
 
+const merchantFeedback = requireFile("src/components/merchant/MerchantFeedbackSummaryLauncher.tsx");
+for (const value of [
+  "merchant_order_feedback",
+  "بدون بيانات إدارية حساسة",
+  "Customer phones, IP hashes, and internal admin notes are never shown.",
+]) requireText(merchantFeedback, value, "MerchantFeedbackSummaryLauncher.tsx");
+
 const main = requireFile("src/main.tsx");
 for (const value of [
   "FeedbackPage",
   "AdminCustomerExperiencePage",
   "AdminCustomerExperienceActions",
+  "MerchantFeedbackSummaryLauncher",
   "ProtectedAdminRoute",
   "WhatsAppRuntimeGuard",
   "normalizeTrackingNumberQuery",
@@ -167,10 +182,29 @@ for (const contract of [
   "admin_create_complaint_from_feedback",
   "admin_suspend_driver_for_complaint",
   "Deliberately excludes order_id, customer_id, merchant_id and driver_id",
-  "drop policy if exists ce_feedback_admin_read",
-  "create policy ce_feedback_scoped_read",
   "dn_ce_audit",
 ]) requireText(privacy, contract, path.basename(privacyPath));
+
+const rlsPath = path.resolve(root, "../../supabase/migrations/20260723141500_customer_experience_rls_storage_hardening.sql");
+const rls = fs.readFileSync(rlsPath, "utf8");
+for (const contract of [
+  "admin_order_feedback_rows",
+  "merchant_order_feedback",
+  "revoke select on public.order_feedback from authenticated",
+  "grant select (",
+  "dn_ce_can_upload_complaint_attachment",
+  "generated_by is null",
+  "metadata->>'ip_hash'",
+]) requireText(rls, contract, path.basename(rlsPath));
+
+const piiPath = path.resolve(root, "../../supabase/migrations/20260723142000_customer_experience_pii_hash_hardening.sql");
+const pii = fs.readFileSync(piiPath, "utf8");
+for (const contract of [
+  "privacy_salt",
+  "hmac(",
+  "No internal IDs, full customer name, phone number, addresses, COD amount or payment data.",
+  "masked_phone",
+]) requireText(pii, contract, path.basename(piiPath));
 
 const runtimeGuard = requireFile("src/components/WhatsAppRuntimeGuard.tsx");
 requireText(runtimeGuard, "hasMessageText", "WhatsAppRuntimeGuard.tsx");
@@ -183,8 +217,30 @@ if (forbiddenDeliveredClaim.test(service)) {
 }
 
 const coreTest = requireFile("scripts/customer-experience-tests.mjs");
-requireText(coreTest, "invalid_whatsapp_phone", "customer-experience-tests.mjs");
-requireText(coreTest, "empty_whatsapp_message", "customer-experience-tests.mjs");
-requireText(coreTest, "مدفوعة مسبقًا", "customer-experience-tests.mjs");
+for (const contract of ["invalid_whatsapp_phone", "empty_whatsapp_message", "مدفوعة مسبقًا"]) {
+  requireText(coreTest, contract, "customer-experience-tests.mjs");
+}
+
+const liveE2e = requireFile("scripts/customer-experience-runtime-e2e.mjs");
+for (const contract of [
+  "customer_experience_runtime_health",
+  "submit_order_feedback",
+  "submit_public_complaint",
+  "duplicate_complaint_rate_limited",
+  "complaint-attachments",
+  "driver_feedback_summary",
+  "admin_update_complaint",
+  "admin_update_message_template",
+  "log_outbound_message",
+  "Temporary Customer Experience E2E records cleaned up.",
+]) requireText(liveE2e, contract, "customer-experience-runtime-e2e.mjs");
+
+const liveWorkflow = requireRepoFile(".github/workflows/customer-experience-runtime-e2e.yml");
+for (const contract of [
+  "environment: production-runtime-tests",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "customer-experience:e2e",
+  "DAY-NIGHT-Customer-Experience-Runtime-Evidence",
+]) requireText(liveWorkflow, contract, "customer-experience-runtime-e2e.yml");
 
 console.log("DAY NIGHT customer experience production gate: PASS");
