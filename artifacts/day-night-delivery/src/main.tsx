@@ -61,7 +61,6 @@ function normalizeTrackingNumberQuery() {
 
 function installGlobalRuntimeHandlers() {
   if (typeof window === "undefined") return;
-
   initializeDayNightNativeRuntime();
   initializeLiveDeploymentWatcher();
 
@@ -147,8 +146,13 @@ async function mountStandaloneCustomerExperience() {
   }
 
   if (/^\/admin\/customer-experience\/?$/i.test(pathname)) {
-    const [{ default: AdminCustomerExperiencePage }, { default: ProtectedAdminRoute }] = await Promise.all([
+    const [
+      { default: AdminCustomerExperiencePage },
+      { default: AdminCustomerExperienceActions },
+      { default: ProtectedAdminRoute },
+    ] = await Promise.all([
       import("./components/admin/AdminCustomerExperiencePage"),
+      import("./components/admin/AdminCustomerExperienceActions"),
       import("./components/ProtectedAdminRoute"),
     ]);
     createRoot(rootElement()).render(
@@ -156,7 +160,10 @@ async function mountStandaloneCustomerExperience() {
         <BrowserRouter>
           <AppProvider>
             <ProtectedAdminRoute>
-              <AdminCustomerExperiencePage />
+              <>
+                <AdminCustomerExperiencePage />
+                <AdminCustomerExperienceActions />
+              </>
             </ProtectedAdminRoute>
             <WhatsAppRuntimeGuard />
           </AppProvider>
@@ -172,7 +179,6 @@ async function mountStandaloneCustomerExperience() {
 async function bootstrapApplication() {
   normalizeTrackingNumberQuery();
   installGlobalRuntimeHandlers();
-
   try {
     if (await mountStandaloneCustomerExperience()) return;
   } catch (error) {
@@ -188,7 +194,6 @@ async function bootstrapApplication() {
       reportError(error, "native_role_mount");
     }
   }
-
   mountPublicApplication();
 }
 
