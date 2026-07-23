@@ -10,6 +10,8 @@ import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
 import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
+import WhatsAppRuntimeGuard from "./components/WhatsAppRuntimeGuard";
+import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -94,6 +96,8 @@ function mountPublicApplication() {
     <StrictMode>
       <AppProvider>
         <App />
+        <WhatsAppRuntimeGuard />
+        <AdminCustomerExperienceLauncher />
         <ProductionOrderRealtimeBridge />
         <AdminDeferredMerchantAccounting />
         <ProductionExperience />
@@ -110,6 +114,7 @@ async function mountNativeRoleApplication(role: NativeRole) {
         <NativeRoleErrorBoundary role={role}>
           <AppProvider>
             <NativeRoleRoot role={role} />
+            <WhatsAppRuntimeGuard />
           </AppProvider>
         </NativeRoleErrorBoundary>
       </BrowserRouter>
@@ -117,8 +122,52 @@ async function mountNativeRoleApplication(role: NativeRole) {
   );
 }
 
+async function mountStandaloneCustomerExperience() {
+  const pathname = window.location.pathname;
+  if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
+    const { default: FeedbackPage } = await import("./components/FeedbackPage");
+    createRoot(rootElement()).render(
+      <StrictMode>
+        <AppProvider>
+          <FeedbackPage />
+          <WhatsAppRuntimeGuard />
+        </AppProvider>
+      </StrictMode>,
+    );
+    return true;
+  }
+
+  if (/^\/admin\/customer-experience\/?$/i.test(pathname)) {
+    const [{ default: AdminCustomerExperiencePage }, { default: ProtectedAdminRoute }] = await Promise.all([
+      import("./components/admin/AdminCustomerExperiencePage"),
+      import("./components/ProtectedAdminRoute"),
+    ]);
+    createRoot(rootElement()).render(
+      <StrictMode>
+        <BrowserRouter>
+          <AppProvider>
+            <ProtectedAdminRoute>
+              <AdminCustomerExperiencePage />
+            </ProtectedAdminRoute>
+            <WhatsAppRuntimeGuard />
+          </AppProvider>
+        </BrowserRouter>
+      </StrictMode>,
+    );
+    return true;
+  }
+
+  return false;
+}
+
 async function bootstrapApplication() {
   installGlobalRuntimeHandlers();
+
+  try {
+    if (await mountStandaloneCustomerExperience()) return;
+  } catch (error) {
+    reportError(error, "customer_experience_mount");
+  }
 
   const nativeRole = nativeRoleFromLocation();
   if (nativeRole) {
