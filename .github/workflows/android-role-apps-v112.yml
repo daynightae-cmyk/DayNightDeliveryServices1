@@ -1,0 +1,142 @@
+name: Android Role Apps v1.1.2
+
+on:
+  pull_request:
+    paths:
+      - "android-role-shell/**"
+      - "artifacts/day-night-delivery/**"
+      - ".github/workflows/android-role-apps-v112.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-role-apps-v112-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-v112:
+    name: Build Driver and Merchant v1.1.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Prepare icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python android-role-shell/scripts/prepare_icons.py
+          test -s android-role-shell/app/src/driver/res/drawable-nodpi/app_icon.png
+          test -s android-role-shell/app/src/merchant/res/drawable-nodpi/app_icon.png
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Verify v1.1.2 contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'compileSdk 36' android-role-shell/app/build.gradle
+          grep -F 'targetSdk 36' android-role-shell/app/build.gradle
+          grep -F 'versionCode 5' android-role-shell/app/build.gradle
+          grep -F 'versionName "1.1.2"' android-role-shell/app/build.gradle
+          grep -F '__dn_live=role-v1.1.2' android-role-shell/app/build.gradle
+          grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
+          grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
+          grep -F 'data-native-driver-router-ready' artifacts/day-night-delivery/src/components/native/NativeDriverRuntimeAcceptance.tsx
+          grep -F 'data-driver-map-ready' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
+          grep -F 'data-driver-vehicle-ready' artifacts/day-night-delivery/src/components/native/NativeDriverRuntimeAcceptance.tsx
+
+      - name: Build APK and AAB packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace \
+            clean assembleDriverDebug assembleMerchantDebug \
+            bundleDriverRelease bundleMerchantRelease \
+            lintDriverRelease lintMerchantRelease
+
+      - name: Stage and verify packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p android-role-shell/dist-v112
+          DRIVER_APK="$(find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' | head -n 1)"
+          MERCHANT_APK="$(find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' | head -n 1)"
+          DRIVER_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*driverRelease*' | head -n 1)"
+          MERCHANT_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*merchantRelease*' | head -n 1)"
+          test -s "$DRIVER_APK" && test -s "$MERCHANT_APK" && test -s "$DRIVER_AAB" && test -s "$MERCHANT_AAB"
+          cp "$DRIVER_APK" android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.apk
+          cp "$MERCHANT_APK" android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.apk
+          cp "$DRIVER_AAB" android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.aab
+          cp "$MERCHANT_AAB" android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.aab
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          "$AAPT" dump badging android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.apk > android-role-shell/dist-v112/driver-badging.txt
+          "$AAPT" dump badging android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.apk > android-role-shell/dist-v112/merchant-badging.txt
+          grep -F "package: name='com.daynightae.driver'" android-role-shell/dist-v112/driver-badging.txt
+          grep -F "versionName='1.1.2'" android-role-shell/dist-v112/driver-badging.txt
+          grep -F "package: name='com.daynightae.merchant'" android-role-shell/dist-v112/merchant-badging.txt
+          grep -F "versionName='1.1.2'" android-role-shell/dist-v112/merchant-badging.txt
+          unzip -t android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.aab >/dev/null
+          unzip -t android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.aab >/dev/null
+          (cd android-role-shell/dist-v112 && sha256sum DAY-NIGHT-Driver-v1.1.2.apk DAY-NIGHT-Driver-v1.1.2.aab > DAY-NIGHT-Driver-v1.1.2.sha256)
+          (cd android-role-shell/dist-v112 && sha256sum DAY-NIGHT-Merchant-v1.1.2.apk DAY-NIGHT-Merchant-v1.1.2.aab > DAY-NIGHT-Merchant-v1.1.2.sha256)
+          (cd android-role-shell/dist-v112 && zip -9 DAY-NIGHT-Android-Apps-v1.1.2-FINAL.zip DAY-NIGHT-Driver-v1.1.2.apk DAY-NIGHT-Driver-v1.1.2.aab DAY-NIGHT-Driver-v1.1.2.sha256 DAY-NIGHT-Merchant-v1.1.2.apk DAY-NIGHT-Merchant-v1.1.2.aab DAY-NIGHT-Merchant-v1.1.2.sha256 driver-badging.txt merchant-badging.txt)
+          (cd android-role-shell/dist-v112 && sha256sum DAY-NIGHT-Android-Apps-v1.1.2-FINAL.zip > DAY-NIGHT-Android-Apps-v1.1.2-FINAL.zip.sha256)
+
+      - name: Upload Driver v1.1.2
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Driver-v1.1.2
+          path: |
+            android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.apk
+            android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.aab
+            android-role-shell/dist-v112/DAY-NIGHT-Driver-v1.1.2.sha256
+            android-role-shell/dist-v112/driver-badging.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Merchant v1.1.2
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Merchant-v1.1.2
+          path: |
+            android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.apk
+            android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.aab
+            android-role-shell/dist-v112/DAY-NIGHT-Merchant-v1.1.2.sha256
+            android-role-shell/dist-v112/merchant-badging.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload complete v1.1.2 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Android-Apps-v1.1.2-FINAL
+          path: |
+            android-role-shell/dist-v112/DAY-NIGHT-Android-Apps-v1.1.2-FINAL.zip
+            android-role-shell/dist-v112/DAY-NIGHT-Android-Apps-v1.1.2-FINAL.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
