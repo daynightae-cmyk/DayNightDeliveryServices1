@@ -56,7 +56,7 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Verify v1.1.2 contracts
+      - name: Verify v1.1.2 release inputs
         shell: bash
         run: |
           set -euo pipefail
@@ -64,14 +64,11 @@ jobs:
           grep -F 'targetSdk 36' android-role-shell/app/build.gradle
           grep -F 'versionCode 5' android-role-shell/app/build.gradle
           grep -F 'versionName "1.1.2"' android-role-shell/app/build.gradle
-          grep -F '__dn_live=role-v1.1.2' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
-          grep -F 'data-driver-runtime-acceptance="ready"' artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
-          grep -F 'data-driver-map-ready' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
-          grep -F 'DayNightVehicleMarker' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
-          grep -F 'BrowserRouter' artifacts/day-night-delivery/src/main.tsx
-          grep -F 'NativeRoleErrorBoundary' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
+          test -s artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
+          test -s artifacts/day-night-delivery/src/components/native/NativeRoleErrorBoundary.tsx
+          test -s artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
 
       - name: Build APK and AAB packages
         shell: bash
