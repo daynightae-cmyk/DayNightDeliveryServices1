@@ -1,0 +1,104 @@
+name: Customer Experience Runtime E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_test_data:
+        description: Preserve temporary Customer Experience records for manual review
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: customer-experience-runtime-e2e
+  cancel-in-progress: false
+
+jobs:
+  live-customer-experience:
+    name: WhatsApp → Feedback → Complaint live lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify protected runtime secrets
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY \
+            RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD \
+            RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD \
+            RUNTIME_DRIVER_EMAIL RUNTIME_DRIVER_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected secrets: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+
+      - name: Run static Customer Experience acceptance
+        run: |
+          pnpm --dir artifacts/day-night-delivery run customer-experience:test
+          pnpm --dir artifacts/day-night-delivery run customer-experience:gate
+
+      - name: Execute live production lifecycle with automatic cleanup
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+          CUSTOMER_EXPERIENCE_E2E_KEEP_DATA: ${{ inputs.keep_test_data }}
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/day-night-delivery/customer-experience-evidence
+          pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 | tee artifacts/day-night-delivery/customer-experience-evidence/runtime-e2e.log
+
+      - name: Upload redacted runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Customer-Experience-Runtime-Evidence
+          path: artifacts/day-night-delivery/customer-experience-evidence/
+          if-no-files-found: error
+          retention-days: 30

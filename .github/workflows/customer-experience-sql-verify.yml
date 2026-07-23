@@ -1,0 +1,98 @@
+name: Customer Experience SQL Verify
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/2026072314*.sql"
+      - "supabase/tests/customer_experience_*.sql"
+      - ".github/workflows/customer-experience-sql-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: customer-experience-sql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-17:
+    name: Apply and verify Customer Experience migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: daynight
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d daynight"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: daynight
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Bootstrap existing DAY NIGHT/Supabase contracts
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/customer_experience_bootstrap.sql
+
+      - name: Apply Customer Experience migrations in production order
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in \
+            supabase/migrations/20260723140000_smart_whatsapp_feedback_complaints.sql \
+            supabase/migrations/20260723140500_customer_experience_runtime_health.sql \
+            supabase/migrations/20260723141000_customer_experience_privacy_actions.sql \
+            supabase/migrations/20260723141500_customer_experience_rls_storage_hardening.sql \
+            supabase/migrations/20260723142000_customer_experience_pii_hash_hardening.sql \
+            supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql \
+            supabase/migrations/20260723143000_customer_experience_pgcrypto_runtime_hotfix.sql \
+            supabase/migrations/20260723143500_customer_experience_notification_enum_lint_hotfix.sql
+          do
+            echo "Applying $migration"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Verify tables, functions, RLS, Realtime, storage and privacy
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/customer_experience_verify.sql | tee customer-experience-sql-verification.log
+
+      - name: Dump customer-experience schema evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p customer-experience-sql-evidence
+          cp customer-experience-sql-verification.log customer-experience-sql-evidence/ 2>/dev/null || true
+          pg_dump --schema-only --no-owner --no-privileges \
+            --table='public.customer_experience_settings' \
+            --table='public.message_templates' \
+            --table='public.outbound_message_logs' \
+            --table='public.feedback_tokens' \
+            --table='public.order_feedback' \
+            --table='public.complaints' \
+            --table='public.complaint_attachments' \
+            --table='public.complaint_events' \
+            --table='public.order_contact_attempts' \
+            > customer-experience-sql-evidence/schema.sql || true
+
+      - name: Upload SQL verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Customer-Experience-SQL-Evidence
+          path: customer-experience-sql-evidence/
+          if-no-files-found: warn
+          retention-days: 30
