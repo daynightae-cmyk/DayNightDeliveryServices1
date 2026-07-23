@@ -5,6 +5,8 @@ import {
   extractTemplateVariables,
   formatAed,
   interpolateTemplate,
+  isLikelyMojibake,
+  repairLikelyMojibake,
   sanitizeWhatsAppPhone,
   validateTemplateVariables,
 } from "../src/services/whatsappMessageCore.mjs";
@@ -41,6 +43,16 @@ assert.ok(!prepaidMessage.includes("المبلغ المطلوب"));
 assert.match(prepaidMessage, /مدفوعة مسبقًا/);
 assert.ok(!/\n{3,}/.test(prepaidMessage), "optional lines should not leave large gaps");
 
+const corruptedArabic = "Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… ðŸ‘‹";
+assert.equal(isLikelyMojibake(corruptedArabic), true);
+assert.equal(isLikelyMojibake("السلام عليكم 👋"), false);
+assert.equal(isLikelyMojibake("Fast Reliable Every Time"), false);
+assert.equal(repairLikelyMojibake(corruptedArabic), "السلام عليكم 👋");
+assert.equal(
+  interpolateTemplate("Ø±Ù‚Ù… Ø§Ù„Ø´Ø­Ù†Ø©: {tracking_number}", { tracking_number: "DN-2026-77777" }),
+  "رقم الشحنة: DN-2026-77777",
+);
+
 assert.equal(sanitizeWhatsAppPhone("+971 56 875 7331"), "971568757331");
 assert.equal(sanitizeWhatsAppPhone("056-875-7331"), "971568757331");
 assert.equal(sanitizeWhatsAppPhone("00971 56 875 7331"), "971568757331");
@@ -51,6 +63,11 @@ assert.equal(formatAed("invalid"), "");
 const url = buildWhatsAppUrl("+971568757331", fullMessage);
 assert.match(url, /^https:\/\/wa\.me\/971568757331\?text=/);
 assert.match(decodeURIComponent(url.split("?text=")[1]), /السلام عليكم/);
+
+const repairedUrl = buildWhatsAppUrl("+971568757331", corruptedArabic);
+assert.match(decodeURIComponent(repairedUrl.split("?text=")[1]), /السلام عليكم/);
+assert.doesNotMatch(decodeURIComponent(repairedUrl.split("?text=")[1]), /Ø|Ù|ðŸ/);
+
 assert.throws(() => buildWhatsAppUrl("123", "hello"), /invalid_whatsapp_phone/);
 assert.throws(() => buildWhatsAppUrl("+971568757331", "   "), /empty_whatsapp_message/);
 

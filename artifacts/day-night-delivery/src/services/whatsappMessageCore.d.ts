@@ -1,3 +1,5 @@
+export function isLikelyMojibake(value?: unknown): boolean;
+export function repairLikelyMojibake(value?: unknown): string;
 export function sanitizeWhatsAppPhone(value?: unknown, defaultCountryCode?: string): string;
 export function formatAed(value?: unknown, locale?: string): string;
 export function extractTemplateVariables(template?: unknown): string[];
