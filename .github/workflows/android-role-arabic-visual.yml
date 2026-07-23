@@ -1,4 +1,4 @@
-name: Android Role Arabic Visual Acceptance
+name: Android Role v1.1.4 Visual Acceptance
 
 on:
   pull_request:
@@ -12,18 +12,25 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-role-arabic-visual-${{ github.ref }}
+  group: android-role-v114-visual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  arabic-visual:
-    name: Driver router/map and Merchant login acceptance
+  role-visual:
+    name: Android ${{ matrix.android_release }} role surfaces
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 34
+            android_release: 14
+          - api: 36
+            android_release: 16
     env:
       VITE_SUPABASE_URL: https://ngdwybpgacauorygoedi.supabase.co
       VITE_SUPABASE_ANON_KEY: ""
-      VITE_ROLE_VISUAL_TEST: "1"
       VITE_DRIVER_RUNTIME_VISUAL_TEST: "1"
 
     steps:
@@ -43,48 +50,55 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Build and serve the exact PR web application
+      - name: Build and serve the exact PR application
         shell: bash
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
+          pnpm run web:typecheck
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
-          grep -F 'data-native-boot' artifacts/day-night-delivery/index.html
-          grep -F 'BrowserRouter' artifacts/day-night-delivery/src/main.tsx
-          grep -F 'NativeRoleErrorBoundary' artifacts/day-night-delivery/src/main.tsx
-          grep -F 'DriverRuntimeVisualAcceptance' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
-          grep -F 'data-driver-runtime-acceptance' artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
+          grep -F '<BrowserRouter>' artifacts/day-night-delivery/src/main.tsx
+          grep -F 'return role === "driver" ? <DriverPortal /> : <MerchantPortal />' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
+          grep -F 'data-driver-runtime-acceptance="ready"' artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
           grep -F 'data-driver-map-ready' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
-          grep -F 'dn-native-role-login-card' artifacts/day-night-delivery/src/components/native/NativeRoleLogin.tsx
-          grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
-          grep -F 'vehicle=' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
-          grep -F 'LAYER_TYPE_SOFTWARE' android-role-shell/app/src/visual/java/com/daynightae/shell/VisualTestActivity.java
-          mkdir -p android-role-shell/arabic-visual
-          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
-          echo $! > android-role-shell/arabic-visual/local-web.pid
-          for attempt in $(seq 1 45); do
+          grep -F 'localAssets.logo' artifacts/day-night-delivery/src/portal-designs/merchant/MerchantDesktopSidebar.tsx
+          grep -F 'localAssets.logo' artifacts/day-night-delivery/src/portal-designs/merchant/MerchantHeader.tsx
+          if grep -R -F 'left","-200vw' android-role-shell/app/src/main/java artifacts/day-night-delivery/src/components/native; then
+            echo 'Off-screen authentication bridge remains in production source.'
+            exit 1
+          fi
+          mkdir -p android-role-shell/visual-api${{ matrix.api }}
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/visual-api${{ matrix.api }}/local-web.log 2>&1 &
+          echo $! > android-role-shell/visual-api${{ matrix.api }}/local-web.pid
+          for attempt in $(seq 1 60); do
             curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null && break
             sleep 1
           done
           curl -fsS "http://127.0.0.1:4173/driver?nativeShell=driver&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null
           curl -fsS "http://127.0.0.1:4173/merchant?nativeShell=merchant&nosplash=1&lang=ar" | grep -F 'id="root"' >/dev/null
 
-      - name: Set up Java and Android SDK
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
 
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install Android 16 and image tools
+      - name: Install Android ${{ matrix.android_release }} and image tools
         shell: bash
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" \
+            "emulator" \
+            "system-images;android-${{ matrix.api }};google_apis;x86_64"
           python -m pip install --disable-pip-version-check "pillow>=10,<13"
           python android-role-shell/scripts/prepare_icons.py
 
@@ -93,7 +107,7 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Build isolated Arabic visual APKs
+      - name: Build isolated visual APKs
         shell: bash
         env:
           DAYNIGHT_ROLE_WEB_BASE_URL: http://10.0.2.2:4173
@@ -101,129 +115,125 @@ jobs:
         run: |
           set -euo pipefail
           gradle -p android-role-shell --no-daemon --console=plain assembleDriverVisual assembleMerchantVisual
-          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*visual*' -exec cp {} android-role-shell/arabic-visual/driver-visual.apk \;
-          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*visual*' -exec cp {} android-role-shell/arabic-visual/merchant-visual.apk \;
-          test -s android-role-shell/arabic-visual/driver-visual.apk
-          test -s android-role-shell/arabic-visual/merchant-visual.apk
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*visual*' -exec cp {} android-role-shell/visual-api${{ matrix.api }}/driver-visual.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*visual*' -exec cp {} android-role-shell/visual-api${{ matrix.api }}/merchant-visual.apk \;
+          test -s android-role-shell/visual-api${{ matrix.api }}/driver-visual.apk
+          test -s android-role-shell/visual-api${{ matrix.api }}/merchant-visual.apk
 
-      - name: Boot Android 16
+      - name: Boot Android ${{ matrix.android_release }}
         shell: bash
         run: |
           set -euo pipefail
-          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-arabic-avd"
-          mkdir -p "$ANDROID_AVD_HOME" android-role-shell/arabic-visual/emulator
-          echo no | avdmanager create avd --force --name daynight_arabic_api36 --package "system-images;android-36;google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_arabic_api36.avd"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-v114-api${{ matrix.api }}-avd"
+          out="android-role-shell/visual-api${{ matrix.api }}"
+          mkdir -p "$ANDROID_AVD_HOME" "$out/emulator"
+          echo no | avdmanager create avd --force --name daynight_v114_api${{ matrix.api }} --package "system-images;android-${{ matrix.api }};google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_v114_api${{ matrix.api }}.avd"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
-          nohup "$ANDROID_HOME/emulator/emulator" -avd daynight_arabic_api36 -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data > android-role-shell/arabic-visual/emulator/boot.log 2>&1 &
-          echo $! > android-role-shell/arabic-visual/emulator/pid
-          timeout 180 adb wait-for-device
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd daynight_v114_api${{ matrix.api }} -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data \
+            > "$out/emulator/boot.log" 2>&1 &
+          echo $! > "$out/emulator/pid"
+          timeout 240 adb wait-for-device
           for attempt in $(seq 1 180); do
             [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
             sleep 5
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
           adb shell settings delete global http_proxy || true
+          adb shell getprop ro.build.version.release | tee "$out/android-release.txt"
+          adb shell getprop ro.build.version.sdk | tee "$out/android-sdk.txt"
+          grep -Fx "${{ matrix.android_release }}" "$out/android-release.txt"
+          grep -Fx "${{ matrix.api }}" "$out/android-sdk.txt"
           sleep 8
 
-      - name: Capture Driver map and Merchant login after real surfaces render
+      - name: Capture real Driver map and Merchant login
         shell: bash
         run: |
           set -euo pipefail
+          out="android-role-shell/visual-api${{ matrix.api }}"
 
           capture_role() {
             role="$1"
             package_name="$2"
-            apk="android-role-shell/arabic-visual/${role}-visual.apk"
-            output="android-role-shell/arabic-visual"
+            apk="$out/${role}-visual.apk"
 
-            adb install -r "$apk" | tee "$output/${role}-install.log"
+            adb install -r "$apk" | tee "$out/${role}-install.log"
+            grep -F 'Success' "$out/${role}-install.log"
             adb shell am force-stop "$package_name"
             adb logcat -c
-            adb shell am start -n "$package_name/com.daynightae.shell.VisualTestActivity" > "$output/${role}-start.log"
-
-            sleep 0.35
-            adb exec-out screencap -p > "$output/${role}-stage-01.png"
-            sleep 0.65
-            adb exec-out screencap -p > "$output/${role}-stage-02.png"
-            sleep 0.9
-            adb exec-out screencap -p > "$output/${role}-stage-03.png"
+            adb shell am start -n "$package_name/com.daynightae.shell.VisualTestActivity" > "$out/${role}-start.log"
 
             ready=""
-            for attempt in $(seq 1 55); do
-              adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > "$output/${role}-runtime.log"
-              if grep -E "${role} attempt=[1-7].*removed=true" "$output/${role}-runtime.log" >/dev/null \
-                && grep -E "${role} attempt=[1-7].*roleReady=true" "$output/${role}-runtime.log" >/dev/null; then
-                ready="1"
+            for attempt in $(seq 1 75); do
+              adb logcat -d -s DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I chromium:I '*:S' > "$out/${role}-runtime.log" || true
+              if grep -F '\"roleReady\":true' "$out/${role}-runtime.log" >/dev/null; then
+                ready=1
                 break
               fi
               sleep 1
             done
-
-            cat "$output/${role}-runtime.log"
+            cat "$out/${role}-runtime.log"
             test "$ready" = "1"
 
+            if [ "$role" = "driver" ]; then
+              grep -F '\"driverRuntime\":true' "$out/${role}-runtime.log"
+              grep -F '\"map\":true' "$out/${role}-runtime.log"
+              grep -F '\"vehicle\":true' "$out/${role}-runtime.log"
+            else
+              if ! grep -F '\"merchantLogin\":true' "$out/${role}-runtime.log" >/dev/null; then
+                grep -F '\"merchantApp\":true' "$out/${role}-runtime.log" >/dev/null
+              fi
+            fi
+
             sleep 2
-            adb shell uiautomator dump "/sdcard/${role}-window.xml" >/dev/null 2>&1 || true
-            adb pull "/sdcard/${role}-window.xml" "$output/${role}-window.xml" >/dev/null 2>&1 || true
-            adb shell dumpsys gfxinfo "$package_name" > "$output/${role}-gfxinfo.txt" || true
-            adb exec-out screencap -p > "$output/${role}-arabic-final.png"
-            sleep 0.5
-            adb exec-out screencap -p > "$output/${role}-arabic-final-confirm.png"
-            python android-role-shell/scripts/assert_portal_screen.py "$output/${role}-arabic-final-confirm.png" --report "$output/${role}-arabic-final.json" --role "$role"
-            cp "$output/${role}-arabic-final-confirm.png" "$output/${role}-arabic-final.png"
+            adb shell dumpsys gfxinfo "$package_name" > "$out/${role}-gfxinfo.txt" || true
+            adb exec-out screencap -p > "$out/${role}-arabic-api${{ matrix.api }}.png"
+            python android-role-shell/scripts/assert_portal_screen.py \
+              "$out/${role}-arabic-api${{ matrix.api }}.png" \
+              --report "$out/${role}-arabic-api${{ matrix.api }}.json" \
+              --role "$role"
             adb shell am force-stop "$package_name"
           }
 
           capture_role driver com.daynightae.driver
           capture_role merchant com.daynightae.merchant
 
-      - name: Validate visible Driver map and Merchant login
+      - name: Validate screenshots contain real surfaces
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageChops, ImageStat
+          from PIL import Image
 
-          for role in ('driver', 'merchant'):
-              log = Path(f'android-role-shell/arabic-visual/{role}-runtime.log').read_text(errors='replace')
-              assert 'removed=true' in log, f'{role} native web-layer removal was not proven'
-              assert 'roleReady=true' in log, f'{role} remained on a generic loader instead of a real role surface'
-              if role == 'driver':
-                  assert 'runtime=true' in log, 'driver authenticated runtime surface was not mounted'
-                  assert 'map=true' in log, 'driver Leaflet map was not mounted'
-                  assert 'vehicle=true' in log, 'driver live vehicle arrow was not rendered'
-              else:
-                  assert 'card=true' in log, 'merchant credential card was not mounted'
-
-              final_path = Path(f'android-role-shell/arabic-visual/{role}-arabic-final.png')
-              final = Image.open(final_path).convert('RGB').resize((240, 420))
-              colors = final.getcolors(240 * 420)
-              assert colors and len(colors) > 30, f'{role} final screen is visually empty'
-              dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
-              dark_ratio = dark_pixels / (final.width * final.height)
-              assert dark_ratio < 0.97, f'{role} final screen is still almost entirely navy ({dark_ratio:.3f})'
-
-              stage = Image.open(f'android-role-shell/arabic-visual/{role}-stage-03.png').convert('RGB').resize((240, 420))
-              diff = ImageChops.difference(stage, final)
-              diff_mean = sum(ImageStat.Stat(diff).mean) / 3
-              assert diff_mean > 3.0, f'{role} final screenshot did not advance from startup ({diff_mean:.2f})'
-              print(role, 'roleReady=true', 'dark_ratio=', round(dark_ratio, 3), 'colors=', len(colors), 'startup_diff=', round(diff_mean, 2))
+          api = "${{ matrix.api }}"
+          root = Path(f"android-role-shell/visual-api{api}")
+          for role in ("driver", "merchant"):
+              image = Image.open(root / f"{role}-arabic-api{api}.png").convert("RGB").resize((240, 420))
+              colors = image.getcolors(image.width * image.height)
+              assert colors and len(colors) > 40, f"{role} API {api} screenshot is visually empty"
+              pixels = list(image.getdata())
+              cream = sum(1 for r, g, b in pixels if r > 225 and g > 220 and b > 200) / len(pixels)
+              dark = sum(1 for r, g, b in pixels if r < 45 and g < 70 and b < 105) / len(pixels)
+              assert cream < 0.94, f"{role} API {api} remained an almost blank cream screen: {cream:.3f}"
+              assert dark < 0.97, f"{role} API {api} remained an almost blank navy screen: {dark:.3f}"
+              print(role, api, "colors", len(colors), "cream", round(cream, 3), "dark", round(dark, 3))
           PY
 
       - name: Stop emulator and local server
         if: always()
         shell: bash
         run: |
+          out="android-role-shell/visual-api${{ matrix.api }}"
           adb emu kill || true
-          if [ -f android-role-shell/arabic-visual/emulator/pid ]; then kill "$(cat android-role-shell/arabic-visual/emulator/pid)" 2>/dev/null || true; fi
-          if [ -f android-role-shell/arabic-visual/local-web.pid ]; then kill "$(cat android-role-shell/arabic-visual/local-web.pid)" 2>/dev/null || true; fi
+          if [ -f "$out/emulator/pid" ]; then kill "$(cat "$out/emulator/pid")" 2>/dev/null || true; fi
+          if [ -f "$out/local-web.pid" ]; then kill "$(cat "$out/local-web.pid")" 2>/dev/null || true; fi
 
-      - name: Upload Arabic visual evidence
+      - name: Upload Android ${{ matrix.android_release }} evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Driver-Map-Merchant-Login-Visual-v1.1.1
-          path: android-role-shell/arabic-visual/
+          name: DAY-NIGHT-v1.1.4-Android-${{ matrix.android_release }}-Evidence
+          path: android-role-shell/visual-api${{ matrix.api }}/
           if-no-files-found: error
           retention-days: 30

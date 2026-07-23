@@ -22,6 +22,7 @@ import {
   UserCog,
   WalletCards,
 } from "lucide-react";
+import localAssets, { withRemoteFallback } from "../../data/localAssets";
 import type { MerchantNavigate, MerchantProfileViewModel, MerchantSectionId } from "./merchantViewModels";
 
 export type MerchantNavItem = {
@@ -103,10 +104,12 @@ export function MerchantDesktopSidebar({
   activeOrdersCount = 0,
   onNavigate,
 }: MerchantDesktopSidebarProps) {
+  const officialLogo = companyLogoUrl || localAssets.logo;
+
   return (
     <aside className="dn-merchant-sidebar" aria-label={isArabic ? "تنقل بوابة التاجر" : "Merchant portal navigation"}>
       <button className="dn-merchant-brand" type="button" onClick={() => onNavigate("dashboard", undefined)}>
-        {companyLogoUrl ? <img src={companyLogoUrl} alt="DAY NIGHT" /> : <span>DN</span>}
+        <img src={officialLogo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" />
         <span>
           <strong>DAY NIGHT</strong>
           <small>{isArabic ? "مركز أعمال التاجر" : "Merchant Business Center"}</small>
@@ -115,7 +118,11 @@ export function MerchantDesktopSidebar({
 
       <div className="dn-merchant-store-chip">
         <div className="dn-merchant-store-avatar">
-          {merchant.logoUrl ? <img src={merchant.logoUrl} alt={merchant.tradeName} /> : merchant.tradeName.slice(0, 2).toUpperCase()}
+          {merchant.logoUrl ? (
+            <img src={merchant.logoUrl} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt={merchant.tradeName} />
+          ) : (
+            <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" />
+          )}
         </div>
         <div>
           <strong>{merchant.tradeName}</strong>

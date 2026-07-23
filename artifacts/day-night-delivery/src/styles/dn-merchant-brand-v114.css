@@ -1,0 +1,47 @@
+/* DAY NIGHT Merchant v1.1.4 — local branding contract.
+   Critical Merchant branding must remain visible even when remote images fail.
+   Final acceptance target: Android 14/API 34 and Android 16/API 36. */
+
+.dn-merchant-login-v3 .dn-merchant-login-visual-v3 {
+  background-image:
+    linear-gradient(145deg, rgba(7, 26, 51, .92), rgba(0, 87, 184, .78)),
+    url("/assets/daynight/logo.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: cover, min(48%, 320px) !important;
+}
+
+.dn-merchant-login-v3 .dn-merchant-login-brand-v3 img {
+  display: block !important;
+  object-fit: contain !important;
+  background: #fff !important;
+}
+
+.dn-merchant-login-v3 .dn-merchant-login-card-v3 > header > span {
+  display: grid !important;
+  place-items: center !important;
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  height: 64px !important;
+  padding: 4px !important;
+  border: 2px solid #d4af37 !important;
+  border-radius: 19px !important;
+  background-color: #071a33 !important;
+  background-image: url("/assets/daynight/logo.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: calc(100% - 8px) calc(100% - 8px) !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 24px rgba(7, 26, 51, .18) !important;
+}
+
+.dn-merchant-login-v3 .dn-merchant-login-card-v3 > header > span > svg {
+  display: none !important;
+}
+
+.dn-merchant-sidebar .dn-merchant-brand > img,
+.dn-merchant-sidebar .dn-merchant-store-avatar > img,
+.dn-merchant-header-title img {
+  object-fit: contain !important;
+  background: #fff !important;
+}

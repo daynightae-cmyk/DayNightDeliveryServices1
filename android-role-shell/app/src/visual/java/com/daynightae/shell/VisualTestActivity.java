@@ -19,14 +19,11 @@ import android.widget.TextView;
 
 /**
  * CI-only visual harness for the `visual` build type.
- *
  * Production debug/release artifacts never include or launch this Activity.
- * The test WebView uses a software layer so `adb screencap` receives the same
- * fully composed login surface instead of a stale GPU texture from the headless
- * Android emulator.
  */
 public final class VisualTestActivity extends Activity {
     private static final String TAG = "DAYNIGHT_VISUAL";
+    private static final int MAX_PROBE_ATTEMPTS = 60;
     private WebView webView;
 
     @Override
@@ -83,18 +80,14 @@ public final class VisualTestActivity extends Activity {
             public void onPageCommitVisible(WebView view, String url) {
                 super.onPageCommitVisible(view, url);
                 settleCompositor(view);
-                logDomState(view, "commit", url);
+                scheduleRoleProbe(view, 1, "commit", url);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 settleCompositor(view);
-                view.postDelayed(() -> {
-                    settleCompositor(view);
-                    logDomState(view, "settled", url);
-                }, 1200L);
-                logDomState(view, "finished", url);
+                scheduleRoleProbe(view, 1, "finished", url);
             }
 
             @Override
@@ -118,21 +111,50 @@ public final class VisualTestActivity extends Activity {
         view.postInvalidateOnAnimation();
     }
 
-    private void logDomState(WebView view, String phase, String url) {
+    private void scheduleRoleProbe(WebView view, int attempt, String phase, String url) {
+        if (view == null || !view.isAttachedToWindow()) return;
+
         String script = "(function(){"
                 + "var root=document.getElementById('root');"
+                + "var driverRuntime=document.querySelector('[data-driver-runtime-acceptance=\"ready\"],.dn-driver-exact-shell');"
+                + "var driverLogin=document.querySelector('.dn-driver-login-page,.dn-native-role-login--driver');"
+                + "var merchantLogin=document.querySelector('.dn-merchant-login-v3,.dn-native-role-login--merchant');"
+                + "var merchantApp=document.querySelector('.dn-merchant-app[data-merchant-authenticated=\"true\"]');"
+                + "var card=document.querySelector('.dn-driver-auth-card,.dn-portal-auth-card,.dn-merchant-login-card-v3,.dn-native-role-login-card');"
+                + "var map=document.querySelector('[data-driver-map-ready]');"
+                + "var vehicle=document.querySelector('[data-driver-vehicle-ready=\"true\"],.dn-official-vehicle-leaflet-icon');"
+                + "var role=" + quote(BuildConfig.ROLE) + ";"
+                + "var target=role==='driver'?(driverRuntime||driverLogin||card):(merchantApp||merchantLogin||card);"
+                + "var style=target?getComputedStyle(target):null;"
+                + "var rect=target?target.getBoundingClientRect():null;"
+                + "var visible=!!(target&&style&&rect&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2&&rect.bottom>0&&rect.top<window.innerHeight);"
+                + "var roleReady=role==='driver'?!!(visible&&((driverRuntime&&map&&vehicle)||driverLogin)):!!(visible&&(merchantApp||merchantLogin));"
                 + "return JSON.stringify({"
                 + "ready:document.readyState,"
                 + "boot:!!document.getElementById('dn-role-boot'),"
                 + "rootChildren:root?root.childElementCount:-1,"
-                + "bodyChildren:document.body?document.body.childElementCount:-1,"
-                + "scripts:Array.from(document.scripts||[]).map(function(s){return s.src||'inline';})"
+                + "driverRuntime:!!driverRuntime,driverLogin:!!driverLogin,merchantLogin:!!merchantLogin,merchantApp:!!merchantApp,card:!!card,map:!!map,vehicle:!!vehicle,"
+                + "visible:visible,roleReady:roleReady,"
+                + "rect:rect?[Math.round(rect.left),Math.round(rect.top),Math.round(rect.width),Math.round(rect.height)].join(':'):'missing',"
+                + "textLength:target?String(target.innerText||'').length:-1,href:String(location.href)"
                 + "});"
                 + "})()";
-        view.evaluateJavascript(script, result -> Log.i(
-                TAG,
-                BuildConfig.ROLE + " phase=" + phase + " url=" + url + " diagnostics=" + result
-        ));
+
+        view.evaluateJavascript(script, result -> {
+            Log.i(TAG, BuildConfig.ROLE + " attempt=" + attempt + " phase=" + phase + " url=" + url + " diagnostics=" + result);
+            boolean ready = result != null && result.contains("\\\"roleReady\\\":true");
+            if (ready) {
+                settleCompositor(view);
+                return;
+            }
+            if (attempt < MAX_PROBE_ATTEMPTS && view.isAttachedToWindow()) {
+                view.postDelayed(() -> scheduleRoleProbe(view, attempt + 1, phase, url), 1000L);
+            }
+        });
+    }
+
+    private static String quote(String value) {
+        return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 
     private void showFailure(String code) {

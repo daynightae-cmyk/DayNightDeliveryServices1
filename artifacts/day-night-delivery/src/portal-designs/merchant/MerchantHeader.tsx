@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Bell, Home, Languages, LogOut, Menu, MoonStar, RefreshCw, Search, SunMedium } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import localAssets, { withRemoteFallback } from "../../data/localAssets";
 import type { MerchantConnectionViewModel, MerchantProfileViewModel, MerchantSectionId } from "./merchantViewModels";
 
 const sectionTitles: Record<MerchantSectionId, { ar: string; en: string }> = {
@@ -89,6 +90,30 @@ export function MerchantHeader(props: MerchantHeaderProps) {
       <div className="dn-merchant-header-title">
         <button type="button" className="dn-merchant-mobile-menu" onClick={onOpenMenu} aria-label={isArabic ? "فتح القائمة" : "Open menu"}>
           <Menu className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate("/merchant")}
+          aria-label="DAY NIGHT"
+          style={{
+            display: "grid",
+            placeItems: "center",
+            flex: "0 0 46px",
+            width: 46,
+            height: 46,
+            padding: 3,
+            border: "1px solid rgba(212,175,55,.55)",
+            borderRadius: 15,
+            background: "#071a33",
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={localAssets.logo}
+            onError={(event) => withRemoteFallback(event, localAssets.remote.logo)}
+            alt="DAY NIGHT"
+            style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 11, background: "#fff" }}
+          />
         </button>
         <div>
           <span>{merchant.tradeName}</span>
