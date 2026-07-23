@@ -12,6 +12,7 @@ import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMer
 import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
 import WhatsAppRuntimeGuard from "./components/WhatsAppRuntimeGuard";
 import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";
+import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -106,6 +107,7 @@ function mountPublicApplication() {
         <App />
         <WhatsAppRuntimeGuard />
         <AdminCustomerExperienceLauncher />
+        <MerchantFeedbackSummaryLauncher />
         <ProductionOrderRealtimeBridge />
         <AdminDeferredMerchantAccounting />
         <ProductionExperience />
@@ -123,6 +125,7 @@ async function mountNativeRoleApplication(role: NativeRole) {
           <AppProvider>
             <NativeRoleRoot role={role} />
             <WhatsAppRuntimeGuard />
+            {role === "merchant" && <MerchantFeedbackSummaryLauncher />}
           </AppProvider>
         </NativeRoleErrorBoundary>
       </BrowserRouter>
