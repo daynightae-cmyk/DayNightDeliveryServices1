@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create schema if not exists auth;
 create schema if not exists storage;
@@ -166,7 +167,7 @@ begin
 end;
 $$;
 
-grant usage on schema public,auth,storage to anon,authenticated,service_role;
+grant usage on schema public,auth,storage,extensions to anon,authenticated,service_role;
 grant select,insert,update,delete on all tables in schema public to authenticated,service_role;
 grant select,insert,update,delete on all tables in schema storage to anon,authenticated,service_role;
 grant usage,select on all sequences in schema public to anon,authenticated,service_role;
