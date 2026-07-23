@@ -25,22 +25,20 @@ import {
 } from "../../services/whatsappMessageService";
 import { getTrackingUrl } from "../../config/companyContact";
 
-type Props = {
-  order: DriverOrder;
-  isArabic: boolean;
-};
+type Props = { order: DriverOrder; isArabic: boolean };
+type ActionKey =
+  | "driver_on_the_way"
+  | "driver_request_location"
+  | "driver_arrived"
+  | "driver_unreachable"
+  | "driver_delivered_feedback";
 
 type MessageAction = {
-  key:
-    | "driver_on_the_way"
-    | "driver_request_location"
-    | "driver_arrived"
-    | "driver_unreachable"
-    | "driver_delivered_feedback";
+  key: ActionKey;
   ar: string;
   en: string;
   Icon: typeof Send;
-  tone?: "normal" | "warning" | "success";
+  tone?: "warning" | "success";
 };
 
 const MESSAGE_ACTIONS: MessageAction[] = [
@@ -63,21 +61,13 @@ function amountDue(order: DriverOrder) {
   const cod = Number(order.cod_amount || 0);
   if (Number.isFinite(cod) && cod > 0) return cod;
   if (String(order.payment_method || "").toLowerCase() === "receiver_pays") {
-    const amount = Number(order.customer_total || order.total_amount || order.total || 0);
-    return Number.isFinite(amount) ? amount : 0;
+    const total = Number(order.customer_total || order.total_amount || order.total || 0);
+    return Number.isFinite(total) ? total : 0;
   }
   return 0;
 }
 
-function DriverOption({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
+function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#071A33]/10 bg-white px-3 py-2 text-[10px] font-black text-[#071A33]">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[#0057B8]" />
@@ -87,9 +77,12 @@ function DriverOption({
 }
 
 export default function DriverCustomerCommunication({ order, isArabic }: Props) {
+  const reference = useMemo(() => trackingReference(order), [order]);
+  const phone = useMemo(() => customerPhone(order), [order]);
+  const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
   const [prepared, setPrepared] = useState<PreparedWhatsAppMessage | null>(null);
   const [draft, setDraft] = useState("");
-  const [preparing, setPreparing] = useState<string>("");
+  const [preparing, setPreparing] = useState<ActionKey | "">("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [contactNote, setContactNote] = useState("");
@@ -107,11 +100,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
     includeMerchantPortalLink: true,
     spacing: "comfortable",
   });
-  const reference = useMemo(() => trackingReference(order), [order]);
-  const phone = useMemo(() => customerPhone(order), [order]);
-  const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
 
-  const updateOption = <K extends keyof MessagePresentationOptions>(key: K, value: MessagePresentationOptions[K]) => {
+  const setOption = <K extends keyof MessagePresentationOptions>(key: K, value: MessagePresentationOptions[K]) => {
     setPresentation((current) => ({ ...current, [key]: value }));
   };
 
@@ -124,8 +114,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
       if (action.key === "driver_on_the_way" || action.key === "driver_delivered_feedback") {
         try {
           feedbackUrl = await createFeedbackLinkForOrder(order.id);
-        } catch (feedbackError) {
-          if (action.key === "driver_delivered_feedback") throw feedbackError;
+        } catch (cause) {
+          if (action.key === "driver_delivered_feedback") throw cause;
         }
       }
 
@@ -172,6 +162,10 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
     }
   }
 
+  function finalPrepared() {
+    return prepared ? revisePreparedWhatsAppMessage(prepared, draft, { customNote: "", customClosing: "" }) : null;
+  }
+
   async function recordUnreachable(result: "opened" | "copied") {
     if (prepared?.templateKey !== "driver_unreachable") return;
     try {
@@ -183,13 +177,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         note: contactNote.trim() || undefined,
       });
     } catch {
-      setError(isArabic ? "تم فتح الرسالة، لكن تعذر تسجيل محاولة التواصل في السجل." : "The message opened, but the contact attempt could not be logged.");
+      setError(isArabic ? "تم تنفيذ الإرسال، لكن تعذر تسجيل محاولة التواصل." : "The message action completed, but the contact attempt could not be logged.");
     }
-  }
-
-  function finalPrepared() {
-    if (!prepared) return null;
-    return revisePreparedWhatsAppMessage(prepared, draft, { customNote: "", customClosing: "" });
   }
 
   async function copyMessage() {
@@ -218,31 +207,33 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0057B8]">DAY NIGHT SMART CONTACT</span>
-          <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل مع العميل" : "Customer communication"}</h4>
+          <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
-            {isArabic ? "خصص الرسالة ثم عاينها وعدّلها قبل فتح واتساب." : "Customize, preview, and edit the message before opening WhatsApp."}
+            {isArabic
+              ? "خصص الرسالة ثم عاينها وعدّلها قبل الإرسال. فتح واتساب لا يغيّر حالة الطلب."
+              : "Customize, preview, and edit before sending. Opening WhatsApp does not change the order status."}
           </p>
         </div>
-        <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" aria-hidden="true" />
+        <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
       </div>
 
       <button type="button" onClick={() => setOptionsOpen((value) => !value)} className="mb-3 inline-flex items-center gap-2 rounded-xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-2 text-[11px] font-black text-[#0057B8]">
         <Settings2 className="h-4 w-4" />
-        {isArabic ? "تخصيص الرسالة وخيارات الروابط" : "Message and link options"}
+        {isArabic ? "خيارات الرسالة والروابط" : "Message and link options"}
       </button>
 
       {optionsOpen && (
         <div className="mb-4 rounded-2xl border border-[#0057B8]/15 bg-[#F4F8FF] p-3">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <DriverOption checked={presentation.linkLabels !== false} onChange={(value) => updateOption("linkLabels", value)} label={isArabic ? "اسم الرابط فوقه" : "Named links"} />
-            <DriverOption checked={presentation.includeTrackingLink !== false} onChange={(value) => updateOption("includeTrackingLink", value)} label={isArabic ? "رابط التتبع" : "Tracking link"} />
-            <DriverOption checked={presentation.includeFeedbackLink !== false} onChange={(value) => updateOption("includeFeedbackLink", value)} label={isArabic ? "رابط التقييم" : "Feedback link"} />
-            <DriverOption checked={presentation.includeSupportPhone === true} onChange={(value) => updateOption("includeSupportPhone", value)} label={isArabic ? "رقم خدمة العملاء" : "Support phone"} />
-            <DriverOption checked={presentation.includeWebsite === true} onChange={(value) => updateOption("includeWebsite", value)} label={isArabic ? "الموقع الرسمي" : "Official website"} />
-            <DriverOption checked={presentation.includeBrandSignature !== false} onChange={(value) => updateOption("includeBrandSignature", value)} label={isArabic ? "توقيع داي نايت" : "DAY NIGHT signature"} />
+            <Toggle checked={presentation.linkLabels !== false} onChange={(value) => setOption("linkLabels", value)} label={isArabic ? "اسم الرابط فوق الرابط" : "Named links"} />
+            <Toggle checked={presentation.includeTrackingLink !== false} onChange={(value) => setOption("includeTrackingLink", value)} label={isArabic ? "رابط التتبع" : "Tracking link"} />
+            <Toggle checked={presentation.includeFeedbackLink !== false} onChange={(value) => setOption("includeFeedbackLink", value)} label={isArabic ? "رابط التقييم" : "Feedback link"} />
+            <Toggle checked={presentation.includeSupportPhone === true} onChange={(value) => setOption("includeSupportPhone", value)} label={isArabic ? "رقم خدمة العملاء" : "Support phone"} />
+            <Toggle checked={presentation.includeWebsite === true} onChange={(value) => setOption("includeWebsite", value)} label={isArabic ? "الموقع الرسمي" : "Official website"} />
+            <Toggle checked={presentation.includeBrandSignature !== false} onChange={(value) => setOption("includeBrandSignature", value)} label={isArabic ? "توقيع داي نايت" : "DAY NIGHT signature"} />
           </div>
           <label className="mt-3 block text-[11px] font-black text-[#071A33]">
-            {isArabic ? "ملاحظة خاصة يضيفها المندوب للرسالة" : "Driver note added to the message"}
+            {isArabic ? "ملاحظة خاصة يضيفها المندوب" : "Driver note added to this message"}
             <textarea value={customNote} onChange={(event) => setCustomNote(event.target.value)} rows={2} maxLength={600} className="mt-2 w-full rounded-xl border border-[#071A33]/10 bg-white p-3 text-sm font-medium leading-6" placeholder={isArabic ? "مثال: سأصل خلال عشر دقائق، يرجى تجهيز المبلغ." : "Example: I will arrive in ten minutes; please prepare the amount."} />
           </label>
         </div>
@@ -250,35 +241,22 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {MESSAGE_ACTIONS.map(({ Icon, ...action }) => (
-          <button
-            type="button"
-            key={action.key}
-            disabled={Boolean(preparing)}
-            onClick={() => void prepare({ Icon, ...action })}
-            className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition active:scale-[0.98] disabled:opacity-50 ${
-              action.tone === "warning"
-                ? "border-amber-400/35 bg-amber-50 text-amber-900"
-                : action.tone === "success"
-                  ? "border-emerald-500/30 bg-emerald-50 text-emerald-900"
-                  : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"
-            }`}
-          >
-            <Icon className="mb-2 h-5 w-5" aria-hidden="true" />
+          <button key={action.key} type="button" disabled={Boolean(preparing)} onClick={() => void prepare({ Icon, ...action })} className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition disabled:opacity-50 ${action.tone === "warning" ? "border-amber-400/35 bg-amber-50 text-amber-900" : action.tone === "success" ? "border-emerald-500/30 bg-emerald-50 text-emerald-900" : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"}`}>
+            <Icon className="mb-2 h-5 w-5" />
             <span>{isArabic ? action.ar : action.en}</span>
-            {preparing === action.key && <span className="mt-2 block text-[10px] opacity-60">{isArabic ? "جارٍ التجهيز…" : "Preparing…"}</span>}
+            {preparing === action.key && <small className="mt-2 block opacity-60">{isArabic ? "جارٍ التجهيز…" : "Preparing…"}</small>}
           </button>
         ))}
-
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone} className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-xs font-black text-[#071A33] aria-disabled:pointer-events-none aria-disabled:opacity-45">
-          <Phone className="mb-2 h-5 w-5" aria-hidden="true" />
+          <Phone className="mb-2 h-5 w-5" />
           {isArabic ? "اتصال بالعميل" : "Call customer"}
         </a>
         <a href={trackingUrl} target="_blank" rel="noreferrer" className="min-h-20 rounded-2xl border border-[#D4AF37]/30 bg-[#FFF9E8] p-3 text-xs font-black text-[#735400]">
-          <ExternalLink className="mb-2 h-5 w-5" aria-hidden="true" />
+          <ExternalLink className="mb-2 h-5 w-5" />
           {isArabic ? "فتح التتبع" : "Open tracking"}
         </a>
         <button type="button" onClick={() => void copyReference()} className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-start text-xs font-black text-[#071A33]">
-          <ClipboardCopy className="mb-2 h-5 w-5" aria-hidden="true" />
+          <ClipboardCopy className="mb-2 h-5 w-5" />
           {copied ? (isArabic ? "تم النسخ" : "Copied") : (isArabic ? "نسخ رقم الشحنة" : "Copy tracking number")}
         </button>
       </div>
@@ -286,38 +264,30 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
       {error && <p className="mt-3 rounded-2xl border border-red-500/20 bg-red-50 p-3 text-xs font-bold leading-6 text-red-800">{error}</p>}
 
       {prepared && (
-        <div className="fixed inset-0 z-[100000] flex items-end justify-center bg-[#071A33]/70 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true">
-          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-white/10 bg-white p-5 shadow-2xl sm:rounded-[28px]">
+        <div className="fixed inset-0 z-[100000] flex items-end justify-center bg-[#071A33]/70 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] bg-white p-5 shadow-2xl sm:rounded-[28px]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#25D366]">WhatsApp preview</span>
                 <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "معاينة وتعديل الرسالة" : "Preview and edit message"}</h4>
                 <p className="mt-1 text-xs text-[#52627A]" dir="ltr">{prepared.phone}</p>
               </div>
-              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-full bg-[#071A33]/5 p-2 text-[#071A33]" aria-label={isArabic ? "إغلاق" : "Close"}>
-                <X className="h-5 w-5" />
-              </button>
+              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-full bg-[#071A33]/5 p-2"><X className="h-5 w-5" /></button>
             </div>
 
             {prepared.templateKey === "driver_unreachable" && (
               <label className="mt-4 block text-xs font-black text-[#071A33]">
                 {isArabic ? "ملاحظة المندوب لمحاولة التواصل" : "Driver contact-attempt note"}
-                <textarea value={contactNote} onChange={(event) => setContactNote(event.target.value)} rows={2} maxLength={1000} className="mt-2 w-full rounded-2xl border border-[#071A33]/15 bg-[#F7FAFF] p-3 text-sm font-medium outline-none focus:border-[#0057B8]" placeholder={isArabic ? "مثال: الهاتف مغلق، والموقع غير واضح" : "Example: phone unavailable and location unclear"} />
+                <textarea value={contactNote} onChange={(event) => setContactNote(event.target.value)} rows={2} className="mt-2 w-full rounded-2xl border border-[#071A33]/15 bg-[#F7FAFF] p-3 text-sm" />
               </label>
             )}
 
-            <textarea value={draft} onChange={(event) => { setDraft(event.target.value); setCopied(false); }} rows={18} maxLength={7000} className="mt-4 min-h-[380px] w-full resize-y rounded-2xl border border-[#071A33]/10 bg-[#F5F8FD] p-4 font-sans text-sm font-medium leading-7 text-[#071A33] outline-none focus:border-[#0057B8]" />
+            <textarea value={draft} onChange={(event) => { setDraft(event.target.value); setCopied(false); }} rows={18} maxLength={7000} className="mt-4 min-h-[380px] w-full resize-y rounded-2xl border border-[#071A33]/10 bg-[#F5F8FD] p-4 text-sm font-medium leading-7 text-[#071A33] outline-none focus:border-[#0057B8]" />
 
             <div className="sticky bottom-0 mt-4 grid grid-cols-3 gap-2 bg-white pt-2">
-              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-2xl border border-[#071A33]/15 px-3 py-3 text-xs font-black text-[#071A33]">
-                {isArabic ? "إلغاء" : "Cancel"}
-              </button>
-              <button type="button" onClick={() => void copyMessage()} className="rounded-2xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-3 text-xs font-black text-[#0057B8]">
-                {copied ? (isArabic ? "تم النسخ" : "Copied") : (isArabic ? "نسخ الرسالة" : "Copy")}
-              </button>
-              <button type="button" onClick={() => void openWhatsApp()} disabled={!draft.trim()} className="rounded-2xl bg-[#25D366] px-3 py-3 text-xs font-black text-[#071A33] shadow-lg disabled:opacity-50">
-                {isArabic ? "فتح واتساب" : "Open WhatsApp"}
-              </button>
+              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-2xl border border-[#071A33]/15 px-3 py-3 text-xs font-black">{isArabic ? "إلغاء" : "Cancel"}</button>
+              <button type="button" onClick={() => void copyMessage()} className="rounded-2xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-3 text-xs font-black text-[#0057B8]">{copied ? (isArabic ? "تم النسخ" : "Copied") : (isArabic ? "نسخ الرسالة" : "Copy")}</button>
+              <button type="button" onClick={() => void openWhatsApp()} disabled={!draft.trim()} className="rounded-2xl bg-[#25D366] px-3 py-3 text-xs font-black text-[#071A33] shadow-lg disabled:opacity-50">{isArabic ? "فتح واتساب" : "Open WhatsApp"}</button>
             </div>
           </div>
         </div>
