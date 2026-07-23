@@ -14,6 +14,8 @@ const files = [
   "supabase/migrations/20260723141500_customer_experience_rls_storage_hardening.sql",
   "supabase/migrations/20260723142000_customer_experience_pii_hash_hardening.sql",
   "supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql",
+  "supabase/migrations/20260723143000_customer_experience_pgcrypto_runtime_hotfix.sql",
+  "supabase/migrations/20260723143500_customer_experience_notification_enum_lint_hotfix.sql",
   "supabase/tests/customer_experience_verify.sql",
 ];
 
