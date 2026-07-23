@@ -40,7 +40,7 @@ expect(workspace, /matchesAdminSection/, "Bulk list respects the active operatio
 
 const driver = read("src/components/driver/DriverOrderCard.tsx");
 for (const status of ["confirmed", "picked_up", "in_transit", "delivered", "cancelled", "returned"]) {
-  expect(driver, new RegExp(`value: [\"']${status}[\"']`), `Driver card exposes ${status} action`);
+  expect(driver, new RegExp(`value: ["']${status}["']`), `Driver card exposes ${status} action`);
 }
 if (/value: ["']accepted["']/.test(driver)) {
   console.error("FAIL: Driver card persists the legacy accepted value instead of canonical confirmed");
@@ -49,8 +49,15 @@ if (/value: ["']accepted["']/.test(driver)) {
   console.log("PASS: Driver card does not persist the legacy accepted enum value");
 }
 expect(driver, /requiresNote: true/, "Risk/closure driver actions require an operational note");
-expect(driver, /wa\.me\/[\s\S]*encodeURIComponent\(whatsappMessage\)/, "Driver WhatsApp action includes a prefilled production message");
-expect(driver, /معكم مندوب DAY NIGHT/, "Driver customer message carries the DAY NIGHT professional identity");
+
+const driverContact = read("src/components/driver/DriverCustomerCommunication.tsx");
+const messageService = read("src/services/whatsappMessageService.ts");
+const messageTemplates = read("src/config/messageTemplates.ts");
+expect(driver, /DriverCustomerCommunication/, "Driver card mounts the centralized customer communication console");
+expect(driverContact, /prepareWhatsAppMessage/, "Driver WhatsApp action is generated through the central message service");
+expect(driverContact, /openPreparedWhatsApp/, "Driver WhatsApp action opens only a prepared non-empty message");
+expect(messageService, /buildWhatsAppUrl/, "Central message service creates encoded wa.me links");
+expect(messageTemplates, /مع حضرتك \{driver_name\}، مندوب شركة داي نايت/, "Driver customer message carries the DAY NIGHT professional identity");
 
 const driverDashboard = read("src/components/driver/DriverDashboard.tsx");
 expect(driverDashboard, /updateDriverOrderStatus\(orderId, status, note\)/, "Driver status controls persist through the authoritative RPC helper");
@@ -75,7 +82,7 @@ expect(portalScroll, /dn-merchant-app/, "Merchant dashboard mobile scroll is exp
 expect(portalScroll, /touch-action:\s*pan-y/, "Touch vertical panning is explicitly enabled");
 
 const realtime = read("src/components/ProductionOrderRealtimeBridge.tsx");
-expect(realtime, /table: [\"']orders[\"']/, "Admin subscribes to real order changes");
+expect(realtime, /table: ["']orders["']/, "Admin subscribes to real order changes");
 expect(realtime, /order_status_history/, "Admin subscribes to status-history changes");
 expect(realtime, /clickAdminRefresh/, "Realtime changes refresh the existing authoritative admin loader");
 
@@ -99,7 +106,7 @@ if (/(?:PRICE|Price|price|سعر|درهم|AED).{0,55}\b30\b|\b30\b.{0,55}(?:PRIC
   console.log("PASS: all customer-facing local price paths are clear of 30 AED");
 }
 
-const combined = `${bulk}\n${workspace}\n${driver}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
+const combined = `${bulk}\n${workspace}\n${driver}\n${driverContact}\n${messageService}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
 if (/Math\.random|demoOrders|mockOrders|localStorage\.setItem\([^)]*order/i.test(combined)) {
   console.error("FAIL: operational controls contain mock/random/local order persistence");
   failed = true;
