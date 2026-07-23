@@ -6,14 +6,25 @@ import DriverLogin from "./DriverLogin";
 import DriverDashboard from "./DriverDashboard";
 import type { DriverProfile, ProfileRole } from "../../types/driver";
 
+const VISUAL_ROLE_TEST = (import.meta as any).env?.VITE_ROLE_VISUAL_TEST === "1";
+
 export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!VISUAL_ROLE_TEST);
   const [signedIn, setSignedIn] = useState(false);
   const [profile, setProfile] = useState<ProfileRole | null>(null);
   const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    if (VISUAL_ROLE_TEST) {
+      setSignedIn(false);
+      setProfile(null);
+      setDriver(null);
+      setError("");
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       setLoading(false);
@@ -43,7 +54,7 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
 
   useEffect(() => {
     void load();
-    if (!supabase) return;
+    if (VISUAL_ROLE_TEST || !supabase) return;
     const { data } = supabase.auth.onAuthStateChange(() => void load());
     return () => data.subscription.unsubscribe();
   }, [load]);
