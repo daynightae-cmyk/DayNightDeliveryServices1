@@ -180,7 +180,9 @@ jobs:
               grep -F '\"map\":true' "$out/${role}-runtime.log"
               grep -F '\"vehicle\":true' "$out/${role}-runtime.log"
             else
-              grep -E '\"merchantLogin\":true|\"merchantApp\":true' "$out/${role}-runtime.log"
+              if ! grep -F '\"merchantLogin\":true' "$out/${role}-runtime.log" >/dev/null; then
+                grep -F '\"merchantApp\":true' "$out/${role}-runtime.log" >/dev/null
+              fi
             fi
 
             sleep 2
