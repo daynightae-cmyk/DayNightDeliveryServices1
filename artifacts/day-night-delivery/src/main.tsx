@@ -50,6 +50,15 @@ function nativeRoleFromLocation(): NativeRole | null {
   return null;
 }
 
+function normalizeTrackingNumberQuery() {
+  if (!/^\/tracking(?:\/|$)/i.test(window.location.pathname)) return;
+  const url = new URL(window.location.href);
+  const number = url.searchParams.get("number")?.trim();
+  if (!number || url.searchParams.get("code")) return;
+  url.searchParams.set("code", number);
+  window.history.replaceState({}, "", url);
+}
+
 function installGlobalRuntimeHandlers() {
   if (typeof window === "undefined") return;
 
@@ -161,6 +170,7 @@ async function mountStandaloneCustomerExperience() {
 }
 
 async function bootstrapApplication() {
+  normalizeTrackingNumberQuery();
   installGlobalRuntimeHandlers();
 
   try {
