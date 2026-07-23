@@ -149,6 +149,7 @@ async function mountStandaloneCustomerExperience() {
   }
 
   if (/^\/admin\/customer-experience\/?$/i.test(pathname)) {
+    // AdminCustomerExperiencePage and AdminCustomerExperienceActions are mounted by AdminCustomerExperienceLauncher inside the admin workspace.
     const [{ default: AdminPanelLuxury }, { default: ProtectedAdminRoute }] = await Promise.all([
       import("./components/AdminPanelLuxury"),
       import("./components/ProtectedAdminRoute"),
