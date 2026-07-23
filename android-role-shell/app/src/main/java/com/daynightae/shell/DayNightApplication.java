@@ -12,22 +12,15 @@ import android.webkit.WebView;
  * Native startup watchdog for Driver and Merchant WebViews.
  *
  * It removes obsolete web splash markup, applies the compatibility layout
- * required by the currently deployed Driver login page, and verifies that a
- * real login/loading/dashboard/map surface is visible. Dashboard CSS is never
- * hidden or replaced.
+ * required by the currently deployed Driver login page, and keeps checking
+ * until a real credential/dashboard/map surface has painted. It never hides
+ * or replaces authenticated dashboard content.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
-    private static final long[] WATCHDOG_DELAYS_MS = {
-            700L,
-            1200L,
-            2400L,
-            4200L,
-            7000L,
-            12000L,
-            20000L,
-            30000L
-    };
+    private static final int MAX_WATCHDOG_ATTEMPTS = 40;
+    private static final long FIRST_WATCHDOG_DELAY_MS = 700L;
+    private static final long NEXT_WATCHDOG_DELAY_MS = 1500L;
 
     @Override
     public void onCreate() {
@@ -54,12 +47,7 @@ public final class DayNightApplication extends Application {
             Log.w(TAG, BuildConfig.ROLE + " schedule webview=missing");
             return;
         }
-
-        for (int index = 0; index < WATCHDOG_DELAYS_MS.length; index += 1) {
-            final int attempt = index + 1;
-            final boolean force = attempt > 1;
-            webView.postDelayed(() -> probeRoleSurface(webView, attempt, force), WATCHDOG_DELAYS_MS[index]);
-        }
+        webView.postDelayed(() -> probeRoleSurface(webView, 1, false), FIRST_WATCHDOG_DELAY_MS);
     }
 
     private void probeRoleSurface(WebView webView, int attempt, boolean force) {
@@ -69,7 +57,7 @@ public final class DayNightApplication extends Application {
         }
 
         String roleSelector = "driver".equals(BuildConfig.ROLE)
-                ? ".dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-login-page,.dn-driver-auth-card,.dn-portal-auth-card,.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3,[data-driver-runtime-acceptance=\"ready\"]"
+                ? ".dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-login-page,.dn-driver-auth-card,.dn-portal-auth-card,.dn-driver-loading-card,.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3,[data-driver-runtime-acceptance=\"ready\"]"
                 : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
 
         String driverAuthCss = "html[data-native-shell=driver] .dn-driver-login-page,body[data-native-role=driver] .dn-driver-login-page{"
@@ -155,10 +143,15 @@ public final class DayNightApplication extends Application {
 
         webView.evaluateJavascript(script, result -> {
             Log.i(TAG, BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result);
-            if (result != null && (result.contains("roleReady=true") || result.contains("runtime=true"))) {
+            boolean ready = result != null && (result.contains("roleReady=true") || result.contains("runtime=true"));
+            if (ready) {
                 webView.requestLayout();
                 webView.invalidate();
                 webView.postInvalidateOnAnimation();
+                return;
+            }
+            if (attempt < MAX_WATCHDOG_ATTEMPTS && webView.isAttachedToWindow()) {
+                webView.postDelayed(() -> probeRoleSurface(webView, attempt + 1, true), NEXT_WATCHDOG_DELAY_MS);
             }
         });
     }
