@@ -11,16 +11,17 @@ import android.webkit.WebView;
 /**
  * Native startup watchdog for Driver and Merchant WebViews.
  *
- * Driver credentials use a software layer because the deployed glass login
- * card can exist in the DOM yet fail GPU composition on Android WebView. Once
- * the authenticated workspace or map appears, hardware acceleration is
- * restored for smooth Leaflet navigation and vehicle animation.
+ * The deployed Driver glass login can exist in the DOM without being painted by
+ * some Android WebView GPU implementations. The watchdog therefore mounts a
+ * simple deterministic credential bridge directly under document.body. It
+ * forwards credentials into the real React/Supabase form, removes itself after
+ * authentication, and leaves the authenticated dashboard/map hardware accelerated.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
-    private static final int MAX_WATCHDOG_ATTEMPTS = 40;
-    private static final long FIRST_WATCHDOG_DELAY_MS = 700L;
-    private static final long NEXT_WATCHDOG_DELAY_MS = 1500L;
+    private static final int MAX_WATCHDOG_ATTEMPTS = 50;
+    private static final long FIRST_WATCHDOG_DELAY_MS = 500L;
+    private static final long NEXT_WATCHDOG_DELAY_MS = 1200L;
 
     @Override
     public void onCreate() {
@@ -47,9 +48,7 @@ public final class DayNightApplication extends Application {
             Log.w(TAG, BuildConfig.ROLE + " schedule webview=missing");
             return;
         }
-        if ("driver".equals(BuildConfig.ROLE)) {
-            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        }
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         webView.postDelayed(() -> probeRoleSurface(webView, 1, false), FIRST_WATCHDOG_DELAY_MS);
     }
 
@@ -60,70 +59,77 @@ public final class DayNightApplication extends Application {
         }
 
         String roleSelector = "driver".equals(BuildConfig.ROLE)
-                ? ".dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-login-page,.dn-driver-auth-card,.dn-portal-auth-card,.dn-driver-loading-card,.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3,[data-driver-runtime-acceptance=\"ready\"]"
+                ? "#dn-driver-native-login,.dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-login-page,.dn-driver-loading-card,.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3,[data-driver-runtime-acceptance=\"ready\"]"
                 : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
 
-        String driverAuthCss = "html[data-native-shell=driver] .dn-driver-login-page,body[data-native-role=driver] .dn-driver-login-page{"
-                + "display:block!important;position:relative!important;inset:auto!important;transform:none!important;"
-                + "width:100%!important;max-width:none!important;min-height:100dvh!important;height:auto!important;"
-                + "margin:0!important;padding:12px!important;overflow:visible!important;background:#f7f5ea!important;"
-                + "filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-shell,body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-shell{"
-                + "display:block!important;position:relative!important;inset:auto!important;transform:none!important;"
-                + "width:100%!important;max-width:560px!important;min-height:0!important;height:auto!important;"
-                + "margin:0 auto!important;padding:0!important;overflow:visible!important;contain:none!important;isolation:auto!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-visual,body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-visual{display:none!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-driver-auth-card,"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-card,"
-                + "body[data-native-role=driver] .dn-driver-login-page .dn-driver-auth-card,"
-                + "body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-card{"
-                + "display:block!important;position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;"
-                + "transform:none!important;translate:none!important;opacity:1!important;visibility:visible!important;animation:none!important;"
-                + "filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;mix-blend-mode:normal!important;contain:none!important;will-change:auto!important;"
-                + "width:100%!important;max-width:520px!important;min-width:0!important;min-height:0!important;height:auto!important;"
-                + "margin:0 auto!important;padding:24px 18px!important;overflow:visible!important;"
-                + "border-radius:24px!important;background:#fff!important;color:#071a33!important;z-index:10!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-driver-auth-card *,"
-                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-card *,"
-                + "body[data-native-role=driver] .dn-driver-login-page .dn-driver-auth-card *,"
-                + "body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-card *{"
-                + "opacity:1!important;visibility:visible!important;transform:none!important;animation:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page input,body[data-native-role=driver] .dn-driver-login-page input{"
-                + "display:block!important;width:100%!important;min-height:50px!important;background:#fff!important;color:#071a33!important;border:1px solid #b8c4d2!important;}"
-                + "html[data-native-shell=driver] .dn-driver-login-page button,body[data-native-role=driver] .dn-driver-login-page button{min-height:48px!important;}";
+        String driverOverlayCss = "#dn-driver-native-login{position:fixed!important;inset:0!important;z-index:2147483646!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;width:100vw!important;height:100dvh!important;overflow:auto!important;padding:calc(16px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom))!important;background:linear-gradient(160deg,#071a33 0%,#0a2d58 55%,#1156a5 100%)!important;font-family:Cairo,Arial,sans-serif!important;color:#071a33!important;box-sizing:border-box!important;}"
+                + "#dn-driver-native-login *{box-sizing:border-box!important;opacity:1!important;visibility:visible!important;transform:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;}"
+                + "#dn-driver-native-login .dn-driver-native-login-card{display:block!important;position:relative!important;width:min(100%,460px)!important;min-height:0!important;margin:0 auto!important;padding:22px 18px 20px!important;border:1px solid rgba(212,175,55,.62)!important;border-radius:26px!important;background:#fff!important;color:#071a33!important;box-shadow:0 22px 60px rgba(0,0,0,.34)!important;}"
+                + "#dn-driver-native-login .dn-native-brand{display:flex!important;align-items:center!important;gap:12px!important;margin-bottom:18px!important;}"
+                + "#dn-driver-native-login .dn-native-mark{display:grid!important;place-items:center!important;flex:0 0 58px!important;width:58px!important;height:58px!important;border-radius:18px!important;background:#071a33!important;color:#d4af37!important;border:2px solid #d4af37!important;font-size:20px!important;font-weight:900!important;}"
+                + "#dn-driver-native-login h1{display:block!important;margin:0!important;color:#071a33!important;font-size:23px!important;line-height:1.3!important;font-weight:900!important;}"
+                + "#dn-driver-native-login .dn-native-subtitle{display:block!important;margin:5px 0 0!important;color:#52677e!important;font-size:13px!important;line-height:1.6!important;font-weight:700!important;}"
+                + "#dn-driver-native-login label{display:block!important;margin:13px 0 0!important;color:#253b55!important;font-size:13px!important;font-weight:900!important;}"
+                + "#dn-driver-native-login input{display:block!important;width:100%!important;height:52px!important;margin-top:7px!important;padding:0 14px!important;border:1px solid #aebdcc!important;border-radius:14px!important;outline:none!important;background:#fff!important;color:#071a33!important;font-size:16px!important;font-weight:700!important;direction:ltr!important;text-align:left!important;}"
+                + "#dn-driver-native-login input:focus{border-color:#176bc0!important;box-shadow:0 0 0 3px rgba(23,107,192,.14)!important;}"
+                + "#dn-driver-native-login .dn-native-submit{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:52px!important;margin-top:18px!important;border:0!important;border-radius:15px!important;background:#d4af37!important;color:#071a33!important;font-size:16px!important;font-weight:900!important;}"
+                + "#dn-driver-native-login .dn-native-submit:disabled{opacity:.65!important;}"
+                + "#dn-driver-native-login .dn-native-status{display:block!important;min-height:22px!important;margin:12px 0 0!important;color:#a12828!important;font-size:12px!important;line-height:1.6!important;font-weight:800!important;text-align:center!important;}"
+                + "#dn-driver-native-login .dn-native-foot{display:block!important;margin:9px 0 0!important;color:#728399!important;font-size:11px!important;line-height:1.7!important;text-align:center!important;}";
 
-        String driverCompatibility = "driver".equals(BuildConfig.ROLE)
-                ? "var fix=document.getElementById('dn-driver-public-auth-fix');"
-                    + "if(!fix){fix=document.createElement('style');fix.id='dn-driver-public-auth-fix';document.head.appendChild(fix);}"
-                    + "fix.textContent=" + quoteForJavascript(driverAuthCss) + ";"
+        String driverBridge = "driver".equals(BuildConfig.ROLE)
+                ? "var dashboard=document.querySelector('.dn-driver-exact-shell,.dn-driver-shell-v3,.dn-driver-state-card,[data-driver-runtime-acceptance=\"ready\"]');"
                     + "var login=document.querySelector('.dn-driver-login-page');"
-                    + "if(login){window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}}"
+                    + "var overlay=document.getElementById('dn-driver-native-login');"
+                    + "if(dashboard&&overlay){overlay.remove();overlay=null;}"
+                    + "if(login&&!dashboard){"
+                    + "var style=document.getElementById('dn-driver-native-login-style');"
+                    + "if(!style){style=document.createElement('style');style.id='dn-driver-native-login-style';document.head.appendChild(style);}"
+                    + "style.textContent=" + quoteForJavascript(driverOverlayCss) + ";"
+                    + "login.style.setProperty('position','fixed','important');login.style.setProperty('left','-200vw','important');login.style.setProperty('top','0','important');login.style.setProperty('width','1px','important');login.style.setProperty('height','1px','important');login.style.setProperty('overflow','hidden','important');login.style.setProperty('opacity','0','important');login.style.setProperty('pointer-events','none','important');"
+                    + "if(!overlay){"
+                    + "var ar=(document.documentElement.dir==='rtl'||document.documentElement.lang==='ar');"
+                    + "overlay=document.createElement('section');overlay.id='dn-driver-native-login';overlay.dir=ar?'rtl':'ltr';"
+                    + "overlay.innerHTML='<div class=\"dn-driver-native-login-card\"><div class=\"dn-native-brand\"><span class=\"dn-native-mark\">DN</span><div><h1>'+(ar?'دخول المندوب':'Driver sign in')+'</h1><p class=\"dn-native-subtitle\">'+(ar?'استخدم بيانات حساب المندوب المعتمدة لدى عمليات DAY NIGHT.':'Use the driver account approved by DAY NIGHT operations.')+'</p></div></div><form id=\"dn-driver-native-form\"><label>'+(ar?'البريد الإلكتروني':'Email address')+'<input id=\"dn-driver-native-email\" type=\"email\" autocomplete=\"username\" required></label><label>'+(ar?'كلمة المرور':'Password')+'<input id=\"dn-driver-native-password\" type=\"password\" autocomplete=\"current-password\" required></label><button class=\"dn-native-submit\" type=\"submit\">'+(ar?'فتح مركز التشغيل':'Open operations center')+'</button><p class=\"dn-native-status\" aria-live=\"polite\"></p><small class=\"dn-native-foot\">DAY NIGHT DELIVERY SERVICES · '+(ar?'دخول آمن ومتصل بالنظام الحقيقي':'Secure access to the live operations system')+'</small></form></div>';"
+                    + "document.body.appendChild(overlay);"
+                    + "var bridgeForm=overlay.querySelector('#dn-driver-native-form');"
+                    + "bridgeForm.addEventListener('submit',function(event){event.preventDefault();"
+                    + "var status=overlay.querySelector('.dn-native-status');var button=overlay.querySelector('.dn-native-submit');"
+                    + "var email=overlay.querySelector('#dn-driver-native-email').value.trim();var password=overlay.querySelector('#dn-driver-native-password').value;"
+                    + "var webForm=login.querySelector('form');var webEmail=login.querySelector('input[type=\"email\"]');var webPassword=login.querySelector('input[type=\"password\"],input[autocomplete=\"current-password\"]');"
+                    + "if(!webForm||!webEmail||!webPassword){status.textContent=ar?'جاري تجهيز صفحة الدخول، حاول بعد لحظة.':'Preparing sign-in. Try again in a moment.';return;}"
+                    + "button.disabled=true;status.style.color='#52677e';status.textContent=ar?'جاري تسجيل الدخول...':'Signing in...';"
+                    + "var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;"
+                    + "setter.call(webEmail,email);webEmail.dispatchEvent(new Event('input',{bubbles:true}));webEmail.dispatchEvent(new Event('change',{bubbles:true}));"
+                    + "setter.call(webPassword,password);webPassword.dispatchEvent(new Event('input',{bubbles:true}));webPassword.dispatchEvent(new Event('change',{bubbles:true}));"
+                    + "window.setTimeout(function(){if(webForm.requestSubmit){webForm.requestSubmit();}else{webForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));}},120);"
+                    + "});"
+                    + "}"
+                    + "var originalError=login.querySelector('.dn-portal-auth-message.is-error');"
+                    + "if(originalError&&String(originalError.innerText||'').trim()&&overlay){var s=overlay.querySelector('.dn-native-status');var b=overlay.querySelector('.dn-native-submit');s.style.color='#a12828';s.textContent=String(originalError.innerText||'').trim();b.disabled=false;}"
+                    + "}"
                 : "";
 
         String script = "(function(){"
-                + driverCompatibility
+                + driverBridge
                 + "var boot=document.getElementById('dn-role-boot');"
                 + "var root=document.getElementById('root');"
                 + "var rendered=!!(root&&root.childElementCount>0);"
                 + "var surface=document.querySelector(" + quoteForJavascript(roleSelector) + ");"
-                + "var card=document.querySelector('.dn-native-role-login-card,.dn-driver-auth-card,.dn-portal-auth-card');"
+                + "var card=document.querySelector('.dn-driver-native-login-card,.dn-native-role-login-card,.dn-driver-auth-card,.dn-portal-auth-card');"
                 + "var dashboard=document.querySelector('.dn-driver-exact-shell,.dn-driver-shell-v3,.dn-driver-state-card');"
                 + "var runtime=document.querySelector('[data-driver-runtime-acceptance=\"ready\"]');"
                 + "var map=document.querySelector('[data-driver-map-ready]');"
                 + "var vehicle=document.querySelector('[data-driver-vehicle-ready=\"true\"],.dn-official-vehicle-leaflet-icon');"
                 + "var target=card||dashboard||surface||runtime;"
-                + "var style=target?getComputedStyle(target):null;"
+                + "var computed=target?getComputedStyle(target):null;"
                 + "var rect=target?target.getBoundingClientRect():null;"
-                + "var visible=!!(target&&style&&rect"
-                + "&&style.display!=='none'&&style.visibility!=='hidden'"
-                + "&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2"
+                + "var visible=!!(target&&computed&&rect"
+                + "&&computed.display!=='none'&&computed.visibility!=='hidden'"
+                + "&&Number(computed.opacity||1)>0&&rect.width>2&&rect.height>2"
                 + "&&rect.bottom>0&&rect.top<window.innerHeight);"
                 + "var roleReady=false;"
-                + "if(visible){"
-                + "window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}"
-                + "if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}"
-                + "else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}"
-                + "}"
+                + "if(visible){if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}}"
                 + "var force=" + (force ? "true" : "false") + ";"
                 + "if(boot&&(rendered||force)){boot.classList.add('is-complete');boot.remove();}"
                 + "return 'removed='+(!document.getElementById('dn-role-boot'))"
@@ -138,10 +144,10 @@ public final class DayNightApplication extends Application {
                 + "+',roleVisible='+visible"
                 + "+',roleReady='+roleReady"
                 + "+',rootChildren='+(root?root.childElementCount:-1)"
-                + "+',display='+(style?style.display:'missing')"
-                + "+',visibility='+(style?style.visibility:'missing')"
-                + "+',opacity='+(style?style.opacity:'missing')"
-                + "+',background='+(style?style.backgroundColor:'missing')"
+                + "+',display='+(computed?computed.display:'missing')"
+                + "+',visibility='+(computed?computed.visibility:'missing')"
+                + "+',opacity='+(computed?computed.opacity:'missing')"
+                + "+',background='+(computed?computed.backgroundColor:'missing')"
                 + "+',rect='+(rect?[Math.round(rect.left),Math.round(rect.top),Math.round(rect.width),Math.round(rect.height)].join(':'):'missing')"
                 + "+',viewport='+window.innerWidth+'x'+window.innerHeight"
                 + "+',ready='+document.readyState"
@@ -157,12 +163,8 @@ public final class DayNightApplication extends Application {
             boolean dashboardReady = result != null
                     && (result.contains("dashboard=true") || result.contains("runtime=true") || result.contains("map=true"))
                     && !result.contains("card=true");
-            if (dashboardReady && "driver".equals(BuildConfig.ROLE)) {
-                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-            } else if (credentialReady && "driver".equals(BuildConfig.ROLE)) {
-                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-            }
             if (credentialReady || dashboardReady) {
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
                 webView.requestLayout();
                 webView.invalidate();
                 webView.postInvalidateOnAnimation();
