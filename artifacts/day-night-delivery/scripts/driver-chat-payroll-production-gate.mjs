@@ -15,7 +15,12 @@ expect(dashboard,/useNavigate\(\)/,"Driver portal exposes safe back navigation")
 
 const orderCard=read("src/components/driver/DriverOrderCard.tsx");
 expect(orderCard,/onChat/,"Every active driver order exposes customer chat");
-expect(orderCard,/wa\.me/ ,"Every driver order keeps professional WhatsApp contact");
+expect(orderCard,/DriverCustomerCommunication/,"Every driver order mounts professional WhatsApp contact");
+const driverContact=read("src/components/driver/DriverCustomerCommunication.tsx");
+const whatsappService=read("src/services/whatsappMessageService.ts");
+expect(driverContact,/prepareWhatsAppMessage/,"Driver contact uses the centralized template engine");
+expect(driverContact,/openPreparedWhatsApp/,"Driver contact opens a validated prepared WhatsApp URL");
+expect(whatsappService,/https:\/\/wa\.me\/|buildWhatsAppUrl/,"Central service produces a prefilled WhatsApp URL");
 
 const overlay=read("src/components/portals/PortalRuntimeOverlay.tsx");
 expect(overlay,/!isMerchant && !isDriver/,"Global floating controls cannot cover either authenticated portal");
