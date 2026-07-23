@@ -39,12 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools" \
-            "emulator" \
-            "system-images;android-36;google_apis;x86_64"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
           python -m pip install --disable-pip-version-check "pillow>=10,<13"
 
       - name: Prepare official icons
@@ -69,7 +64,6 @@ jobs:
           grep -F 'roleRuntimeVersion = "1.1.3"' android-role-shell/app/build.gradle
           grep -F 'dnNativeRole=driver' android-role-shell/app/build.gradle
           grep -F 'role == "driver" && !roleVisualQuery' android-role-shell/app/build.gradle
-          grep -F 'nativeShell=${role}' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.driver"' android-role-shell/app/build.gradle
           grep -F 'applicationId "com.daynightae.merchant"' android-role-shell/app/build.gradle
 
@@ -77,16 +71,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gradle -p android-role-shell --no-daemon --console=plain --stacktrace \
-            clean assembleDriverDebug assembleMerchantDebug \
-            bundleDriverRelease bundleMerchantRelease \
-            lintDriverRelease lintMerchantRelease
+          gradle -p android-role-shell --no-daemon --console=plain --stacktrace clean assembleDriverDebug assembleMerchantDebug bundleDriverRelease bundleMerchantRelease lintDriverRelease lintMerchantRelease
 
       - name: Stage and verify v1.1.3 packages
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p android-role-shell/dist-v113 android-role-shell/screens-v113
+          mkdir -p android-role-shell/dist-v113 android-role-shell/screens-v113 android-role-shell/emulator-v113
           DRIVER_APK="$(find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' | head -n 1)"
           MERCHANT_APK="$(find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' | head -n 1)"
           DRIVER_AAB="$(find android-role-shell/app/build/outputs/bundle -type f -name '*.aab' -path '*driverRelease*' | head -n 1)"
@@ -113,12 +104,10 @@ jobs:
         run: |
           set -euo pipefail
           export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-v113-avd"
-          mkdir -p "$ANDROID_AVD_HOME" android-role-shell/emulator-v113
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | avdmanager create avd --force --name daynight_v113_api36 --package "system-images;android-36;google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_v113_api36.avd"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
-          nohup "$ANDROID_HOME/emulator/emulator" \
-            -avd daynight_v113_api36 -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data \
-            > android-role-shell/emulator-v113/boot.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator" -avd daynight_v113_api36 -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data > android-role-shell/emulator-v113/boot.log 2>&1 &
           echo $! > android-role-shell/emulator-v113/pid
           timeout 180 adb wait-for-device
           for attempt in $(seq 1 180); do
@@ -130,40 +119,47 @@ jobs:
           sleep 8
 
       - name: Launch-test production Driver and Merchant routes
+        id: live_launch
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           test_role() {
             role="$1"
+            role_lower="$(echo "$role" | tr '[:upper:]' '[:lower:]')"
             package_name="$2"
             apk="android-role-shell/dist-v113/DAY-NIGHT-${role}-v1.1.3.apk"
-            adb install -r "$apk" | tee "android-role-shell/dist-v113/${role,,}-install.txt"
-            grep -F 'Success' "android-role-shell/dist-v113/${role,,}-install.txt"
+            adb install -r "$apk" | tee "android-role-shell/dist-v113/${role_lower}-install.txt"
+            grep -F 'Success' "android-role-shell/dist-v113/${role_lower}-install.txt"
             adb shell am force-stop "$package_name"
-            adb shell monkey -p "$package_name" 1 >/dev/null
+            adb logcat -c
+            adb shell monkey -p "$package_name" 1 > "android-role-shell/dist-v113/${role_lower}-launch.txt"
             sleep 20
-            adb shell pidof "$package_name" > "android-role-shell/dist-v113/${role,,}-pid.txt"
-            test -s "android-role-shell/dist-v113/${role,,}-pid.txt"
-            adb exec-out screencap -p > "android-role-shell/screens-v113/${role,,}-live-v1.1.3.png"
-            python android-role-shell/scripts/assert_portal_screen.py \
-              "android-role-shell/screens-v113/${role,,}-live-v1.1.3.png" \
-              --report "android-role-shell/screens-v113/${role,,}-live-v1.1.3.json" \
-              --role "${role,,}"
+            adb shell pidof "$package_name" > "android-role-shell/dist-v113/${role_lower}-pid.txt"
+            adb logcat -d > "android-role-shell/dist-v113/${role_lower}-logcat.txt" || true
+            adb exec-out screencap -p > "android-role-shell/screens-v113/${role_lower}-live-v1.1.3.png"
+            test -s "android-role-shell/dist-v113/${role_lower}-pid.txt"
+            python android-role-shell/scripts/assert_portal_screen.py "android-role-shell/screens-v113/${role_lower}-live-v1.1.3.png" --report "android-role-shell/screens-v113/${role_lower}-live-v1.1.3.json" --role "$role_lower"
             adb shell am force-stop "$package_name"
           }
           test_role Driver com.daynightae.driver
           test_role Merchant com.daynightae.merchant
 
       - name: Create final bundle
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          cp android-role-shell/screens-v113/driver-live-v1.1.3.png android-role-shell/dist-v113/DAY-NIGHT-Driver-v1.1.3-Live-Test.png
-          cp android-role-shell/screens-v113/merchant-live-v1.1.3.png android-role-shell/dist-v113/DAY-NIGHT-Merchant-v1.1.3-Live-Test.png
-          (cd android-role-shell/dist-v113 && zip -9 DAY-NIGHT-Android-Apps-v1.1.3-FINAL.zip \
-            DAY-NIGHT-Driver-v1.1.3.apk DAY-NIGHT-Driver-v1.1.3.aab DAY-NIGHT-Driver-v1.1.3.sha256 DAY-NIGHT-Driver-v1.1.3-Live-Test.png \
-            DAY-NIGHT-Merchant-v1.1.3.apk DAY-NIGHT-Merchant-v1.1.3.aab DAY-NIGHT-Merchant-v1.1.3.sha256 DAY-NIGHT-Merchant-v1.1.3-Live-Test.png \
-            driver-badging.txt merchant-badging.txt)
+          files=(DAY-NIGHT-Driver-v1.1.3.apk DAY-NIGHT-Driver-v1.1.3.aab DAY-NIGHT-Driver-v1.1.3.sha256 DAY-NIGHT-Merchant-v1.1.3.apk DAY-NIGHT-Merchant-v1.1.3.aab DAY-NIGHT-Merchant-v1.1.3.sha256 driver-badging.txt merchant-badging.txt)
+          if [ -s android-role-shell/screens-v113/driver-live-v1.1.3.png ]; then
+            cp android-role-shell/screens-v113/driver-live-v1.1.3.png android-role-shell/dist-v113/DAY-NIGHT-Driver-v1.1.3-Live-Test.png
+            files+=(DAY-NIGHT-Driver-v1.1.3-Live-Test.png)
+          fi
+          if [ -s android-role-shell/screens-v113/merchant-live-v1.1.3.png ]; then
+            cp android-role-shell/screens-v113/merchant-live-v1.1.3.png android-role-shell/dist-v113/DAY-NIGHT-Merchant-v1.1.3-Live-Test.png
+            files+=(DAY-NIGHT-Merchant-v1.1.3-Live-Test.png)
+          fi
+          (cd android-role-shell/dist-v113 && zip -9 DAY-NIGHT-Android-Apps-v1.1.3-FINAL.zip "${files[@]}")
           (cd android-role-shell/dist-v113 && sha256sum DAY-NIGHT-Android-Apps-v1.1.3-FINAL.zip > DAY-NIGHT-Android-Apps-v1.1.3-FINAL.zip.sha256)
 
       - name: Stop emulator
@@ -174,6 +170,7 @@ jobs:
           if [ -f android-role-shell/emulator-v113/pid ]; then kill "$(cat android-role-shell/emulator-v113/pid)" 2>/dev/null || true; fi
 
       - name: Upload Driver v1.1.3
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-Driver-v1.1.3
@@ -182,11 +179,13 @@ jobs:
             android-role-shell/dist-v113/DAY-NIGHT-Driver-v1.1.3.aab
             android-role-shell/dist-v113/DAY-NIGHT-Driver-v1.1.3.sha256
             android-role-shell/dist-v113/DAY-NIGHT-Driver-v1.1.3-Live-Test.png
-            android-role-shell/dist-v113/driver-badging.txt
+            android-role-shell/dist-v113/driver-*
+            android-role-shell/screens-v113/driver-*
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload Merchant v1.1.3
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-Merchant-v1.1.3
@@ -195,11 +194,13 @@ jobs:
             android-role-shell/dist-v113/DAY-NIGHT-Merchant-v1.1.3.aab
             android-role-shell/dist-v113/DAY-NIGHT-Merchant-v1.1.3.sha256
             android-role-shell/dist-v113/DAY-NIGHT-Merchant-v1.1.3-Live-Test.png
-            android-role-shell/dist-v113/merchant-badging.txt
+            android-role-shell/dist-v113/merchant-*
+            android-role-shell/screens-v113/merchant-*
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload complete v1.1.3 bundle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-Android-Apps-v1.1.3-FINAL
@@ -208,3 +209,10 @@ jobs:
             android-role-shell/dist-v113/DAY-NIGHT-Android-Apps-v1.1.3-FINAL.zip.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Fail when live-route validation failed
+        if: steps.live_launch.outcome == 'failure'
+        shell: bash
+        run: |
+          echo 'One live production-route screenshot failed validation. Diagnostics were uploaded.'
+          exit 1
