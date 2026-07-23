@@ -1,9 +1,9 @@
--- DAY NIGHT DELIVERY SERVICES
+﻿-- DAY NIGHT DELIVERY SERVICES
 -- Smart WhatsApp messaging, customer feedback, complaints, attachments, RLS and realtime.
 
 begin;
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 create or replace function public.dn_ce_try_uuid(value text)
 returns uuid
@@ -92,10 +92,10 @@ create or replace function public.dn_ce_request_ip_hash()
 returns text
 language sql
 stable
-set search_path = public, pg_temp
+set search_path = public, extensions, pg_temp
 as $$
   select encode(
-    digest(
+    extensions.digest(
       coalesce(
         nullif((coalesce(current_setting('request.headers', true), '{}')::jsonb)->>'x-forwarded-for', ''),
         nullif((coalesce(current_setting('request.headers', true), '{}')::jsonb)->>'cf-connecting-ip', ''),
@@ -295,31 +295,31 @@ for each row execute function public.dn_ce_touch_updated_at();
 -- Seed editable templates. Frontend defaults remain a safe fallback if templates are disabled or unavailable.
 insert into public.message_templates(template_key,audience,channel,language,title,body)
 values
-('driver_on_the_way','customer','whatsapp','ar','أنا في الطريق',$body$السلام عليكم أ/ {customer_name} 👋
+('driver_on_the_way','customer','whatsapp','ar','Ø£Ù†Ø§ ÙÙŠ Ø§Ù„Ø·Ø±ÙŠÙ‚',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… Ø£/ {customer_name} ðŸ‘‹
 
-مع حضرتك {driver_name}، مندوب شركة داي نايت لخدمات التوصيل والشحن.
+Ù…Ø¹ Ø­Ø¶Ø±ØªÙƒ {driver_name}ØŒ Ù…Ù†Ø¯ÙˆØ¨ Ø´Ø±ÙƒØ© Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙˆØµÙŠÙ„ ÙˆØ§Ù„Ø´Ø­Ù†.
 
-🚚 أنا الآن في الطريق إليكم لتسليم الشحنة التالية:
+ðŸšš Ø£Ù†Ø§ Ø§Ù„Ø¢Ù† ÙÙŠ Ø§Ù„Ø·Ø±ÙŠÙ‚ Ø¥Ù„ÙŠÙƒÙ… Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø´Ø­Ù†Ø© Ø§Ù„ØªØ§Ù„ÙŠØ©:
 
-📦 رقم الشحنة: {tracking_number}
+ðŸ“¦ Ø±Ù‚Ù… Ø§Ù„Ø´Ø­Ù†Ø©: {tracking_number}
 {amount_due_line}
 {payment_line}
 
-📍 يرجى إرسال موقع الاستلام الحالي من خلال خاصية مشاركة الموقع في واتساب، مع التأكد من وجود شخص متاح لاستلام الشحنة.
+ðŸ“ ÙŠØ±Ø¬Ù‰ Ø¥Ø±Ø³Ø§Ù„ Ù…ÙˆÙ‚Ø¹ Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø­Ø§Ù„ÙŠ Ù…Ù† Ø®Ù„Ø§Ù„ Ø®Ø§ØµÙŠØ© Ù…Ø´Ø§Ø±ÙƒØ© Ø§Ù„Ù…ÙˆÙ‚Ø¹ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ØŒ Ù…Ø¹ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø´Ø®Øµ Ù…ØªØ§Ø­ Ù„Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø´Ø­Ù†Ø©.
 
-🔎 متابعة الشحنة:
+ðŸ”Ž Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„Ø´Ø­Ù†Ø©:
 {tracking_url}
 
-⭐ التقييم والملاحظات:
+â­ Ø§Ù„ØªÙ‚ÙŠÙŠÙ… ÙˆØ§Ù„Ù…Ù„Ø§Ø­Ø¸Ø§Øª:
 {feedback_url}
 
-شكرًا لاختياركم داي نايت.
-سريع • آمن • موثوق$body$),
-('driver_on_the_way','customer','whatsapp','en','Driver on the way',$body$Hello {customer_name} 👋
+Ø´ÙƒØ±Ù‹Ø§ Ù„Ø§Ø®ØªÙŠØ§Ø±ÙƒÙ… Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª.
+Ø³Ø±ÙŠØ¹ â€¢ Ø¢Ù…Ù† â€¢ Ù…ÙˆØ«ÙˆÙ‚$body$),
+('driver_on_the_way','customer','whatsapp','en','Driver on the way',$body$Hello {customer_name} ðŸ‘‹
 
 This is {driver_name}, your DAY NIGHT DELIVERY SERVICES driver.
 
-🚚 I am on the way with shipment {tracking_number}.
+ðŸšš I am on the way with shipment {tracking_number}.
 {amount_due_line}
 {payment_line}
 
@@ -328,67 +328,67 @@ Please share your current WhatsApp location.
 Tracking: {tracking_url}
 Feedback: {feedback_url}
 
-Fast • Reliable • Every Time$body$),
-('driver_request_location','customer','whatsapp','ar','طلب إرسال الموقع',$body$السلام عليكم أ/ {customer_name} 👋
+Fast â€¢ Reliable â€¢ Every Time$body$),
+('driver_request_location','customer','whatsapp','ar','Ø·Ù„Ø¨ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ù…ÙˆÙ‚Ø¹',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… Ø£/ {customer_name} ðŸ‘‹
 
-مع حضرتك {driver_name}، مندوب داي نايت.
+Ù…Ø¹ Ø­Ø¶Ø±ØªÙƒ {driver_name}ØŒ Ù…Ù†Ø¯ÙˆØ¨ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª.
 
-📦 الشحنة: {tracking_number}
+ðŸ“¦ Ø§Ù„Ø´Ø­Ù†Ø©: {tracking_number}
 
-يرجى الضغط على علامة المشبك في واتساب ثم اختيار: الموقع ← إرسال موقعك الحالي.
+ÙŠØ±Ø¬Ù‰ Ø§Ù„Ø¶ØºØ· Ø¹Ù„Ù‰ Ø¹Ù„Ø§Ù…Ø© Ø§Ù„Ù…Ø´Ø¨Ùƒ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ Ø«Ù… Ø§Ø®ØªÙŠØ§Ø±: Ø§Ù„Ù…ÙˆÙ‚Ø¹ â† Ø¥Ø±Ø³Ø§Ù„ Ù…ÙˆÙ‚Ø¹Ùƒ Ø§Ù„Ø­Ø§Ù„ÙŠ.
 
-🔎 {tracking_url}
+ðŸ”Ž {tracking_url}
 
-شكرًا لتعاونكم.$body$),
+Ø´ÙƒØ±Ù‹Ø§ Ù„ØªØ¹Ø§ÙˆÙ†ÙƒÙ….$body$),
 ('driver_request_location','customer','whatsapp','en','Request location',$body$Hello {customer_name}. This is {driver_name}, your DAY NIGHT driver.
 
 Shipment: {tracking_number}
-Please use WhatsApp attachment → Location → Send current location.
+Please use WhatsApp attachment â†’ Location â†’ Send current location.
 
 Tracking: {tracking_url}$body$),
-('driver_arrived','customer','whatsapp','ar','وصلت إلى الموقع',$body$السلام عليكم أ/ {customer_name}
+('driver_arrived','customer','whatsapp','ar','ÙˆØµÙ„Øª Ø¥Ù„Ù‰ Ø§Ù„Ù…ÙˆÙ‚Ø¹',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… Ø£/ {customer_name}
 
-وصل مندوب داي نايت إلى موقع التسليم الآن 🚚📍
+ÙˆØµÙ„ Ù…Ù†Ø¯ÙˆØ¨ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ø¥Ù„Ù‰ Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø¢Ù† ðŸššðŸ“
 
-📦 رقم الشحنة: {tracking_number}
+ðŸ“¦ Ø±Ù‚Ù… Ø§Ù„Ø´Ø­Ù†Ø©: {tracking_number}
 {amount_due_line}
 
-يرجى التوجه لاستلام الشحنة أو التواصل مع المندوب.
+ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªÙˆØ¬Ù‡ Ù„Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø´Ø­Ù†Ø© Ø£Ùˆ Ø§Ù„ØªÙˆØ§ØµÙ„ Ù…Ø¹ Ø§Ù„Ù…Ù†Ø¯ÙˆØ¨.
 
-🔎 {tracking_url}$body$),
-('driver_arrived','customer','whatsapp','en','Driver arrived',$body$Hello {customer_name}. Your DAY NIGHT driver has arrived 🚚📍
+ðŸ”Ž {tracking_url}$body$),
+('driver_arrived','customer','whatsapp','en','Driver arrived',$body$Hello {customer_name}. Your DAY NIGHT driver has arrived ðŸššðŸ“
 
 Tracking: {tracking_number}
 {amount_due_line}
 
 Please proceed to receive the shipment.
 {tracking_url}$body$),
-('driver_unreachable','customer','whatsapp','ar','تعذر التواصل',$body$السلام عليكم أ/ {customer_name}
+('driver_unreachable','customer','whatsapp','ar','ØªØ¹Ø°Ø± Ø§Ù„ØªÙˆØ§ØµÙ„',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… Ø£/ {customer_name}
 
-حاول مندوب داي نايت الوصول إليكم بخصوص الشحنة {tracking_number}، ولكن تعذر التواصل أو تحديد الموقع.
+Ø­Ø§ÙˆÙ„ Ù…Ù†Ø¯ÙˆØ¨ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ø§Ù„ÙˆØµÙˆÙ„ Ø¥Ù„ÙŠÙƒÙ… Ø¨Ø®ØµÙˆØµ Ø§Ù„Ø´Ø­Ù†Ø© {tracking_number}ØŒ ÙˆÙ„ÙƒÙ† ØªØ¹Ø°Ø± Ø§Ù„ØªÙˆØ§ØµÙ„ Ø£Ùˆ ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ù…ÙˆÙ‚Ø¹.
 
-يرجى الرد وإرسال الموقع الصحيح.
+ÙŠØ±Ø¬Ù‰ Ø§Ù„Ø±Ø¯ ÙˆØ¥Ø±Ø³Ø§Ù„ Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØµØ­ÙŠØ­.
 
-🔎 {tracking_url}
-📞 {support_phone}$body$),
+ðŸ”Ž {tracking_url}
+ðŸ“ž {support_phone}$body$),
 ('driver_unreachable','customer','whatsapp','en','Unable to contact customer',$body$Hello {customer_name}. We could not reach you regarding shipment {tracking_number}.
 Please reply with the correct location.
 
 Tracking: {tracking_url}
 Support: {support_phone}$body$),
-('driver_delivered_feedback','customer','whatsapp','ar','تم التسليم – طلب تقييم',$body$تم تسليم شحنتكم بنجاح ✅📦
+('driver_delivered_feedback','customer','whatsapp','ar','ØªÙ… Ø§Ù„ØªØ³Ù„ÙŠÙ… â€“ Ø·Ù„Ø¨ ØªÙ‚ÙŠÙŠÙ…',$body$ØªÙ… ØªØ³Ù„ÙŠÙ… Ø´Ø­Ù†ØªÙƒÙ… Ø¨Ù†Ø¬Ø§Ø­ âœ…ðŸ“¦
 
-📦 رقم الشحنة: {tracking_number}
+ðŸ“¦ Ø±Ù‚Ù… Ø§Ù„Ø´Ø­Ù†Ø©: {tracking_number}
 
-⭐ قيّموا تجربة التوصيل والمندوب من هنا:
+â­ Ù‚ÙŠÙ‘Ù…ÙˆØ§ ØªØ¬Ø±Ø¨Ø© Ø§Ù„ØªÙˆØµÙŠÙ„ ÙˆØ§Ù„Ù…Ù†Ø¯ÙˆØ¨ Ù…Ù† Ù‡Ù†Ø§:
 {feedback_url}
 
-يمكن تقديم شكوى أو ملاحظة من نفس الصفحة.
+ÙŠÙ…ÙƒÙ† ØªÙ‚Ø¯ÙŠÙ… Ø´ÙƒÙˆÙ‰ Ø£Ùˆ Ù…Ù„Ø§Ø­Ø¸Ø© Ù…Ù† Ù†ÙØ³ Ø§Ù„ØµÙØ­Ø©.
 
-شكرًا لثقتكم بنا 💙
+Ø´ÙƒØ±Ù‹Ø§ Ù„Ø«Ù‚ØªÙƒÙ… Ø¨Ù†Ø§ ðŸ’™
 DAY NIGHT DELIVERY SERVICES
-Fast • Reliable • Every Time$body$),
-('driver_delivered_feedback','customer','whatsapp','en','Delivered – request feedback',$body$Your shipment was delivered successfully ✅📦
+Fast â€¢ Reliable â€¢ Every Time$body$),
+('driver_delivered_feedback','customer','whatsapp','en','Delivered â€“ request feedback',$body$Your shipment was delivered successfully âœ…ðŸ“¦
 Tracking: {tracking_number}
 
 Rate the service and driver:
@@ -396,24 +396,24 @@ Rate the service and driver:
 
 You can also submit a complaint from the same page.
 DAY NIGHT DELIVERY SERVICES$body$),
-('merchant_welcome','merchant','whatsapp','ar','ترحيب التاجر',$body$السلام عليكم ورحمة الله وبركاته 👋
+('merchant_welcome','merchant','whatsapp','ar','ØªØ±Ø­ÙŠØ¨ Ø§Ù„ØªØ§Ø¬Ø±',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… ÙˆØ±Ø­Ù…Ø© Ø§Ù„Ù„Ù‡ ÙˆØ¨Ø±ÙƒØ§ØªÙ‡ ðŸ‘‹
 
-يسعدنا الترحيب بكم ضمن شركاء داي نايت لخدمات التوصيل والشحن.
+ÙŠØ³Ø¹Ø¯Ù†Ø§ Ø§Ù„ØªØ±Ø­ÙŠØ¨ Ø¨ÙƒÙ… Ø¶Ù…Ù† Ø´Ø±ÙƒØ§Ø¡ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙˆØµÙŠÙ„ ÙˆØ§Ù„Ø´Ø­Ù†.
 
-🚚 توصيل داخل جميع الإمارات
-✅ COD
-✅ تتبع وإدارة الطلبات
-✅ دعم مستمر
-✅ حلول التجارة الإلكترونية والشحن المحلي والدولي
+ðŸšš ØªÙˆØµÙŠÙ„ Ø¯Ø§Ø®Ù„ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¥Ù…Ø§Ø±Ø§Øª
+âœ… COD
+âœ… ØªØªØ¨Ø¹ ÙˆØ¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø·Ù„Ø¨Ø§Øª
+âœ… Ø¯Ø¹Ù… Ù…Ø³ØªÙ…Ø±
+âœ… Ø­Ù„ÙˆÙ„ Ø§Ù„ØªØ¬Ø§Ø±Ø© Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ© ÙˆØ§Ù„Ø´Ø­Ù† Ø§Ù„Ù…Ø­Ù„ÙŠ ÙˆØ§Ù„Ø¯ÙˆÙ„ÙŠ
 
-🌐 {company_website}
-📦 {tracking_url}
-🏪 {merchant_portal_url}
-📞 {support_phone}
-✉️ {company_email}
-⭐ {feedback_url}
+ðŸŒ {company_website}
+ðŸ“¦ {tracking_url}
+ðŸª {merchant_portal_url}
+ðŸ“ž {support_phone}
+âœ‰ï¸ {company_email}
+â­ {feedback_url}
 
-نشكر ثقتكم ونسعد بتعاون ناجح ومستمر.$body$),
+Ù†Ø´ÙƒØ± Ø«Ù‚ØªÙƒÙ… ÙˆÙ†Ø³Ø¹Ø¯ Ø¨ØªØ¹Ø§ÙˆÙ† Ù†Ø§Ø¬Ø­ ÙˆÙ…Ø³ØªÙ…Ø±.$body$),
 ('merchant_welcome','merchant','whatsapp','en','Merchant welcome',$body$Welcome {merchant_name} to DAY NIGHT DELIVERY SERVICES.
 
 Website: {company_website}
@@ -423,31 +423,31 @@ Support: {support_phone}
 Email: {company_email}
 Feedback: {feedback_url}
 
-Fast • Reliable • Every Time$body$),
-('merchant_orders_today','merchant','whatsapp','ar','الاستفسار عن طلبات اليوم',$body$السلام عليكم ورحمة الله وبركاته 👋
+Fast â€¢ Reliable â€¢ Every Time$body$),
+('merchant_orders_today','merchant','whatsapp','ar','Ø§Ù„Ø§Ø³ØªÙØ³Ø§Ø± Ø¹Ù† Ø·Ù„Ø¨Ø§Øª Ø§Ù„ÙŠÙˆÙ…',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… ÙˆØ±Ø­Ù…Ø© Ø§Ù„Ù„Ù‡ ÙˆØ¨Ø±ÙƒØ§ØªÙ‡ ðŸ‘‹
 
-هل توجد لديكم طلبات جاهزة للاستلام والتوصيل اليوم؟ 📦🚚
+Ù‡Ù„ ØªÙˆØ¬Ø¯ Ù„Ø¯ÙŠÙƒÙ… Ø·Ù„Ø¨Ø§Øª Ø¬Ø§Ù‡Ø²Ø© Ù„Ù„Ø§Ø³ØªÙ„Ø§Ù… ÙˆØ§Ù„ØªÙˆØµÙŠÙ„ Ø§Ù„ÙŠÙˆÙ…ØŸ ðŸ“¦ðŸšš
 
-🏪 لوحة التاجر:
+ðŸª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ§Ø¬Ø±:
 {merchant_portal_url}
 
-يمكنكم أيضًا إرسال اسم العميل ورقمه وعنوانه والمبلغ والملاحظات عبر واتساب.
+ÙŠÙ…ÙƒÙ†ÙƒÙ… Ø£ÙŠØ¶Ù‹Ø§ Ø¥Ø±Ø³Ø§Ù„ Ø§Ø³Ù… Ø§Ù„Ø¹Ù…ÙŠÙ„ ÙˆØ±Ù‚Ù…Ù‡ ÙˆØ¹Ù†ÙˆØ§Ù†Ù‡ ÙˆØ§Ù„Ù…Ø¨Ù„Øº ÙˆØ§Ù„Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø¹Ø¨Ø± ÙˆØ§ØªØ³Ø§Ø¨.
 
-📞 {support_phone}$body$),
-('merchant_orders_today','merchant','whatsapp','en','Today orders inquiry',$body$Hello. Do you have orders ready for pickup and delivery today? 📦🚚
+ðŸ“ž {support_phone}$body$),
+('merchant_orders_today','merchant','whatsapp','en','Today orders inquiry',$body$Hello. Do you have orders ready for pickup and delivery today? ðŸ“¦ðŸšš
 
 Merchant portal: {merchant_portal_url}
 Support: {support_phone}$body$),
-('merchant_order_received','merchant','whatsapp','ar','تم استلام طلب جديد',$body$تم تسجيل طلب جديد ✅
-📦 {tracking_number}
-👤 {customer_name}
-📍 {customer_city}
+('merchant_order_received','merchant','whatsapp','ar','ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯',$body$ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø·Ù„Ø¨ Ø¬Ø¯ÙŠØ¯ âœ…
+ðŸ“¦ {tracking_number}
+ðŸ‘¤ {customer_name}
+ðŸ“ {customer_city}
 {amount_due_line}
-📋 {order_status}
+ðŸ“‹ {order_status}
 
-تفاصيل الطلب: {merchant_order_url}
-التتبع: {tracking_url}$body$),
-('merchant_order_received','merchant','whatsapp','en','New order received',$body$New order registered ✅
+ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨: {merchant_order_url}
+Ø§Ù„ØªØªØ¨Ø¹: {tracking_url}$body$),
+('merchant_order_received','merchant','whatsapp','en','New order received',$body$New order registered âœ…
 Tracking: {tracking_number}
 Customer: {customer_name}
 City: {customer_city}
@@ -456,63 +456,63 @@ Status: {order_status}
 
 Order: {merchant_order_url}
 Tracking: {tracking_url}$body$),
-('merchant_driver_assigned','merchant','whatsapp','ar','تم تعيين مندوب',$body$تم تعيين مندوب للشحنة 🚚
-📦 {tracking_number}
-👤 {driver_name}
-📋 {order_status}
-🔎 {tracking_url}$body$),
-('merchant_driver_assigned','merchant','whatsapp','en','Driver assigned',$body$A driver was assigned 🚚
+('merchant_driver_assigned','merchant','whatsapp','ar','ØªÙ… ØªØ¹ÙŠÙŠÙ† Ù…Ù†Ø¯ÙˆØ¨',$body$ØªÙ… ØªØ¹ÙŠÙŠÙ† Ù…Ù†Ø¯ÙˆØ¨ Ù„Ù„Ø´Ø­Ù†Ø© ðŸšš
+ðŸ“¦ {tracking_number}
+ðŸ‘¤ {driver_name}
+ðŸ“‹ {order_status}
+ðŸ”Ž {tracking_url}$body$),
+('merchant_driver_assigned','merchant','whatsapp','en','Driver assigned',$body$A driver was assigned ðŸšš
 Tracking: {tracking_number}
 Driver: {driver_name}
 Status: {order_status}
 {tracking_url}$body$),
-('merchant_shipment_collected','merchant','whatsapp','ar','تم استلام الشحنة',$body$تم استلام الشحنة منكم بنجاح ✅📦
-📦 {tracking_number}
-👤 {driver_name}
-🕒 {pickup_time}
+('merchant_shipment_collected','merchant','whatsapp','ar','ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø´Ø­Ù†Ø©',$body$ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø´Ø­Ù†Ø© Ù…Ù†ÙƒÙ… Ø¨Ù†Ø¬Ø§Ø­ âœ…ðŸ“¦
+ðŸ“¦ {tracking_number}
+ðŸ‘¤ {driver_name}
+ðŸ•’ {pickup_time}
 
-المرحلة التالية: التوجه إلى العميل.
+Ø§Ù„Ù…Ø±Ø­Ù„Ø© Ø§Ù„ØªØ§Ù„ÙŠØ©: Ø§Ù„ØªÙˆØ¬Ù‡ Ø¥Ù„Ù‰ Ø§Ù„Ø¹Ù…ÙŠÙ„.
 {tracking_url}$body$),
-('merchant_shipment_collected','merchant','whatsapp','en','Shipment collected',$body$Shipment collected successfully ✅📦
+('merchant_shipment_collected','merchant','whatsapp','en','Shipment collected',$body$Shipment collected successfully âœ…ðŸ“¦
 Tracking: {tracking_number}
 Driver: {driver_name}
 Pickup time: {pickup_time}
 Next: customer delivery.
 {tracking_url}$body$),
-('merchant_delivered','merchant','whatsapp','ar','تم تسليم الشحنة',$body$تم تسليم الشحنة بنجاح ✅📦
-📦 {tracking_number}
+('merchant_delivered','merchant','whatsapp','ar','ØªÙ… ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø´Ø­Ù†Ø©',$body$ØªÙ… ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø´Ø­Ù†Ø© Ø¨Ù†Ø¬Ø§Ø­ âœ…ðŸ“¦
+ðŸ“¦ {tracking_number}
 {amount_due_line}
-🕒 {delivery_time}
-تفاصيل الطلب: {merchant_order_url}
-التقييم: {feedback_url}$body$),
-('merchant_delivered','merchant','whatsapp','en','Shipment delivered',$body$Shipment delivered successfully ✅📦
+ðŸ•’ {delivery_time}
+ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨: {merchant_order_url}
+Ø§Ù„ØªÙ‚ÙŠÙŠÙ…: {feedback_url}$body$),
+('merchant_delivered','merchant','whatsapp','en','Shipment delivered',$body$Shipment delivered successfully âœ…ðŸ“¦
 Tracking: {tracking_number}
 {amount_due_line}
 Delivery time: {delivery_time}
 Order: {merchant_order_url}
 Feedback: {feedback_url}$body$),
-('merchant_delivery_failed','merchant','whatsapp','ar','تعذر التسليم',$body$تعذر تسليم الشحنة ⚠️
-📦 {tracking_number}
-👤 {driver_name}
-🕒 {delivery_time}
-📋 {failure_reason}
-تفاصيل الطلب: {merchant_order_url}$body$),
-('merchant_delivery_failed','merchant','whatsapp','en','Delivery failed',$body$Delivery failed ⚠️
+('merchant_delivery_failed','merchant','whatsapp','ar','ØªØ¹Ø°Ø± Ø§Ù„ØªØ³Ù„ÙŠÙ…',$body$ØªØ¹Ø°Ø± ØªØ³Ù„ÙŠÙ… Ø§Ù„Ø´Ø­Ù†Ø© âš ï¸
+ðŸ“¦ {tracking_number}
+ðŸ‘¤ {driver_name}
+ðŸ•’ {delivery_time}
+ðŸ“‹ {failure_reason}
+ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨: {merchant_order_url}$body$),
+('merchant_delivery_failed','merchant','whatsapp','en','Delivery failed',$body$Delivery failed âš ï¸
 Tracking: {tracking_number}
 Driver: {driver_name}
 Time: {delivery_time}
 Reason: {failure_reason}
 Order: {merchant_order_url}$body$),
-('merchant_settlement','merchant','whatsapp','ar','إشعار التسوية المالية',$body$إشعار تسوية مالية 💳
-🏪 {merchant_name}
-📅 {settlement_period}
-📦 {order_count}
-💰 {gross_collected} درهم
-🧾 {fees} درهم
-✅ {net_due} درهم
+('merchant_settlement','merchant','whatsapp','ar','Ø¥Ø´Ø¹Ø§Ø± Ø§Ù„ØªØ³ÙˆÙŠØ© Ø§Ù„Ù…Ø§Ù„ÙŠØ©',$body$Ø¥Ø´Ø¹Ø§Ø± ØªØ³ÙˆÙŠØ© Ù…Ø§Ù„ÙŠØ© ðŸ’³
+ðŸª {merchant_name}
+ðŸ“… {settlement_period}
+ðŸ“¦ {order_count}
+ðŸ’° {gross_collected} Ø¯Ø±Ù‡Ù…
+ðŸ§¾ {fees} Ø¯Ø±Ù‡Ù…
+âœ… {net_due} Ø¯Ø±Ù‡Ù…
 
 {statement_url}$body$),
-('merchant_settlement','merchant','whatsapp','en','Settlement notice',$body$Financial settlement 💳
+('merchant_settlement','merchant','whatsapp','en','Settlement notice',$body$Financial settlement ðŸ’³
 Merchant: {merchant_name}
 Period: {settlement_period}
 Orders: {order_count}
@@ -520,39 +520,39 @@ Gross: {gross_collected} AED
 Fees: {fees} AED
 Net: {net_due} AED
 {statement_url}$body$),
-('tracking_support','support','whatsapp','ar','مساعدة التتبع',$body$السلام عليكم، أحتاج مساعدة بخصوص تتبع الشحنة رقم:
+('tracking_support','support','whatsapp','ar','Ù…Ø³Ø§Ø¹Ø¯Ø© Ø§Ù„ØªØªØ¨Ø¹',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ø£Ø­ØªØ§Ø¬ Ù…Ø³Ø§Ø¹Ø¯Ø© Ø¨Ø®ØµÙˆØµ ØªØªØ¨Ø¹ Ø§Ù„Ø´Ø­Ù†Ø© Ø±Ù‚Ù…:
 {tracking_number}
 
-رابط التتبع:
+Ø±Ø§Ø¨Ø· Ø§Ù„ØªØªØ¨Ø¹:
 {tracking_url}$body$),
 ('tracking_support','support','whatsapp','en','Tracking support',$body$Hello, I need help tracking shipment {tracking_number}.
 {tracking_url}$body$),
-('cod_service','support','whatsapp','ar','استفسار COD',$body$السلام عليكم، أرغب في معرفة تفاصيل خدمة الدفع عند الاستلام COD المقدمة من داي نايت.$body$),
+('cod_service','support','whatsapp','ar','Ø§Ø³ØªÙØ³Ø§Ø± COD',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ø£Ø±ØºØ¨ ÙÙŠ Ù…Ø¹Ø±ÙØ© ØªÙØ§ØµÙŠÙ„ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¯ÙØ¹ Ø¹Ù†Ø¯ Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù… COD Ø§Ù„Ù…Ù‚Ø¯Ù…Ø© Ù…Ù† Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª.$body$),
 ('cod_service','support','whatsapp','en','COD inquiry',$body$Hello, I would like information about DAY NIGHT cash on delivery service.$body$),
-('merchant_registration','support','whatsapp','ar','تسجيل تاجر',$body$السلام عليكم، أرغب في التسجيل كتاجر جديد مع داي نايت.
+('merchant_registration','support','whatsapp','ar','ØªØ³Ø¬ÙŠÙ„ ØªØ§Ø¬Ø±',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ø£Ø±ØºØ¨ ÙÙŠ Ø§Ù„ØªØ³Ø¬ÙŠÙ„ ÙƒØªØ§Ø¬Ø± Ø¬Ø¯ÙŠØ¯ Ù…Ø¹ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª.
 
-اسم النشاط:
-المدينة:
-عدد الطلبات المتوقع:$body$),
+Ø§Ø³Ù… Ø§Ù„Ù†Ø´Ø§Ø·:
+Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©:
+Ø¹Ø¯Ø¯ Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…ØªÙˆÙ‚Ø¹:$body$),
 ('merchant_registration','support','whatsapp','en','Merchant registration',$body$Hello, I would like to register as a DAY NIGHT merchant.
 
 Business name:
 City:
 Expected orders:$body$),
-('complaint_support','support','whatsapp','ar','متابعة شكوى',$body$السلام عليكم، لدي استفسار بخصوص الشكوى رقم:
+('complaint_support','support','whatsapp','ar','Ù…ØªØ§Ø¨Ø¹Ø© Ø´ÙƒÙˆÙ‰',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ù„Ø¯ÙŠ Ø§Ø³ØªÙØ³Ø§Ø± Ø¨Ø®ØµÙˆØµ Ø§Ù„Ø´ÙƒÙˆÙ‰ Ø±Ù‚Ù…:
 {complaint_number}$body$),
 ('complaint_support','support','whatsapp','en','Complaint support',$body$Hello, I have a question about complaint {complaint_number}.$body$),
-('admin_order_contact','customer','whatsapp','ar','تواصل الإدارة',$body$السلام عليكم، نتواصل معكم من إدارة داي نايت بخصوص الشحنة رقم:
+('admin_order_contact','customer','whatsapp','ar','ØªÙˆØ§ØµÙ„ Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ù†ØªÙˆØ§ØµÙ„ Ù…Ø¹ÙƒÙ… Ù…Ù† Ø¥Ø¯Ø§Ø±Ø© Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ø¨Ø®ØµÙˆØµ Ø§Ù„Ø´Ø­Ù†Ø© Ø±Ù‚Ù…:
 {tracking_number}
 
-الحالة الحالية:
+Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©:
 {order_status}
 
 {tracking_url}$body$),
 ('admin_order_contact','customer','whatsapp','en','Admin order contact',$body$Hello, DAY NIGHT management is contacting you regarding shipment {tracking_number}.
 Status: {order_status}
 {tracking_url}$body$),
-('generic_support','support','whatsapp','ar','تواصل عام',$body$السلام عليكم، أحتاج مساعدة من فريق داي نايت بخصوص الصفحة الحالية:
+('generic_support','support','whatsapp','ar','ØªÙˆØ§ØµÙ„ Ø¹Ø§Ù…',$body$Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ…ØŒ Ø£Ø­ØªØ§Ø¬ Ù…Ø³Ø§Ø¹Ø¯Ø© Ù…Ù† ÙØ±ÙŠÙ‚ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª Ø¨Ø®ØµÙˆØµ Ø§Ù„ØµÙØ­Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©:
 {company_website}$body$),
 ('generic_support','support','whatsapp','en','General support',$body$Hello, I need help from DAY NIGHT regarding this page:
 {company_website}$body$)
@@ -659,7 +659,7 @@ begin
 
   v_token := encode(gen_random_bytes(32), 'hex');
   insert into public.feedback_tokens(order_id, token_hash, expires_at)
-  values (p_order_id, digest(v_token, 'sha256'), now() + make_interval(days => coalesce(v_days,30)));
+  values (p_order_id, extensions.digest(v_token, 'sha256'), now() + make_interval(days => coalesce(v_days,30)));
 
   perform public.dn_ce_audit('feedback_token','create',jsonb_build_object('order_id',p_order_id));
   return jsonb_build_object(
@@ -689,7 +689,7 @@ declare
 begin
   select * into v_token
   from public.feedback_tokens
-  where token_hash = digest(coalesce(p_token,''), 'sha256')
+  where token_hash = extensions.digest(coalesce(p_token,''), 'sha256')
     and is_active = true
     and expires_at > now()
   order by created_at desc
@@ -716,10 +716,10 @@ begin
     'delivered_at', coalesce(to_jsonb(v_order)->>'delivered_at', to_jsonb(v_order)->>'updated_at'),
     'service_type', to_jsonb(v_order)->>'service_type',
     'driver_id', v_driver_id,
-    'driver_name', coalesce(to_jsonb(v_order)->>'driver_name', to_jsonb(v_driver)->>'full_name', to_jsonb(v_driver)->>'name', 'مندوب داي نايت'),
+    'driver_name', coalesce(to_jsonb(v_order)->>'driver_name', to_jsonb(v_driver)->>'full_name', to_jsonb(v_driver)->>'name', 'Ù…Ù†Ø¯ÙˆØ¨ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª'),
     'merchant_id', v_order.merchant_id,
     'merchant_name', coalesce(to_jsonb(v_merchant)->>'trade_name',''),
-    'customer_name', coalesce(to_jsonb(v_order)->>'receiver_name',to_jsonb(v_order)->>'customer_name','عميل داي نايت'),
+    'customer_name', coalesce(to_jsonb(v_order)->>'receiver_name',to_jsonb(v_order)->>'customer_name','Ø¹Ù…ÙŠÙ„ Ø¯Ø§ÙŠ Ù†Ø§ÙŠØª'),
     'masked_phone', public.dn_ce_mask_phone(coalesce(to_jsonb(v_order)->>'receiver_phone',to_jsonb(v_order)->>'customer_phone','')),
     'locale', coalesce(to_jsonb(v_order)->>'preferred_language','ar'),
     'already_submitted', v_existing,
@@ -764,7 +764,7 @@ begin
 
   select * into v_token
   from public.feedback_tokens
-  where token_hash = digest(coalesce(p_token,''),'sha256') and is_active and expires_at > now()
+  where token_hash = extensions.digest(coalesce(p_token,''),'sha256') and is_active and expires_at > now()
   order by created_at desc limit 1;
   if not found then raise exception 'feedback_token_invalid_or_expired'; end if;
 
@@ -807,8 +807,8 @@ begin
 
   update public.feedback_tokens set used_at = coalesce(used_at,now()) where id = v_token.id;
   perform public.dn_ce_notify_admins(
-    'تقييم جديد للشحنة ' || v_tracking,
-    'وصل تقييم جديد بدرجة ' || p_overall_rating || ' نجوم للشحنة ' || v_tracking || '.',
+    'ØªÙ‚ÙŠÙŠÙ… Ø¬Ø¯ÙŠØ¯ Ù„Ù„Ø´Ø­Ù†Ø© ' || v_tracking,
+    'ÙˆØµÙ„ ØªÙ‚ÙŠÙŠÙ… Ø¬Ø¯ÙŠØ¯ Ø¨Ø¯Ø±Ø¬Ø© ' || p_overall_rating || ' Ù†Ø¬ÙˆÙ… Ù„Ù„Ø´Ø­Ù†Ø© ' || v_tracking || '.',
     'customer_feedback',
     jsonb_build_object('feedback_id',v_feedback_id,'order_id',v_order.id,'tracking_number',v_tracking,'rating',p_overall_rating,'route','/admin/customer-experience?tab=ratings')
   );
@@ -851,7 +851,7 @@ begin
   if length(v_description) > 4000 then raise exception 'complaint_description_too_long'; end if;
 
   select * into v_token from public.feedback_tokens
-  where token_hash=digest(coalesce(p_token,''),'sha256') and is_active and expires_at>now()
+  where token_hash=extensions.digest(coalesce(p_token,''),'sha256') and is_active and expires_at>now()
   order by created_at desc limit 1;
   if not found then raise exception 'feedback_token_invalid_or_expired'; end if;
   select * into v_order from public.orders where id=v_token.order_id;
@@ -880,10 +880,10 @@ begin
   values(v_id,'created','new','Public complaint submitted',jsonb_build_object('severity',v_severity,'category',v_category));
 
   perform public.dn_ce_notify_admins(
-    case when v_severity='critical' then 'شكوى حرجة جديدة' else 'شكوى جديدة' end,
+    case when v_severity='critical' then 'Ø´ÙƒÙˆÙ‰ Ø­Ø±Ø¬Ø© Ø¬Ø¯ÙŠØ¯Ø©' else 'Ø´ÙƒÙˆÙ‰ Ø¬Ø¯ÙŠØ¯Ø©' end,
     case when v_severity='critical'
-      then 'شكوى حرجة جديدة مرتبطة بالشحنة ' || v_tracking || ' وتحتاج إلى مراجعة فورية.'
-      else 'تم استلام الشكوى ' || v_number || ' للشحنة ' || v_tracking || '.' end,
+      then 'Ø´ÙƒÙˆÙ‰ Ø­Ø±Ø¬Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù…Ø±ØªØ¨Ø·Ø© Ø¨Ø§Ù„Ø´Ø­Ù†Ø© ' || v_tracking || ' ÙˆØªØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ Ù…Ø±Ø§Ø¬Ø¹Ø© ÙÙˆØ±ÙŠØ©.'
+      else 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø§Ù„Ø´ÙƒÙˆÙ‰ ' || v_number || ' Ù„Ù„Ø´Ø­Ù†Ø© ' || v_tracking || '.' end,
     case when v_severity='critical' then 'critical_complaint' else 'complaint' end,
     jsonb_build_object('complaint_id',v_id,'complaint_number',v_number,'order_id',v_order.id,'tracking_number',v_tracking,'severity',v_severity,'route','/admin/customer-experience?tab=complaints&complaint='||v_id)
   );
@@ -1220,3 +1220,4 @@ end;
 $$;
 
 commit;
+
