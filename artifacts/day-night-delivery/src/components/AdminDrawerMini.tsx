@@ -1,6 +1,8 @@
+import type { MouseEvent } from "react";
 import { MessageSquareWarning } from "lucide-react";
 import useOpenComplaintsCount from "../hooks/useOpenComplaintsCount";
 
+const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
 const links = [
   ["#dn-admin-top", "لوحة التحكم"],
   ["#dn-admin-core", "إضافة طلب جديد"],
@@ -21,18 +23,18 @@ const links = [
   ["#dn-admin-core", "الدخل"],
   ["#dn-admin-core", "المصروفات"],
   ["#dn-admin-prospect", "صياد التجار"],
-];
+] as const;
 
 export default function AdminDrawerMini() {
   const openComplaints = useOpenComplaintsCount(true);
 
-  const handleCustomerExperience = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const handleCustomerExperience = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     if (href !== "/admin/customer-experience") return;
     event.preventDefault();
     const url = new URL(window.location.href);
     url.pathname = href;
     window.history.replaceState({}, "", url);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.dispatchEvent(new CustomEvent<string>(CUSTOMER_EXPERIENCE_PATH_EVENT, { detail: href }));
   };
 
   return (
