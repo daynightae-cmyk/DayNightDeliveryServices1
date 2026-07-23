@@ -147,17 +147,17 @@ export async function uploadComplaintAttachment(complaint: ComplaintCreated, fil
 export async function loadAdminCustomerExperience(): Promise<AdminExperienceSnapshot> {
   const client = requireSupabase();
   const [feedbackResult, complaintsResult, messagesResult, templatesResult, merchantsResult] = await Promise.all([
-    client.from("order_feedback").select("*").order("submitted_at", { ascending: false }).limit(500),
+    client.rpc("admin_order_feedback_rows"),
     client.from("complaints").select("*").order("created_at", { ascending: false }).limit(500),
     client.from("outbound_message_logs").select("*").order("generated_at", { ascending: false }).limit(500),
     client.from("message_templates").select("*").order("template_key", { ascending: true }),
     client.from("merchants").select("id,merchant_code,trade_name,owner_name,phone,email,status,created_at").order("created_at", { ascending: false }).limit(500),
   ]);
-
   const firstError = [feedbackResult.error, complaintsResult.error, messagesResult.error, templatesResult.error, merchantsResult.error].find(Boolean);
   if (firstError) throw firstError;
+  const feedbackPayload = unwrapRpc<any>(feedbackResult.data);
   return {
-    feedback: feedbackResult.data || [],
+    feedback: Array.isArray(feedbackPayload?.feedback) ? feedbackPayload.feedback : [],
     complaints: complaintsResult.data || [],
     messages: messagesResult.data || [],
     templates: templatesResult.data || [],
@@ -165,12 +165,19 @@ export async function loadAdminCustomerExperience(): Promise<AdminExperienceSnap
   };
 }
 
+export async function loadMerchantOrderFeedback() {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("merchant_order_feedback");
+  if (error) throw error;
+  const payload = unwrapRpc<any>(data);
+  return Array.isArray(payload?.feedback) ? payload.feedback : [];
+}
+
 export async function loadComplaintDetails(complaintId: string) {
   const client = requireSupabase();
   const complaintResult = await client.from("complaints").select("*").eq("id", complaintId).single();
   if (complaintResult.error) throw complaintResult.error;
   const complaint = complaintResult.data;
-
   const emptyResult = Promise.resolve({ data: null, error: null });
   const [eventsResult, attachmentsResult, orderResult, driverResult, merchantResult, historyResult, attemptsResult] = await Promise.all([
     client.from("complaint_events").select("*").eq("complaint_id", complaintId).order("created_at", { ascending: true }),
@@ -181,15 +188,12 @@ export async function loadComplaintDetails(complaintId: string) {
     client.from("order_status_history").select("*").eq("order_id", complaint.order_id).order("created_at", { ascending: true }),
     client.from("order_contact_attempts").select("*").eq("order_id", complaint.order_id).order("created_at", { ascending: true }),
   ]);
-
   const firstError = [eventsResult.error, attachmentsResult.error, orderResult.error, driverResult.error, merchantResult.error, historyResult.error, attemptsResult.error].find(Boolean);
   if (firstError) throw firstError;
-
   const attachments = await Promise.all((attachmentsResult.data || []).map(async (attachment: any) => {
     const { data } = await client.storage.from("complaint-attachments").createSignedUrl(attachment.storage_path, 900);
     return { ...attachment, signed_url: data?.signedUrl || "" };
   }));
-
   return {
     complaint,
     order: orderResult.data || null,
@@ -202,14 +206,7 @@ export async function loadComplaintDetails(complaintId: string) {
   };
 }
 
-export async function updateComplaint(input: {
-  complaintId: string;
-  status?: string;
-  severity?: string;
-  assignedTo?: string | null;
-  resolution?: string | null;
-  note?: string | null;
-}) {
+export async function updateComplaint(input: { complaintId: string; status?: string; severity?: string; assignedTo?: string | null; resolution?: string | null; note?: string | null }) {
   const client = requireSupabase();
   const { data, error } = await client.rpc("admin_update_complaint", {
     p_complaint_id: input.complaintId,
@@ -223,11 +220,7 @@ export async function updateComplaint(input: {
   return unwrapRpc<any>(data);
 }
 
-export async function setFeedbackReview(input: {
-  feedbackId: string;
-  reviewStatus: "new" | "reviewed" | "published" | "hidden" | "converted_to_complaint";
-  allowPublicDisplay?: boolean;
-}) {
+export async function setFeedbackReview(input: { feedbackId: string; reviewStatus: "new" | "reviewed" | "published" | "hidden" | "converted_to_complaint"; allowPublicDisplay?: boolean }) {
   const client = requireSupabase();
   const { data, error } = await client.rpc("admin_set_feedback_review", {
     p_feedback_id: input.feedbackId,
@@ -240,20 +233,14 @@ export async function setFeedbackReview(input: {
 
 export async function convertFeedbackToComplaint(feedbackId: string, severity: "low" | "medium" | "high" | "critical" = "medium") {
   const client = requireSupabase();
-  const { data, error } = await client.rpc("admin_create_complaint_from_feedback", {
-    p_feedback_id: feedbackId,
-    p_severity: severity,
-  });
+  const { data, error } = await client.rpc("admin_create_complaint_from_feedback", { p_feedback_id: feedbackId, p_severity: severity });
   if (error) throw error;
   return unwrapRpc<any>(data);
 }
 
 export async function suspendDriverForComplaint(complaintId: string, note: string) {
   const client = requireSupabase();
-  const { data, error } = await client.rpc("admin_suspend_driver_for_complaint", {
-    p_complaint_id: complaintId,
-    p_note: note || null,
-  });
+  const { data, error } = await client.rpc("admin_suspend_driver_for_complaint", { p_complaint_id: complaintId, p_note: note || null });
   if (error) throw error;
   return unwrapRpc<any>(data);
 }
@@ -265,11 +252,7 @@ export async function loadDriverFeedbackSummary() {
   return unwrapRpc<any>(data);
 }
 
-export async function saveMessageTemplate(input: {
-  id: string;
-  body: string;
-  isActive: boolean;
-}) {
+export async function saveMessageTemplate(input: { id: string; body: string; isActive: boolean }) {
   const client = requireSupabase();
   const { data, error } = await client.rpc("admin_update_message_template", {
     p_template_id: input.id,
@@ -289,7 +272,5 @@ export function subscribeCustomerExperience(onChange: () => void) {
     .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "outbound_message_logs" }, onChange)
     .subscribe();
-  return () => {
-    void client.removeChannel(channel);
-  };
+  return () => { void client.removeChannel(channel); };
 }
