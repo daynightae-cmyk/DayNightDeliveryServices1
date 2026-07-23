@@ -11,9 +11,9 @@ import android.webkit.WebView;
 /**
  * Native startup watchdog for Driver and Merchant WebViews.
  *
- * The Android role route now mounts an isolated native React root, so the
- * watchdog only removes obsolete splash markup and verifies that the dedicated
- * login/loading/dashboard surface is visible. It never mutates dashboard CSS.
+ * The Android role route mounts an isolated React root. The watchdog removes
+ * obsolete splash markup and verifies either the credential screen, a real
+ * authenticated workspace, or the dedicated driver map acceptance surface.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
@@ -67,8 +67,8 @@ public final class DayNightApplication extends Application {
         }
 
         String roleSelector = "driver".equals(BuildConfig.ROLE)
-                ? ".dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3"
-                : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
+                ? "[data-driver-runtime-acceptance],.dn-native-role-login,[data-native-role-loading=\"driver\"],[data-native-role-recovery=\"driver\"],.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3"
+                : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],[data-native-role-recovery=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
 
         String script = "(function(){"
                 + "var boot=document.getElementById('dn-role-boot');"
@@ -76,15 +76,19 @@ public final class DayNightApplication extends Application {
                 + "var rendered=!!(root&&root.childElementCount>0);"
                 + "var surface=document.querySelector(" + quoteForJavascript(roleSelector) + ");"
                 + "var card=document.querySelector('.dn-native-role-login-card');"
-                + "var target=card||surface;"
+                + "var runtime=document.querySelector('[data-driver-runtime-acceptance]');"
+                + "var map=document.querySelector('.leaflet-container');"
+                + "var vehicle=document.querySelector('.dn-official-vehicle');"
+                + "var target=card||runtime||surface;"
                 + "var style=target?getComputedStyle(target):null;"
                 + "var rect=target?target.getBoundingClientRect():null;"
                 + "var visible=!!(target&&style&&rect"
                 + "&&style.display!=='none'&&style.visibility!=='hidden'"
                 + "&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2"
                 + "&&rect.bottom>0&&rect.top<window.innerHeight);"
+                + "var mapReady=!runtime||!!(map&&vehicle);"
                 + "var roleReady=false;"
-                + "if(visible){"
+                + "if(visible&&mapReady){"
                 + "window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}"
                 + "if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}"
                 + "else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}"
@@ -95,6 +99,9 @@ public final class DayNightApplication extends Application {
                 + "+',rendered='+rendered"
                 + "+',surface='+(!!surface)"
                 + "+',card='+(!!card)"
+                + "+',runtime='+(!!runtime)"
+                + "+',map='+(!!map)"
+                + "+',vehicle='+(!!vehicle)"
                 + "+',textLength='+(target?String(target.innerText||'').length:-1)"
                 + "+',roleVisible='+visible"
                 + "+',roleReady='+roleReady"

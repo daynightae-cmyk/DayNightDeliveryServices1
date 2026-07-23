@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import { AppProvider } from "./lib/AppContext.tsx";
 import { reportError } from "./lib/monitoring";
@@ -8,6 +9,7 @@ import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
+import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -103,9 +105,13 @@ async function mountNativeRoleApplication(role: NativeRole) {
   const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot");
   createRoot(rootElement()).render(
     <StrictMode>
-      <AppProvider>
-        <NativeRoleRoot role={role} />
-      </AppProvider>
+      <BrowserRouter>
+        <NativeRoleErrorBoundary role={role}>
+          <AppProvider>
+            <NativeRoleRoot role={role} />
+          </AppProvider>
+        </NativeRoleErrorBoundary>
+      </BrowserRouter>
     </StrictMode>,
   );
 }
