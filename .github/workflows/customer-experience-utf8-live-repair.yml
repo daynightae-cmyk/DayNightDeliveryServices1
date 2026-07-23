@@ -1,0 +1,61 @@
+name: Customer Experience UTF-8 Live Repair
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "artifacts/day-night-delivery/scripts/repair-customer-experience-template-encoding.mjs"
+      - "artifacts/day-night-delivery/src/services/whatsappMessageCore.mjs"
+      - ".github/workflows/customer-experience-utf8-live-repair.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: customer-experience-utf8-live-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-production-data:
+    name: Repair Arabic templates in Supabase production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify protected production credentials
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VITE_SUPABASE_URL:-}" || { echo "Missing VITE_SUPABASE_URL" >&2; exit 2; }
+          test -n "${SUPABASE_SERVICE_ROLE_KEY:-}" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY" >&2; exit 2; }
+
+      - name: Repair and verify Arabic templates
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node artifacts/day-night-delivery/scripts/repair-customer-experience-template-encoding.mjs
