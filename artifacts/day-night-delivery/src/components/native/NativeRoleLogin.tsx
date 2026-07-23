@@ -57,7 +57,7 @@ export default function NativeRoleLogin({ role, isArabic }: { role: NativeRole; 
         .dn-native-role-submit{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:58px!important;margin-top:3px!important;border:0!important;border-radius:15px!important;background:#0b4db2!important;color:#fff!important;-webkit-text-fill-color:#fff!important;font-size:15px!important;font-weight:900!important;opacity:1!important;}
         .dn-native-role-submit:disabled{background:#91a8c3!important;color:#fff!important;}
         .dn-native-role-error{margin:0!important;padding:11px 12px!important;border:1px solid rgba(220,38,38,.22)!important;border-radius:13px!important;background:#fff1f2!important;color:#b42318!important;font-size:12px!important;line-height:1.7!important;font-weight:800!important;}
-        .dn-native-role-trust{margin:auto 0 0!important;padding-top:24px!important;color:#667085!important;font-size:11px!important;line-height:1.8!important;font-weight:700!important;}
+        .dn-native-role-trust{display:block!important;width:100%!important;margin:auto 0 0!important;padding:24px 0 0!important;border:0!important;background:transparent!important;color:#667085!important;font-size:11px!important;line-height:1.8!important;font-weight:700!important;text-align:start!important;}
         .dn-native-role-trust strong{display:block!important;margin-bottom:4px!important;color:#071a33!important;font-size:12px!important;}
         @media(min-width:700px){.dn-native-role-login{display:grid!important;place-items:center!important;padding:24px!important;}.dn-native-role-login-card{min-height:0!important;padding:32px!important;}}
       `}</style>
@@ -112,12 +112,12 @@ export default function NativeRoleLogin({ role, isArabic }: { role: NativeRole; 
           </button>
         </form>
 
-        <footer className="dn-native-role-trust">
+        <div className="dn-native-role-trust">
           <strong>{isArabic ? "اتصال آمن ومباشر" : "Secure live connection"}</strong>
           {isArabic
             ? "لا توجد بيانات تجريبية داخل التطبيق. الطلبات والمبالغ والصلاحيات تُقرأ من الحساب الحقيقي."
             : "The app contains no demo records. Orders, balances, and permissions come from the live account."}
-        </footer>
+        </div>
       </main>
     </section>
   );
