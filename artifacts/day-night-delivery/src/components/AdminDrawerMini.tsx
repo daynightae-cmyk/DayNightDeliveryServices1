@@ -1,3 +1,6 @@
+import { MessageSquareWarning } from "lucide-react";
+import useOpenComplaintsCount from "../hooks/useOpenComplaintsCount";
+
 const links = [
   ["#dn-admin-top", "لوحة التحكم"],
   ["#dn-admin-core", "إضافة طلب جديد"],
@@ -8,6 +11,7 @@ const links = [
   ["#dn-admin-core", "الطلبات قيد المراجعة"],
   ["#dn-admin-core", "الطلبات المؤجلة"],
   ["#dn-admin-core", "الطلبات الراجعة"],
+  ["/admin/customer-experience", "تجربة العملاء"],
   ["#dn-admin-core", "الطلبات قيد الإحضار"],
   ["#dn-admin-core", "طلبات أبوظبي"],
   ["#dn-admin-core", "الطلبات الخارجية"],
@@ -20,6 +24,17 @@ const links = [
 ];
 
 export default function AdminDrawerMini() {
+  const openComplaints = useOpenComplaintsCount(true);
+
+  const handleCustomerExperience = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href !== "/admin/customer-experience") return;
+    event.preventDefault();
+    const url = new URL(window.location.href);
+    url.pathname = href;
+    window.history.replaceState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
   return (
     <details className="group fixed bottom-24 right-5 z-50" dir="rtl">
       <summary className="relative z-[2] cursor-pointer list-none rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep shadow-2xl">قائمة الإدارة / إغلاق</summary>
@@ -28,7 +43,32 @@ export default function AdminDrawerMini() {
           <strong className="block text-xl font-black text-white">DAY NIGHT</strong>
           <span className="text-xs font-bold text-brand-gold">نصل إليك في كل وقت… وإدارتك أوضح من أي وقت</span>
         </div>
-        {links.map(([href, label]) => <a key={label} href={href} className="mb-2 block rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:border-brand-gold/40 hover:bg-white/10">{label}</a>)}
+        {links.map(([href, label]) => {
+          const isCustomerExperience = href === "/admin/customer-experience";
+          return (
+            <a
+              key={label}
+              href={href}
+              onClick={(event) => handleCustomerExperience(event, href)}
+              className="mb-2 flex items-center gap-3 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:border-brand-gold/40 hover:bg-white/10"
+            >
+              {isCustomerExperience && (
+                <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#0057B8]">
+                  <MessageSquareWarning className="h-4 w-4" />
+                  {openComplaints > 0 && (
+                    <b className="absolute -end-2 -top-2 min-w-5 rounded-full bg-red-600 px-1 text-center text-[10px] text-white">
+                      {openComplaints > 99 ? "99+" : openComplaints}
+                    </b>
+                  )}
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <strong className="block">{label}</strong>
+                {isCustomerExperience && <small className="block truncate text-[10px] text-white/55">التقييمات • الشكاوى • الرسائل</small>}
+              </span>
+            </a>
+          );
+        })}
         <div className="mt-5 rounded-2xl border border-brand-gold/20 bg-brand-gold/10 p-4 text-xs font-bold leading-6 text-white/65">القائمة مبنية على طلب منصور أبو خليفه، والبيانات تظهر من النظام فقط بدون أسماء افتراضية.</div>
       </div>
     </details>
