@@ -21,8 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 70
     env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ngdwybpgacauorygoedi.supabase.co' }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'visual-test-public-client-placeholder' }}
+      VITE_SUPABASE_URL: https://ngdwybpgacauorygoedi.supabase.co
+      VITE_SUPABASE_ANON_KEY: ""
+      VITE_ROLE_VISUAL_TEST: "1"
 
     steps:
       - name: Checkout
@@ -46,10 +47,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${VITE_SUPABASE_URL:-}"
-          test -n "${VITE_SUPABASE_ANON_KEY:-}"
           pnpm install --frozen-lockfile
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
+          grep -F 'VITE_ROLE_VISUAL_TEST' artifacts/day-night-delivery/src/components/driver/DriverAuthGuard.tsx
           grep -F 'dnBootAbsoluteFailsafe' artifacts/day-night-delivery/index.html
           grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
           grep -F 'DAYNIGHT_SPLASH' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
