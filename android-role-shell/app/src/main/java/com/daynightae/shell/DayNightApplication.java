@@ -13,8 +13,8 @@ import android.webkit.WebView;
  *
  * Android removes obsolete web splash layers and applies a final inline mobile
  * authentication layout. Inline important declarations deliberately outrank
- * legacy site styles, so a Driver/Merchant credential card cannot be positioned
- * below the visible phone or tablet viewport.
+ * legacy site styles. Blur/backdrop composition is disabled because older and
+ * low-memory Android WebViews may otherwise create a transparent login layer.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
@@ -81,10 +81,26 @@ public final class DayNightApplication extends Application {
         String cardSelector = driverRole ? ".dn-driver-auth-card" : ".dn-merchant-login-card-v3";
         String visualSelector = driverRole ? ".dn-driver-auth-visual" : ".dn-merchant-login-visual-v3";
         String shellSelector = driverRole ? ".dn-portal-auth-shell" : "";
+        String roleCss = driverRole
+                ? "html[data-native-shell=\"driver\"] .dn-driver-login-page::before,html[data-native-shell=\"driver\"] .dn-driver-login-page::after{display:none!important;}"
+                    + "html[data-native-shell=\"driver\"] .dn-driver-auth-card{background:#fff!important;color:#071a33!important;border:1px solid rgba(7,26,51,.14)!important;box-shadow:0 18px 54px rgba(7,26,51,.18)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;isolation:auto!important;mix-blend-mode:normal!important;}"
+                    + "html[data-native-shell=\"driver\"] .dn-driver-auth-card *{opacity:1!important;visibility:visible!important;content-visibility:visible!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;mix-blend-mode:normal!important;}"
+                    + "html[data-native-shell=\"driver\"] .dn-driver-auth-card :is(h1,h2,h3,p,strong,small,label>span){color:#071a33!important;}"
+                    + "html[data-native-shell=\"driver\"] .dn-driver-auth-card input{display:block!important;background:#fff!important;color:#071a33!important;border:1px solid rgba(7,26,51,.18)!important;-webkit-text-fill-color:#071a33!important;}"
+                    + "html[data-native-shell=\"driver\"] .dn-driver-auth-card .dn-portal-auth-primary{display:flex!important;background:#0b4db2!important;color:#fff!important;}"
+                : "html[data-native-shell=\"merchant\"] .dn-merchant-login-v3::before,html[data-native-shell=\"merchant\"] .dn-merchant-login-v3::after{display:none!important;}"
+                    + "html[data-native-shell=\"merchant\"] .dn-merchant-login-card-v3{background:#fff!important;color:#071a33!important;border:1px solid rgba(7,26,51,.14)!important;box-shadow:0 18px 54px rgba(7,26,51,.18)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;isolation:auto!important;mix-blend-mode:normal!important;}"
+                    + "html[data-native-shell=\"merchant\"] .dn-merchant-login-card-v3 *{opacity:1!important;visibility:visible!important;content-visibility:visible!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;mix-blend-mode:normal!important;}"
+                    + "html[data-native-shell=\"merchant\"] .dn-merchant-login-card-v3 :is(h1,h2,h3,p,strong,small,label>span){color:#071a33!important;}"
+                    + "html[data-native-shell=\"merchant\"] .dn-merchant-login-card-v3 input{display:block!important;background:#fff!important;color:#071a33!important;border:1px solid rgba(7,26,51,.18)!important;-webkit-text-fill-color:#071a33!important;}"
+                    + "html[data-native-shell=\"merchant\"] .dn-merchant-login-card-v3 button[type=submit]{display:flex!important;background:#0b4db2!important;color:#fff!important;}";
 
         String script = "(function(){"
                 + "function forceStyle(element,name,value){if(element){element.style.setProperty(name,value,'important');}}"
                 + "function forceMany(element,values){if(!element)return;Object.keys(values).forEach(function(name){forceStyle(element,name,values[name]);});}"
+                + "var styleTag=document.getElementById('dn-native-last-paint-style');"
+                + "if(!styleTag){styleTag=document.createElement('style');styleTag.id='dn-native-last-paint-style';document.head.appendChild(styleTag);}"
+                + "styleTag.textContent=" + quoteForJavascript(roleCss) + ";"
                 + "var boot=document.getElementById('dn-role-boot');"
                 + "var root=document.getElementById('root');"
                 + "var rendered=!!(root&&root.childElementCount>0);"
@@ -96,44 +112,42 @@ public final class DayNightApplication extends Application {
                 + "if(login){"
                 + "forceMany(document.documentElement,{width:'100%',minWidth:'0',minHeight:'100%',overflowX:'hidden'});"
                 + "forceMany(document.body,{width:'100%',minWidth:'0',minHeight:'100%',margin:'0',padding:'0',overflowX:'hidden'});"
-                + "forceMany(login,{position:'fixed',inset:'0',top:'0',right:'0',bottom:'0',left:'0',zIndex:'2147483000',display:'block',width:'100vw',minWidth:'0',maxWidth:'none',height:'100dvh',minHeight:'100dvh',margin:'0',padding:'10px',overflowX:'hidden',overflowY:'auto',transform:'none',translate:'none',filter:'none',opacity:'1',visibility:'visible',contentVisibility:'visible',clip:'auto',clipPath:'none',scrollBehavior:'auto'});"
+                + "forceMany(login,{position:'fixed',inset:'0',top:'0',right:'0',bottom:'0',left:'0',zIndex:'2147483000',display:'block',width:'100vw',minWidth:'0',maxWidth:'none',height:'100dvh',minHeight:'100dvh',margin:'0',padding:'10px',overflowX:'hidden',overflowY:'auto',transform:'none',translate:'none',filter:'none',opacity:'1',visibility:'visible',contentVisibility:'visible',clip:'auto',clipPath:'none',scrollBehavior:'auto',backdropFilter:'none',WebkitBackdropFilter:'none'});"
                 + "if(shell){forceMany(shell,{position:'static',display:'block',width:'100%',minWidth:'0',maxWidth:'none',height:'auto',minHeight:'0',margin:'0',padding:'0',overflow:'visible',transform:'none',translate:'none'});}"
                 + "if(visual){forceStyle(visual,'display','none');}"
-                + "if(card){forceMany(card,{position:'relative',inset:'auto',top:'auto',right:'auto',bottom:'auto',left:'auto',zIndex:'2',display:'flex',flexDirection:'column',justifyContent:'flex-start',alignSelf:'auto',justifySelf:'auto',width:'100%',minWidth:'0',maxWidth:'560px',height:'auto',minHeight:'0',maxHeight:'none',margin:'0 auto',padding:'22px 17px 20px',overflow:'visible',transform:'none',translate:'none',filter:'none',opacity:'1',visibility:'visible',contentVisibility:'visible',clip:'auto',clipPath:'none',borderRadius:'24px'});}"
+                + "if(card){"
+                + "forceMany(card,{position:'relative',inset:'auto',top:'auto',right:'auto',bottom:'auto',left:'auto',zIndex:'2',display:'flex',flexDirection:'column',justifyContent:'flex-start',alignSelf:'auto',justifySelf:'auto',width:'100%',minWidth:'0',maxWidth:'560px',height:'auto',minHeight:'0',maxHeight:'none',margin:'0 auto',padding:'22px 17px 20px',overflow:'visible',transform:'none',translate:'none',filter:'none',opacity:'1',visibility:'visible',contentVisibility:'visible',clip:'auto',clipPath:'none',borderRadius:'24px',background:'#ffffff',color:'#071a33',border:'1px solid rgba(7,26,51,.14)',boxShadow:'0 18px 54px rgba(7,26,51,.18)',backdropFilter:'none',WebkitBackdropFilter:'none',isolation:'auto',mixBlendMode:'normal'});"
+                + "Array.from(card.querySelectorAll('*')).forEach(function(child){forceMany(child,{opacity:'1',visibility:'visible',contentVisibility:'visible',filter:'none',backdropFilter:'none',WebkitBackdropFilter:'none',animation:'none',mixBlendMode:'normal'});});"
+                + "}"
                 + "}"
                 + "var target=card||surface;"
                 + "var style=target?getComputedStyle(target):null;"
                 + "var rect=target?target.getBoundingClientRect():null;"
+                + "var first=card&&card.firstElementChild?card.firstElementChild:null;"
+                + "var firstStyle=first?getComputedStyle(first):null;"
+                + "var firstRect=first?first.getBoundingClientRect():null;"
                 + "var visible=!!(target&&style&&rect&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2&&rect.bottom>0&&rect.top<window.innerHeight);"
                 + "var roleReady=false;"
-                + "if(visible){"
-                + "window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}"
-                + "if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}"
-                + "else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}"
-                + "}"
+                + "if(visible){window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}}"
                 + "var force=" + (force ? "true" : "false") + ";"
                 + "if(boot&&(rendered||force)){boot.classList.add('is-complete');boot.remove();}"
                 + "return 'removed='+(!document.getElementById('dn-role-boot'))"
-                + "+',rendered='+rendered"
-                + "+',login='+(!!login)"
-                + "+',card='+(!!card)"
-                + "+',roleVisible='+visible"
-                + "+',roleReady='+roleReady"
+                + "+',rendered='+rendered+',login='+(!!login)+',card='+(!!card)"
+                + "+',textLength='+(card?String(card.innerText||'').length:-1)"
+                + "+',children='+(card?card.childElementCount:-1)"
+                + "+',roleVisible='+visible+',roleReady='+roleReady"
                 + "+',rootChildren='+(root?root.childElementCount:-1)"
+                + "+',background='+(style?style.backgroundColor:'missing')"
                 + "+',display='+(style?style.display:'missing')"
                 + "+',visibility='+(style?style.visibility:'missing')"
                 + "+',opacity='+(style?style.opacity:'missing')"
                 + "+',rect='+(rect?[Math.round(rect.left),Math.round(rect.top),Math.round(rect.width),Math.round(rect.height)].join(':'):'missing')"
-                + "+',viewport='+window.innerWidth+'x'+window.innerHeight"
-                + "+',ready='+document.readyState"
-                + "+',href='+String(location.href);"
+                + "+',first='+(firstStyle&&firstRect?[firstStyle.display,firstStyle.visibility,firstStyle.opacity,Math.round(firstRect.left),Math.round(firstRect.top),Math.round(firstRect.width),Math.round(firstRect.height)].join(':'):'missing')"
+                + "+',viewport='+window.innerWidth+'x'+window.innerHeight+',ready='+document.readyState+',href='+String(location.href);"
                 + "})()";
 
         webView.evaluateJavascript(script, result -> {
-            Log.i(
-                    TAG,
-                    BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result
-            );
+            Log.i(TAG, BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result);
             if (result != null && result.contains("roleReady=true")) {
                 webView.postInvalidateOnAnimation();
             }
