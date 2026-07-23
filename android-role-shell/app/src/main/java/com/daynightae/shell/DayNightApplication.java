@@ -11,13 +11,15 @@ import android.webkit.WebView;
 /**
  * Native startup watchdog for Driver and Merchant WebViews.
  *
- * The Android role route mounts an isolated React root. The watchdog removes
- * obsolete splash markup and verifies either the credential screen, a real
- * authenticated workspace, or the dedicated driver map acceptance surface.
+ * It removes obsolete web splash markup, applies the compatibility layout
+ * required by the currently deployed Driver login page, and verifies that a
+ * real login/loading/dashboard/map surface is visible. Dashboard CSS is never
+ * hidden or replaced.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
     private static final long[] WATCHDOG_DELAYS_MS = {
+            700L,
             1200L,
             2400L,
             4200L,
@@ -67,28 +69,63 @@ public final class DayNightApplication extends Application {
         }
 
         String roleSelector = "driver".equals(BuildConfig.ROLE)
-                ? "[data-driver-runtime-acceptance],.dn-native-role-login,[data-native-role-loading=\"driver\"],[data-native-role-recovery=\"driver\"],.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3"
-                : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],[data-native-role-recovery=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
+                ? ".dn-native-role-login,[data-native-role-loading=\"driver\"],.dn-driver-login-page,.dn-driver-auth-card,.dn-portal-auth-card,.dn-driver-exact-shell,.dn-driver-state-card,.dn-driver-shell-v3,[data-driver-runtime-acceptance=\"ready\"]"
+                : ".dn-native-role-login,[data-native-role-loading=\"merchant\"],.dn-merchant-app,.dn-merchant-state-v3,.dn-merchant-shell-v3";
+
+        String driverAuthCss = "html[data-native-shell=driver] .dn-driver-login-page,body[data-native-role=driver] .dn-driver-login-page{"
+                + "display:block!important;position:relative!important;inset:auto!important;transform:none!important;"
+                + "width:100%!important;max-width:none!important;min-height:100dvh!important;height:auto!important;"
+                + "margin:0!important;padding:12px!important;overflow:visible!important;background:#f7f5ea!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-shell,body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-shell{"
+                + "display:block!important;position:relative!important;inset:auto!important;transform:none!important;"
+                + "width:100%!important;max-width:560px!important;min-height:0!important;height:auto!important;"
+                + "margin:0 auto!important;padding:0!important;overflow:visible!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-visual,body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-visual{display:none!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-driver-auth-card,"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-card,"
+                + "body[data-native-role=driver] .dn-driver-login-page .dn-driver-auth-card,"
+                + "body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-card{"
+                + "display:block!important;position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;"
+                + "transform:none!important;translate:none!important;opacity:1!important;visibility:visible!important;animation:none!important;"
+                + "width:100%!important;max-width:520px!important;min-width:0!important;min-height:0!important;height:auto!important;"
+                + "margin:0 auto!important;padding:24px 18px!important;overflow:visible!important;"
+                + "border-radius:24px!important;background:#fff!important;color:#071a33!important;z-index:10!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-driver-auth-card *,"
+                + "html[data-native-shell=driver] .dn-driver-login-page .dn-portal-auth-card *,"
+                + "body[data-native-role=driver] .dn-driver-login-page .dn-driver-auth-card *,"
+                + "body[data-native-role=driver] .dn-driver-login-page .dn-portal-auth-card *{"
+                + "opacity:1!important;visibility:visible!important;transform:none!important;animation:none!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page input,body[data-native-role=driver] .dn-driver-login-page input{"
+                + "display:block!important;width:100%!important;min-height:50px!important;background:#fff!important;color:#071a33!important;border:1px solid #b8c4d2!important;}"
+                + "html[data-native-shell=driver] .dn-driver-login-page button,body[data-native-role=driver] .dn-driver-login-page button{min-height:48px!important;}";
+
+        String driverCompatibility = "driver".equals(BuildConfig.ROLE)
+                ? "var fix=document.getElementById('dn-driver-public-auth-fix');"
+                    + "if(!fix){fix=document.createElement('style');fix.id='dn-driver-public-auth-fix';document.head.appendChild(fix);}"
+                    + "fix.textContent=" + quoteForJavascript(driverAuthCss) + ";"
+                    + "var login=document.querySelector('.dn-driver-login-page');"
+                    + "if(login){window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}}"
+                : "";
 
         String script = "(function(){"
+                + driverCompatibility
                 + "var boot=document.getElementById('dn-role-boot');"
                 + "var root=document.getElementById('root');"
                 + "var rendered=!!(root&&root.childElementCount>0);"
                 + "var surface=document.querySelector(" + quoteForJavascript(roleSelector) + ");"
-                + "var card=document.querySelector('.dn-native-role-login-card');"
-                + "var runtime=document.querySelector('[data-driver-runtime-acceptance]');"
-                + "var map=document.querySelector('.leaflet-container');"
-                + "var vehicle=document.querySelector('.dn-official-vehicle');"
-                + "var target=card||runtime||surface;"
+                + "var card=document.querySelector('.dn-native-role-login-card,.dn-driver-auth-card,.dn-portal-auth-card');"
+                + "var runtime=document.querySelector('[data-driver-runtime-acceptance=\"ready\"]');"
+                + "var map=document.querySelector('[data-driver-map-ready]');"
+                + "var vehicle=document.querySelector('[data-driver-vehicle-ready=\"true\"],.dn-official-vehicle-leaflet-icon');"
+                + "var target=card||surface||runtime;"
                 + "var style=target?getComputedStyle(target):null;"
                 + "var rect=target?target.getBoundingClientRect():null;"
                 + "var visible=!!(target&&style&&rect"
                 + "&&style.display!=='none'&&style.visibility!=='hidden'"
                 + "&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2"
                 + "&&rect.bottom>0&&rect.top<window.innerHeight);"
-                + "var mapReady=!runtime||!!(map&&vehicle);"
                 + "var roleReady=false;"
-                + "if(visible&&mapReady){"
+                + "if(visible){"
                 + "window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}"
                 + "if(target.dataset.dnNativePaintProbe==='1'){roleReady=true;}"
                 + "else{target.dataset.dnNativePaintProbe='1';void target.offsetHeight;requestAnimationFrame(function(){requestAnimationFrame(function(){target.dataset.dnNativePainted='1';});});}"
@@ -118,7 +155,7 @@ public final class DayNightApplication extends Application {
 
         webView.evaluateJavascript(script, result -> {
             Log.i(TAG, BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result);
-            if (result != null && result.contains("roleReady=true")) {
+            if (result != null && (result.contains("roleReady=true") || result.contains("runtime=true"))) {
                 webView.requestLayout();
                 webView.invalidate();
                 webView.postInvalidateOnAnimation();
