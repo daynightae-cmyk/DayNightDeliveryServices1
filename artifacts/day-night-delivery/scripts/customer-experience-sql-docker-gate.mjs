@@ -19,8 +19,8 @@ const files = [
   "supabase/tests/customer_experience_verify.sql",
 ];
 
-function command(binary, args, options = {}) {
-  const result = spawnSync(binary, args, {
+function run(binary, args, options = {}) {
+  return spawnSync(binary, args, {
     cwd: repositoryRoot,
     encoding: "utf8",
     stdio: options.input ? ["pipe", "pipe", "pipe"] : "pipe",
@@ -28,6 +28,10 @@ function command(binary, args, options = {}) {
     env: process.env,
     timeout: options.timeout || 120_000,
   });
+}
+
+function command(binary, args, options = {}) {
+  const result = run(binary, args, options);
   if (result.status !== 0) {
     const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
     throw new Error(`${binary} ${args.join(" ")} failed (${result.status}):\n${output}`);
@@ -36,12 +40,62 @@ function command(binary, args, options = {}) {
 }
 
 function dockerAvailable() {
-  const probe = spawnSync("docker", ["version", "--format", "{{.Server.Version}}"], { encoding: "utf8", timeout: 20_000 });
+  const probe = run("docker", ["version", "--format", "{{.Server.Version}}"], { timeout: 20_000 });
   return probe.status === 0;
 }
 
 function stopContainer() {
-  spawnSync("docker", ["rm", "-f", containerName], { encoding: "utf8", timeout: 20_000 });
+  run("docker", ["rm", "-f", containerName], { timeout: 20_000 });
+}
+
+function containerLogs() {
+  const result = run("docker", ["logs", containerName], { timeout: 20_000 });
+  return `${result.stdout || ""}\n${result.stderr || ""}`;
+}
+
+async function waitForFinalPostgresStartup() {
+  let consecutiveReadyChecks = 0;
+  let lastLogs = "";
+
+  for (let attempt = 1; attempt <= 120; attempt += 1) {
+    lastLogs = containerLogs();
+    const initializationCompleted = lastLogs.includes("PostgreSQL init process complete; ready for start up.");
+    const ready = run("docker", ["exec", containerName, "pg_isready", "-U", "postgres", "-d", "daynight"], {
+      timeout: 10_000,
+    });
+
+    if (initializationCompleted && ready.status === 0) {
+      consecutiveReadyChecks += 1;
+      if (consecutiveReadyChecks >= 3) return;
+    } else {
+      consecutiveReadyChecks = 0;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error(`PostgreSQL 17 container did not reach stable final startup.\n${lastLogs}`);
+}
+
+async function applySql(relative, sql) {
+  let lastFailure = "";
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const result = run("docker", [
+      "exec", "-i", containerName,
+      "psql", "-U", "postgres", "-d", "daynight", "-v", "ON_ERROR_STOP=1",
+    ], { input: sql, timeout: 180_000 });
+
+    if (result.status === 0) return String(result.stdout || "").trim();
+
+    lastFailure = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+    const transientStartupFailure = /database system is (starting up|shutting down)|connection.*failed/i.test(lastFailure);
+    if (!transientStartupFailure || attempt === 4) break;
+
+    console.warn(`Transient PostgreSQL startup state while applying ${relative}; retrying (${attempt}/4).`);
+    await waitForFinalPostgresStartup();
+  }
+
+  throw new Error(`psql failed while applying ${relative}:\n${lastFailure}\n\nContainer logs:\n${containerLogs()}`);
 }
 
 if (!dockerAvailable()) {
@@ -57,34 +111,20 @@ try {
   stopContainer();
   command("docker", [
     "run", "-d", "--rm", "--name", containerName,
+    "--shm-size", "256m",
     "-e", "POSTGRES_PASSWORD=postgres",
     "-e", "POSTGRES_DB=daynight",
-    "postgres:17",
+    "postgres:17-alpine",
   ], { timeout: 180_000 });
 
-  let ready = false;
-  for (let attempt = 1; attempt <= 60; attempt += 1) {
-    const check = spawnSync("docker", ["exec", containerName, "pg_isready", "-U", "postgres", "-d", "daynight"], {
-      encoding: "utf8",
-      timeout: 10_000,
-    });
-    if (check.status === 0) {
-      ready = true;
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  if (!ready) throw new Error("PostgreSQL 17 container did not become ready.");
+  await waitForFinalPostgresStartup();
 
   for (const relative of files) {
     const absolute = path.join(repositoryRoot, relative);
     if (!fs.existsSync(absolute)) throw new Error(`Missing SQL gate input: ${relative}`);
     console.log(`Applying ${relative}`);
     const sql = fs.readFileSync(absolute, "utf8");
-    const output = command("docker", [
-      "exec", "-i", containerName,
-      "psql", "-U", "postgres", "-d", "daynight", "-v", "ON_ERROR_STOP=1",
-    ], { input: sql, timeout: 180_000 });
+    const output = await applySql(relative, sql);
     if (output) console.log(output);
   }
 
