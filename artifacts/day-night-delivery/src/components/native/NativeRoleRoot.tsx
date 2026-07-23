@@ -4,11 +4,13 @@ import { useAppContext } from "../../lib/AppContext";
 import { supabase } from "../../supabase";
 import DriverPortal from "../driver/DriverPortal";
 import MerchantPortal from "../merchant/MerchantPortalCommandCenter";
+import DriverRuntimeVisualAcceptance from "./DriverRuntimeVisualAcceptance";
 import NativeRoleLogin from "./NativeRoleLogin";
 
 export type NativeRole = "driver" | "merchant";
 
 const VISUAL_ROLE_TEST = (import.meta as any).env?.VITE_ROLE_VISUAL_TEST === "1";
+const DRIVER_RUNTIME_VISUAL_TEST = (import.meta as any).env?.VITE_DRIVER_RUNTIME_VISUAL_TEST === "1";
 
 function NativeRoleLoading({ role, isArabic }: { role: NativeRole; isArabic: boolean }) {
   const label = role === "driver"
@@ -96,6 +98,9 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
     };
   }, []);
 
+  if (VISUAL_ROLE_TEST && DRIVER_RUNTIME_VISUAL_TEST && role === "driver") {
+    return <DriverRuntimeVisualAcceptance />;
+  }
   if (checkingSession) return <NativeRoleLoading role={role} isArabic={isArabic} />;
   if (!user) return <NativeRoleLogin role={role} isArabic={isArabic} />;
 
