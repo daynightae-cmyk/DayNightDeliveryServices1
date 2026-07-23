@@ -1,78 +1,108 @@
 \set ON_ERROR_STOP on
 
-select public.customer_experience_runtime_health() as health \gset
+DO $$
+DECLARE
+  v_health jsonb;
+  v_required_table text;
+  v_required_function text;
+BEGIN
+  v_health := public.customer_experience_runtime_health();
+  IF coalesce((v_health->>'ok')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'customer_experience_runtime_health failed: %', v_health;
+  END IF;
 
-select case
-  when (:health::jsonb->>'ok')::boolean is true then 1
-  else (select 1/0)
-end as health_ok;
+  FOREACH v_required_table IN ARRAY ARRAY[
+    'customer_experience_settings',
+    'message_templates',
+    'outbound_message_logs',
+    'feedback_tokens',
+    'order_feedback',
+    'complaints',
+    'complaint_attachments',
+    'complaint_events',
+    'order_contact_attempts'
+  ] LOOP
+    IF to_regclass('public.'||v_required_table) IS NULL THEN
+      RAISE EXCEPTION 'missing required table: %', v_required_table;
+    END IF;
+  END LOOP;
 
-select case when to_regclass('public.message_templates') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.outbound_message_logs') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.order_feedback') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.complaints') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.complaint_attachments') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.complaint_events') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.feedback_tokens') is not null then 1 else (select 1/0) end;
-select case when to_regclass('public.order_contact_attempts') is not null then 1 else (select 1/0) end;
+  FOREACH v_required_function IN ARRAY ARRAY[
+    'public.create_feedback_token_for_order(uuid)',
+    'public.get_feedback_context(text)',
+    'public.submit_order_feedback(text,integer,integer,integer,integer,integer,integer,integer,integer,text[],text,boolean,boolean)',
+    'public.submit_public_complaint(text,text,text,text,text,boolean)',
+    'public.driver_feedback_summary()',
+    'public.merchant_order_feedback()',
+    'public.admin_order_feedback_rows()',
+    'public.admin_update_complaint(uuid,text,text,uuid,text,text)',
+    'public.admin_set_feedback_review(uuid,text,boolean)',
+    'public.admin_create_complaint_from_feedback(uuid,text)',
+    'public.admin_suspend_driver_for_complaint(uuid,text)'
+  ] LOOP
+    IF to_regprocedure(v_required_function) IS NULL THEN
+      RAISE EXCEPTION 'missing required function: %', v_required_function;
+    END IF;
+  END LOOP;
 
-select case when to_regprocedure('public.create_feedback_token_for_order(uuid)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.get_feedback_context(text)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.submit_order_feedback(text,integer,integer,integer,integer,integer,integer,integer,integer,text[],text,boolean,boolean)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.submit_public_complaint(text,text,text,text,text,boolean)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.driver_feedback_summary()') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.merchant_order_feedback()') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.admin_order_feedback_rows()') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.admin_update_complaint(uuid,text,text,uuid,text,text)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.admin_set_feedback_review(uuid,text,boolean)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.admin_create_complaint_from_feedback(uuid,text)') is not null then 1 else (select 1/0) end;
-select case when to_regprocedure('public.admin_suspend_driver_for_complaint(uuid,text)') is not null then 1 else (select 1/0) end;
+  IF NOT EXISTS(
+    SELECT 1 FROM storage.buckets
+    WHERE id='complaint-attachments'
+      AND public=false
+      AND file_size_limit=8388608
+      AND allowed_mime_types @> ARRAY['image/jpeg','image/png','image/webp','application/pdf']::text[]
+  ) THEN
+    RAISE EXCEPTION 'complaint attachment bucket contract failed';
+  END IF;
 
-select case when exists(
-  select 1 from storage.buckets
-  where id='complaint-attachments'
-    and public=false
-    and file_size_limit=8388608
-    and allowed_mime_types @> array['image/jpeg','image/png','image/webp','application/pdf']::text[]
-) then 1 else (select 1/0) end as attachment_bucket_ok;
+  IF NOT EXISTS(
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='storage'
+      AND tablename='objects'
+      AND policyname='ce_complaint_storage_insert'
+  ) THEN
+    RAISE EXCEPTION 'complaint attachment insert policy missing';
+  END IF;
 
-select case when exists(
-  select 1 from pg_policies
-  where schemaname='storage'
-    and tablename='objects'
-    and policyname='ce_complaint_storage_insert'
-) then 1 else (select 1/0) end as attachment_policy_ok;
+  IF NOT EXISTS(
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public'
+      AND p.proname='dn_ce_request_ip_hash'
+      AND pg_get_functiondef(p.oid) LIKE '%extensions.hmac(%'
+  ) THEN
+    RAISE EXCEPTION 'salted request hash contract failed';
+  END IF;
 
-select case when exists(
-  select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-  where n.nspname='public'
-    and p.proname='dn_ce_request_ip_hash'
-    and pg_get_functiondef(p.oid) like '%hmac(%'
-) then 1 else (select 1/0) end as salted_hash_ok;
+  IF EXISTS(
+    SELECT 1
+    FROM information_schema.role_column_grants
+    WHERE table_schema='public'
+      AND table_name='order_feedback'
+      AND grantee='authenticated'
+      AND column_name IN ('customer_id','ip_hash','metadata')
+      AND privilege_type='SELECT'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role can select sensitive feedback columns';
+  END IF;
 
-select case when not exists(
-  select 1
-  from information_schema.role_column_grants
-  where table_schema='public'
-    and table_name='order_feedback'
-    and grantee='authenticated'
-    and column_name in ('customer_id','ip_hash','metadata')
-    and privilege_type='SELECT'
-) then 1 else (select 1/0) end as sensitive_columns_not_granted;
+  IF NOT EXISTS(
+    SELECT 1
+    FROM information_schema.role_column_grants
+    WHERE table_schema='public'
+      AND table_name='order_feedback'
+      AND grantee='authenticated'
+      AND column_name='overall_rating'
+      AND privilege_type='SELECT'
+  ) THEN
+    RAISE EXCEPTION 'safe feedback rating columns are not granted';
+  END IF;
 
-select case when exists(
-  select 1
-  from information_schema.role_column_grants
-  where table_schema='public'
-    and table_name='order_feedback'
-    and grantee='authenticated'
-    and column_name='overall_rating'
-    and privilege_type='SELECT'
-) then 1 else (select 1/0) end as safe_rating_columns_granted;
-
-select case when (
-  select count(*) from public.message_templates
-  where language in ('ar','en') and channel='whatsapp'
-) >= 30 then 1 else (select 1/0) end as seeded_templates_ok;
+  IF (SELECT count(*) FROM public.message_templates WHERE language IN ('ar','en') AND channel='whatsapp') < 30 THEN
+    RAISE EXCEPTION 'bilingual WhatsApp template seed is incomplete';
+  END IF;
+END;
+$$;
 
 \echo 'DAY NIGHT Customer Experience PostgreSQL verification: PASS'
