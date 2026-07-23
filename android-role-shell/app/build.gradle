@@ -5,18 +5,15 @@ plugins {
 def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
 def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
-def roleRuntimeVersion = "1.1.3"
+def roleRuntimeVersion = "1.1.4"
 
-// Production Driver deliberately enters the public /driver route so the live
-// BrowserRouter owns the authenticated dashboard. This avoids the isolated
-// native-root crash present on the currently deployed site while Vercel is
-// build-rate-limited. Visual CI still uses nativeShell=driver to test the
-// latest isolated runtime and map implementation from the branch itself.
-// Merchant keeps its proven isolated native role route.
+// Both production role apps enter the isolated role root. The role root owns a
+// real BrowserRouter, Supabase session lifecycle, role guard, error boundary,
+// and role-only layout. No public website chrome or synthetic native login is
+// mounted inside the Android applications.
 def roleStartUrl = { String role ->
     def visualSuffix = roleVisualQuery ? "&${roleVisualQuery}" : ""
-    def roleParameter = role == "driver" && !roleVisualQuery ? "dnNativeRole=driver" : "nativeShell=${role}"
-    return "${roleWebBaseUrl}/${role}?${roleParameter}&nosplash=1&__dn_live=role-v${roleRuntimeVersion}${visualSuffix}"
+    return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1&__dn_live=role-v${roleRuntimeVersion}${visualSuffix}"
 }
 
 android {
@@ -26,8 +23,8 @@ android {
     defaultConfig {
         minSdk 24
         targetSdk 36
-        versionCode 6
-        versionName "1.1.3"
+        versionCode 7
+        versionName "1.1.4"
     }
 
     signingConfigs {
@@ -88,7 +85,6 @@ android {
     lint {
         abortOnError true
         checkReleaseBuilds true
-        // v1.1.3 keeps same-document back navigation for drawers and modals.
         disable "GestureBackNavigation"
     }
 
