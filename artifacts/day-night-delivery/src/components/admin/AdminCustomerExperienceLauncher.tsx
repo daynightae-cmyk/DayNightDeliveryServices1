@@ -8,22 +8,23 @@ export default function AdminCustomerExperienceLauncher() {
 
   useEffect(() => {
     if (!isAdminRoute || !supabase) return;
+    const client = supabase;
     let active = true;
     const refresh = async () => {
-      const { count: total } = await supabase
+      const { count: total } = await client
         .from("complaints")
         .select("id", { count: "exact", head: true })
         .not("status", "in", '("resolved","closed","rejected")');
       if (active) setCount(total || 0);
     };
     void refresh();
-    const channel = supabase
+    const channel = client
       .channel(`admin-customer-experience-launcher-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, refresh)
       .subscribe();
     return () => {
       active = false;
-      void supabase?.removeChannel(channel);
+      void client.removeChannel(channel);
     };
   }, [isAdminRoute]);
 
