@@ -12,8 +12,9 @@ import android.webkit.WebView;
  * Native fail-safe for the live Driver and Merchant WebViews.
  *
  * Android removes any obsolete web splash independently from JavaScript and
- * probes until a real role surface exists. A generic React root or Suspense
- * spinner is not treated as a completed Driver/Merchant startup.
+ * probes until a real, visible and painted role surface exists. A generic React
+ * root, an off-screen element, or a Suspense spinner is not treated as a
+ * completed Driver/Merchant startup.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
@@ -79,22 +80,47 @@ public final class DayNightApplication extends Application {
                 + "var boot=document.getElementById('dn-role-boot');"
                 + "var root=document.getElementById('root');"
                 + "var rendered=!!(root&&root.childElementCount>0);"
-                + "var roleReady=!!document.querySelector(" + quoteForJavascript(roleSelector) + ");"
+                + "var surface=document.querySelector(" + quoteForJavascript(roleSelector) + ");"
+                + "var style=surface?getComputedStyle(surface):null;"
+                + "var rect=surface?surface.getBoundingClientRect():null;"
+                + "var visible=!!(surface&&style&&rect"
+                + "&&style.display!=='none'&&style.visibility!=='hidden'"
+                + "&&Number(style.opacity||1)>0&&rect.width>2&&rect.height>2"
+                + "&&rect.bottom>0&&rect.top<window.innerHeight);"
+                + "var roleReady=false;"
+                + "if(visible){"
+                + "window.scrollTo(0,0);document.documentElement.scrollTop=0;"
+                + "if(document.body){document.body.scrollTop=0;}"
+                + "if(surface.dataset.dnNativePaintProbe==='1'){roleReady=true;}"
+                + "else{surface.dataset.dnNativePaintProbe='1';"
+                + "void surface.offsetHeight;"
+                + "requestAnimationFrame(function(){requestAnimationFrame(function(){surface.dataset.dnNativePainted='1';});});}"
+                + "}"
                 + "var force=" + (force ? "true" : "false") + ";"
                 + "if(boot&&(rendered||force)){boot.classList.add('is-complete');boot.remove();}"
-                + "if(roleReady){window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body){document.body.scrollTop=0;}}"
                 + "return 'removed='+(!document.getElementById('dn-role-boot'))"
                 + "+',rendered='+rendered"
+                + "+',roleVisible='+visible"
                 + "+',roleReady='+roleReady"
                 + "+',rootChildren='+(root?root.childElementCount:-1)"
+                + "+',display='+(style?style.display:'missing')"
+                + "+',visibility='+(style?style.visibility:'missing')"
+                + "+',opacity='+(style?style.opacity:'missing')"
+                + "+',rect='+(rect?[Math.round(rect.left),Math.round(rect.top),Math.round(rect.width),Math.round(rect.height)].join(':'):'missing')"
+                + "+',viewport='+window.innerWidth+'x'+window.innerHeight"
                 + "+',ready='+document.readyState"
                 + "+',href='+String(location.href);"
                 + "})()";
 
-        webView.evaluateJavascript(script, result -> Log.i(
-                TAG,
-                BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result
-        ));
+        webView.evaluateJavascript(script, result -> {
+            Log.i(
+                    TAG,
+                    BuildConfig.ROLE + " attempt=" + attempt + " force=" + force + " diagnostics=" + result
+            );
+            if (result != null && result.contains("roleReady=true")) {
+                webView.postInvalidateOnAnimation();
+            }
+        });
     }
 
     private static String quoteForJavascript(String value) {
