@@ -16,6 +16,7 @@ const files = [
   "supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql",
   "supabase/migrations/20260723143000_customer_experience_pgcrypto_runtime_hotfix.sql",
   "supabase/migrations/20260723143500_customer_experience_notification_enum_lint_hotfix.sql",
+  "supabase/migrations/20260723144000_customer_experience_utf8_template_repair.sql",
   "supabase/tests/customer_experience_verify.sql",
 ];
 
