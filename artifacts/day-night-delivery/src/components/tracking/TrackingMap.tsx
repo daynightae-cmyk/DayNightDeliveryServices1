@@ -171,7 +171,8 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
   const orderId = getString(activeOrder, ["id"]);
   const driverId = getString(activeOrder, ["driver_id", "assigned_driver_id", "courier_id"]);
   const status = normalizeStatus(getString(activeOrder, ["status"]));
-  const isTrackingStatus = ["picked_up", "in_transit", "out_for_delivery"].includes(status);
+  const isOutForDelivery = status === "out_for_delivery";
+  const isTrackingStatus = ["picked_up", "in_transit"].includes(status) || isOutForDelivery;
 
   useEffect(() => {
     const client = supabase;
@@ -290,7 +291,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
     <div className={`dn-live-map-shell dn-satellite-map relative h-full min-h-[360px] w-full overflow-hidden rounded-2xl border border-brand-gold/20 bg-[#020812] ${navigationMode ? "dn-live-map-navigation" : ""}`} data-driver-map-ready={driverPos ? "live" : "waiting"}>
       <div className="absolute left-3 right-3 top-3 z-[650] flex flex-wrap items-center justify-between gap-2">
         <div className="rounded-2xl border border-brand-gold/25 bg-[#071A33]/88 px-3 py-2 shadow-xl backdrop-blur-xl">
-          <p className="flex items-center gap-2 text-[11px] font-black text-brand-gold">{navigationMode ? <Navigation className="h-3.5 w-3.5" /> : <Radio className="h-3.5 w-3.5" />}{driverPos ? (isArabic ? "موقع المندوب مباشر داخل التطبيق" : "Live driver position inside the app") : (isArabic ? "بانتظار أول قراءة GPS" : "Waiting for the first GPS reading")}</p>
+          <p className="flex items-center gap-2 text-[11px] font-black text-brand-gold">{navigationMode ? <Navigation className="h-3.5 w-3.5" /> : <Radio className="h-3.5 w-3.5" />}{driverPos ? (isArabic ? "موقع المندوب مباشر داخل التطبيق" : "Live driver position inside the app") : (isArabic ? "بانتظار أول تحديث GPS من المندوب" : "Waiting for the driver's first GPS update")}</p>
           <p className="mt-1 text-[10px] font-bold text-white/60">{reference} · {lastLiveLabel}{routeSummary ? ` · ${formatDistance(routeSummary.distanceMeters, isArabic)} · ${formatDuration(routeSummary.durationSeconds, isArabic)}` : ""}</p>
           {gpsError && <p className="mt-1 text-[10px] font-bold text-red-200">{gpsError}</p>}
         </div>
