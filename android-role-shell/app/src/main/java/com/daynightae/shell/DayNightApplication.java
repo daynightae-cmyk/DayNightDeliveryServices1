@@ -14,11 +14,19 @@ import android.webkit.WebView;
  * The role splash is a web layer and must never be allowed to cover a loaded
  * login/dashboard indefinitely. Android schedules these checks directly on
  * the WebView, independently from JavaScript timers, requestAnimationFrame,
- * service workers, and cached page state.
+ * service workers, and cached page state. Later probes also provide evidence
+ * that React rendered on slower phones and CI emulators.
  */
 public final class DayNightApplication extends Application {
     private static final String TAG = "DAYNIGHT_SPLASH";
-    private static final long[] WATCHDOG_DELAYS_MS = {1800L, 3500L, 6500L};
+    private static final long[] WATCHDOG_DELAYS_MS = {
+            1800L,
+            3500L,
+            6500L,
+            12000L,
+            20000L,
+            30000L
+    };
 
     @Override
     public void onCreate() {
