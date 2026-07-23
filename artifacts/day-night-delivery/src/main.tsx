@@ -27,6 +27,7 @@ import "./styles/dn-production-visual-rescue-v3.css";
 import "./styles/dn-admin-unified-sections-v4.css";
 import "./styles/dn-merchant-mobile-drawer-final.css";
 import "./styles/dn-pointer-performance.css";
+import "./styles/dn-role-auth-mobile-final.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 
