@@ -52,8 +52,11 @@ jobs:
           grep -F 'data-native-boot' artifacts/day-night-delivery/index.html
           grep -F 'VITE_ROLE_VISUAL_TEST' artifacts/day-night-delivery/src/components/driver/DriverAuthGuard.tsx
           grep -F 'dn-role-auth-mobile-final.css' artifacts/day-night-delivery/src/main.tsx
+          grep -F 'dn-driver-native-auth-final.css' artifacts/day-night-delivery/src/main.tsx
+          grep -F 'dn-merchant-native-auth-final.css' artifacts/day-night-delivery/src/main.tsx
           grep -F 'removeNativeRoleCaches' artifacts/day-night-delivery/src/lib/pwaRuntime.ts
           grep -F 'roleReady' android-role-shell/app/src/main/java/com/daynightae/shell/DayNightApplication.java
+          grep -F 'LAYER_TYPE_SOFTWARE' android-role-shell/app/src/visual/java/com/daynightae/shell/VisualTestActivity.java
           mkdir -p android-role-shell/arabic-visual
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 0.0.0.0 --port 4173 --strictPort > android-role-shell/arabic-visual/local-web.log 2>&1 &
           echo $! > android-role-shell/arabic-visual/local-web.pid
@@ -143,10 +146,10 @@ jobs:
             adb exec-out screencap -p > "$output/${role}-stage-03.png"
 
             ready=""
-            for attempt in $(seq 1 42); do
+            for attempt in $(seq 1 50); do
               adb logcat -d -s DAYNIGHT_SPLASH:I DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I '*:S' > "$output/${role}-runtime.log"
-              if grep -E "${role} attempt=[1-6].*removed=true" "$output/${role}-runtime.log" >/dev/null \
-                && grep -E "${role} attempt=[1-6].*roleReady=true" "$output/${role}-runtime.log" >/dev/null; then
+              if grep -E "${role} attempt=[1-7].*removed=true" "$output/${role}-runtime.log" >/dev/null \
+                && grep -E "${role} attempt=[1-7].*roleReady=true" "$output/${role}-runtime.log" >/dev/null; then
                 ready="1"
                 break
               fi
@@ -155,8 +158,19 @@ jobs:
 
             cat "$output/${role}-runtime.log"
             test "$ready" = "1"
+
+            # Allow two complete Android/WebView compositor frames after the DOM
+            # readiness proof. The CI-only WebView uses software rendering so adb
+            # receives the painted credentials rather than a stale GPU texture.
+            sleep 2
+            adb shell uiautomator dump "/sdcard/${role}-window.xml" >/dev/null 2>&1 || true
+            adb pull "/sdcard/${role}-window.xml" "$output/${role}-window.xml" >/dev/null 2>&1 || true
+            adb shell dumpsys gfxinfo "$package_name" > "$output/${role}-gfxinfo.txt" || true
             adb exec-out screencap -p > "$output/${role}-arabic-final.png"
-            python android-role-shell/scripts/assert_portal_screen.py "$output/${role}-arabic-final.png" --report "$output/${role}-arabic-final.json" --role "$role"
+            sleep 0.5
+            adb exec-out screencap -p > "$output/${role}-arabic-final-confirm.png"
+            python android-role-shell/scripts/assert_portal_screen.py "$output/${role}-arabic-final-confirm.png" --report "$output/${role}-arabic-final.json" --role "$role"
+            cp "$output/${role}-arabic-final-confirm.png" "$output/${role}-arabic-final.png"
             adb shell am force-stop "$package_name"
           }
 
@@ -169,7 +183,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image
+          from PIL import Image, ImageChops, ImageStat
 
           for role in ('driver', 'merchant'):
               log = Path(f'android-role-shell/arabic-visual/{role}-runtime.log').read_text(errors='replace')
@@ -183,7 +197,12 @@ jobs:
               dark_pixels = sum(1 for r, g, b in final.getdata() if r < 45 and g < 70 and b < 105)
               dark_ratio = dark_pixels / (final.width * final.height)
               assert dark_ratio < 0.94, f'{role} final screen is still almost entirely navy ({dark_ratio:.3f})'
-              print(role, 'roleReady=true', 'dark_ratio=', round(dark_ratio, 3), 'colors=', len(colors))
+
+              stage = Image.open(f'android-role-shell/arabic-visual/{role}-stage-03.png').convert('RGB').resize((240, 420))
+              diff = ImageChops.difference(stage, final)
+              diff_mean = sum(ImageStat.Stat(diff).mean) / 3
+              assert diff_mean > 4.0, f'{role} final screenshot did not advance from startup ({diff_mean:.2f})'
+              print(role, 'roleReady=true', 'dark_ratio=', round(dark_ratio, 3), 'colors=', len(colors), 'startup_diff=', round(diff_mean, 2))
           PY
 
       - name: Stop emulator and local server
