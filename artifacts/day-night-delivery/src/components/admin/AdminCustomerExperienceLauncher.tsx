@@ -5,6 +5,7 @@ import { useAppContext } from "../../lib/AppContext";
 import useOpenComplaintsCount from "../../hooks/useOpenComplaintsCount";
 import AdminCustomerExperienceActions from "./AdminCustomerExperienceActions";
 import AdminCustomerExperiencePage from "./AdminCustomerExperiencePage";
+import AdminMessageControlCenter from "./AdminMessageControlCenter";
 import "../../styles/dn-customer-experience-navigation.css";
 
 type NavSurface = "legacy" | "command";
@@ -253,6 +254,7 @@ export default function AdminCustomerExperienceLauncher() {
             <div className="dn-customer-experience-section-map" aria-label={isArabic ? "أقسام تجربة العملاء" : "Customer Experience sections"}>
               {sectionLabels.map((label) => <span key={label}>{label}</span>)}
             </div>
+            <AdminMessageControlCenter isArabic={isArabic} />
             <AdminCustomerExperiencePage />
             <AdminCustomerExperienceActions />
           </div>,
