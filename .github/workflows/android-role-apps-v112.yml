@@ -46,6 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install --disable-pip-version-check "pillow>=10,<13"
           python android-role-shell/scripts/prepare_icons.py
           test -s android-role-shell/app/src/driver/res/drawable-nodpi/app_icon.png
           test -s android-role-shell/app/src/merchant/res/drawable-nodpi/app_icon.png
