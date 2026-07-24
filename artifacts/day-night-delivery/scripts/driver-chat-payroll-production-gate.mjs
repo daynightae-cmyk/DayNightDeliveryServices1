@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+// This gate protects every admin route, including /admin/employees, from DOM observer feedback loops.
 const root=process.cwd(); const repo=path.resolve(root,"../.."); let failed=false;
 function read(relative,repository=false){const file=path.join(repository?repo:root,relative);if(!fs.existsSync(file)){console.error(`FAIL: missing ${relative}`);failed=true;return"";}console.log(`PASS: ${relative} exists`);return fs.readFileSync(file,"utf8");}
 function expect(content,pattern,label){if(!pattern.test(content)){console.error(`FAIL: ${label}`);failed=true;}else console.log(`PASS: ${label}`);}
@@ -31,6 +32,10 @@ expect(messageLauncher,/مركز الرسائل|Message Center/,"Admin navigatio
 expect(messageLauncher,/dn-customer-experience-native-section/,"Message Center owns a stable native admin navigation section");
 expect(messageLauncher,/AdminMessageControlCenter/,"Message Center mounts the operational message-control workspace");
 expect(messageLauncher,/ensureLegacyTarget/,"Message Center no longer depends solely on a returned-order button injection");
+expect(messageLauncher,/heading && heading\.textContent !== nextHeading/,"Message Center changes injected headings only when their text actually changes");
+expect(messageLauncher,/requestAnimationFrame[\s\S]*scheduleSync/,"Admin DOM synchronization is coalesced to one animation frame");
+expect(messageLauncher,/cancelAnimationFrame/,"Admin DOM synchronization cancels pending work during cleanup");
+reject(messageLauncher,/if \(heading\) heading\.textContent = isArabic/,"Message Center cannot recreate its heading on every MutationObserver callback");
 
 const canvasTypes=read("src/types/canvas-text-compat.d.ts");
 expect(canvasTypes,/CanvasRenderingContext2D/,"Payroll PDF canvas typing is available to strict TypeScript checks");
