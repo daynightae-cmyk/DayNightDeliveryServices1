@@ -1,0 +1,47 @@
+name: Run protected admin repair from pull request
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Execute protected repair script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-admin-native-route-repair.yml')
+          text = workflow.read_text(encoding='utf-8')
+          start_marker = "          python3 - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = text.index(start_marker) + len(start_marker)
+          end = text.index(end_marker, start)
+          lines = text[start:end].splitlines()
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
+          exec(compile(script, str(workflow), 'exec'), {'__name__': '__main__'})
+          PY
+
+          rm -f .github/workflows/apply-admin-native-route-repair.yml
+          rm -f .github/workflows/run-admin-repair-on-pr.yml
+          git config user.name "DAY NIGHT Production Repair"
+          git config user.email "daynight.ae@gmail.com"
+          git add -A
+          git commit -m "Fix admin routes, native Message Center, and driver action templates"
+          git push origin HEAD:${{ github.head_ref }}
