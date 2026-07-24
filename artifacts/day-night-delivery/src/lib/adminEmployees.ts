@@ -131,6 +131,112 @@ function one<T>(value: unknown): T {
   return (Array.isArray(value) ? value[0] : value) as T;
 }
 
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function textValue(value: unknown, fallback = "") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function numberValue(value: unknown, fallback = 0) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function listValue<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function normalizeEmployeePayrollSnapshot(value: unknown, dateFrom: string, dateTo: string): EmployeePayrollSnapshot {
+  const raw = objectValue(one<unknown>(value));
+  if (raw.error) throw new Error(textValue(raw.error, "employee_payroll_snapshot_failed"));
+
+  const employeeRaw = objectValue(raw.employee);
+  if (!textValue(employeeRaw.id)) throw new Error("invalid_employee_payroll_snapshot");
+
+  const employee = {
+    ...employeeRaw,
+    id: textValue(employeeRaw.id),
+    employee_code: textValue(employeeRaw.employee_code),
+    full_name: textValue(employeeRaw.full_name, "DAY NIGHT Employee"),
+    employee_type: textValue(employeeRaw.employee_type, "other"),
+    phone: textValue(employeeRaw.phone, "Not set"),
+    joined_at: textValue(employeeRaw.joined_at, dateFrom),
+    employment_status: textValue(employeeRaw.employment_status, "active"),
+    base_salary: numberValue(employeeRaw.base_salary),
+    salary_currency: textValue(employeeRaw.salary_currency, "AED"),
+    salary_cycle: textValue(employeeRaw.salary_cycle, "monthly"),
+    salary_effective_from: textValue(employeeRaw.salary_effective_from, dateFrom),
+  } as Employee;
+
+  const deductions = numberValue(raw.deductions);
+  const advances = numberValue(raw.advances);
+  const penalties = numberValue(raw.penalties);
+  const expenses = numberValue(raw.expenses);
+  const debitAdjustments = numberValue(raw.debit_adjustments);
+  const debits = numberValue(raw.debits, deductions + advances + penalties + expenses + debitAdjustments);
+
+  const salaryHistory = listValue<Record<string, unknown>>(raw.salary_history).map((item, index) => ({
+    ...item,
+    id: textValue(item.id, `salary-history-${index}`),
+    base_salary: numberValue(item.base_salary),
+    salary_currency: textValue(item.salary_currency, "AED"),
+    salary_cycle: textValue(item.salary_cycle, "monthly"),
+    effective_from: textValue(item.effective_from, dateFrom),
+    effective_to: textValue(item.effective_to) || null,
+    change_amount: numberValue(item.change_amount),
+    created_at: textValue(item.created_at),
+  })) as EmployeeSalaryHistory[];
+
+  const entries = listValue<Record<string, unknown>>(raw.entries).map((item, index) => ({
+    ...item,
+    id: textValue(item.id, `payroll-entry-${index}`),
+    entry_date: textValue(item.entry_date, dateFrom),
+    entry_type: textValue(item.entry_type, "adjustment"),
+    direction: textValue(item.direction, "debit"),
+    amount: numberValue(item.amount),
+    notes: textValue(item.notes),
+    status: textValue(item.status, "approved"),
+    source: textValue(item.source, textValue(raw.source, "employee_payroll")),
+    created_at: textValue(item.created_at),
+  })) as EmployeePayrollEntry[];
+
+  return {
+    employee,
+    period_from: textValue(raw.period_from, dateFrom),
+    period_to: textValue(raw.period_to, dateTo),
+    currency: textValue(raw.currency, "AED"),
+    gross_salary: numberValue(raw.gross_salary),
+    credits: numberValue(raw.credits),
+    debits,
+    bonuses: numberValue(raw.bonuses),
+    overtime: numberValue(raw.overtime),
+    allowances: numberValue(raw.allowances),
+    adjustments: numberValue(raw.adjustments),
+    reimbursements: numberValue(raw.reimbursements),
+    expenses,
+    deductions,
+    advances,
+    penalties,
+    debit_adjustments: debitAdjustments,
+    payments: numberValue(raw.payments),
+    net_salary: numberValue(raw.net_salary),
+    outstanding: numberValue(raw.outstanding),
+    employee_liability: numberValue(raw.employee_liability),
+    overpaid: numberValue(raw.overpaid),
+    source: textValue(raw.source, "employee_payroll"),
+    linked_driver: Boolean(raw.linked_driver),
+    calculation_method: textValue(raw.calculation_method),
+    salary_history: salaryHistory,
+    entries,
+  };
+}
+
 export async function fetchEmployees() {
   const { data, error } = await client().rpc("admin_employee_directory");
   if (error) throw new Error(error.message);
@@ -153,7 +259,7 @@ export async function fetchEmployeePayrollSnapshot(employeeId: string, dateFrom:
     p_to: dateTo,
   });
   if (error) throw new Error(error.message);
-  return one<EmployeePayrollSnapshot>(data);
+  return normalizeEmployeePayrollSnapshot(data, dateFrom, dateTo);
 }
 
 export async function setEmployeeSalary(input: {
@@ -221,6 +327,9 @@ export function employeeErrorMessage(error: unknown, isArabic: boolean) {
   }
   if (/not_authorized|permission|row-level/i.test(raw)) {
     return isArabic ? "حساب الإدارة لا يملك صلاحية إدارة الموظفين والرواتب." : "This admin account does not have HR payroll permission.";
+  }
+  if (/invalid_employee_payroll_snapshot/i.test(raw)) {
+    return isArabic ? "تعذر قراءة بطاقة الراتب بأمان. أعد المحاولة أو حدّث الصفحة." : "The payroll card response could not be read safely. Retry or refresh the page.";
   }
   if (/employee_name_required/i.test(raw)) return isArabic ? "اسم الموظف مطلوب." : "Employee name is required.";
   if (/employee_phone_required/i.test(raw)) return isArabic ? "رقم هاتف الموظف مطلوب." : "Employee phone is required.";
