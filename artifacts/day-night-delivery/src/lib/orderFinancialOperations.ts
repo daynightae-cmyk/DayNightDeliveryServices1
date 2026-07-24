@@ -58,6 +58,27 @@ function operationError(error: unknown, fallback: string) {
   return wrapped;
 }
 
+function buildFinanceNote(financials: OrderFinancialBreakdown) {
+  const settlementLine =
+    financials.merchantDue < 0
+      ? `Due from merchant ${Math.abs(financials.merchantDue).toFixed(2)} AED`
+      : `Due to merchant ${financials.merchantDue.toFixed(2)} AED`;
+  const lines = [
+    `Goods value ${financials.goodsValue.toFixed(2)} AED`,
+    `Delivery fee ${financials.deliveryFee.toFixed(2)} AED`,
+  ];
+  if (financials.discountAmount > 0) {
+    lines.push(`Discount ${financials.discountAmount.toFixed(2)} AED`);
+  }
+  lines.push(
+    `Customer total ${financials.customerTotal.toFixed(2)} AED`,
+    settlementLine,
+    `DAY NIGHT revenue ${financials.companyRevenue.toFixed(2)} AED`,
+    `Delivery fee mode ${financials.deliveryFeeMode}`,
+  );
+  return lines.join(" | ");
+}
+
 export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): OrderFinancialBreakdown & {
   systemDeliveryFee: number;
   priceSource: "system" | "manual";
@@ -110,15 +131,7 @@ function buildFinancialOrderPayload(
   const paymentMethod = normalizePaymentMethod(input.payment_method);
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
   const codAmount = paymentMethod === "cod" ? financials.customerTotal : 0;
-  const financeNote = [
-    `Goods value ${financials.goodsValue.toFixed(2)} AED`,
-    `Delivery fee ${financials.deliveryFee.toFixed(2)} AED`,
-    `Discount ${financials.discountAmount.toFixed(2)} AED`,
-    `Customer total ${financials.customerTotal.toFixed(2)} AED`,
-    `Merchant due ${financials.merchantDue.toFixed(2)} AED`,
-    `DAY NIGHT revenue ${financials.companyRevenue.toFixed(2)} AED`,
-    `Delivery fee mode ${financials.deliveryFeeMode}`,
-  ].join(" | ");
+  const financeNote = buildFinanceNote(financials);
 
   return {
     tracking_number: trackingNumber,
