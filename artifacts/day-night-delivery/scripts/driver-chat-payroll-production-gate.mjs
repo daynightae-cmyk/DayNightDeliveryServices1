@@ -20,7 +20,21 @@ const driverContact=read("src/components/driver/DriverCustomerCommunication.tsx"
 const whatsappService=read("src/services/whatsappMessageService.ts");
 expect(driverContact,/prepareWhatsAppMessage/,"Driver contact uses the centralized template engine");
 expect(driverContact,/openPreparedWhatsApp/,"Driver contact opens a validated prepared WhatsApp URL");
+expect(driverContact,/ensureRecordedAmountLine/,"Every driver customer message receives the recorded shipment amount");
+expect(driverContact,/order\.cod_amount[\s\S]*order\.customer_total[\s\S]*order\.total_amount/,"Shipment amount uses authoritative order financial fields");
+expect(driverContact,/مبلغ الشحنة المسجل|Recorded shipment amount/,"Driver UI clearly previews the recorded shipment amount");
+expect(driverContact,/recordedShipmentAmount/,"Outbound-message metadata records the shipment amount used");
 expect(whatsappService,/https:\/\/wa\.me\/|buildWhatsAppUrl/,"Central service produces a prefilled WhatsApp URL");
+
+const messageLauncher=read("src/components/admin/AdminCustomerExperienceLauncher.tsx");
+expect(messageLauncher,/مركز الرسائل|Message Center/,"Admin navigation exposes a permanent Message Center");
+expect(messageLauncher,/dn-customer-experience-native-section/,"Message Center owns a stable native admin navigation section");
+expect(messageLauncher,/AdminMessageControlCenter/,"Message Center mounts the operational message-control workspace");
+expect(messageLauncher,/ensureLegacyTarget/,"Message Center no longer depends solely on a returned-order button injection");
+
+const canvasTypes=read("src/types/canvas-text-compat.d.ts");
+expect(canvasTypes,/CanvasRenderingContext2D/,"Payroll PDF canvas typing is available to strict TypeScript checks");
+expect(canvasTypes,/string \| null \| undefined/,"Nullable display text is safely accepted by the browser canvas contract");
 
 const overlay=read("src/components/portals/PortalRuntimeOverlay.tsx");
 expect(overlay,/!isMerchant && !isDriver/,"Global floating controls cannot cover either authenticated portal");

@@ -58,13 +58,55 @@ function customerPhone(order: DriverOrder) {
 }
 
 function amountDue(order: DriverOrder) {
-  const cod = Number(order.cod_amount || 0);
-  if (Number.isFinite(cod) && cod > 0) return cod;
-  if (String(order.payment_method || "").toLowerCase() === "receiver_pays") {
-    const total = Number(order.customer_total || order.total_amount || order.total || 0);
-    return Number.isFinite(total) ? total : 0;
+  const candidates = [
+    order.cod_amount,
+    order.customer_total,
+    order.total_amount,
+    order.total_price,
+    order.total,
+    order.amount,
+    order.collected_amount,
+    order.goods_value,
+    order.product_value,
+    order.merchant_goods_value,
+    order.delivery_fee,
+    order.delivery_price,
+    order.price,
+    order.base_price,
+  ];
+  for (const candidate of candidates) {
+    const value = Number(candidate ?? 0);
+    if (Number.isFinite(value) && value > 0) return value;
   }
   return 0;
+}
+
+function formattedAmount(amount: number, isArabic: boolean) {
+  return new Intl.NumberFormat(isArabic ? "ar-AE" : "en-AE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function ensureRecordedAmountLine(message: string, amount: number, reference: string, isArabic: boolean) {
+  if (!Number.isFinite(amount) || amount <= 0) return message;
+  const formatted = formattedAmount(amount, isArabic);
+  const western = amount.toFixed(2);
+  if (message.includes(formatted) || message.includes(western)) return message;
+
+  const amountLine = isArabic
+    ? `💰 مبلغ الشحنة المسجل: ${formatted} درهم إماراتي`
+    : `💰 Recorded shipment amount: ${formatted} AED`;
+  const lines = message.split(/\r?\n/);
+  const trackingIndex = reference
+    ? lines.findIndex((line) => line.includes(reference))
+    : -1;
+  if (trackingIndex >= 0) lines.splice(trackingIndex + 1, 0, amountLine);
+  else {
+    const firstContent = lines.findIndex((line) => line.trim().length > 0);
+    lines.splice(firstContent >= 0 ? firstContent + 1 : 0, 0, amountLine);
+  }
+  return lines.join("\n");
 }
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
@@ -79,6 +121,7 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
 export default function DriverCustomerCommunication({ order, isArabic }: Props) {
   const reference = useMemo(() => trackingReference(order), [order]);
   const phone = useMemo(() => customerPhone(order), [order]);
+  const shipmentAmount = useMemo(() => amountDue(order), [order]);
   const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
   const [prepared, setPrepared] = useState<PreparedWhatsAppMessage | null>(null);
   const [draft, setDraft] = useState("");
@@ -131,7 +174,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         driverId: order.assigned_driver_id || order.driver_id || undefined,
         driverName: order.driver_name,
         driverPhone: order.driver_phone,
-        amountDue: amountDue(order),
+        amountDue: shipmentAmount,
         paymentMethod: order.payment_method,
         pickupAddress: [order.sender_city, order.sender_address].filter(Boolean).join("، "),
         deliveryAddress: [order.receiver_city, order.receiver_address].filter(Boolean).join("، "),
@@ -140,10 +183,15 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         orderStatus: order.status,
         locale: isArabic ? "ar" : "en",
         presentation: { ...presentation, customNote: customNote.trim() },
-        metadata: { surface: "driver_order_card", action: action.key },
+        metadata: {
+          surface: "driver_order_card",
+          action: action.key,
+          recordedShipmentAmount: shipmentAmount,
+          amountSource: "authoritative_order_financial_fields",
+        },
       });
       setPrepared(result);
-      setDraft(result.message);
+      setDraft(ensureRecordedAmountLine(result.message, shipmentAmount, reference, isArabic));
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "message_generation_failed";
       setError(
@@ -210,12 +258,18 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
             {isArabic
-              ? "خصص الرسالة ثم عاينها وعدّلها قبل الإرسال. فتح واتساب لا يغيّر حالة الطلب."
-              : "Customize, preview, and edit before sending. Opening WhatsApp does not change the order status."}
+              ? "تظهر الرسالة رقم الشحنة ومبلغها المسجل تلقائيًا، ويمكن تعديلها قبل الإرسال. فتح واتساب لا يغيّر حالة الطلب."
+              : "The message automatically includes the tracking number and recorded amount, and remains editable before sending. Opening WhatsApp does not change the order status."}
           </p>
         </div>
         <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
       </div>
+
+      {shipmentAmount > 0 && (
+        <div className="mb-3 rounded-2xl border border-[#D4AF37]/30 bg-[#FFF9E8] px-4 py-3 text-xs font-black text-[#735400]">
+          {isArabic ? "مبلغ الشحنة المسجل" : "Recorded shipment amount"}: {formattedAmount(shipmentAmount, isArabic)} {isArabic ? "درهم" : "AED"}
+        </div>
+      )}
 
       <button type="button" onClick={() => setOptionsOpen((value) => !value)} className="mb-3 inline-flex items-center gap-2 rounded-xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-2 text-[11px] font-black text-[#0057B8]">
         <Settings2 className="h-4 w-4" />
