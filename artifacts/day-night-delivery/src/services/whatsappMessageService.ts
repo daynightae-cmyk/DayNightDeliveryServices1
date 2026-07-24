@@ -114,6 +114,26 @@ const MERCHANT_TEMPLATE_KEYS = new Set<MessageTemplateKey>([
   "merchant_settlement",
 ]);
 
+const DRIVER_TEMPLATE_KEYS = new Set<MessageTemplateKey>([
+  "driver_on_the_way",
+  "driver_request_location",
+  "driver_arrived",
+  "driver_unreachable",
+  "driver_delivered_feedback",
+]);
+
+function normalizeTemplateFingerprint(value: unknown) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/[\u200e\u200f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function containsCorruptedTemplateText(value: unknown) {
+  return /(?:Ø.|Ù.|Ã.|Â.|ðŸ|â€|�)/.test(String(value || ""));
+}
+
 function normalizeLocale(locale?: string | null): MessageLocale {
   return String(locale || "ar").toLowerCase().startsWith("en") ? "en" : "ar";
 }
@@ -216,7 +236,43 @@ function recipientPhone(key: MessageTemplateKey, context: MessageContext) {
   return context.customerPhone || context.merchantPhone || context.driverPhone;
 }
 
+async function activeDriverTemplateBody(key: MessageTemplateKey, locale: MessageLocale) {
+  const fallback = { body: getDefaultMessageTemplate(key, locale), database: false };
+  if (!supabase) return fallback;
+
+  try {
+    const { data, error } = await supabase
+      .from("message_templates")
+      .select("template_key,body,is_active")
+      .eq("language", locale)
+      .eq("channel", "whatsapp")
+      .in("template_key", Array.from(DRIVER_TEMPLATE_KEYS));
+
+    if (error || !Array.isArray(data)) return fallback;
+    const rows = data as Array<{ template_key?: string; body?: string; is_active?: boolean }>;
+    const fingerprints = new Map<string, number>();
+
+    for (const row of rows) {
+      if (!row.is_active || !String(row.body || "").trim()) continue;
+      const fingerprint = normalizeTemplateFingerprint(row.body);
+      fingerprints.set(fingerprint, (fingerprints.get(fingerprint) || 0) + 1);
+    }
+
+    const row = rows.find((item) => item.template_key === key && item.is_active);
+    const body = String(row?.body || "").trim();
+    const fingerprint = normalizeTemplateFingerprint(body);
+    const duplicated = Boolean(fingerprint) && (fingerprints.get(fingerprint) || 0) > 1;
+    const unknown = validateTemplateVariables(body, MESSAGE_TEMPLATE_VARIABLES);
+
+    if (!body || duplicated || containsCorruptedTemplateText(body) || unknown.length > 0) return fallback;
+    return { body, database: true };
+  } catch {
+    return fallback;
+  }
+}
+
 async function activeTemplateBody(key: MessageTemplateKey, locale: MessageLocale) {
+  if (DRIVER_TEMPLATE_KEYS.has(key)) return activeDriverTemplateBody(key, locale);
   if (!supabase) return { body: getDefaultMessageTemplate(key, locale), database: false };
   try {
     const { data, error } = await supabase
@@ -228,12 +284,13 @@ async function activeTemplateBody(key: MessageTemplateKey, locale: MessageLocale
     if (error || !data?.is_active || !String(data.body || "").trim()) {
       return { body: getDefaultMessageTemplate(key, locale), database: false };
     }
-    const unknown = validateTemplateVariables(String(data.body), MESSAGE_TEMPLATE_VARIABLES);
-    if (unknown.length) {
-      console.warn(`Message template ${key}/${locale} contains unknown variables:`, unknown);
+    const body = String(data.body);
+    const unknown = validateTemplateVariables(body, MESSAGE_TEMPLATE_VARIABLES);
+    if (unknown.length || containsCorruptedTemplateText(body)) {
+      console.warn(`Message template ${key}/${locale} is invalid and the built-in fallback was used.`);
       return { body: getDefaultMessageTemplate(key, locale), database: false };
     }
-    return { body: String(data.body), database: true };
+    return { body, database: true };
   } catch {
     return { body: getDefaultMessageTemplate(key, locale), database: false };
   }

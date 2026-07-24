@@ -17,19 +17,24 @@ const RETURNED_LABELS = ["الطلبات الراجعة", "Returned Orders"];
 const FINANCE_LABELS = ["المالية", "Finance"];
 
 function currentPathname() {
-  return typeof window === "undefined" ? "" : window.location.pathname.replace(/\/+$/, "") || "/";
+  if (typeof window === "undefined") return "";
+  return `${window.location.pathname.replace(/\/+$/, "") || "/"}${window.location.search}`;
 }
 
-function isCustomerExperiencePath(pathname: string) {
-  return pathname === CUSTOMER_EXPERIENCE_PATH;
+function isCustomerExperiencePath(locationKey: string) {
+  const url = new URL(locationKey || "/", window.location.origin);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+  return pathname === CUSTOMER_EXPERIENCE_PATH || (pathname === "/admin" && url.searchParams.get("cx") === "messages");
 }
 
 function replaceAdminPath(pathname: string) {
   const url = new URL(window.location.href);
-  url.pathname = pathname;
-  if (pathname === "/admin") url.search = "";
-  window.history.replaceState({}, "", url);
-  window.dispatchEvent(new CustomEvent(CUSTOMER_EXPERIENCE_PATH_EVENT, { detail: pathname }));
+  const openMessageCenter = pathname === CUSTOMER_EXPERIENCE_PATH;
+  url.pathname = "/admin";
+  url.search = "";
+  if (openMessageCenter) url.searchParams.set("cx", "messages");
+  window.history.replaceState(window.history.state, "", url);
+  window.dispatchEvent(new CustomEvent(CUSTOMER_EXPERIENCE_PATH_EVENT, { detail: `${url.pathname}${url.search}` }));
 }
 
 function normalizedText(element: Element | null) {
@@ -102,10 +107,6 @@ function ensureNavigationTargets(isArabic: boolean) {
     if (host) targets.push({ element: host, surface: "legacy" });
   });
 
-  document.querySelectorAll<HTMLElement>(".dncc-navigation").forEach((root, index) => {
-    const host = ensureCommandTarget(root, index);
-    targets.push({ element: host, surface: "command" });
-  });
 
   return targets;
 }
@@ -185,7 +186,7 @@ export default function AdminCustomerExperienceLauncher() {
   const [pathname, setPathname] = useState(currentPathname);
   const [navTargets, setNavTargets] = useState<NavTarget[]>([]);
   const [workspaceTarget, setWorkspaceTarget] = useState<HTMLElement | null>(null);
-  const isAdminRoute = /^\/admin(?:\/|$)/.test(pathname);
+  const isAdminRoute = /^\/admin(?:\/|\?|$)/.test(pathname);
   const active = isCustomerExperiencePath(pathname);
   const count = useOpenComplaintsCount(isAdminRoute);
 
@@ -258,7 +259,7 @@ export default function AdminCustomerExperienceLauncher() {
       }
 
       const regularAdminButton = target?.closest<HTMLButtonElement>(
-        ".dn-admin-side-nav button:not(.dn-customer-experience-nav), .dncc-navigation button:not(.dn-customer-experience-nav)",
+        ".dn-admin-side-nav button:not(.dn-customer-experience-nav), .dncc-navigation button:not(.dn-customer-experience-nav):not([data-dn-command-section=\"customer_experience\"])",
       );
       if (regularAdminButton) replaceAdminPath("/admin");
     };
