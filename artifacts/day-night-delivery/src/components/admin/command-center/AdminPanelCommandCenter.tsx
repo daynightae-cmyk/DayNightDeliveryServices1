@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Truck,
   UserRoundPlus,
+  UsersRound,
   XCircle,
 } from "lucide-react";
 import companyMeta from "../../../data/companyMeta";
@@ -40,8 +41,13 @@ import type { AdminSectionId } from "../AdminSectionRegistry";
 import AdminCommandCenterShell, {
   type AdminCommandMenuItem,
   type AdminCommandSearchItem,
+  type AdminCommandSectionId,
 } from "./AdminCommandCenterShell";
 import "../../../styles/dn-admin-command-center-v1.css";
+
+const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
+const NEW_EMPLOYEE_PATH = "/admin/new-employee";
+const EMPLOYEES_PATH = "/admin/employees";
 
 const menu: readonly AdminCommandMenuItem[] = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: LayoutDashboard },
@@ -49,6 +55,8 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "new_order", ar: "إضافة طلب جديد", en: "New Order", groupAr: "العمليات", groupEn: "Operations", Icon: PackagePlus },
   { id: "new_merchant", ar: "إضافة تاجر", en: "New Merchant", groupAr: "العمليات", groupEn: "Operations", Icon: UserRoundPlus },
   { id: "merchants", ar: "التجار", en: "Merchants", groupAr: "العمليات", groupEn: "Operations", Icon: Store },
+  { id: "new_employee", ar: "إضافة موظف", en: "Add Employee", groupAr: "الموارد البشرية", groupEn: "Human Resources", Icon: UserRoundPlus },
+  { id: "employees", ar: "الموظفون", en: "Employees", groupAr: "الموارد البشرية", groupEn: "Human Resources", Icon: UsersRound },
   { id: "all_orders", ar: "كافة الطلبات", en: "All Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: ClipboardList },
   { id: "cancelled", ar: "الطلبات الملغية", en: "Cancelled Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: XCircle },
   { id: "review", ar: "الطلبات قيد المراجعة", en: "Under Review", groupAr: "الطلبات", groupEn: "Orders", Icon: SearchCheck },
@@ -76,6 +84,33 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "production_readiness", ar: "جاهزية الإنتاج", en: "Production Readiness", groupAr: "النظام", groupEn: "System", Icon: ShieldCheck },
   { id: "logout", ar: "تسجيل الخروج", en: "Logout", groupAr: "الحساب", groupEn: "Account", Icon: LogOut },
 ];
+
+function pathname() {
+  return window.location.pathname.replace(/\/+$/, "") || "/";
+}
+
+function employeeSectionFromPath(): "new_employee" | "employees" | null {
+  const path = pathname();
+  if (path === NEW_EMPLOYEE_PATH) return "new_employee";
+  if (path === EMPLOYEES_PATH) return "employees";
+  return null;
+}
+
+function isEmployeeSection(id: AdminCommandSectionId): id is "new_employee" | "employees" {
+  return id === "new_employee" || id === "employees";
+}
+
+function isLegacySection(id: AdminCommandSectionId): id is AdminSectionId {
+  return !isEmployeeSection(id);
+}
+
+function employeePathFor(id: "new_employee" | "employees") {
+  return id === "new_employee" ? NEW_EMPLOYEE_PATH : EMPLOYEES_PATH;
+}
+
+function announceEmployeePath(path: string) {
+  window.dispatchEvent(new CustomEvent<string>(EMPLOYEE_PATH_EVENT, { detail: path }));
+}
 
 function normalizeMenuText(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
@@ -128,7 +163,7 @@ export default function AdminPanelCommandCenter() {
   const navigateRouter = useNavigate();
   const { language, toggleLanguage, theme, toggleTheme } = useAppContext();
   const isArabic = language === "ar";
-  const [active, setActive] = useState<AdminSectionId>("dashboard");
+  const [active, setActive] = useState<AdminCommandSectionId>(() => employeeSectionFromPath() ?? "dashboard");
   const [operatorLabel, setOperatorLabel] = useState("DAY NIGHT Operations Admin");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -201,10 +236,34 @@ export default function AdminPanelCommandCenter() {
   }, []);
 
   useEffect(() => {
+    const syncRoute = () => {
+      const employeeSection = employeeSectionFromPath();
+      if (employeeSection) setActive(employeeSection);
+    };
+    const syncCustom = (event: Event) => {
+      const path = (event as CustomEvent<string>).detail || pathname();
+      if (path === NEW_EMPLOYEE_PATH) setActive("new_employee");
+      else if (path === EMPLOYEES_PATH) setActive("employees");
+    };
+    window.addEventListener("popstate", syncRoute);
+    window.addEventListener(EMPLOYEE_PATH_EVENT, syncCustom);
+    syncRoute();
+    return () => {
+      window.removeEventListener("popstate", syncRoute);
+      window.removeEventListener(EMPLOYEE_PATH_EVENT, syncCustom);
+    };
+  }, []);
+
+  useEffect(() => {
     const syncFromLegacyPanel = () => {
-      const selectedButton = legacySidebarButtons().find((button) => button.classList.contains("is-active")) ?? null;
-      const selectedItem = menuItemFromLegacyButton(selectedButton);
-      if (selectedItem) setActive(selectedItem.id);
+      const employeeSection = employeeSectionFromPath();
+      if (employeeSection) {
+        setActive(employeeSection);
+      } else {
+        const selectedButton = legacySidebarButtons().find((button) => button.classList.contains("is-active")) ?? null;
+        const selectedItem = menuItemFromLegacyButton(selectedButton);
+        if (selectedItem && isLegacySection(selectedItem.id)) setActive(selectedItem.id);
+      }
       const isLoading = Boolean(document.querySelector(".dn-admin-loading-banner"));
       const errorNode = document.querySelector<HTMLElement>(".dn-admin-error-banner");
       setLoading(isLoading);
@@ -217,10 +276,26 @@ export default function AdminPanelCommandCenter() {
     return () => observer.disconnect();
   }, []);
 
-  const navigate = (id: AdminSectionId) => {
+  const navigate = (id: AdminCommandSectionId) => {
+    if (isEmployeeSection(id)) {
+      const path = employeePathFor(id);
+      navigateRouter(path);
+      setActive(id);
+      window.setTimeout(() => announceEmployeePath(path), 0);
+      return;
+    }
+
     const button = legacySidebarButtonFor(id);
-    if (button) button.click();
-    else if (id === "logout") navigateRouter("/auth");
+    const currentEmployeeSection = employeeSectionFromPath();
+    if (currentEmployeeSection) {
+      navigateRouter("/admin");
+      announceEmployeePath("/admin");
+      window.setTimeout(() => button?.click(), 0);
+    } else if (button) {
+      button.click();
+    } else if (id === "logout") {
+      navigateRouter("/auth");
+    }
     setActive(id);
   };
 
