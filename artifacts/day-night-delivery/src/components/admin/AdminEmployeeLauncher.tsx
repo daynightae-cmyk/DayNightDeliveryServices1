@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { UserPlus, UsersRound } from "lucide-react";
 import { useAppContext } from "../../lib/AppContext";
 import AdminEmployeesCenter, { type EmployeeCenterMode } from "./AdminEmployeesCenter";
+import EmployeePayrollStatementActions from "./EmployeePayrollStatementActions";
 import "../../styles/dn-employee-hr-navigation.css";
 
 type Surface = "legacy";
@@ -164,5 +165,6 @@ export default function AdminEmployeeLauncher() {
       workspace,
       "employee-hr-workspace",
     )}
+    <EmployeePayrollStatementActions active={activeMode === "directory"} isArabic={isArabic} />
   </>;
 }
