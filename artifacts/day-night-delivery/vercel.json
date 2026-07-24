@@ -8,6 +8,16 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/admin/employees",
+      "destination": "/admin?hr=employees",
+      "permanent": false
+    },
+    {
+      "source": "/admin/new-employee",
+      "destination": "/admin?hr=new",
+      "permanent": false
+    },
+    {
       "source": "/(.*)",
       "has": [
         {
@@ -20,6 +30,20 @@
     }
   ],
   "headers": [
+    {
+      "source": "/admin",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-store, max-age=0, must-revalidate" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-store, max-age=0, must-revalidate" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
     {
       "source": "/sw.js",
       "headers": [

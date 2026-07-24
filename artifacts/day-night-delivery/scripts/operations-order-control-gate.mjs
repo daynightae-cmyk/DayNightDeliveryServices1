@@ -69,7 +69,7 @@ expect(driverData, /rpc\(["']driver_update_order_status["']/, "Driver status hel
 const statements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
 expect(statements, /merchants\.map/, "Merchant statements list every registered merchant");
 expect(statements, /selectedOrderIds/, "Merchant statements support exact multi-order selection");
-expect(statements, /AdminPdfExportButton/, "Selected merchant orders use the real PDF/CSV/Word exporter");
+expect(statements, /AdminPdfExportButton|MerchantStatementExportButton/, "Selected merchant orders use a real production export flow");
 expect(statements, /wa\.me\/[\s\S]*merchantWhatsAppMessage/, "Selected merchant orders have a prefilled merchant WhatsApp statement");
 expect(statements, /allTime/, "Merchant statement can show the merchant's complete order history");
 

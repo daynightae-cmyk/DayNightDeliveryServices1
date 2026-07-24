@@ -17,10 +17,27 @@ import {
   buildWhatsAppUrl,
   compactMessage,
   formatAed,
+  formatProfessionalMessage,
   interpolateTemplate,
   sanitizeWhatsAppPhone,
   validateTemplateVariables,
 } from "./whatsappMessageCore.mjs";
+
+export type MessagePresentationOptions = {
+  linkLabels?: boolean;
+  includeBrandSignature?: boolean;
+  includeSlogan?: boolean;
+  includeWebsite?: boolean;
+  includeSupportPhone?: boolean;
+  includeEmail?: boolean;
+  includeTrackingLink?: boolean;
+  includeFeedbackLink?: boolean;
+  includeMerchantPortalLink?: boolean;
+  spacing?: "comfortable" | "compact";
+  customNote?: string;
+  customClosing?: string;
+  customFooter?: string;
+};
 
 export type MessageContext = {
   messageType: MessageTemplateKey | string;
@@ -56,6 +73,7 @@ export type MessageContext = {
   fees?: number;
   netDue?: number;
   locale?: MessageLocale;
+  presentation?: MessagePresentationOptions;
   metadata?: Record<string, unknown>;
 };
 
@@ -70,6 +88,12 @@ export type PreparedWhatsAppMessage = {
   logId?: string;
   usedDatabaseTemplate: boolean;
 };
+
+export type OpenPreparedWhatsAppOptions = {
+  direct?: boolean;
+};
+
+export const WHATSAPP_PREVIEW_EVENT = "dn-whatsapp-preview";
 
 const SUPPORT_TEMPLATE_KEYS = new Set<MessageTemplateKey>([
   "tracking_support",
@@ -238,7 +262,7 @@ async function logOutboundMessage(
       p_generated_message: message,
       p_generated_url: url,
       p_status: status,
-      p_metadata: { locale, ...(context.metadata || {}) },
+      p_metadata: { locale, presentation: context.presentation || null, ...(context.metadata || {}) },
     });
     if (error) return undefined;
     const row = Array.isArray(data) ? data[0] : data;
@@ -267,7 +291,8 @@ export async function prepareWhatsAppMessage(context: MessageContext): Promise<P
   if (!phone) throw new Error("invalid_whatsapp_phone");
 
   const { body, database } = await activeTemplateBody(key, locale);
-  const message = compactMessage(interpolateTemplate(body, variablesForContext(context, locale)));
+  const rendered = interpolateTemplate(body, variablesForContext(context, locale));
+  const message = formatProfessionalMessage(rendered, context.presentation || {});
   if (!message) throw new Error("empty_whatsapp_message");
   if (/\{[a-zA-Z0-9_]+\}/.test(message)) throw new Error("unresolved_message_variables");
 
@@ -276,7 +301,28 @@ export async function prepareWhatsAppMessage(context: MessageContext): Promise<P
   return { templateKey: key, locale, phone, message, url, logId, usedDatabaseTemplate: database };
 }
 
-export async function openPreparedWhatsApp(prepared: PreparedWhatsAppMessage) {
+export function revisePreparedWhatsAppMessage(
+  prepared: PreparedWhatsAppMessage,
+  message: string,
+  presentation: MessagePresentationOptions = {},
+): PreparedWhatsAppMessage {
+  const revisedMessage = formatProfessionalMessage(compactMessage(message), presentation);
+  if (!revisedMessage) throw new Error("empty_whatsapp_message");
+  return {
+    ...prepared,
+    message: revisedMessage,
+    url: buildWhatsAppUrl(prepared.phone, revisedMessage),
+  };
+}
+
+export async function openPreparedWhatsApp(
+  prepared: PreparedWhatsAppMessage,
+  options: OpenPreparedWhatsAppOptions = {},
+) {
+  if (!options.direct && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(WHATSAPP_PREVIEW_EVENT, { detail: prepared }));
+    return;
+  }
   await markOutboundMessageStatus(prepared.logId, "opened");
   window.open(prepared.url, "_blank", "noopener,noreferrer");
 }
@@ -335,6 +381,7 @@ export function contextualSupportContext(pathname: string, search: string, local
 export function buildSynchronousContextualWhatsAppUrl(pathname: string, search: string, locale: MessageLocale) {
   const context = contextualSupportContext(pathname, search, locale);
   const key = templateKey(context.messageType);
-  const message = interpolateTemplate(getDefaultMessageTemplate(key, locale), variablesForContext(context, locale));
+  const rendered = interpolateTemplate(getDefaultMessageTemplate(key, locale), variablesForContext(context, locale));
+  const message = formatProfessionalMessage(rendered, context.presentation || {});
   return buildWhatsAppUrl(COMPANY_CONTACT.whatsappNumber, message);
 }

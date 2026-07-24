@@ -1,0 +1,46 @@
+.dn-employee-nav-host{display:contents}
+.dn-employee-nav{width:100%;display:flex;align-items:center;gap:.75rem;border:0;background:transparent;color:inherit;text-align:start}
+.dn-employee-nav-copy{min-width:0;display:flex;flex:1;flex-direction:column;align-items:flex-start;line-height:1.15}
+.dn-employee-nav-copy strong{font-size:inherit;font-weight:900}
+.dn-employee-nav-copy small{margin-top:.2rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.58rem;font-weight:700;opacity:.46}
+.dn-admin-side-nav .dn-employee-nav{padding:.72rem .8rem;border-radius:.8rem}
+.dn-admin-side-nav .dn-employee-nav:hover,.dn-admin-side-nav .dn-employee-nav.is-active{background:rgba(212,175,55,.11);color:#d4af37}
+.dn-employee-nav-command{border-radius:1rem!important}
+.dn-employee-nav-command.is-active{border-color:rgba(212,175,55,.5)!important;background:rgba(212,175,55,.12)!important}
+body.dn-employee-hr-embedded .dn-admin-workspace-host> :not(.dn-employee-hr-embedded-root){display:none!important}
+body.dn-employee-hr-embedded .dn-admin-current-section{display:none!important}
+body.dn-employee-hr-embedded .dn-admin-command-deck{display:none!important}
+.dn-employee-hr-embedded-root{width:100%;min-width:0}
+.dn-employee-hr-embedded-root table th,.dn-employee-hr-embedded-root table td{vertical-align:middle}
+
+.dn-employee-payroll-actions{display:inline-flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+.dn-employee-pdf-primary,.dn-employee-pdf-share{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:44px;padding:.72rem 1rem;border-radius:.85rem;font-size:.72rem;font-weight:950;line-height:1;border:1px solid transparent;transition:transform .16s ease,box-shadow .16s ease,background .16s ease;white-space:nowrap}
+.dn-employee-pdf-primary{background:linear-gradient(135deg,#f7ce4d,#d4af37);color:#031226;box-shadow:0 12px 28px rgba(212,175,55,.18)}
+.dn-employee-pdf-share{border-color:rgba(56,189,248,.34);background:rgba(56,189,248,.1);color:#7dd3fc}
+.dn-employee-pdf-primary:hover,.dn-employee-pdf-share:hover{transform:translateY(-1px)}
+.dn-employee-pdf-primary:disabled,.dn-employee-pdf-share:disabled{cursor:not-allowed;opacity:.55;transform:none}
+
+body.dn-employee-detail-active .dncc-desktop-sidebar{display:none!important}
+body.dn-employee-detail-active .dncc-shell{background:#020b18!important}
+body.dn-employee-detail-active .dncc-stage{width:100%;background:radial-gradient(circle at 90% 0%,rgba(56,189,248,.1),transparent 28rem),radial-gradient(circle at 10% 8%,rgba(212,175,55,.09),transparent 25rem),linear-gradient(180deg,#041426 0%,#020b18 100%)!important}
+body.dn-employee-detail-active .dncc-topbar{grid-template-columns:1fr!important;min-height:66px!important;border-bottom-color:rgba(255,255,255,.08)!important;background:rgba(3,18,38,.94)!important;box-shadow:0 10px 30px rgba(0,0,0,.22)!important}
+body.dn-employee-detail-active .dncc-search,body.dn-employee-detail-active .dncc-topbar-actions{display:none!important}
+body.dn-employee-detail-active .dncc-page-title span{color:rgba(255,255,255,.48)!important}
+body.dn-employee-detail-active .dncc-page-title strong{color:#fff!important}
+body.dn-employee-detail-active .dncc-history-actions button{border-color:rgba(255,255,255,.12)!important;background:rgba(255,255,255,.055)!important;color:#fff!important}
+body.dn-employee-detail-active .dncc-main{padding:0!important;background:transparent!important;overflow:auto!important}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root{min-height:100%;padding:1.25rem 1.4rem 4rem;background:transparent}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root>section{max-width:1680px;margin:0 auto}
+body.dn-employee-detail-active [data-dn-employee-detail-header="true"]{position:sticky;top:0;z-index:30;border-color:rgba(212,175,55,.34)!important;background:linear-gradient(135deg,rgba(3,18,38,.98),rgba(5,31,58,.97))!important;box-shadow:0 18px 46px rgba(0,0,0,.28)!important;backdrop-filter:blur(18px)}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root article{min-height:92px;box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.12)}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root section.rounded-\[1\.7rem\]{box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 16px 42px rgba(0,0,0,.16)}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root table{border-collapse:separate!important;border-spacing:0 .42rem!important}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root thead th{position:sticky;top:0;z-index:5;padding:.85rem .8rem!important;border:0!important;background:#0b2545!important;color:#d4af37!important;font-size:.7rem!important;font-weight:950!important}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root tbody tr{background:rgba(7,26,51,.92);box-shadow:0 8px 22px rgba(0,0,0,.12)}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root tbody td{padding:.9rem .8rem!important;border-top:1px solid rgba(255,255,255,.08)!important;border-bottom:1px solid rgba(255,255,255,.08)!important;background:rgba(7,26,51,.88)!important;color:#fff!important}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root tbody td:first-child{border-inline-start:1px solid rgba(255,255,255,.08)!important;border-start-start-radius:.85rem;border-end-start-radius:.85rem}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root tbody td:last-child{border-inline-end:1px solid rgba(255,255,255,.08)!important;border-start-end-radius:.85rem;border-end-end-radius:.85rem}
+body.dn-employee-detail-active .dn-employee-hr-embedded-root tbody tr:hover td{background:rgba(10,40,73,.96)!important}
+
+@media(max-width:900px){body.dn-employee-detail-active .dn-employee-hr-embedded-root{padding:.8rem .7rem 5rem}.dn-employee-payroll-actions{width:100%}.dn-employee-pdf-primary,.dn-employee-pdf-share{flex:1;min-width:150px}}
+@media(max-width:760px){.dn-employee-nav-copy small{display:none}.dn-employee-hr-embedded-root{padding-bottom:5rem}body.dn-employee-detail-active .dncc-topbar{min-height:58px!important;padding:.55rem .7rem!important}body.dn-employee-detail-active [data-dn-employee-detail-header="true"]{position:relative;top:auto}.dn-employee-pdf-primary,.dn-employee-pdf-share{width:100%}}

@@ -9,6 +9,7 @@ const force = process.argv.includes("--force");
 
 const assets = [
   { name: "logo", url: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png", output: "public/assets/daynight/logo.png", minBytes: 2048 },
+  { name: "merchant-statement-logo", url: "https://i.postimg.cc/XqnP282D/cropped-circle-image-(9).png", output: "public/assets/daynight/merchant-statement-logo.png", minBytes: 1024 },
   { name: "hero", url: "https://i.postimg.cc/cJ7MbD6R/Chat-GPT-Image-22-ywnyw-2026-04-52-05-m-(10).png", output: "public/assets/daynight/hero-uae-delivery.png", minBytes: 8192 },
   { name: "uae-map", url: "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png", output: "public/assets/daynight/uae-live-map.png", minBytes: 8192 },
   { name: "admin-auth-intro-gateway", url: "https://i.postimg.cc/657vswy0/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(10).png", output: "public/assets/daynight/admin-auth-v3/intro-gateway.png", minBytes: 8192 },
@@ -29,15 +30,32 @@ async function downloadAsset(asset) {
     return;
   }
   console.log(`[assets] installing ${asset.name} from ${asset.url}`);
-  const response = await fetch(asset.url, { redirect: "follow", headers: { "user-agent": "DAY-NIGHT-DELIVERY-ASSET-INSTALLER/1.2", accept: "image/png,image/*;q=0.8,*/*;q=0.5" } });
-  if (!response.ok || !response.body) throw new Error(`Failed to download ${asset.name}: HTTP ${response.status}`);
+  const response = await fetch(asset.url, {
+    redirect: "follow",
+    headers: {
+      "user-agent": "DAY-NIGHT-DELIVERY-ASSET-INSTALLER/1.2",
+      accept: "image/png,image/*;q=0.8,*/*;q=0.5",
+    },
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Failed to download ${asset.name}: HTTP ${response.status}`);
+  }
   const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("image")) throw new Error(`Failed to download ${asset.name}: non-image content type ${contentType || "unknown"}`);
+  if (!contentType.includes("image")) {
+    throw new Error(
+      `Failed to download ${asset.name}: non-image content type ${contentType || "unknown"}`,
+    );
+  }
   await pipeline(response.body, createWriteStream(outputPath));
   const size = statSync(outputPath).size;
-  if (size < asset.minBytes) throw new Error(`Downloaded ${asset.name} is too small (${size} bytes)`);
-  console.log(`[assets] installed ${asset.name}: ${asset.output} (${Math.round(size / 1024)} KB)`);
+  if (size < asset.minBytes) {
+    throw new Error(`Downloaded ${asset.name} is too small (${size} bytes)`);
+  }
+  console.log(
+    `[assets] installed ${asset.name}: ${asset.output} (${Math.round(size / 1024)} KB)`,
+  );
 }
+
 const failures = [];
 for (const asset of assets) {
   try {
@@ -45,10 +63,13 @@ for (const asset of assets) {
   } catch (error) {
     const optional = asset.output.includes("/admin-auth-v3/");
     if (!optional) failures.push(asset.name);
-    console.warn(`[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`);
+    console.warn(
+      `[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`,
+    );
     console.warn(error instanceof Error ? error.message : error);
   }
 }
+
 if (strict && failures.length) {
   console.error(`[assets] strict mode failed for: ${failures.join(", ")}`);
   process.exit(1);

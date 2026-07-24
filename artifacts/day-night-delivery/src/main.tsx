@@ -12,6 +12,7 @@ import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMer
 import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
 import WhatsAppRuntimeGuard from "./components/WhatsAppRuntimeGuard";
 import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";
+import AdminEmployeeLauncher from "./components/admin/AdminEmployeeLauncher";
 import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
 import "./index.css";
 import "./styles/dn-premium.css";
@@ -107,6 +108,7 @@ function mountPublicApplication() {
         <App />
         <WhatsAppRuntimeGuard />
         <AdminCustomerExperienceLauncher />
+        <AdminEmployeeLauncher />
         <MerchantFeedbackSummaryLauncher />
         <ProductionOrderRealtimeBridge />
         <AdminDeferredMerchantAccounting />
@@ -133,7 +135,7 @@ async function mountNativeRoleApplication(role: NativeRole) {
   );
 }
 
-async function mountStandaloneCustomerExperience() {
+async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
   if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
     const { default: FeedbackPage } = await import("./components/FeedbackPage");
@@ -148,14 +150,11 @@ async function mountStandaloneCustomerExperience() {
     return true;
   }
 
-  if (/^\/admin\/customer-experience\/?$/i.test(pathname)) {
-    const [
-      { default: AdminCustomerExperiencePage },
-      { default: AdminCustomerExperienceActions },
-      { default: ProtectedAdminRoute },
-    ] = await Promise.all([
-      import("./components/admin/AdminCustomerExperiencePage"),
-      import("./components/admin/AdminCustomerExperienceActions"),
+  if (/^\/admin\/(?:customer-experience|new-employee|employees)\/?$/i.test(pathname)) {
+    // AdminCustomerExperiencePage and AdminCustomerExperienceActions remain mounted by
+    // AdminCustomerExperienceLauncher inside the authenticated admin workspace.
+    const [{ default: AdminPanelLuxury }, { default: ProtectedAdminRoute }] = await Promise.all([
+      import("./components/AdminPanelLuxury"),
       import("./components/ProtectedAdminRoute"),
     ]);
     createRoot(rootElement()).render(
@@ -163,11 +162,10 @@ async function mountStandaloneCustomerExperience() {
         <BrowserRouter>
           <AppProvider>
             <ProtectedAdminRoute>
-              <>
-                <AdminCustomerExperiencePage />
-                <AdminCustomerExperienceActions />
-              </>
+              <AdminPanelLuxury />
             </ProtectedAdminRoute>
+            <AdminCustomerExperienceLauncher />
+            <AdminEmployeeLauncher />
             <WhatsAppRuntimeGuard />
           </AppProvider>
         </BrowserRouter>
@@ -183,9 +181,9 @@ async function bootstrapApplication() {
   normalizeTrackingNumberQuery();
   installGlobalRuntimeHandlers();
   try {
-    if (await mountStandaloneCustomerExperience()) return;
+    if (await mountStandaloneAdminFeatures()) return;
   } catch (error) {
-    reportError(error, "customer_experience_mount");
+    reportError(error, "standalone_admin_feature_mount");
   }
 
   const nativeRole = nativeRoleFromLocation();

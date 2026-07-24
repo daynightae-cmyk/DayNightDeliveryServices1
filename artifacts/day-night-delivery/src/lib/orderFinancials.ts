@@ -50,6 +50,23 @@ export function normalizeDeliveryFeeMode(value: unknown): DeliveryFeeMode {
   return "customer_pays";
 }
 
+/**
+ * DAY NIGHT accounting rule:
+ * A merchant order with zero goods/customer value and a positive delivery fee
+ * is always charged to the merchant. The operator does not need to choose the
+ * fee mode manually, and the order can never appear as "due to merchant 0".
+ */
+export function resolveDeliveryFeeMode(
+  goodsValue: unknown,
+  deliveryFee: unknown,
+  requestedMode: unknown,
+): DeliveryFeeMode {
+  const goods = roundMoney(Math.max(0, financialNumber(goodsValue, 0)));
+  const fee = roundMoney(Math.max(0, financialNumber(deliveryFee, 0)));
+  if (goods === 0 && fee > 0) return "deduct_from_merchant";
+  return normalizeDeliveryFeeMode(requestedMode);
+}
+
 export function calculateOrderFinancials(
   input: OrderFinancialInput,
 ): OrderFinancialBreakdown {
@@ -62,7 +79,11 @@ export function calculateOrderFinancials(
   const discountAmount = roundMoney(
     Math.max(0, financialNumber(input.discountAmount, 0)),
   );
-  const deliveryFeeMode = normalizeDeliveryFeeMode(input.deliveryFeeMode);
+  const deliveryFeeMode = resolveDeliveryFeeMode(
+    goodsValue,
+    deliveryFee,
+    input.deliveryFeeMode,
+  );
 
   const maximumDiscount =
     deliveryFeeMode === "customer_pays"
@@ -121,7 +142,9 @@ export function financialsFromOrder(
     order.discount_amount ?? order.discount,
     0,
   );
-  const mode = normalizeDeliveryFeeMode(
+  const mode = resolveDeliveryFeeMode(
+    goodsValue,
+    deliveryFee,
     order.delivery_fee_mode ??
       (String(order.payment_method || "").toLowerCase() === "sender_pays"
         ? "deduct_from_merchant"
@@ -162,7 +185,7 @@ export function orderFinancialValidation(
     return "negative_financial_value";
   }
 
-  const mode = normalizeDeliveryFeeMode(input.deliveryFeeMode);
+  const mode = resolveDeliveryFeeMode(goods, fee, input.deliveryFeeMode);
   const maximumDiscount = mode === "customer_pays" ? goods + fee : goods;
   if (discount > maximumDiscount) {
     return mode === "customer_pays"

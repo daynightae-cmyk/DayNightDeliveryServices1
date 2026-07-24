@@ -1,0 +1,4 @@
+DAY NIGHT employee HR production deployment
+Commit base: 465f215ae18b8d564488dfe54fc1938db90f137c
+Generated: 2026-07-24
+Purpose: force Vercel to build the latest main branch containing employee HR and payroll routes.

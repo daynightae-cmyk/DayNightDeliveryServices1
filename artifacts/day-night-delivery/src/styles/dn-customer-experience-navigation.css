@@ -1,0 +1,122 @@
+/* DAY NIGHT — customer experience navigation integration */
+.dn-customer-experience-nav-host {
+  display: contents;
+}
+
+.dn-customer-experience-nav {
+  position: relative;
+}
+
+.dn-customer-experience-nav-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+  text-align: start;
+}
+
+.dn-customer-experience-nav-copy strong {
+  font: inherit;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.dn-customer-experience-nav-copy small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.25;
+  opacity: 0.62;
+}
+
+.dn-customer-experience-badge {
+  position: absolute;
+  inset-inline-end: -0.45rem;
+  top: -0.45rem;
+  display: grid;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border: 2px solid #071a33;
+  border-radius: 999px;
+  background: #dc2626;
+  padding-inline: 0.2rem;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 5px 14px rgba(220, 38, 38, 0.38);
+}
+
+.dncc-nav-icon .dn-customer-experience-badge {
+  inset-inline-end: -0.55rem;
+  top: -0.55rem;
+  border-color: var(--dncc-sidebar, #071a33);
+}
+
+body.dn-customer-experience-embedded .dn-admin-command-deck,
+body.dn-customer-experience-embedded .dn-admin-current-section,
+body.dn-customer-experience-embedded .dn-admin-left-ai {
+  display: none !important;
+}
+
+body.dn-customer-experience-embedded .dn-admin-home-full,
+body.dn-customer-experience-embedded .dn-admin-workspace-host {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+body.dn-customer-experience-embedded .dn-admin-workspace-host > :not(.dn-customer-experience-embedded-root) {
+  display: none !important;
+}
+
+.dn-customer-experience-embedded-root {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.dn-customer-experience-embedded-root > main {
+  min-height: calc(100dvh - 5.5rem);
+  border-radius: 1.5rem;
+  overflow: clip;
+}
+
+.dn-customer-experience-section-map {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(7, 26, 51, 0.08);
+  background: #fff;
+  padding: 0.65rem 0.85rem;
+  scrollbar-width: thin;
+}
+
+.dn-customer-experience-section-map span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 87, 184, 0.13);
+  border-radius: 999px;
+  background: #f4f8ff;
+  padding: 0.42rem 0.72rem;
+  color: #30506f;
+  font-size: 0.65rem;
+  font-weight: 850;
+}
+
+@media (max-width: 767px) {
+  .dn-customer-experience-nav-copy small {
+    font-size: 0.59rem;
+  }
+
+  .dn-customer-experience-embedded-root > main {
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+}
