@@ -13,6 +13,33 @@ const buildId =
   process.env.DAY_NIGHT_BUILD_ID ||
   `local-${builtAt.replace(/[-:.TZ]/g, "")}`;
 
+/**
+ * DAY NIGHT production configuration is intentionally authoritative here.
+ *
+ * Vercel currently contains duplicated URL variables with different environment
+ * scopes. A stale VITE_SUPABASE_URL must never disconnect the browser client
+ * from the approved production database. The project URL is therefore fixed,
+ * while the public anon/publishable key is selected from server-side build
+ * variables and then injected into the Vite bundle.
+ *
+ * Never add SUPABASE_SERVICE_ROLE_KEY to this list: service-role credentials
+ * must not be exposed to browser code.
+ */
+const approvedSupabaseUrl = "https://ngdwybpgacauorygoedi.supabase.co";
+const publicSupabaseAnonKey = [
+  process.env.SUPABASE_PUBLISHABLE_KEY,
+  process.env.SUPABASE_ANON_KEY,
+  process.env.VITE_SUPABASE_ANON_KEY,
+]
+  .map((value) => String(value || "").trim())
+  .find(Boolean) || "";
+
+// Keep Vite's normal env pipeline aligned with the explicit compile-time values.
+process.env.VITE_SUPABASE_URL = approvedSupabaseUrl;
+if (publicSupabaseAnonKey) {
+  process.env.VITE_SUPABASE_ANON_KEY = publicSupabaseAnonKey;
+}
+
 function buildMetadataPlugin(): Plugin {
   return {
     name: "day-night-build-metadata",
@@ -26,6 +53,9 @@ function buildMetadataPlugin(): Plugin {
             app: "DAY NIGHT DELIVERY SERVICES",
             buildId,
             builtAt,
+            supabaseProject: "ngdwybpgacauorygoedi",
+            supabaseKeyConfigured: Boolean(publicSupabaseAnonKey),
+            supabaseConfigSource: "authoritative-vite-build-config",
           },
           null,
           2,
@@ -56,6 +86,8 @@ export default defineConfig({
   define: {
     __DAY_NIGHT_BUILD_ID__: JSON.stringify(buildId),
     __DAY_NIGHT_BUILT_AT__: JSON.stringify(builtAt),
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(approvedSupabaseUrl),
+    "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(publicSupabaseAnonKey),
   },
   plugins: [react(), tailwindcss(), buildMetadataPlugin()],
   resolve: {
