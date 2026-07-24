@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import type { AdminSectionId } from "../AdminSectionRegistry";
 
+export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees";
+
 export type AdminCommandMenuItem = {
-  id: AdminSectionId;
+  id: AdminCommandSectionId;
   ar: string;
   en: string;
   groupAr: string;
@@ -32,7 +34,7 @@ export type AdminCommandMenuItem = {
 
 export type AdminCommandSearchItem = {
   key: string;
-  sectionId: AdminSectionId;
+  sectionId: AdminCommandSectionId;
   labelAr: string;
   labelEn: string;
   secondaryAr?: string;
@@ -43,7 +45,7 @@ export type AdminCommandSearchItem = {
 type AdminCommandCenterShellProps = {
   isArabic: boolean;
   theme: "light" | "dark";
-  active: AdminSectionId;
+  active: AdminCommandSectionId;
   menu: readonly AdminCommandMenuItem[];
   logoUrl: string;
   companyName: string;
@@ -57,7 +59,7 @@ type AdminCommandCenterShellProps = {
   error?: string;
   searchItems: AdminCommandSearchItem[];
   khalifaOpen: boolean;
-  onNavigate: (id: AdminSectionId) => void;
+  onNavigate: (id: AdminCommandSectionId) => void;
   onSearchSelect: (item: AdminCommandSearchItem) => void;
   onToggleLanguage: () => void;
   onToggleTheme: () => void;
@@ -197,6 +199,7 @@ export default function AdminCommandCenterShell({
                   <button
                     type="button"
                     key={item.id}
+                    data-dn-command-section={item.id}
                     className={selected ? "is-active" : ""}
                     onClick={() => {
                       onNavigate(item.id);

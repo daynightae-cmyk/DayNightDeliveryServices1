@@ -24,17 +24,35 @@ function expect(content, pattern, label) {
   }
 }
 
+function reject(content, pattern, label) {
+  if (pattern.test(content)) {
+    console.error(`FAIL: ${label}`);
+    failed = true;
+  } else {
+    console.log(`PASS: ${label}`);
+  }
+}
+
 console.log("\n--- DAY NIGHT employee HR & payroll gate ---");
 
 const launcher = read("src/components/admin/AdminEmployeeLauncher.tsx");
 const center = read("src/components/admin/AdminEmployeesCenter.tsx");
 const client = read("src/lib/adminEmployees.ts");
 const main = read("src/main.tsx");
+const commandCenter = read("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
+const commandShell = read("src/components/admin/command-center/AdminCommandCenterShell.tsx");
 const migration = read("../../supabase/migrations/20260724083000_employee_hr_payroll_center.sql");
 
 expect(launcher, /\/admin\/new-employee/, "New employee admin route is registered");
 expect(launcher, /\/admin\/employees/, "Employee directory admin route is registered");
 expect(launcher, /AdminEmployeesCenter/, "Admin navigation mounts the employee center");
+expect(commandCenter, /id:\s*"new_employee"[\s\S]*ar:\s*"إضافة موظف"/, "Add employee is a native command-center menu item");
+expect(commandCenter, /id:\s*"employees"[\s\S]*ar:\s*"الموظفون"/, "Employee directory is a native command-center menu item");
+expect(commandCenter, /groupAr:\s*"الموارد البشرية"/, "Employee menu has a permanent HR group");
+expect(commandCenter, /navigateRouter\(path\)[\s\S]*announceEmployeePath/, "Native employee menu opens the real employee route");
+expect(commandShell, /AdminCommandSectionId\s*=\s*AdminSectionId\s*\|\s*"new_employee"\s*\|\s*"employees"/, "Command shell recognizes permanent employee sections");
+expect(commandShell, /data-dn-command-section=\{item\.id\}/, "Native command items expose stable section markers");
+reject(launcher, /selector:\s*"\.dncc-navigation"/, "Employee links are no longer injected dynamically into command navigation");
 expect(center, /محاسب|Accountant/, "Employee types include accountant");
 expect(center, /مطور برمجيات|Developer/, "Employee types include developer");
 expect(center, /سائق \/ مندوب|Driver/, "Employee types include driver");
