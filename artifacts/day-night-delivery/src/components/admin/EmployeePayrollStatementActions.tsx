@@ -43,12 +43,13 @@ function ensureTarget(): Target | null {
   if (!header) return null;
   const employeeCode = (header.textContent || "").match(EMPLOYEE_CODE)?.[0]?.toUpperCase();
   if (!employeeCode) return null;
+  header.dataset.dnEmployeeDetailHeader = "true";
   const actions = header.querySelector<HTMLElement>(".flex.flex-wrap.gap-2") || header;
   let host = actions.querySelector<HTMLElement>("[data-dn-employee-pdf-actions]");
   if (!host) {
     host = document.createElement("span");
     host.dataset.dnEmployeePdfActions = "true";
-    host.className = "contents";
+    host.className = "dn-employee-payroll-actions";
     actions.appendChild(host);
   }
   return { host, employeeCode, ...payrollPeriod(root) };
@@ -65,19 +66,30 @@ export default function EmployeePayrollStatementActions({ active, isArabic }: Pr
   useEffect(() => {
     if (!active) {
       setTarget(null);
+      document.body.classList.remove("dn-employee-detail-active");
       return;
     }
     const sync = () => {
       const next = ensureTarget();
       setTarget((current) => sameTarget(current, next) ? current : next);
+      document.body.classList.toggle("dn-employee-detail-active", Boolean(next));
+    };
+    const syncFromInput = (event: Event) => {
+      const element = event.target as HTMLElement | null;
+      if (element?.matches('.dn-employee-hr-embedded-root input[type="date"]')) sync();
     };
     sync();
     const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["value"] });
-    const timer = window.setInterval(sync, 700);
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("input", syncFromInput, true);
+    document.addEventListener("change", syncFromInput, true);
+    const timer = window.setInterval(sync, 500);
     return () => {
       observer.disconnect();
+      document.removeEventListener("input", syncFromInput, true);
+      document.removeEventListener("change", syncFromInput, true);
       window.clearInterval(timer);
+      document.body.classList.remove("dn-employee-detail-active");
     };
   }, [active]);
 
@@ -120,19 +132,19 @@ export default function EmployeePayrollStatementActions({ active, isArabic }: Pr
       type="button"
       disabled={busy !== null}
       onClick={() => void run("download")}
-      className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-xs font-black text-[#031226] shadow-lg shadow-brand-gold/10 disabled:cursor-not-allowed disabled:opacity-50"
+      className="dn-employee-pdf-primary"
     >
       {busy === "download" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-      {busy === "download" ? (isArabic ? "جارٍ إنشاء PDF..." : "Creating PDF...") : (isArabic ? "كشف راتب PDF" : "Payroll PDF")}
+      {busy === "download" ? (isArabic ? "جارٍ إنشاء PDF..." : "Creating PDF...") : (isArabic ? "طباعة كشف الراتب PDF" : "Print payroll PDF")}
     </button>
     <button
       type="button"
       disabled={busy !== null}
       onClick={() => void run("share")}
-      className="inline-flex items-center gap-2 rounded-xl border border-brand-sky/30 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky disabled:cursor-not-allowed disabled:opacity-50"
+      className="dn-employee-pdf-share"
     >
       {busy === "share" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-      {busy === "share" ? (isArabic ? "جارٍ تجهيز المشاركة..." : "Preparing share...") : (isArabic ? "مشاركة الكشف" : "Share statement")}
+      {busy === "share" ? (isArabic ? "جارٍ تجهيز المشاركة..." : "Preparing share...") : (isArabic ? "إرسال كشف الموظف" : "Share employee statement")}
     </button>
   </>, target.host);
 }
