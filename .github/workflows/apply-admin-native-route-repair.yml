@@ -1,0 +1,500 @@
+name: Apply admin native route and driver message repair
+
+on:
+  push:
+    branches:
+      - fix/admin-native-routes-message-center-driver-templates
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-native-routes-message-center-driver-templates
+          fetch-depth: 0
+
+      - name: Apply exact production repair
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          def read(path):
+              return (root / path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              (root / path).write_text(text, encoding='utf-8')
+
+          def replace_once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {text.count(old)}')
+              return text.replace(old, new, 1)
+
+          def sub_once(text, pattern, replacement, label, flags=0):
+              next_text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one regex match, found {count}')
+              return next_text
+
+          # 1) Normalize legacy direct admin URLs before React mounts and remove the fragile standalone admin mount.
+          path = 'artifacts/day-night-delivery/src/main.tsx'
+          text = read(path)
+          marker = 'function installGlobalRuntimeHandlers() {'
+          normalizer = '''function normalizeLegacyAdminFeaturePath() {
+            if (typeof window === "undefined") return;
+            const url = new URL(window.location.href);
+            const path = url.pathname.replace(/\\/+$/, "") || "/";
+            let changed = false;
+
+            if (path === "/admin/new-employee") {
+              url.pathname = "/admin";
+              url.search = "";
+              url.searchParams.set("hr", "new");
+              changed = true;
+            } else if (path === "/admin/employees") {
+              url.pathname = "/admin";
+              url.search = "";
+              url.searchParams.set("hr", "employees");
+              changed = true;
+            } else if (path === "/admin/customer-experience") {
+              url.pathname = "/admin";
+              url.search = "";
+              url.searchParams.set("cx", "messages");
+              changed = true;
+            }
+
+            if (changed) window.history.replaceState(window.history.state, "", url);
+          }
+
+          '''
+          text = replace_once(text, marker, normalizer + marker, 'insert legacy admin normalizer')
+          text = sub_once(
+              text,
+              r'\n  if \(/\^\\/admin\\/\(\?:customer-experience\|new-employee\|employees\)\\/\?\$/i\.test\(pathname\)\) \{[\s\S]*?\n    return true;\n  \}\n',
+              '\n',
+              'remove standalone admin route mount',
+          )
+          text = replace_once(
+              text,
+              '  normalizeTrackingNumberQuery();\n  installGlobalRuntimeHandlers();',
+              '  normalizeTrackingNumberQuery();\n  normalizeLegacyAdminFeaturePath();\n  installGlobalRuntimeHandlers();',
+              'call legacy admin normalizer',
+          )
+          write(path, text)
+
+          # 2) Make employee launcher accept semantic events, legacy paths and canonical query routes.
+          path = 'artifacts/day-night-delivery/src/components/admin/AdminEmployeeLauncher.tsx'
+          text = read(path)
+          marker = 'function replaceRoute(route: EmployeeRouteState) {'
+          helper = '''function routeFromEventDetail(detail: string | undefined): EmployeeRouteState | string {
+            const value = String(detail || "").trim();
+            if (value === NEW_EMPLOYEE_ROUTE || value === EMPLOYEES_ROUTE || value === ADMIN_PATH) return value;
+            if (value === LEGACY_NEW_EMPLOYEE_PATH || value.includes("hr=new")) return NEW_EMPLOYEE_ROUTE;
+            if (value === LEGACY_EMPLOYEES_PATH || value.includes("hr=employees")) return EMPLOYEES_ROUTE;
+            return routeState();
+          }
+
+          '''
+          text = replace_once(text, marker, helper + marker, 'insert employee event normalizer')
+          text = replace_once(
+              text,
+              '    const custom = (event: Event) => setRoute((event as CustomEvent<EmployeeRouteState>).detail || routeState());',
+              '    const custom = (event: Event) => setRoute(routeFromEventDetail((event as CustomEvent<string>).detail));',
+              'normalize employee custom events',
+          )
+          write(path, text)
+
+          # 3) Register Message Center as a first-class command section.
+          path = 'artifacts/day-night-delivery/src/components/admin/command-center/AdminCommandCenterShell.tsx'
+          text = read(path)
+          text = replace_once(
+              text,
+              'export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees";',
+              'export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees" | "customer_experience";',
+              'extend command section type',
+          )
+          write(path, text)
+
+          path = 'artifacts/day-night-delivery/src/components/admin/command-center/AdminPanelCommandCenter.tsx'
+          text = read(path)
+          text = replace_once(text, '  MapPinned,\n', '  MapPinned,\n  MessageSquareWarning,\n', 'import MessageSquareWarning')
+          text = replace_once(
+              text,
+              '''const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
+          const NEW_EMPLOYEE_PATH = "/admin/new-employee";
+          const EMPLOYEES_PATH = "/admin/employees";
+          ''',
+              '''const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
+          const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
+          const LEGACY_NEW_EMPLOYEE_PATH = "/admin/new-employee";
+          const LEGACY_EMPLOYEES_PATH = "/admin/employees";
+          const LEGACY_CUSTOMER_EXPERIENCE_PATH = "/admin/customer-experience";
+          const NEW_EMPLOYEE_ROUTE = "/admin?hr=new";
+          const EMPLOYEES_ROUTE = "/admin?hr=employees";
+          const CUSTOMER_EXPERIENCE_ROUTE = "/admin?cx=messages";
+          ''',
+              'replace admin feature route constants',
+          )
+          text = replace_once(
+              text,
+              '  { id: "returned", ar: "الطلبات الراجعة", en: "Returned Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: RotateCcw },\n',
+              '  { id: "returned", ar: "الطلبات الراجعة", en: "Returned Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: RotateCcw },\n  { id: "customer_experience", ar: "مركز الرسائل", en: "Message Center", groupAr: "تجربة العملاء", groupEn: "Customer Experience", Icon: MessageSquareWarning },\n',
+              'add native message center menu item',
+          )
+          text = sub_once(
+              text,
+              r'function pathname\(\) \{[\s\S]*?function announceEmployeePath\(path: string\) \{\n  window\.dispatchEvent\(new CustomEvent<string>\(EMPLOYEE_PATH_EVENT, \{ detail: path \}\)\);\n\}\n',
+              '''function pathname() {
+            return window.location.pathname.replace(/\\/+$/, "") || "/";
+          }
+
+          function specialSectionFromLocation(): "new_employee" | "employees" | "customer_experience" | null {
+            const url = new URL(window.location.href);
+            const path = pathname();
+            const hr = url.searchParams.get("hr");
+            const customerExperience = url.searchParams.get("cx");
+            if (path === LEGACY_NEW_EMPLOYEE_PATH || (path === "/admin" && hr === "new")) return "new_employee";
+            if (path === LEGACY_EMPLOYEES_PATH || (path === "/admin" && hr === "employees")) return "employees";
+            if (path === LEGACY_CUSTOMER_EXPERIENCE_PATH || (path === "/admin" && customerExperience === "messages")) return "customer_experience";
+            return null;
+          }
+
+          function isEmployeeSection(id: AdminCommandSectionId): id is "new_employee" | "employees" {
+            return id === "new_employee" || id === "employees";
+          }
+
+          function isCustomerExperienceSection(id: AdminCommandSectionId): id is "customer_experience" {
+            return id === "customer_experience";
+          }
+
+          function isSpecialSection(id: AdminCommandSectionId) {
+            return isEmployeeSection(id) || isCustomerExperienceSection(id);
+          }
+
+          function isLegacySection(id: AdminCommandSectionId): id is AdminSectionId {
+            return !isSpecialSection(id);
+          }
+
+          function employeeRouteFor(id: "new_employee" | "employees") {
+            return id === "new_employee" ? NEW_EMPLOYEE_ROUTE : EMPLOYEES_ROUTE;
+          }
+
+          function announceEmployeeRoute(id: "new_employee" | "employees" | null) {
+            const detail = id === "new_employee" ? "employee:new" : id === "employees" ? "employee:directory" : "/admin";
+            window.dispatchEvent(new CustomEvent<string>(EMPLOYEE_PATH_EVENT, { detail }));
+          }
+
+          function announceCustomerExperienceRoute(active: boolean) {
+            window.dispatchEvent(new CustomEvent<string>(CUSTOMER_EXPERIENCE_PATH_EVENT, {
+              detail: active ? CUSTOMER_EXPERIENCE_ROUTE : "/admin",
+            }));
+          }
+''',
+              'replace command route helpers',
+          )
+          text = replace_once(
+              text,
+              '  const [active, setActive] = useState<AdminCommandSectionId>(() => employeeSectionFromPath() ?? "dashboard");',
+              '  const [active, setActive] = useState<AdminCommandSectionId>(() => specialSectionFromLocation() ?? "dashboard");',
+              'initialize special admin section',
+          )
+          text = sub_once(
+              text,
+              r'  useEffect\(\(\) => \{\n    const syncRoute = \(\) => \{[\s\S]*?\n  \}, \[\]\);\n\n  useEffect\(\(\) => \{\n    const syncFromLegacyPanel',
+              '''  useEffect(() => {
+            const syncRoute = () => {
+              const section = specialSectionFromLocation();
+              if (section) setActive(section);
+            };
+            window.addEventListener("popstate", syncRoute);
+            window.addEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+            window.addEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+            syncRoute();
+            return () => {
+              window.removeEventListener("popstate", syncRoute);
+              window.removeEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+              window.removeEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+            };
+          }, []);
+
+          useEffect(() => {
+            const syncFromLegacyPanel''',
+              'replace command route synchronization',
+          )
+          text = replace_once(
+              text,
+              '''      const employeeSection = employeeSectionFromPath();
+                if (employeeSection) {
+                  setActive(employeeSection);
+          ''',
+              '''      const specialSection = specialSectionFromLocation();
+                if (specialSection) {
+                  setActive(specialSection);
+          ''',
+              'sync special section from legacy panel',
+          )
+          text = sub_once(
+              text,
+              r'  const navigate = \(id: AdminCommandSectionId\) => \{[\s\S]*?\n  \};\n\n  const selectSearchItem',
+              '''  const navigate = (id: AdminCommandSectionId) => {
+            if (isEmployeeSection(id)) {
+              navigateRouter(employeeRouteFor(id));
+              setActive(id);
+              window.setTimeout(() => announceEmployeeRoute(id), 0);
+              return;
+            }
+
+            if (isCustomerExperienceSection(id)) {
+              navigateRouter(CUSTOMER_EXPERIENCE_ROUTE);
+              setActive(id);
+              window.setTimeout(() => announceCustomerExperienceRoute(true), 0);
+              return;
+            }
+
+            if (!isLegacySection(id)) return;
+            const button = legacySidebarButtonFor(id);
+            const currentSpecialSection = specialSectionFromLocation();
+            if (currentSpecialSection) {
+              navigateRouter("/admin");
+              announceEmployeeRoute(null);
+              announceCustomerExperienceRoute(false);
+              window.setTimeout(() => button?.click(), 0);
+            } else if (button) {
+              button.click();
+            } else if (id === "logout") {
+              navigateRouter("/auth");
+            }
+            setActive(id);
+          };
+
+          const selectSearchItem''',
+              'replace command navigation',
+          )
+          write(path, text)
+
+          # 4) Use a canonical query route for Message Center and stop injecting duplicate command-center buttons.
+          path = 'artifacts/day-night-delivery/src/components/admin/AdminCustomerExperienceLauncher.tsx'
+          text = read(path)
+          text = replace_once(
+              text,
+              '  return typeof window === "undefined" ? "" : window.location.pathname.replace(/\\/+$/, "") || "/";',
+              '  if (typeof window === "undefined") return "";\n  return `${window.location.pathname.replace(/\\/+$/, "") || "/"}${window.location.search}`;',
+              'track customer experience query route',
+          )
+          text = replace_once(
+              text,
+              '''function isCustomerExperiencePath(pathname: string) {
+            return pathname === CUSTOMER_EXPERIENCE_PATH;
+          }
+          ''',
+              '''function isCustomerExperiencePath(locationKey: string) {
+            const url = new URL(locationKey || "/", window.location.origin);
+            const pathname = url.pathname.replace(/\\/+$/, "") || "/";
+            return pathname === CUSTOMER_EXPERIENCE_PATH || (pathname === "/admin" && url.searchParams.get("cx") === "messages");
+          }
+          ''',
+              'recognize canonical message center query',
+          )
+          text = sub_once(
+              text,
+              r'function replaceAdminPath\(pathname: string\) \{[\s\S]*?\n\}\n\nfunction normalizedText',
+              '''function replaceAdminPath(pathname: string) {
+            const url = new URL(window.location.href);
+            const openMessageCenter = pathname === CUSTOMER_EXPERIENCE_PATH;
+            url.pathname = "/admin";
+            url.search = "";
+            if (openMessageCenter) url.searchParams.set("cx", "messages");
+            window.history.replaceState(window.history.state, "", url);
+            window.dispatchEvent(new CustomEvent(CUSTOMER_EXPERIENCE_PATH_EVENT, { detail: `${url.pathname}${url.search}` }));
+          }
+
+          function normalizedText''',
+              'canonicalize message center route',
+          )
+          text = sub_once(
+              text,
+              r'\n  document\.querySelectorAll<HTMLElement>\("\\.dncc-navigation"\)\.forEach\(\(root, index\) => \{[\s\S]*?\n  \}\);\n',
+              '\n',
+              'remove command navigation injection',
+          )
+          text = replace_once(
+              text,
+              '  const isAdminRoute = /^\\/admin(?:\\/|$)/.test(pathname);',
+              '  const isAdminRoute = /^\\/admin(?:\\/|\\?|$)/.test(pathname);',
+              'recognize admin query routes',
+          )
+          text = replace_once(
+              text,
+              '        ".dn-admin-side-nav button:not(.dn-customer-experience-nav), .dncc-navigation button:not(.dn-customer-experience-nav)",',
+              '        ".dn-admin-side-nav button:not(.dn-customer-experience-nav), .dncc-navigation button:not(.dn-customer-experience-nav):not([data-dn-command-section=\\"customer_experience\\"])",',
+              'preserve native message center navigation click',
+          )
+          write(path, text)
+
+          # 5) Reject duplicated/corrupted database driver templates and use the correct action-specific fallback.
+          path = 'artifacts/day-night-delivery/src/services/whatsappMessageService.ts'
+          text = read(path)
+          marker = 'function normalizeLocale(locale?: string | null): MessageLocale {'
+          driver_guard = '''const DRIVER_TEMPLATE_KEYS = new Set<MessageTemplateKey>([
+            "driver_on_the_way",
+            "driver_request_location",
+            "driver_arrived",
+            "driver_unreachable",
+            "driver_delivered_feedback",
+          ]);
+
+          function normalizeTemplateFingerprint(value: unknown) {
+            return String(value || "")
+              .replace(/\\s+/g, " ")
+              .replace(/[\\u200e\\u200f]/g, "")
+              .trim()
+              .toLowerCase();
+          }
+
+          function containsCorruptedTemplateText(value: unknown) {
+            return /(?:Ø.|Ù.|Ã.|Â.|ðŸ|â€|�)/.test(String(value || ""));
+          }
+
+          '''
+          text = replace_once(text, marker, driver_guard + marker, 'insert driver template guard helpers')
+          text = sub_once(
+              text,
+              r'async function activeTemplateBody\(key: MessageTemplateKey, locale: MessageLocale\) \{[\s\S]*?\n\}\n\nasync function logOutboundMessage',
+              '''async function activeDriverTemplateBody(key: MessageTemplateKey, locale: MessageLocale) {
+            const fallback = { body: getDefaultMessageTemplate(key, locale), database: false };
+            if (!supabase) return fallback;
+
+            try {
+              const { data, error } = await supabase
+                .from("message_templates")
+                .select("template_key,body,is_active")
+                .eq("language", locale)
+                .eq("channel", "whatsapp")
+                .in("template_key", Array.from(DRIVER_TEMPLATE_KEYS));
+
+              if (error || !Array.isArray(data)) return fallback;
+              const rows = data as Array<{ template_key?: string; body?: string; is_active?: boolean }>;
+              const fingerprints = new Map<string, number>();
+
+              for (const row of rows) {
+                if (!row.is_active || !String(row.body || "").trim()) continue;
+                const fingerprint = normalizeTemplateFingerprint(row.body);
+                fingerprints.set(fingerprint, (fingerprints.get(fingerprint) || 0) + 1);
+              }
+
+              const row = rows.find((item) => item.template_key === key && item.is_active);
+              const body = String(row?.body || "").trim();
+              const fingerprint = normalizeTemplateFingerprint(body);
+              const duplicated = Boolean(fingerprint) && (fingerprints.get(fingerprint) || 0) > 1;
+              const unknown = validateTemplateVariables(body, MESSAGE_TEMPLATE_VARIABLES);
+
+              if (!body || duplicated || containsCorruptedTemplateText(body) || unknown.length > 0) return fallback;
+              return { body, database: true };
+            } catch {
+              return fallback;
+            }
+          }
+
+          async function activeTemplateBody(key: MessageTemplateKey, locale: MessageLocale) {
+            if (DRIVER_TEMPLATE_KEYS.has(key)) return activeDriverTemplateBody(key, locale);
+            if (!supabase) return { body: getDefaultMessageTemplate(key, locale), database: false };
+            try {
+              const { data, error } = await supabase
+                .from("message_templates")
+                .select("body,is_active")
+                .eq("template_key", key)
+                .eq("language", locale)
+                .maybeSingle();
+              if (error || !data?.is_active || !String(data.body || "").trim()) {
+                return { body: getDefaultMessageTemplate(key, locale), database: false };
+              }
+              const body = String(data.body);
+              const unknown = validateTemplateVariables(body, MESSAGE_TEMPLATE_VARIABLES);
+              if (unknown.length || containsCorruptedTemplateText(body)) {
+                console.warn(`Message template ${key}/${locale} is invalid and the built-in fallback was used.`);
+                return { body: getDefaultMessageTemplate(key, locale), database: false };
+              }
+              return { body, database: true };
+            } catch {
+              return { body: getDefaultMessageTemplate(key, locale), database: false };
+            }
+          }
+
+          async function logOutboundMessage''',
+              'install action-specific driver template guard',
+          )
+          write(path, text)
+
+          # 6) Strengthen production gates for all three reported failures.
+          path = 'artifacts/day-night-delivery/scripts/driver-chat-payroll-production-gate.mjs'
+          text = read(path)
+          text = replace_once(
+              text,
+              'expect(whatsappService,/https:\\/\\/wa\\.me\\/|buildWhatsAppUrl/,"Central service produces a prefilled WhatsApp URL");',
+              '''expect(whatsappService,/https:\\/\\/wa\\.me\\/|buildWhatsAppUrl/,"Central service produces a prefilled WhatsApp URL");
+          expect(whatsappService,/DRIVER_TEMPLATE_KEYS/,"Driver actions have an explicit template-key set");
+          expect(whatsappService,/normalizeTemplateFingerprint[\\s\\S]*duplicated/,"Duplicated database driver templates are rejected");
+          expect(whatsappService,/containsCorruptedTemplateText/,"Corrupted database templates fall back safely");
+          expect(whatsappService,/activeDriverTemplateBody/,"Each driver action resolves through the action-specific template guard");''',
+              'gate driver template separation',
+          )
+          text = replace_once(
+              text,
+              'expect(messageLauncher,/ensureLegacyTarget/,"Message Center no longer depends solely on a returned-order button injection");',
+              '''expect(messageLauncher,/ensureLegacyTarget/,"Message Center preserves legacy sidebar compatibility");
+          expect(messageLauncher,/cx\\"\\) === \\"messages\\"|searchParams\\.get\\(\\"cx\\"\\)/,"Message Center recognizes its canonical admin query route");
+          reject(messageLauncher,/querySelectorAll<HTMLElement>\\(\\"\\.dncc-navigation\\"\\)/,"Message Center is not injected dynamically into command navigation");
+          const commandCenter=read("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
+          const commandShell=read("src/components/admin/command-center/AdminCommandCenterShell.tsx");
+          const mainEntry=read("src/main.tsx");
+          expect(commandCenter,/id:\\s*\\"customer_experience\\"[\\s\\S]*مركز الرسائل/,"Message Center is a native permanent command item");
+          expect(commandCenter,/CUSTOMER_EXPERIENCE_ROUTE = \\"\\/admin\\?cx=messages\\"/,"Message Center uses the registered admin route");
+          expect(commandShell,/\\"customer_experience\\"/,"Command shell recognizes Message Center");
+          expect(mainEntry,/normalizeLegacyAdminFeaturePath/,"Legacy direct admin feature URLs are normalized before mounting");''',
+              'gate native message center and routes',
+          )
+          write(path, text)
+
+          path = 'artifacts/day-night-delivery/scripts/employee-hr-payroll-production-gate.mjs'
+          text = read(path)
+          text = replace_once(
+              text,
+              'expect(commandCenter, /navigateRouter\\(path\\)[\\s\\S]*announceEmployeePath/, "Native employee menu opens the real employee route");',
+              'expect(commandCenter, /employeeRouteFor[\\s\\S]*announceEmployeeRoute/, "Native employee menu opens the canonical registered admin route");',
+              'update employee command route gate',
+          )
+          text = replace_once(
+              text,
+              'expect(commandShell, /AdminCommandSectionId\\s*=\\s*AdminSectionId\\s*\\|\\s*"new_employee"\\s*\\|\\s*"employees"/, "Command shell recognizes permanent employee sections");',
+              'expect(commandShell, /AdminCommandSectionId[\\s\\S]*"new_employee"[\\s\\S]*"employees"/, "Command shell recognizes permanent employee sections");',
+              'update command shell type gate',
+          )
+          text = replace_once(
+              text,
+              'expect(main, /AdminEmployeeLauncher/, "Employee launcher mounts globally and on direct admin routes");',
+              '''expect(main, /AdminEmployeeLauncher/, "Employee launcher mounts globally");
+          expect(main, /normalizeLegacyAdminFeaturePath[\\s\\S]*hr\\", \\"new\\"[\\s\\S]*hr\\", \\"employees\\"/, "Legacy employee URLs normalize to canonical admin query routes");
+          expect(commandCenter, /NEW_EMPLOYEE_ROUTE = \\"\\/admin\\?hr=new\\"[\\s\\S]*EMPLOYEES_ROUTE = \\"\\/admin\\?hr=employees\\"/, "Employee command items remain inside the registered admin route");
+          expect(launcher, /routeFromEventDetail/, "Employee launcher normalizes semantic and legacy navigation events");''',
+              'gate canonical employee routes',
+          )
+          write(path, text)
+
+          workflow = root / '.github/workflows/apply-admin-native-route-repair.yml'
+          if workflow.exists():
+              workflow.unlink()
+          PY
+
+          git config user.name "DAY NIGHT Production Repair"
+          git config user.email "daynight.ae@gmail.com"
+          git add -A
+          git commit -m "Fix admin routes, native Message Center, and driver message templates"
+          git push origin HEAD:fix/admin-native-routes-message-center-driver-templates
