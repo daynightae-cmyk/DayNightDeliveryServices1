@@ -28,6 +28,10 @@ function isNativeRoleShell() {
   return role === "driver" || role === "merchant" || /DAYNIGHT\/\d+(?:\.\d+)*\s+(?:driver|merchant)/i.test(navigator.userAgent);
 }
 
+function isAdminRoute() {
+  return window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
+}
+
 function isStandaloneDisplay() {
   return window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
 }
@@ -48,19 +52,19 @@ function applyRuntimeClasses() {
   root.dataset.dayNightBuild = DAY_NIGHT_BUILD_ID;
 }
 
-async function removeNativeRoleCaches() {
+async function removeDayNightCaches() {
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations?.();
     await Promise.all((registrations || []).map((registration) => registration.unregister()));
   } catch {
-    // A missing/locked service-worker store must never block the live role app.
+    // A missing or locked service-worker store must never block a live portal.
   }
 
   try {
     const keys = await window.caches?.keys?.();
     await Promise.all((keys || []).filter((key) => key.startsWith("day-night-")).map((key) => window.caches.delete(key)));
   } catch {
-    // Cache cleanup is best-effort; the role navigation also carries a cache-bust.
+    // Cache cleanup is best-effort and never blocks the current application.
   }
 }
 
@@ -74,7 +78,7 @@ function announceUpdate(registration: ServiceWorkerRegistration) {
 }
 
 async function registerServiceWorker() {
-  if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isNativeCapacitor() || isNativeRoleShell()) return;
+  if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isNativeCapacitor() || isNativeRoleShell() || isAdminRoute()) return;
 
   try {
     const workerUrl = `/sw.js?v=${encodeURIComponent(DAY_NIGHT_BUILD_ID)}`;
@@ -117,8 +121,11 @@ export function initializeDayNightPwaRuntime() {
 
   applyRuntimeClasses();
 
-  if (isNativeRoleShell()) {
-    void removeNativeRoleCaches();
+  // Administration must always run from the current deployed bundle. Removing
+  // old PWA control here prevents a cached public router from rendering the
+  // public NotFound screen for /admin employee navigation.
+  if (isNativeRoleShell() || isAdminRoute()) {
+    void removeDayNightCaches();
     return;
   }
 
