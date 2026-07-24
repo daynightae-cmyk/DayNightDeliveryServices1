@@ -3,10 +3,10 @@ import { createPortal } from "react-dom";
 import { FileDown, Loader2, Share2 } from "lucide-react";
 import { fetchEmployeePayrollSnapshot, fetchEmployees } from "../../lib/adminEmployees";
 import {
-  downloadEmployeePayrollPdf,
-  shareEmployeePayrollPdf,
+  downloadEmployeePayrollPdfSafe,
+  shareEmployeePayrollPdfSafe,
   type EmployeePayrollStatementPayload,
-} from "../../lib/employeePayrollStatementExport";
+} from "../../lib/employeePayrollStatementSafeExport";
 
 type Props = {
   active: boolean;
@@ -96,14 +96,15 @@ export default function EmployeePayrollStatementActions({ active, isArabic }: Pr
   async function payload(): Promise<EmployeePayrollStatementPayload> {
     if (!target) throw new Error("employee_pdf_target_missing");
     const employees = await fetchEmployees();
-    const employee = employees.find((item) => String(item.employee_code || "").toUpperCase() === target.employeeCode);
+    const normalizedCode = target.employeeCode.replace(/\s+/g, "").toUpperCase();
+    const employee = employees.find((item) => String(item.employee_code || "").replace(/\s+/g, "").toUpperCase() === normalizedCode);
     if (!employee) throw new Error("employee_not_found_for_pdf");
     const snapshot = await fetchEmployeePayrollSnapshot(employee.id, target.dateFrom, target.dateTo);
     return {
       language: isArabic ? "ar" : "en",
       employee: snapshot.employee || employee,
       snapshot,
-      logoUrl: "https://i.postimg.cc/XqnP282D/cropped-circle-image-(9).png",
+      logoUrl: "/assets/daynight/merchant-statement-logo.png",
       generatedBy: "DAY NIGHT HR & Payroll Center",
     };
   }
@@ -113,13 +114,14 @@ export default function EmployeePayrollStatementActions({ active, isArabic }: Pr
     setBusy(action);
     try {
       const data = await payload();
-      if (action === "download") await downloadEmployeePayrollPdf(data);
-      else await shareEmployeePayrollPdf(data);
+      if (action === "download") await downloadEmployeePayrollPdfSafe(data);
+      else await shareEmployeePayrollPdfSafe(data);
     } catch (error) {
       console.error("Employee payroll statement export failed.", error);
+      const code = error instanceof Error ? error.message : String(error || "unknown_error");
       window.alert(isArabic
-        ? "تعذر إنشاء كشف راتب الموظف الآن. حدّث الصفحة وتأكد من تحديد الفترة ثم أعد المحاولة."
-        : "The employee payroll statement could not be created. Refresh, confirm the period, and try again.");
+        ? `تعذر إنشاء كشف راتب الموظف. رمز الخطأ: ${code}`
+        : `The employee payroll statement could not be created. Error: ${code}`);
     } finally {
       setBusy(null);
     }
