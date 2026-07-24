@@ -75,7 +75,8 @@ function ensureLegacyTarget(root: HTMLElement, index: number, isArabic: boolean)
   }
 
   const heading = section.querySelector<HTMLElement>("[data-dn-customer-experience-heading]");
-  if (heading) heading.textContent = isArabic ? "خدمة العملاء" : "Customer Service";
+  const nextHeading = isArabic ? "خدمة العملاء" : "Customer Service";
+  if (heading && heading.textContent !== nextHeading) heading.textContent = nextHeading;
   return section.querySelector<HTMLElement>(".dn-customer-experience-nav-host-legacy");
 }
 
@@ -204,14 +205,24 @@ export default function AdminCustomerExperienceLauncher() {
       setWorkspaceTarget((current) => (current === nextWorkspace ? current : nextWorkspace));
     };
 
+    let scheduledFrame = 0;
+    const scheduleSync = () => {
+      if (scheduledFrame) return;
+      scheduledFrame = window.requestAnimationFrame(() => {
+        scheduledFrame = 0;
+        syncTargets();
+      });
+    };
+
     syncTargets();
-    const observer = new MutationObserver(syncTargets);
+    const observer = new MutationObserver(scheduleSync);
     observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setInterval(syncTargets, 800);
+    const timer = window.setInterval(scheduleSync, 1600);
 
     return () => {
       observer.disconnect();
       window.clearInterval(timer);
+      if (scheduledFrame) window.cancelAnimationFrame(scheduledFrame);
     };
   }, [isAdminRoute, isArabic]);
 
