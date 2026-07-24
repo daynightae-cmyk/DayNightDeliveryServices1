@@ -222,28 +222,92 @@ export default function AdminCommandCenterShell({
           </section>
         ))}
       </nav>
+
+      <footer className="dncc-operator">
+        <span className="dncc-operator-avatar" aria-hidden="true">
+          {operatorLabel.trim().charAt(0).toUpperCase() || "D"}
+        </span>
+        {!collapsed && (
+          <div>
+            <strong>{operatorLabel}</strong>
+            <span>{operatorRole}</span>
+          </div>
+        )}
+        <button type="button" onClick={() => onNavigate("logout")} aria-label={isArabic ? "تسجيل الخروج" : "Sign out"}>
+          <LogOut />
+        </button>
+      </footer>
     </aside>
   );
 
   return (
-    <div className={`dncc-root ${theme === "light" ? "is-light" : ""}`} dir={isArabic ? "rtl" : "ltr"}>
-      <button type="button" className="dncc-mobile-menu" onClick={() => setMobileOpen(true)} aria-label={isArabic ? "فتح القائمة" : "Open menu"}><Menu /></button>
-      <div className={`dncc-mobile-overlay ${mobileOpen ? "is-open" : ""}`} onClick={() => setMobileOpen(false)} />
-      <div className={`dncc-sidebar-wrap ${mobileOpen ? "is-open" : ""}`}>
-        <button type="button" className="dncc-mobile-close" onClick={() => setMobileOpen(false)} aria-label={isArabic ? "إغلاق القائمة" : "Close menu"}><X /></button>
-        {sidebar}
-      </div>
+    <div
+      className={`dncc-shell ${khalifaOpen ? "is-khalifa-open" : ""}`}
+      dir={isArabic ? "rtl" : "ltr"}
+      data-theme={theme}
+    >
+      <div className="dncc-desktop-sidebar">{sidebar}</div>
 
-      <main className="dncc-main">
+      {mobileOpen && (
+        <div className="dncc-mobile-layer" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="dncc-mobile-backdrop"
+            onClick={() => setMobileOpen(false)}
+            aria-label={isArabic ? "إغلاق القائمة" : "Close navigation"}
+          />
+          <div className="dncc-mobile-drawer">
+            <button
+              type="button"
+              className="dncc-mobile-close"
+              onClick={() => setMobileOpen(false)}
+              aria-label={isArabic ? "إغلاق" : "Close"}
+            >
+              <X />
+            </button>
+            {sidebar}
+          </div>
+        </div>
+      )}
+
+      {khalifaOpen && (
+        <button
+          type="button"
+          className="dncc-khalifa-backdrop"
+          onClick={onToggleKhalifa}
+          aria-label={isArabic ? "إغلاق خليفة" : "Close Khalifa"}
+        />
+      )}
+
+      <div className="dncc-stage">
         <header className="dncc-topbar">
           <div className="dncc-topbar-start">
-            <button type="button" onClick={onBack} aria-label={isArabic ? "رجوع" : "Back"}>{isArabic ? <ArrowRight /> : <ArrowLeft />}</button>
-            <button type="button" onClick={onOpenWebsite} aria-label={isArabic ? "الموقع" : "Website"}><House /></button>
-            <div><span>{activeGroup}</span><strong>{activeTitle}</strong></div>
+            <button
+              type="button"
+              className="dncc-mobile-menu"
+              onClick={() => setMobileOpen(true)}
+              aria-label={isArabic ? "فتح القائمة" : "Open navigation"}
+            >
+              <Menu />
+            </button>
+
+            <div className="dncc-history-actions">
+              <button type="button" onClick={onBack} aria-label={isArabic ? "رجوع" : "Back"} title={isArabic ? "رجوع" : "Back"}>
+                {isArabic ? <ArrowRight /> : <ArrowLeft />}
+              </button>
+              <button type="button" onClick={onOpenWebsite} aria-label={isArabic ? "الموقع الرئيسي" : "Main website"} title={isArabic ? "الموقع الرئيسي" : "Main website"}>
+                <House />
+              </button>
+            </div>
+
+            <div className="dncc-page-title">
+              <span>{activeGroup}</span>
+              <strong>{activeTitle}</strong>
+            </div>
           </div>
 
           <div className="dncc-search" ref={searchRef}>
-            <Search />
+            <Search aria-hidden="true" />
             <input
               value={query}
               onFocus={() => setSearchOpen(true)}
@@ -252,54 +316,95 @@ export default function AdminCommandCenterShell({
                 setSearchOpen(true);
               }}
               placeholder={isArabic ? "ابحث عن طلب أو تاجر أو قسم..." : "Search orders, merchants, or sections..."}
+              aria-label={isArabic ? "البحث العام" : "Global search"}
             />
             <kbd>⌘K</kbd>
             {searchOpen && (
               <div className="dncc-search-results">
-                {filteredSearch.map((item) => (
-                  <button
-                    type="button"
-                    key={item.key}
-                    onClick={() => {
-                      onSearchSelect(item);
-                      setSearchOpen(false);
-                      setQuery("");
-                    }}
-                  >
-                    <strong>{isArabic ? item.labelAr : item.labelEn}</strong>
-                    <small>{isArabic ? item.secondaryAr : item.secondaryEn}</small>
-                  </button>
-                ))}
-                {!filteredSearch.length && <span>{isArabic ? "لا توجد نتائج" : "No results"}</span>}
+                {filteredSearch.length === 0 ? (
+                  <p>{isArabic ? "لا توجد نتائج مطابقة" : "No matching results"}</p>
+                ) : (
+                  filteredSearch.map((item) => (
+                    <button
+                      type="button"
+                      key={item.key}
+                      onClick={() => {
+                        onSearchSelect(item);
+                        setQuery("");
+                        setSearchOpen(false);
+                      }}
+                    >
+                      <span data-kind={item.kind}>
+                        {item.kind === "order"
+                          ? isArabic ? "طلب" : "Order"
+                          : item.kind === "merchant"
+                            ? isArabic ? "تاجر" : "Merchant"
+                            : isArabic ? "قسم" : "Section"}
+                      </span>
+                      <div>
+                        <strong>{isArabic ? item.labelAr : item.labelEn}</strong>
+                        {(item.secondaryAr || item.secondaryEn) && (
+                          <small>{isArabic ? item.secondaryAr : item.secondaryEn}</small>
+                        )}
+                      </div>
+                      {isArabic ? <ChevronLeft /> : <ChevronRight />}
+                    </button>
+                  ))
+                )}
               </div>
             )}
           </div>
 
-          <div className="dncc-actions">
-            <button type="button" onClick={onRefresh} aria-label={isArabic ? "تحديث" : "Refresh"}><RefreshCw /></button>
-            <button type="button" onClick={onToggleTheme} aria-label={isArabic ? "تبديل المظهر" : "Toggle theme"}>{theme === "dark" ? <Sun /> : <Moon />}</button>
-            <button type="button" onClick={onToggleLanguage} aria-label={isArabic ? "English" : "العربية"}><Languages /></button>
-            {notificationSlot}
-            <button type="button" onClick={onToggleKhalifa} aria-label={isArabic ? "خليفة" : "Khalifa AI"}><Bot /></button>
+          <div className="dncc-topbar-actions">
+            <div className={`dncc-sync-state ${error ? "is-error" : loading ? "is-loading" : "is-ready"}`}>
+              <span />
+              <div>
+                <strong>
+                  {error
+                    ? isArabic ? "تعذر التحديث" : "Sync issue"
+                    : loading
+                      ? isArabic ? "جارٍ التحديث" : "Refreshing"
+                      : isArabic ? "تمت المزامنة" : "Synced"}
+                </strong>
+                <small>{formatSyncTime(lastSyncAt, isArabic)}</small>
+              </div>
+            </div>
+
+            <button type="button" onClick={onRefresh} aria-label={isArabic ? "تحديث البيانات" : "Refresh data"} title={isArabic ? "تحديث البيانات" : "Refresh data"}>
+              <RefreshCw className={loading ? "is-spinning" : ""} />
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              aria-label={theme === "light" ? (isArabic ? "الوضع الليلي" : "Dark mode") : (isArabic ? "الوضع النهاري" : "Light mode")}
+              title={theme === "light" ? (isArabic ? "الوضع الليلي" : "Dark mode") : (isArabic ? "الوضع النهاري" : "Light mode")}
+            >
+              {theme === "light" ? <Moon /> : <Sun />}
+            </button>
+
+            <button type="button" onClick={onToggleLanguage} aria-label={isArabic ? "Switch to English" : "التبديل إلى العربية"}>
+              <Languages />
+              <span>{isArabic ? "EN" : "ع"}</span>
+            </button>
+
+            <button
+              type="button"
+              className={khalifaOpen ? "is-active" : ""}
+              onClick={onToggleKhalifa}
+              aria-label={isArabic ? "فتح مساعد خليفة" : "Open Khalifa assistant"}
+              title={isArabic ? "خليفة" : "Khalifa"}
+            >
+              <Bot />
+              <span>{isArabic ? "خليفة" : "Khalifa"}</span>
+            </button>
+
+            <div className="dncc-notification-slot">{notificationSlot || <Bell />}</div>
           </div>
         </header>
 
-        <section className="dncc-statusbar">
-          <div><strong>{operatorLabel}</strong><span>{operatorRole}</span></div>
-          <div className={error ? "is-error" : loading ? "is-loading" : "is-ready"}>
-            <i />
-            <span>{error || (loading ? (isArabic ? "جارٍ المزامنة" : "Syncing") : (isArabic ? "متصل ومحدث" : "Live and synced"))}</span>
-            <small>{formatSyncTime(lastSyncAt, isArabic)}</small>
-          </div>
-        </section>
-
-        <section className="dncc-content">{children}</section>
-      </main>
-
-      <aside className={`dncc-khalifa ${khalifaOpen ? "is-open" : ""}`}>
-        <header><Bot /><div><strong>{isArabic ? "خليفة" : "Khalifa"}</strong><span>{isArabic ? "مساعد العمليات" : "Operations assistant"}</span></div><button type="button" onClick={onToggleKhalifa}><X /></button></header>
-        <div><p>{isArabic ? "اسأل عن الطلبات أو التجار أو التحصيل أو حالة التشغيل." : "Ask about orders, merchants, collection, or operations."}</p></div>
-      </aside>
+        <main className="dncc-main">{children}</main>
+      </div>
     </div>
   );
 }
