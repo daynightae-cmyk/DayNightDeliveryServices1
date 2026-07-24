@@ -8,27 +8,56 @@ import "../../styles/dn-employee-hr-navigation.css";
 
 type Surface = "legacy";
 type Target = { element: HTMLElement; surface: Surface; mode: EmployeeCenterMode };
+type EmployeeRouteState = "/admin" | "employee:new" | "employee:directory";
 
 export const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
-const NEW_EMPLOYEE_PATH = "/admin/new-employee";
-const EMPLOYEES_PATH = "/admin/employees";
+const ADMIN_PATH = "/admin";
+const LEGACY_NEW_EMPLOYEE_PATH = "/admin/new-employee";
+const LEGACY_EMPLOYEES_PATH = "/admin/employees";
+const NEW_EMPLOYEE_ROUTE: EmployeeRouteState = "employee:new";
+const EMPLOYEES_ROUTE: EmployeeRouteState = "employee:directory";
 
-function pathname() {
-  return typeof window === "undefined" ? "" : window.location.pathname.replace(/\/+$/, "") || "/";
+function normalizedPathname() {
+  return typeof window === "undefined"
+    ? ""
+    : window.location.pathname.replace(/\/+$/, "") || "/";
 }
 
-function modeFromPath(path: string): EmployeeCenterMode | null {
-  if (path === NEW_EMPLOYEE_PATH) return "new";
-  if (path === EMPLOYEES_PATH) return "directory";
+function routeState(): EmployeeRouteState | string {
+  if (typeof window === "undefined") return "";
+  const path = normalizedPathname();
+
+  // Compatibility for an already-open legacy URL before Vercel redirects it.
+  if (path === LEGACY_NEW_EMPLOYEE_PATH) return NEW_EMPLOYEE_ROUTE;
+  if (path === LEGACY_EMPLOYEES_PATH) return EMPLOYEES_ROUTE;
+  if (path !== ADMIN_PATH) return path;
+
+  const view = new URL(window.location.href).searchParams.get("hr");
+  if (view === "new") return NEW_EMPLOYEE_ROUTE;
+  if (view === "employees") return EMPLOYEES_ROUTE;
+  return ADMIN_PATH;
+}
+
+function modeFromRoute(route: EmployeeRouteState | string): EmployeeCenterMode | null {
+  if (route === NEW_EMPLOYEE_ROUTE) return "new";
+  if (route === EMPLOYEES_ROUTE) return "directory";
   return null;
 }
 
-function replacePath(path: string) {
+function replaceRoute(route: EmployeeRouteState) {
   const url = new URL(window.location.href);
-  url.pathname = path;
-  if (path === "/admin") url.search = "";
-  window.history.replaceState({}, "", url);
-  window.dispatchEvent(new CustomEvent<string>(EMPLOYEE_PATH_EVENT, { detail: path }));
+  url.pathname = ADMIN_PATH;
+  url.search = "";
+
+  if (route === NEW_EMPLOYEE_ROUTE) url.searchParams.set("hr", "new");
+  if (route === EMPLOYEES_ROUTE) url.searchParams.set("hr", "employees");
+
+  window.history.replaceState(window.history.state, "", url);
+
+  // BrowserRouter only reacts to history events. Dispatching popstate keeps the
+  // URL, React Router and the embedded HR workspace synchronized immediately.
+  window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+  window.dispatchEvent(new CustomEvent<EmployeeRouteState>(EMPLOYEE_PATH_EVENT, { detail: route }));
 }
 
 function matchingButton(root: Element, labels: string[]) {
@@ -86,11 +115,11 @@ function EmployeeNavButton({ mode, active, isArabic, onOpen }: {
 export default function AdminEmployeeLauncher() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
-  const [path, setPath] = useState(pathname);
+  const [route, setRoute] = useState<EmployeeRouteState | string>(routeState);
   const [targets, setTargets] = useState<Target[]>([]);
   const [workspace, setWorkspace] = useState<HTMLElement | null>(null);
-  const activeMode = modeFromPath(path);
-  const isAdminRoute = /^\/admin(?:\/|$)/.test(path);
+  const activeMode = modeFromRoute(route);
+  const isAdminRoute = normalizedPathname().startsWith(ADMIN_PATH);
 
   useEffect(() => {
     if (!isAdminRoute) {
@@ -99,8 +128,8 @@ export default function AdminEmployeeLauncher() {
       return;
     }
     const sync = () => {
-      const livePath = pathname();
-      setPath((current) => current === livePath ? current : livePath);
+      const liveRoute = routeState();
+      setRoute((current) => current === liveRoute ? current : liveRoute);
       const nextTargets = ensureNavigationTargets();
       setTargets((current) => sameTargets(current, nextTargets) ? current : nextTargets);
       const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
@@ -114,8 +143,8 @@ export default function AdminEmployeeLauncher() {
   }, [isAdminRoute]);
 
   useEffect(() => {
-    const sync = () => setPath(pathname());
-    const custom = (event: Event) => setPath((event as CustomEvent<string>).detail || pathname());
+    const sync = () => setRoute(routeState());
+    const custom = (event: Event) => setRoute((event as CustomEvent<EmployeeRouteState>).detail || routeState());
     window.addEventListener("popstate", sync);
     window.addEventListener(EMPLOYEE_PATH_EVENT, custom);
     return () => {
@@ -137,8 +166,8 @@ export default function AdminEmployeeLauncher() {
         ".dn-admin-side-nav button:not(.dn-employee-nav)",
       );
       if (regularButton) {
-        replacePath("/admin");
-        setPath("/admin");
+        replaceRoute(ADMIN_PATH);
+        setRoute(ADMIN_PATH);
       }
     };
     document.addEventListener("click", capture, true);
@@ -146,9 +175,9 @@ export default function AdminEmployeeLauncher() {
   }, [activeMode]);
 
   function open(mode: EmployeeCenterMode) {
-    const next = mode === "new" ? NEW_EMPLOYEE_PATH : EMPLOYEES_PATH;
-    replacePath(next);
-    setPath(next);
+    const next = mode === "new" ? NEW_EMPLOYEE_ROUTE : EMPLOYEES_ROUTE;
+    replaceRoute(next);
+    setRoute(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -161,7 +190,7 @@ export default function AdminEmployeeLauncher() {
       `${target.surface}-${target.mode}-${index}`,
     ))}
     {activeMode && workspace && createPortal(
-      <div className="dn-employee-hr-embedded-root"><AdminEmployeesCenter isArabic={isArabic} mode={activeMode} onNavigate={(next) => open(next === NEW_EMPLOYEE_PATH ? "new" : "directory")} /></div>,
+      <div className="dn-employee-hr-embedded-root"><AdminEmployeesCenter isArabic={isArabic} mode={activeMode} onNavigate={(next) => open(next === LEGACY_NEW_EMPLOYEE_PATH ? "new" : "directory")} /></div>,
       workspace,
       "employee-hr-workspace",
     )}
