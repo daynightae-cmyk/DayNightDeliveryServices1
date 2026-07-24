@@ -5,7 +5,7 @@ import { useAppContext } from "../../lib/AppContext";
 import AdminEmployeesCenter, { type EmployeeCenterMode } from "./AdminEmployeesCenter";
 import "../../styles/dn-employee-hr-navigation.css";
 
-type Surface = "legacy" | "command";
+type Surface = "legacy";
 type Target = { element: HTMLElement; surface: Surface; mode: EmployeeCenterMode };
 
 export const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
@@ -51,18 +51,11 @@ function ensureTarget(root: HTMLElement, surface: Surface, mode: EmployeeCenterM
 
 function ensureNavigationTargets() {
   const targets: Target[] = [];
-  const roots: Array<{ selector: string; surface: Surface }> = [
-    { selector: ".dn-admin-side-nav", surface: "legacy" },
-    { selector: ".dncc-navigation", surface: "command" },
-  ];
-
-  roots.forEach(({ selector, surface }) => {
-    document.querySelectorAll<HTMLElement>(selector).forEach((root, index) => {
-      const addMerchant = matchingButton(root, ["إضافة تاجر", "New Merchant", "Add Merchant"]);
-      const merchants = matchingButton(root, ["التجار", "Merchants"]);
-      if (addMerchant) targets.push(ensureTarget(root, surface, "new", addMerchant, index));
-      if (merchants) targets.push(ensureTarget(root, surface, "directory", merchants, index));
-    });
+  document.querySelectorAll<HTMLElement>(".dn-admin-side-nav").forEach((root, index) => {
+    const addMerchant = matchingButton(root, ["إضافة تاجر", "New Merchant", "Add Merchant"]);
+    const merchants = matchingButton(root, ["التجار", "Merchants"]);
+    if (addMerchant) targets.push(ensureTarget(root, "legacy", "new", addMerchant, index));
+    if (merchants) targets.push(ensureTarget(root, "legacy", "directory", merchants, index));
   });
   return targets;
 }
@@ -73,8 +66,7 @@ function sameTargets(left: Target[], right: Target[]) {
   );
 }
 
-function EmployeeNavButton({ surface, mode, active, isArabic, onOpen }: {
-  surface: Surface;
+function EmployeeNavButton({ mode, active, isArabic, onOpen }: {
   mode: EmployeeCenterMode;
   active: boolean;
   isArabic: boolean;
@@ -86,10 +78,6 @@ function EmployeeNavButton({ surface, mode, active, isArabic, onOpen }: {
   const subtitle = isNew
     ? (isArabic ? "وظيفة • هاتف • راتب" : "Role • Phone • Salary")
     : (isArabic ? "البطاقات • الرواتب • الخصومات" : "Cards • Payroll • Deductions");
-
-  if (surface === "command") {
-    return <button type="button" className={`dn-employee-nav dn-employee-nav-command ${active ? "is-active" : ""}`} onClick={onOpen} aria-current={active ? "page" : undefined}><span className="dncc-nav-icon"><Icon /></span><span className="dncc-nav-copy"><strong>{title}</strong><small>{subtitle}</small></span></button>;
-  }
 
   return <button type="button" className={`dn-employee-nav ${active ? "is-active" : ""}`} onClick={onOpen} aria-current={active ? "page" : undefined}><span className="dn-admin-sidebar-icon"><Icon className="h-4 w-4" /></span><span className="dn-employee-nav-copy"><strong>{title}</strong><small>{subtitle}</small></span></button>;
 }
@@ -145,7 +133,7 @@ export default function AdminEmployeeLauncher() {
     const capture = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       const regularButton = target?.closest<HTMLButtonElement>(
-        ".dn-admin-side-nav button:not(.dn-employee-nav), .dncc-navigation button:not(.dn-employee-nav)",
+        ".dn-admin-side-nav button:not(.dn-employee-nav)",
       );
       if (regularButton) {
         replacePath("/admin");
@@ -167,7 +155,7 @@ export default function AdminEmployeeLauncher() {
 
   return <>
     {targets.map((target, index) => createPortal(
-      <EmployeeNavButton surface={target.surface} mode={target.mode} active={activeMode === target.mode} isArabic={isArabic} onOpen={() => open(target.mode)} />,
+      <EmployeeNavButton mode={target.mode} active={activeMode === target.mode} isArabic={isArabic} onOpen={() => open(target.mode)} />,
       target.element,
       `${target.surface}-${target.mode}-${index}`,
     ))}
