@@ -1,0 +1,15 @@
+.dn-employee-nav-host{display:contents}
+.dn-employee-nav{width:100%;display:flex;align-items:center;gap:.75rem;border:0;background:transparent;color:inherit;text-align:start}
+.dn-employee-nav-copy{min-width:0;display:flex;flex:1;flex-direction:column;align-items:flex-start;line-height:1.15}
+.dn-employee-nav-copy strong{font-size:inherit;font-weight:900}
+.dn-employee-nav-copy small{margin-top:.2rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.58rem;font-weight:700;opacity:.46}
+.dn-admin-side-nav .dn-employee-nav{padding:.72rem .8rem;border-radius:.8rem}
+.dn-admin-side-nav .dn-employee-nav:hover,.dn-admin-side-nav .dn-employee-nav.is-active{background:rgba(212,175,55,.11);color:#d4af37}
+.dn-employee-nav-command{border-radius:1rem!important}
+.dn-employee-nav-command.is-active{border-color:rgba(212,175,55,.5)!important;background:rgba(212,175,55,.12)!important}
+body.dn-employee-hr-embedded .dn-admin-workspace-host> :not(.dn-employee-hr-embedded-root){display:none!important}
+body.dn-employee-hr-embedded .dn-admin-current-section{display:none!important}
+body.dn-employee-hr-embedded .dn-admin-command-deck{display:none!important}
+.dn-employee-hr-embedded-root{width:100%;min-width:0}
+.dn-employee-hr-embedded-root table th,.dn-employee-hr-embedded-root table td{vertical-align:middle}
+@media(max-width:760px){.dn-employee-nav-copy small{display:none}.dn-employee-hr-embedded-root{padding-bottom:5rem}}
