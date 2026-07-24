@@ -71,6 +71,7 @@ export interface Order {
   pieces: number;
   service_type: "standard" | "express" | string;
   delivery_price: number;
+  delivery_date?: string;
   payment_method: "sender_pays" | "cod" | "receiver_pays" | string;
   cod_amount?: number;
   notes?: string;
