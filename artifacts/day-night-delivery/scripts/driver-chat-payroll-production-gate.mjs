@@ -31,6 +31,10 @@ expect(messageLauncher,/مركز الرسائل|Message Center/,"Admin navigatio
 expect(messageLauncher,/dn-customer-experience-native-section/,"Message Center owns a stable native admin navigation section");
 expect(messageLauncher,/AdminMessageControlCenter/,"Message Center mounts the operational message-control workspace");
 expect(messageLauncher,/ensureLegacyTarget/,"Message Center no longer depends solely on a returned-order button injection");
+expect(messageLauncher,/heading && heading\.textContent !== nextHeading/,"Message Center changes injected headings only when their text actually changes");
+expect(messageLauncher,/requestAnimationFrame[\s\S]*scheduleSync/,"Admin DOM synchronization is coalesced to one animation frame");
+expect(messageLauncher,/cancelAnimationFrame/,"Admin DOM synchronization cancels pending work during cleanup");
+reject(messageLauncher,/if \(heading\) heading\.textContent = isArabic/,"Message Center cannot recreate its heading on every MutationObserver callback");
 
 const canvasTypes=read("src/types/canvas-text-compat.d.ts");
 expect(canvasTypes,/CanvasRenderingContext2D/,"Payroll PDF canvas typing is available to strict TypeScript checks");
