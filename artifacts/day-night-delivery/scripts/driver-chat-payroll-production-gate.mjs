@@ -6,7 +6,7 @@ function read(relative,repository=false){const file=path.join(repository?repo:ro
 function expect(content,pattern,label){if(!pattern.test(content)){console.error(`FAIL: ${label}`);failed=true;}else console.log(`PASS: ${label}`);}
 function reject(content,pattern,label){if(pattern.test(content)){console.error(`FAIL: ${label}`);failed=true;}else console.log(`PASS: ${label}`);}
 
-console.log("\n--- DAY NIGHT driver chat & payroll production gate ---");
+console.log("\n--- DAY NIGHT driver chat & specialized payroll production gate ---");
 const dashboard=read("src/components/driver/DriverDashboard.tsx");
 expect(dashboard,/updateStatus\(order\.id,\s*["']confirmed["']/,"Mission start persists the canonical confirmed status");
 reject(dashboard,/updateStatus\(order\.id,\s*["']accepted["']/,"Mission start does not persist the legacy accepted enum value");
@@ -43,11 +43,22 @@ const customer=read("src/components/customer/CustomerOrderHistory.tsx");
 expect(customer,/actorRole=["']customer["']/,"Customer can join the private order conversation");
 
 const statements=read("src/components/admin/AdminDriverStatementsCenter.tsx");
-expect(statements,/useAdminDrivers/,"Driver statements load real driver profiles and assigned orders");
-expect(statements,/setDriverSalary/,"Driver statements save real salary configuration");
-expect(statements,/createDriverPayrollEntry/,"Expenses and deductions post to the payroll ledger");
-expect(statements,/AdminPdfExportButton/,"Driver statements export PDF, CSV, and document files");
-reject(statements,/Math\.random|localStorage|mock driver|demo driver/i,"Driver statements contain no generated or browser-only operational rows");
+expect(statements,/useAdminDrivers/,"Driver payroll loads real driver profiles and assigned orders");
+expect(statements,/setDriverSalary/,"Driver payroll saves real salary configuration");
+expect(statements,/createDriverPayrollEntry/,"Classified payroll movements post to the database ledger");
+expect(statements,/entryOptions/,"Payroll entry types have explicit business classifications");
+expect(statements,/Salary setup and history|تعريف الراتب وحفظ تاريخه/,"Salary setup exposes effective date and history semantics");
+expect(statements,/paymentTooHigh/,"Salary payment cannot silently exceed the current outstanding amount");
+expect(statements,/reimbursement/,"Driver reimbursement is separated from driver-charged expense");
+expect(statements,/debit_adjustment/,"Positive and negative adjustments are no longer ambiguous");
+expect(statements,/AdminPdfExportButton/,"Driver payroll and orders export professional statements");
+reject(statements,/Math\.random|localStorage|mock driver|demo driver/i,"Driver payroll contains no generated or browser-only operational rows");
+
+const payrollClient=read("src/lib/adminDriverPayroll.ts");
+expect(payrollClient,/DriverSalaryHistoryRow/,"Frontend payroll contract includes salary history");
+expect(payrollClient,/overpaid/,"Frontend payroll contract exposes overpayment separately");
+expect(payrollClient,/reimbursement/,"Frontend payroll contract supports reimbursements");
+expect(payrollClient,/debit_adjustment/,"Frontend payroll contract supports negative adjustments");
 
 const merchants=read("src/components/admin/AdminMerchantStatementsCenter.tsx");
 expect(merchants,/dn-admin-merchant-directory-card/,"Merchant directory cards use a dedicated non-button surface");
@@ -65,10 +76,20 @@ expect(migration,/alter type[\s\S]*add value if not exists/s,"Migration reconcil
 expect(migration,/pg_notify\('pgrst','reload schema'\)/,"Migration reloads the live PostgREST schema immediately");
 expect(migration,/grant execute on function public\.driver_chat_payroll_runtime_health\(\) to anon, authenticated/,"Runtime health is remotely verifiable after SQL execution");
 
+const payrollSpecialization=read("supabase/migrations/20260724043000_specialized_driver_payroll.sql",true);
+expect(payrollSpecialization,/create table if not exists public\.driver_salary_history/,"Specialized migration preserves dated salary history");
+expect(payrollSpecialization,/daily_proration_from_salary_history/,"Period salary is prorated from salary history");
+expect(payrollSpecialization,/entry_type in \([\s\S]*reimbursement[\s\S]*debit_adjustment/s,"Payroll ledger separates reimbursement and debit adjustment");
+expect(payrollSpecialization,/v_type='payment'.*reduces_outstanding_only/s,"Salary payments reduce outstanding only");
+expect(payrollSpecialization,/driver_payroll_specialization_health/,"Specialized payroll migration exposes a health RPC");
+expect(payrollSpecialization,/drivers read own salary history/,"Drivers can read only their own salary history");
+expect(payrollSpecialization,/driver_is_admin\(\)/,"Payroll writes remain restricted to administrators");
+reject(payrollSpecialization,/delete from public\.driver_payroll_entries|truncate public\.driver_payroll_entries/i,"Specialization never destroys payroll history");
+
 const missionLocationHotfix=read("supabase/migrations/20260722094500_driver_start_mission_location_not_null_hotfix.sql",true);
 expect(missionLocationHotfix,/driver_start_mission_location_hotfix_health/,"23502 location hotfix publishes a remotely verifiable health RPC");
 expect(missionLocationHotfix,/location_insert_removed/,"23502 hotfix proves the premature location insert was removed");
 expect(missionLocationHotfix,/gps_source','driver_report_location_only'/,"GPS rows remain sourced exclusively from real phone coordinates");
 
-if(failed){console.error("Driver chat & payroll production gate FAILED.");process.exit(1);}
-console.log("Driver chat & payroll production gate PASSED.\n");
+if(failed){console.error("Driver chat & specialized payroll production gate FAILED.");process.exit(1);}
+console.log("Driver chat & specialized payroll production gate PASSED.\n");
