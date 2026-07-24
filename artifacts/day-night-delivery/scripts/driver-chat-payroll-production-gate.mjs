@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+// This gate protects every admin route, including /admin/employees, from DOM observer feedback loops.
 const root=process.cwd(); const repo=path.resolve(root,"../.."); let failed=false;
 function read(relative,repository=false){const file=path.join(repository?repo:root,relative);if(!fs.existsSync(file)){console.error(`FAIL: missing ${relative}`);failed=true;return"";}console.log(`PASS: ${relative} exists`);return fs.readFileSync(file,"utf8");}
 function expect(content,pattern,label){if(!pattern.test(content)){console.error(`FAIL: ${label}`);failed=true;}else console.log(`PASS: ${label}`);}
