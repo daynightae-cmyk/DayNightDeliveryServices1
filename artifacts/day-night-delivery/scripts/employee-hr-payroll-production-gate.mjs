@@ -62,6 +62,11 @@ expect(center, /زيادة أو تعديل الراتب الأساسي|Salary re
 expect(center, /المكافأة تُضاف والخصم يُطرح تلقائيًا|Bonuses add and deductions subtract automatically/, "UI explains automatic payroll effects");
 expect(center, /مرتبط بسجل رواتب المندوب الأصلي|Linked to the original driver payroll/, "Linked drivers do not duplicate payroll");
 expect(client, /admin_employee_payroll_snapshot/, "Frontend reads authoritative payroll snapshots");
+expect(client, /normalizeEmployeePayrollSnapshot/, "Payroll snapshots are normalized before employee-card rendering");
+expect(client, /salary_history:\s*salaryHistory/, "Missing salary history is converted to a safe list");
+expect(client, /entries,\s*\n\s*};/, "Missing payroll entries are converted to a safe list");
+expect(client, /numberValue\(raw\.debits,\s*deductions \+ advances \+ penalties \+ expenses \+ debitAdjustments\)/, "Driver snapshots receive a safe debit total");
+expect(client, /invalid_employee_payroll_snapshot/, "Malformed payroll responses fail safely instead of crashing React");
 expect(client, /admin_set_employee_salary/, "Frontend persists salary revisions");
 expect(client, /admin_create_employee_payroll_entry/, "Frontend persists payroll movements");
 expect(main, /AdminEmployeeLauncher/, "Employee launcher mounts globally and on direct admin routes");
