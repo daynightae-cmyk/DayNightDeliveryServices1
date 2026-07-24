@@ -35,9 +35,26 @@ jobs:
           end = text.index(end_marker, start)
           lines = text[start:end].splitlines()
           script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
-          exec(compile(script, str(workflow), 'exec'), {'__name__': '__main__'})
+          Path('/tmp/day-night-repair.py').write_text(script, encoding='utf-8')
           PY
 
+          set +e
+          python3 /tmp/day-night-repair.py > /tmp/day-night-repair.log 2>&1
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            cat /tmp/day-night-repair.log
+            cp /tmp/day-night-repair.log repair-error.txt
+            git config user.name "DAY NIGHT Production Repair"
+            git config user.email "daynight.ae@gmail.com"
+            git add repair-error.txt
+            git commit -m "Record protected repair failure"
+            git push origin HEAD:${{ github.head_ref }}
+            exit "$status"
+          fi
+
+          rm -f repair-error.txt
           rm -f .github/workflows/apply-admin-native-route-repair.yml
           rm -f .github/workflows/run-admin-repair-on-pr.yml
           git config user.name "DAY NIGHT Production Repair"
