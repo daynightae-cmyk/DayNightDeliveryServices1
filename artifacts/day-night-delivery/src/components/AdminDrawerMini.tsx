@@ -1,13 +1,16 @@
 import type { MouseEvent } from "react";
-import { MessageSquareWarning } from "lucide-react";
+import { MessageSquareWarning, UserPlus, UsersRound } from "lucide-react";
 import useOpenComplaintsCount from "../hooks/useOpenComplaintsCount";
 
 const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
+const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
 const links = [
   ["#dn-admin-top", "لوحة التحكم"],
   ["#dn-admin-core", "إضافة طلب جديد"],
   ["#dn-admin-core", "إضافة تاجر"],
   ["#dn-admin-ai", "التجار"],
+  ["/admin/new-employee", "إضافة موظف"],
+  ["/admin/employees", "الموظفون"],
   ["#dn-admin-core", "كافة الطلبات"],
   ["#dn-admin-core", "الطلبات الملغية"],
   ["#dn-admin-core", "الطلبات قيد المراجعة"],
@@ -28,13 +31,15 @@ const links = [
 export default function AdminDrawerMini() {
   const openComplaints = useOpenComplaintsCount(true);
 
-  const handleCustomerExperience = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (href !== "/admin/customer-experience") return;
+  const handleAdminFeature = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    const isCustomerExperience = href === "/admin/customer-experience";
+    const isEmployeeFeature = href === "/admin/new-employee" || href === "/admin/employees";
+    if (!isCustomerExperience && !isEmployeeFeature) return;
     event.preventDefault();
     const url = new URL(window.location.href);
     url.pathname = href;
     window.history.replaceState({}, "", url);
-    window.dispatchEvent(new CustomEvent<string>(CUSTOMER_EXPERIENCE_PATH_EVENT, { detail: href }));
+    window.dispatchEvent(new CustomEvent<string>(isCustomerExperience ? CUSTOMER_EXPERIENCE_PATH_EVENT : EMPLOYEE_PATH_EVENT, { detail: href }));
   };
 
   return (
@@ -47,26 +52,28 @@ export default function AdminDrawerMini() {
         </div>
         {links.map(([href, label]) => {
           const isCustomerExperience = href === "/admin/customer-experience";
+          const isAddEmployee = href === "/admin/new-employee";
+          const isEmployees = href === "/admin/employees";
+          const FeatureIcon = isAddEmployee ? UserPlus : isEmployees ? UsersRound : null;
           return (
             <a
               key={label}
               href={href}
-              onClick={(event) => handleCustomerExperience(event, href)}
+              onClick={(event) => handleAdminFeature(event, href)}
               className="mb-2 flex items-center gap-3 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-white hover:border-brand-gold/40 hover:bg-white/10"
             >
               {isCustomerExperience && (
                 <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#0057B8]">
                   <MessageSquareWarning className="h-4 w-4" />
-                  {openComplaints > 0 && (
-                    <b className="absolute -end-2 -top-2 min-w-5 rounded-full bg-red-600 px-1 text-center text-[10px] text-white">
-                      {openComplaints > 99 ? "99+" : openComplaints}
-                    </b>
-                  )}
+                  {openComplaints > 0 && <b className="absolute -end-2 -top-2 min-w-5 rounded-full bg-red-600 px-1 text-center text-[10px] text-white">{openComplaints > 99 ? "99+" : openComplaints}</b>}
                 </span>
               )}
+              {FeatureIcon && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand-gold/15 text-brand-gold"><FeatureIcon className="h-4 w-4" /></span>}
               <span className="min-w-0 flex-1">
                 <strong className="block">{label}</strong>
                 {isCustomerExperience && <small className="block truncate text-[10px] text-white/55">التقييمات • الشكاوى • الرسائل</small>}
+                {isAddEmployee && <small className="block truncate text-[10px] text-white/55">الوظيفة • الهاتف • الراتب</small>}
+                {isEmployees && <small className="block truncate text-[10px] text-white/55">البطاقات • الرواتب • الخصومات</small>}
               </span>
             </a>
           );
