@@ -9,6 +9,7 @@ import {
 export type AdminOrderEditSaveResult = {
   row: Order;
   source: "rpc" | "db";
+  financialsLocked?: boolean;
 };
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -35,6 +36,11 @@ function isMissingFinancialUpdateRuntime(error: unknown) {
   return /admin_update_order_with_financials|pgrst202|schema cache|could not find the function|function .* does not exist|migration/.test(detail);
 }
 
+function financialsAreLocked(order: Order) {
+  const status = clean(order.status).toLowerCase().replace(/[\s-]+/g, "_");
+  return Boolean(order.financial_posted_at) || ["delivered", "completed", "complete"].includes(status);
+}
+
 function uniqueAddress(parts: unknown[]) {
   const seen = new Set<string>();
   return parts
@@ -54,7 +60,38 @@ function normalizedPaymentMethod(value: unknown) {
   return "cod";
 }
 
-function directPatch(input: FinancialOpsOrderUpdateInput) {
+function corePatch(input: FinancialOpsOrderUpdateInput) {
+  const merchant = input.merchant;
+  if (!merchant?.id) throw new Error("merchant_required");
+  const isInternational = input.shipping_scope === "international";
+  const receiverCity = isInternational
+    ? clean(input.destination_country || input.delivery_city || "WORLD")
+    : clean(input.delivery_city || "Abu Dhabi");
+  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
+  const notes = clean(input.notes);
+  const editReason = clean(input.edit_reason || "Updated from admin order editor");
+
+  return {
+    receiver_name: clean(input.receiver_name),
+    receiver_phone: clean(input.receiver_phone),
+    receiver_city: receiverCity,
+    receiver_address: uniqueAddress([
+      input.delivery_area,
+      input.delivery_street,
+      input.receiver_address,
+    ]),
+    package_type: packageValue,
+    package_description: packageValue,
+    weight: Math.max(0.1, Number(input.weight || 1)),
+    pieces: count,
+    order_count: count,
+    notes: [notes, `Admin edit: ${editReason}`].filter(Boolean).join(" | "),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fullPatch(input: FinancialOpsOrderUpdateInput) {
   const merchant = input.merchant;
   if (!merchant?.id) throw new Error("merchant_required");
   const financials = calculateFinancialOpsOrder(input);
@@ -122,9 +159,11 @@ function directPatch(input: FinancialOpsOrderUpdateInput) {
   };
 }
 
-async function updateDirectly(input: FinancialOpsOrderUpdateInput): Promise<Order> {
+async function updateWithPatch(
+  input: FinancialOpsOrderUpdateInput,
+  patch: Record<string, unknown>,
+): Promise<Order> {
   if (!supabase) throw new Error("Supabase is not configured.");
-  const patch = directPatch(input);
   const orderId = clean(input.order.id);
 
   if (orderId) {
@@ -161,13 +200,18 @@ async function updateDirectly(input: FinancialOpsOrderUpdateInput): Promise<Orde
 export async function saveAdminOrderEdit(
   input: FinancialOpsOrderUpdateInput,
 ): Promise<AdminOrderEditSaveResult> {
+  if (financialsAreLocked(input.order)) {
+    const row = await updateWithPatch(input, corePatch(input));
+    return { row, source: "db", financialsLocked: true };
+  }
+
   try {
     const result = await updateFinancialOpsOrder(input);
     if (!result.row?.id) throw new Error("financial_order_update_returned_no_row");
-    return { row: result.row, source: result.source };
+    return { row: result.row, source: result.source, financialsLocked: false };
   } catch (error) {
     if (!isMissingFinancialUpdateRuntime(error)) throw error;
-    const row = await updateDirectly(input);
-    return { row, source: "db" };
+    const row = await updateWithPatch(input, fullPatch(input));
+    return { row, source: "db", financialsLocked: false };
   }
 }
