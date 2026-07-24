@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FileDown, Loader2, Share2 } from "lucide-react";
-import { fetchEmployeePayrollSnapshot, fetchEmployees, type Employee } from "../../lib/adminEmployees";
+import { fetchEmployeePayrollSnapshot, fetchEmployees } from "../../lib/adminEmployees";
 import {
   downloadEmployeePayrollPdf,
   shareEmployeePayrollPdf,
