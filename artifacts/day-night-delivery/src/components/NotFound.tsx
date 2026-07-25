@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { FileQuestion, Home, MessageSquare, Search } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import companyMeta from "../data/companyMeta";
+import BankTransferCenter from "./BankTransferCenter";
 
 interface NotFoundProps {
   onNavigate?: (tab: string) => void;
@@ -14,7 +15,12 @@ interface NotFoundProps {
 
 export default function NotFound({ onNavigate }: NotFoundProps) {
   const { language } = useAppContext();
+  const location = useLocation();
   const isArabic = language === "ar";
+
+  if (location.pathname === "/payment" || location.pathname === "/bank-transfer") {
+    return <BankTransferCenter />;
+  }
 
   const homeLabel = isArabic ? "العودة للرئيسية" : "Back to home";
   const trackingLabel = isArabic ? "تتبع شحنة" : "Track shipment";
