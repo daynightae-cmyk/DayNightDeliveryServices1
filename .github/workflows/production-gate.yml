@@ -45,24 +45,8 @@ jobs:
           end = text.index(end_marker, start)
           lines = text[start:end].splitlines()
           script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
-
-          original_helper = '''def replace_once(text, old, new, label):
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f'{label}: expected 1 match, found {count}')
-    return text.replace(old, new, 1)
-'''
-          hardened_helper = '''def replace_once(text, old, new, label):
-    count = text.count(old)
-    if count == 1:
-        return text.replace(old, new, 1)
-    if label == 'personal coupon optional field':
-        pattern = r'(value=\\{form\\.coupon_number \\|\\| ""\\}[\\s\\S]{0,260}?)required(\\s+dir="ltr")'
-        next_text, replaced = re.subn(pattern, r'\\1required={!personalOrder}\\2', text, count=1)
-        if replaced == 1:
-            return next_text
-    raise SystemExit(f'{label}: expected 1 match, found {count}')
-'''
+          original_helper = "def replace_once(text, old, new, label):\n    count = text.count(old)\n    if count != 1:\n        raise SystemExit(f'{label}: expected 1 match, found {count}')\n    return text.replace(old, new, 1)\n"
+          hardened_helper = "def replace_once(text, old, new, label):\n    count = text.count(old)\n    if count == 1:\n        return text.replace(old, new, 1)\n    if label == 'personal coupon optional field':\n        pattern = r'(value=\\{form\\.coupon_number \\|\\| \"\"\\}[\\s\\S]{0,260}?)required(\\s+dir=\"ltr\")'\n        next_text, replaced = re.subn(pattern, r'\\1required={!personalOrder}\\2', text, count=1)\n        if replaced == 1:\n            return next_text\n    raise SystemExit(f'{label}: expected 1 match, found {count}')\n"
           if original_helper not in script:
               raise SystemExit('replace_once helper contract not found')
           script = script.replace(original_helper, hardened_helper, 1)
