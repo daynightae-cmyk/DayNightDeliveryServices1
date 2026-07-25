@@ -54,7 +54,11 @@ expect(editModal, /حفظ التعديلات(?: الآن)?|Save changes(?: now)?
 expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");
 expect(editModal, /saveAdminOrderEdit/, "Order edits use verified persistence");
 expect(editModal, /dn-admin-orders-updated/, "Successful edits notify the live admin workspace");
-expect(persistence, /select\("\*"\)\s*\.single\(\)/s, "Database update verifies the returned order row");
+expect(
+  persistence,
+  /select\("\*"\)[\s\S]*\.limit\(1\)[\s\S]*data\?\.\[0\]\?\.id/s,
+  "Database update verifies the returned order row",
+);
 expect(persistence, /financialsAreLocked/, "Delivered financial snapshots remain protected");
 expect(persistence, /corePatch/, "Delivered orders still allow safe core-data edits");
 expect(persistence, /isMissingFinancialUpdateRuntime/, "Missing RPC runtime has a controlled compatibility path");
