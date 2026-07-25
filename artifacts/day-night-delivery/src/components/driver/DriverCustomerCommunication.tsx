@@ -250,8 +250,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
             {isArabic
-              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين."
-              : "Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected."}
+              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين. فتح واتساب لا يغيّر حالة الطلب."
+              : "Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected. Opening WhatsApp does not change the order status."}
           </p>
         </div>
         <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
