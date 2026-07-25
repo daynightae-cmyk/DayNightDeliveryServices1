@@ -50,7 +50,7 @@ expect(exportButton, /merchantDue:\s*-effectiveFee/, "Zero-value statement rows 
 expect(exportButton, /normalizeZeroOrderPayload/, "PDF and CSV normalize zero-value rows before export");
 expect(migration, /greatest\([\s\S]*180[\s\S]*merchant_due\s*=\s*-r\.effective_fee/, "Database backfill recovers hidden fees and charges zero-value rows to merchant");
 
-expect(editModal, /تحديث الطلب الآن|Update order now/, "Order edit has an explicit visible update button");
+expect(editModal, /حفظ التعديلات(?: الآن)?|Save changes(?: now)?/, "Order edit has an explicit visible save button");
 expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");
 expect(editModal, /saveAdminOrderEdit/, "Order edits use verified persistence");
 expect(editModal, /dn-admin-orders-updated/, "Successful edits notify the live admin workspace");
