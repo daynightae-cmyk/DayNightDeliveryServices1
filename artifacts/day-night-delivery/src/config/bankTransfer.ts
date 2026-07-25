@@ -1,4 +1,5 @@
 export type DayNightBankId = "adib" | "adcb";
+export type CustomerPaymentMode = "cash" | "online";
 
 export type DayNightBankAccount = {
   id: DayNightBankId;
@@ -49,30 +50,50 @@ export const DAY_NIGHT_BANK_ACCOUNTS: readonly DayNightBankAccount[] = [
 ] as const;
 
 export function getDayNightBank(bankId: string | null | undefined) {
-  return (
-    DAY_NIGHT_BANK_ACCOUNTS.find((bank) => bank.id === bankId) ||
-    DAY_NIGHT_BANK_ACCOUNTS[0]
-  );
+  return DAY_NIGHT_BANK_ACCOUNTS.find((bank) => bank.id === bankId) || DAY_NIGHT_BANK_ACCOUNTS[0];
 }
 
 export function normalizeBankId(value: string | null | undefined): DayNightBankId {
   return value === "adcb" ? "adcb" : "adib";
 }
 
-export function normalizePaymentMode(value: string | null | undefined) {
+export function normalizePaymentMode(value: string | null | undefined): CustomerPaymentMode {
   const normalized = String(value || "")
     .trim()
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
   if (["bank_transfer", "online", "card", "wallet", "prepaid", "paid", "sender_pays"].includes(normalized)) {
-    return "online" as const;
+    return "online";
   }
-  return "cash" as const;
+  return "cash";
 }
 
-export function paymentModeLabel(mode: "cash" | "online", isArabic: boolean) {
+export function normalizeCustomerPaymentMode(value: string | null | undefined): CustomerPaymentMode {
+  return String(value || "").trim().toLowerCase() === "online" ? "online" : "cash";
+}
+
+export function paymentModeLabel(mode: CustomerPaymentMode, isArabic: boolean) {
   if (mode === "online") return isArabic ? "تحويل بنكي / دفع أونلاين" : "Bank transfer / online payment";
   return isArabic ? "كاش عند الاستلام" : "Cash on delivery";
+}
+
+export function buildCustomerPaymentUrl(input: {
+  orderReference?: string | null;
+  amount?: number | string | null;
+  bank?: DayNightBankId;
+  locale?: "ar" | "en";
+  mode?: CustomerPaymentMode;
+}) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://daynightae.com";
+  const params = new URLSearchParams();
+  const reference = String(input.orderReference || "").trim();
+  const amount = Number(input.amount || 0);
+  if (reference) params.set("order", reference);
+  if (Number.isFinite(amount) && amount > 0) params.set("amount", amount.toFixed(2));
+  params.set("mode", input.mode || "cash");
+  params.set("bank", input.bank || "adib");
+  params.set("lang", input.locale || "ar");
+  return `${origin}/payment?${params.toString()}`;
 }
 
 export function buildBankTransferUrl(input: {
@@ -81,15 +102,21 @@ export function buildBankTransferUrl(input: {
   bank?: DayNightBankId;
   locale?: "ar" | "en";
 }) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://daynightae.com";
-  const params = new URLSearchParams();
-  const reference = String(input.orderReference || "").trim();
+  return buildCustomerPaymentUrl({ ...input, mode: "online" });
+}
+
+export function buildCashConfirmationWhatsAppUrl(input: {
+  orderReference?: string | null;
+  amount?: number | string | null;
+  isArabic?: boolean;
+}) {
+  const reference = String(input.orderReference || "").trim() || "—";
   const amount = Number(input.amount || 0);
-  if (reference) params.set("order", reference);
-  if (Number.isFinite(amount) && amount > 0) params.set("amount", amount.toFixed(2));
-  params.set("bank", input.bank || "adib");
-  params.set("lang", input.locale || "ar");
-  return `${origin}/payment?${params.toString()}`;
+  const amountText = Number.isFinite(amount) && amount > 0 ? `${amount.toFixed(2)} AED` : "—";
+  const message = input.isArabic === false
+    ? `Hello DAY NIGHT, I confirm cash payment on delivery.\nOrder: ${reference}\nAmount: ${amountText}\nPayment method: Cash on delivery.`
+    : `السلام عليكم شركة داي نايت، أؤكد اختيار الدفع كاش عند الاستلام.\nرقم الطلب: ${reference}\nالمبلغ: ${amountText}\nطريقة الدفع: كاش عند الاستلام.`;
+  return `https://wa.me/971568757331?text=${encodeURIComponent(message)}`;
 }
 
 export function buildTransferProofWhatsAppUrl(input: {
