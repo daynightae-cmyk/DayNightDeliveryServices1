@@ -49,6 +49,8 @@ jobs:
           end = text.index(end_marker, start)
           lines = text[start:end].splitlines()
           script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
+          script = script.replace("'         merchant: selectedMerchant,'", "'merchant: selectedMerchant,'")
+          script = script.replace("'         merchant: personalOrder ? null : selectedMerchant,'", "'merchant: personalOrder ? null : selectedMerchant,'")
           Path('/tmp/day-night-personal-orders-repair.py').write_text(script, encoding='utf-8')
           PY
 
