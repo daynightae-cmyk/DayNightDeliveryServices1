@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import {
+  Banknote,
   CheckCircle2,
   ClipboardCopy,
   ExternalLink,
+  Landmark,
   MapPin,
   MessageCircle,
   Navigation,
@@ -17,24 +19,28 @@ import {
   copyPreparedWhatsApp,
   createFeedbackLinkForOrder,
   openPreparedWhatsApp,
-  prepareWhatsAppMessage,
   recordDriverContactAttempt,
   revisePreparedWhatsAppMessage,
   type MessagePresentationOptions,
   type PreparedWhatsAppMessage,
 } from "../../services/whatsappMessageService";
+import {
+  prepareDeterministicDriverWhatsApp,
+  type DriverMessageActionKey,
+  type DriverPaymentMode,
+} from "../../services/driverActionMessageService";
+import {
+  buildBankTransferUrl,
+  normalizePaymentMode,
+  type DayNightBankId,
+} from "../../config/bankTransfer";
 import { getTrackingUrl } from "../../config/companyContact";
 
 type Props = { order: DriverOrder; isArabic: boolean };
-type ActionKey =
-  | "driver_on_the_way"
-  | "driver_request_location"
-  | "driver_arrived"
-  | "driver_unreachable"
-  | "driver_delivered_feedback";
+type PaymentChoice = "recorded" | DriverPaymentMode;
 
 type MessageAction = {
-  key: ActionKey;
+  key: DriverMessageActionKey;
   ar: string;
   en: string;
   Icon: typeof Send;
@@ -88,27 +94,6 @@ function formattedAmount(amount: number, isArabic: boolean) {
   }).format(amount);
 }
 
-function ensureRecordedAmountLine(message: string, amount: number, reference: string, isArabic: boolean) {
-  if (!Number.isFinite(amount) || amount <= 0) return message;
-  const formatted = formattedAmount(amount, isArabic);
-  const western = amount.toFixed(2);
-  if (message.includes(formatted) || message.includes(western)) return message;
-
-  const amountLine = isArabic
-    ? `💰 مبلغ الشحنة المسجل: ${formatted} درهم إماراتي`
-    : `💰 Recorded shipment amount: ${formatted} AED`;
-  const lines = message.split(/\r?\n/);
-  const trackingIndex = reference
-    ? lines.findIndex((line) => line.includes(reference))
-    : -1;
-  if (trackingIndex >= 0) lines.splice(trackingIndex + 1, 0, amountLine);
-  else {
-    const firstContent = lines.findIndex((line) => line.trim().length > 0);
-    lines.splice(firstContent >= 0 ? firstContent + 1 : 0, 0, amountLine);
-  }
-  return lines.join("\n");
-}
-
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#071A33]/10 bg-white px-3 py-2 text-[10px] font-black text-[#071A33]">
@@ -123,26 +108,32 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
   const phone = useMemo(() => customerPhone(order), [order]);
   const shipmentAmount = useMemo(() => amountDue(order), [order]);
   const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
+  const recordedPaymentMode = useMemo(() => normalizePaymentMode(order.payment_method), [order.payment_method]);
+
   const [prepared, setPrepared] = useState<PreparedWhatsAppMessage | null>(null);
   const [draft, setDraft] = useState("");
-  const [preparing, setPreparing] = useState<ActionKey | "">("");
+  const [preparing, setPreparing] = useState<DriverMessageActionKey | "">("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [contactNote, setContactNote] = useState("");
   const [customNote, setCustomNote] = useState("");
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("recorded");
+  const [preferredBank, setPreferredBank] = useState<DayNightBankId>("adib");
   const [presentation, setPresentation] = useState<MessagePresentationOptions>({
-    linkLabels: true,
     includeBrandSignature: true,
     includeSlogan: true,
-    includeWebsite: false,
-    includeSupportPhone: true,
-    includeEmail: false,
     includeTrackingLink: true,
     includeFeedbackLink: true,
-    includeMerchantPortalLink: true,
+    includeSupportPhone: true,
     spacing: "comfortable",
   });
+
+  const effectivePaymentMode: DriverPaymentMode = paymentChoice === "recorded" ? recordedPaymentMode : paymentChoice;
+  const bankPaymentUrl = useMemo(
+    () => buildBankTransferUrl({ orderReference: reference, amount: shipmentAmount, bank: preferredBank, locale: isArabic ? "ar" : "en" }),
+    [isArabic, preferredBank, reference, shipmentAmount],
+  );
 
   const setOption = <K extends keyof MessagePresentationOptions>(key: K, value: MessagePresentationOptions[K]) => {
     setPresentation((current) => ({ ...current, [key]: value }));
@@ -154,15 +145,11 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
     setCopied(false);
     try {
       let feedbackUrl = "";
-      if (action.key === "driver_on_the_way" || action.key === "driver_delivered_feedback") {
-        try {
-          feedbackUrl = await createFeedbackLinkForOrder(order.id);
-        } catch (cause) {
-          if (action.key === "driver_delivered_feedback") throw cause;
-        }
+      if (action.key === "driver_delivered_feedback") {
+        feedbackUrl = await createFeedbackLinkForOrder(order.id);
       }
 
-      const result = await prepareWhatsAppMessage({
+      const result = await prepareDeterministicDriverWhatsApp({
         messageType: action.key,
         orderId: order.id,
         trackingNumber: reference,
@@ -175,23 +162,28 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         driverName: order.driver_name,
         driverPhone: order.driver_phone,
         amountDue: shipmentAmount,
-        paymentMethod: order.payment_method,
+        paymentMethod: effectivePaymentMode === "online" ? "bank_transfer" : "cash",
         pickupAddress: [order.sender_city, order.sender_address].filter(Boolean).join("، "),
         deliveryAddress: [order.receiver_city, order.receiver_address].filter(Boolean).join("، "),
         trackingUrl,
         feedbackUrl,
         orderStatus: order.status,
         locale: isArabic ? "ar" : "en",
+        paymentMode: effectivePaymentMode,
+        preferredBank,
         presentation: { ...presentation, customNote: customNote.trim() },
         metadata: {
           surface: "driver_order_card",
           action: action.key,
+          deterministicTemplate: true,
+          paymentMode: effectivePaymentMode,
+          preferredBank,
           recordedShipmentAmount: shipmentAmount,
-          amountSource: "authoritative_order_financial_fields",
         },
       });
+
       setPrepared(result);
-      setDraft(ensureRecordedAmountLine(result.message, shipmentAmount, reference, isArabic));
+      setDraft(result.message);
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "message_generation_failed";
       setError(
@@ -199,11 +191,11 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           ? code === "invalid_whatsapp_phone"
             ? "رقم هاتف العميل غير صالح لفتح واتساب. راجع بيانات الطلب أولًا."
             : code === "feedback_service_unavailable" || code === "feedback_link_not_created"
-              ? "تعذر إنشاء رابط تقييم آمن لهذا الطلب. تأكد من تطبيق تحديث قاعدة البيانات."
-              : "تعذر تجهيز الرسالة. تأكد من اكتمال بيانات الطلب وحاول مجددًا."
+              ? "تعذر إنشاء رابط التقييم الآمن لهذا الطلب."
+              : "تعذر تجهيز الرسالة المستقلة. راجع بيانات الطلب وحاول مجددًا."
           : code === "invalid_whatsapp_phone"
-            ? "The customer phone is invalid for WhatsApp. Review the order first."
-            : "The message could not be prepared. Check the order data and try again.",
+            ? "The customer phone is invalid for WhatsApp."
+            : "The action-specific message could not be prepared. Review the order and try again.",
       );
     } finally {
       setPreparing("");
@@ -211,7 +203,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
   }
 
   function finalPrepared() {
-    return prepared ? revisePreparedWhatsAppMessage(prepared, draft, { customNote: "", customClosing: "" }) : null;
+    return prepared ? revisePreparedWhatsAppMessage(prepared, draft, { customNote: "", customClosing: "", customFooter: "" }) : null;
   }
 
   async function recordUnreachable(result: "opened" | "copied") {
@@ -251,15 +243,15 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
   }
 
   return (
-    <section className="mt-4 rounded-3xl border border-[#0057B8]/20 bg-white/90 p-4 shadow-[0_18px_50px_rgba(7,26,51,0.08)]" dir={isArabic ? "rtl" : "ltr"}>
+    <section className="mt-4 rounded-3xl border border-[#0057B8]/20 bg-white/95 p-4 shadow-[0_18px_50px_rgba(7,26,51,0.08)]" dir={isArabic ? "rtl" : "ltr"}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0057B8]">DAY NIGHT SMART CONTACT</span>
           <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
             {isArabic
-              ? "تظهر الرسالة رقم الشحنة ومبلغها المسجل تلقائيًا، ويمكن تعديلها قبل الإرسال. فتح واتساب لا يغيّر حالة الطلب."
-              : "The message automatically includes the tracking number and recorded amount, and remains editable before sending. Opening WhatsApp does not change the order status."}
+              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين."
+              : "Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected."}
           </p>
         </div>
         <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
@@ -271,24 +263,46 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         </div>
       )}
 
+      <div className="mb-3 grid gap-2 rounded-2xl border border-[#0057B8]/15 bg-[#F4F8FF] p-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-[10px] font-black text-[#071A33]">
+          <span className="inline-flex items-center gap-1"><Banknote className="h-4 w-4 text-[#0057B8]" />{isArabic ? "طريقة الدفع في الرسالة" : "Payment method in message"}</span>
+          <select value={paymentChoice} onChange={(event) => setPaymentChoice(event.target.value as PaymentChoice)} className="min-h-11 rounded-xl border border-[#071A33]/10 bg-white px-3 text-xs font-black">
+            <option value="recorded">{isArabic ? `حسب الطلب (${recordedPaymentMode === "online" ? "أونلاين" : "كاش"})` : `From order (${recordedPaymentMode})`}</option>
+            <option value="cash">{isArabic ? "كاش عند الاستلام" : "Cash on delivery"}</option>
+            <option value="online">{isArabic ? "تحويل بنكي / أونلاين" : "Bank transfer / online"}</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-[10px] font-black text-[#071A33]">
+          <span className="inline-flex items-center gap-1"><Landmark className="h-4 w-4 text-[#D4AF37]" />{isArabic ? "الحساب البنكي المفضل" : "Preferred bank account"}</span>
+          <select value={preferredBank} onChange={(event) => setPreferredBank(event.target.value as DayNightBankId)} disabled={effectivePaymentMode !== "online"} className="min-h-11 rounded-xl border border-[#071A33]/10 bg-white px-3 text-xs font-black disabled:opacity-45">
+            <option value="adib">ADIB — مصرف أبوظبي الإسلامي</option>
+            <option value="adcb">ADCB — بنك أبوظبي التجاري</option>
+          </select>
+        </label>
+        {effectivePaymentMode === "online" && (
+          <a href={bankPaymentUrl} target="_blank" rel="noreferrer" className="sm:col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#071A33] px-3 text-xs font-black text-white">
+            <Landmark className="h-4 w-4 text-[#D4AF37]" />
+            {isArabic ? "معاينة صفحة التحويل التي ستصل للعميل" : "Preview customer bank-transfer page"}
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
+      </div>
+
       <button type="button" onClick={() => setOptionsOpen((value) => !value)} className="mb-3 inline-flex items-center gap-2 rounded-xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-2 text-[11px] font-black text-[#0057B8]">
         <Settings2 className="h-4 w-4" />
-        {isArabic ? "خيارات الرسالة والروابط" : "Message and link options"}
+        {isArabic ? "خيارات الرسالة" : "Message options"}
       </button>
 
       {optionsOpen && (
         <div className="mb-4 rounded-2xl border border-[#0057B8]/15 bg-[#F4F8FF] p-3">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <Toggle checked={presentation.linkLabels !== false} onChange={(value) => setOption("linkLabels", value)} label={isArabic ? "اسم الرابط فوق الرابط" : "Named links"} />
             <Toggle checked={presentation.includeTrackingLink !== false} onChange={(value) => setOption("includeTrackingLink", value)} label={isArabic ? "رابط التتبع" : "Tracking link"} />
             <Toggle checked={presentation.includeFeedbackLink !== false} onChange={(value) => setOption("includeFeedbackLink", value)} label={isArabic ? "رابط التقييم" : "Feedback link"} />
-            <Toggle checked={presentation.includeSupportPhone === true} onChange={(value) => setOption("includeSupportPhone", value)} label={isArabic ? "رقم خدمة العملاء" : "Support phone"} />
-            <Toggle checked={presentation.includeWebsite === true} onChange={(value) => setOption("includeWebsite", value)} label={isArabic ? "الموقع الرسمي" : "Official website"} />
             <Toggle checked={presentation.includeBrandSignature !== false} onChange={(value) => setOption("includeBrandSignature", value)} label={isArabic ? "توقيع داي نايت" : "DAY NIGHT signature"} />
           </div>
           <label className="mt-3 block text-[11px] font-black text-[#071A33]">
             {isArabic ? "ملاحظة خاصة يضيفها المندوب" : "Driver note added to this message"}
-            <textarea value={customNote} onChange={(event) => setCustomNote(event.target.value)} rows={2} maxLength={600} className="mt-2 w-full rounded-xl border border-[#071A33]/10 bg-white p-3 text-sm font-medium leading-6" placeholder={isArabic ? "مثال: سأصل خلال عشر دقائق، يرجى تجهيز المبلغ." : "Example: I will arrive in ten minutes; please prepare the amount."} />
+            <textarea value={customNote} onChange={(event) => setCustomNote(event.target.value)} rows={2} maxLength={600} className="mt-2 w-full rounded-xl border border-[#071A33]/10 bg-white p-3 text-sm font-medium leading-6" placeholder={isArabic ? "مثال: سأصل خلال عشر دقائق." : "Example: I will arrive in ten minutes."} />
           </label>
         </div>
       )}
@@ -298,7 +312,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           <button key={action.key} type="button" disabled={Boolean(preparing)} onClick={() => void prepare({ Icon, ...action })} className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition disabled:opacity-50 ${action.tone === "warning" ? "border-amber-400/35 bg-amber-50 text-amber-900" : action.tone === "success" ? "border-emerald-500/30 bg-emerald-50 text-emerald-900" : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"}`}>
             <Icon className="mb-2 h-5 w-5" />
             <span>{isArabic ? action.ar : action.en}</span>
-            {preparing === action.key && <small className="mt-2 block opacity-60">{isArabic ? "جارٍ التجهيز…" : "Preparing…"}</small>}
+            {preparing === action.key && <small className="mt-2 block opacity-60">{isArabic ? "جارٍ تجهيز القالب الخاص…" : "Preparing this action…"}</small>}
           </button>
         ))}
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone} className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-xs font-black text-[#071A33] aria-disabled:pointer-events-none aria-disabled:opacity-45">
@@ -323,7 +337,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#25D366]">WhatsApp preview</span>
-                <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "معاينة وتعديل الرسالة" : "Preview and edit message"}</h4>
+                <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "معاينة القالب الخاص بهذا الزر" : "Preview this action-specific message"}</h4>
                 <p className="mt-1 text-xs text-[#52627A]" dir="ltr">{prepared.phone}</p>
               </div>
               <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-full bg-[#071A33]/5 p-2"><X className="h-5 w-5" /></button>
