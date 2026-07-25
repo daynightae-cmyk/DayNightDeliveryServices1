@@ -1,7 +1,10 @@
 import { supabase } from "../supabase";
 import type { Order } from "../types";
 import { isPersonalAdminOrder } from "./adminOrderLogic";
-import { PERSONAL_ORDER_DELIVERY_FEE, calculatePersonalOrderFinancials } from "./personalOrderOperations";
+import {
+  PERSONAL_ORDER_DELIVERY_FEE,
+  calculatePersonalOrderFinancials,
+} from "./personalOrderOperations";
 import {
   calculateFinancialOpsOrder,
   updateFinancialOpsOrder,
@@ -15,6 +18,8 @@ export type AdminOrderEditSaveResult = {
 };
 
 const clean = (value: unknown) => String(value ?? "").trim();
+const ORDERS_SCHEMA_COLUMN_RE =
+  /Could not find the '([^']+)' column of 'orders' in the schema cache/i;
 
 function errorDetail(error: unknown) {
   const record = error as {
@@ -30,17 +35,36 @@ function errorDetail(error: unknown) {
     .join(" | ");
 }
 
+function missingOrdersSchemaColumn(error: unknown) {
+  return errorDetail(error).match(ORDERS_SCHEMA_COLUMN_RE)?.[1] || "";
+}
+
+function withoutPatchColumn(patch: Record<string, unknown>, column: string) {
+  const next = { ...patch };
+  delete next[column];
+  return next;
+}
+
 function isMissingFinancialUpdateRuntime(error: unknown) {
   const detail = errorDetail(error).toLowerCase();
-  if (/not_authorized|permission denied|row-level security|financials_locked|delivered settlements are locked/.test(detail)) {
+  if (
+    /not_authorized|permission denied|row-level security|financials_locked|delivered settlements are locked/.test(
+      detail,
+    )
+  ) {
     return false;
   }
-  return /admin_update_order_with_financials|pgrst202|schema cache|could not find the function|function .* does not exist|migration/.test(detail);
+  return /admin_update_order_with_financials|pgrst202|schema cache|could not find the function|function .* does not exist|migration/.test(
+    detail,
+  );
 }
 
 function financialsAreLocked(order: Order) {
   const status = clean(order.status).toLowerCase().replace(/[\s-]+/g, "_");
-  return Boolean(order.financial_posted_at) || ["delivered", "completed", "complete"].includes(status);
+  return (
+    Boolean(order.financial_posted_at) ||
+    ["delivered", "completed", "complete"].includes(status)
+  );
 }
 
 function uniqueAddress(parts: unknown[]) {
@@ -58,7 +82,9 @@ function uniqueAddress(parts: unknown[]) {
 function normalizedPaymentMethod(value: unknown) {
   const normalized = clean(value || "cod").toLowerCase();
   if (normalized === "merchant_pays") return "sender_pays";
-  if (["sender_pays", "receiver_pays", "cod", "prepaid"].includes(normalized)) return normalized;
+  if (["sender_pays", "receiver_pays", "cod", "prepaid"].includes(normalized)) {
+    return normalized;
+  }
   return "cod";
 }
 
@@ -69,7 +95,9 @@ function corePatch(input: FinancialOpsOrderUpdateInput) {
   const receiverCity = isInternational
     ? clean(input.destination_country || input.delivery_city || "WORLD")
     : clean(input.delivery_city || "Abu Dhabi");
-  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const packageValue = clean(
+    input.package_description || input.package_type || "Shipment",
+  );
   const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
   const notes = clean(input.notes);
   const editReason = clean(input.edit_reason || "Updated from admin order editor");
@@ -102,7 +130,9 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
   const receiverCity = isInternational
     ? clean(input.destination_country || input.delivery_city || "WORLD")
     : clean(input.delivery_city || "Abu Dhabi");
-  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const packageValue = clean(
+    input.package_description || input.package_type || "Shipment",
+  );
   const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
   const notes = clean(input.notes);
   const editReason = clean(input.edit_reason || "Updated from admin order editor");
@@ -153,7 +183,8 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
     total_price: financials.customerTotal,
     amount: financials.customerTotal,
     price: financials.customerTotal,
-    manual_delivery_price: financials.priceSource === "manual" ? financials.deliveryFee : null,
+    manual_delivery_price:
+      financials.priceSource === "manual" ? financials.deliveryFee : null,
     price_source: financials.priceSource,
     currency: "AED",
     notes: [notes, `Admin edit: ${editReason}`].filter(Boolean).join(" | "),
@@ -162,11 +193,10 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
 }
 
 function personalCorePatch(input: FinancialOpsOrderUpdateInput) {
-  const isInternational = input.shipping_scope === "international";
-  const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
-    : clean(input.delivery_city || "Abu Dhabi");
-  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const receiverCity = clean(input.delivery_city || "Abu Dhabi");
+  const packageValue = clean(
+    input.package_description || input.package_type || "Shipment",
+  );
   const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
   return {
     merchant_id: null,
@@ -176,17 +206,31 @@ function personalCorePatch(input: FinancialOpsOrderUpdateInput) {
     sender_name: clean(input.sender_name || input.order.sender_name),
     sender_phone: clean(input.sender_phone || input.order.sender_phone),
     sender_city: clean(input.pickup_city || input.order.sender_city || "Abu Dhabi"),
-    sender_address: uniqueAddress([input.pickup_area, input.pickup_street, input.order.sender_address]),
+    sender_address: uniqueAddress([
+      input.pickup_area,
+      input.pickup_street,
+      input.order.sender_address,
+    ]),
     receiver_name: clean(input.receiver_name),
     receiver_phone: clean(input.receiver_phone),
     receiver_city: receiverCity,
-    receiver_address: uniqueAddress([input.delivery_area, input.delivery_street, input.receiver_address]),
+    receiver_address: uniqueAddress([
+      input.delivery_area,
+      input.delivery_street,
+      input.receiver_address,
+    ]),
+    coupon_number: clean(input.coupon_number) || null,
     package_type: packageValue,
     package_description: packageValue,
     weight: Math.max(0.1, Number(input.weight || 1)),
     pieces: count,
     order_count: count,
-    notes: [clean(input.notes), `Admin edit: ${clean(input.edit_reason || "Updated personal order")}`].filter(Boolean).join(" | "),
+    notes: [
+      clean(input.notes),
+      `Admin edit: ${clean(input.edit_reason || "Updated personal order")}`,
+    ]
+      .filter(Boolean)
+      .join(" | "),
     updated_at: new Date().toISOString(),
   };
 }
@@ -198,7 +242,8 @@ function personalFullPatch(input: FinancialOpsOrderUpdateInput) {
     discountAmount: input.discount_amount,
     deliveryFee: PERSONAL_ORDER_DELIVERY_FEE,
   });
-  const paymentMethod = normalizedPaymentMethod(input.payment_method) === "sender_pays" ? "prepaid" : normalizedPaymentMethod(input.payment_method);
+  const normalized = normalizedPaymentMethod(input.payment_method);
+  const paymentMethod = normalized === "sender_pays" ? "prepaid" : normalized;
   return {
     ...core,
     shipping_scope: "local",
@@ -220,29 +265,67 @@ function personalFullPatch(input: FinancialOpsOrderUpdateInput) {
     total_price: financials.customerTotal,
     amount: financials.customerTotal,
     price: financials.customerTotal,
-    manual_delivery_price: null,
-    price_source: "system",
     currency: "AED",
   };
+}
+
+async function updateByColumn(
+  column: string,
+  value: string,
+  patch: Record<string, unknown>,
+  strict: boolean,
+): Promise<Order | null> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  let compatiblePatch = { ...patch };
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    if (!Object.keys(compatiblePatch).length) {
+      throw new Error("order_update_patch_became_empty");
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .update(compatiblePatch)
+      .eq(column, value)
+      .select("*")
+      .limit(1);
+
+    if (!error && data?.[0]?.id) return data[0] as Order;
+
+    if (error) {
+      const missingColumn = missingOrdersSchemaColumn(error);
+      if (
+        missingColumn &&
+        Object.prototype.hasOwnProperty.call(compatiblePatch, missingColumn)
+      ) {
+        console.warn(
+          `[DAY NIGHT] Retrying order edit without unavailable orders.${missingColumn}`,
+        );
+        compatiblePatch = withoutPatchColumn(compatiblePatch, missingColumn);
+        continue;
+      }
+
+      if (strict) {
+        throw new Error(errorDetail(error) || "order_update_failed");
+      }
+    }
+
+    return null;
+  }
+
+  throw new Error("order_update_schema_compatibility_retry_limit");
 }
 
 async function updateWithPatch(
   input: FinancialOpsOrderUpdateInput,
   patch: Record<string, unknown>,
 ): Promise<Order> {
-  if (!supabase) throw new Error("Supabase is not configured.");
   const orderId = clean(input.order.id);
 
   if (orderId) {
-    const { data, error } = await supabase
-      .from("orders")
-      .update(patch)
-      .eq("id", orderId)
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    if (!data?.id) throw new Error("order_update_verification_failed");
-    return data as Order;
+    const row = await updateByColumn("id", orderId, patch, true);
+    if (!row?.id) throw new Error("order_update_verification_failed");
+    return row;
   }
 
   const reference = clean(
@@ -253,13 +336,8 @@ async function updateWithPatch(
   if (!reference) throw new Error("order_reference_required");
 
   for (const column of ["tracking_number", "invoice_number", "coupon_number"]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .update(patch)
-      .eq(column, reference)
-      .select("*")
-      .limit(1);
-    if (!error && data?.[0]?.id) return data[0] as Order;
+    const row = await updateByColumn(column, reference, patch, false);
+    if (row?.id) return row;
   }
   throw new Error("order_update_verification_failed");
 }
@@ -269,7 +347,10 @@ export async function saveAdminOrderEdit(
 ): Promise<AdminOrderEditSaveResult> {
   if (isPersonalAdminOrder(input.order)) {
     const locked = financialsAreLocked(input.order);
-    const row = await updateWithPatch(input, locked ? personalCorePatch(input) : personalFullPatch(input));
+    const row = await updateWithPatch(
+      input,
+      locked ? personalCorePatch(input) : personalFullPatch(input),
+    );
     return { row, source: "db", financialsLocked: locked };
   }
 
