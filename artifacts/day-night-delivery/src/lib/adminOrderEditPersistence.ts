@@ -58,7 +58,7 @@ function uniqueAddress(parts: unknown[]) {
 function normalizedPaymentMethod(value: unknown) {
   const normalized = clean(value || "cod").toLowerCase();
   if (normalized === "merchant_pays") return "sender_pays";
-  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) return normalized;
+  if (["sender_pays", "receiver_pays", "cod", "prepaid"].includes(normalized)) return normalized;
   return "cod";
 }
 

@@ -251,12 +251,21 @@ function FinancialMetric`,
           : order.payment_method || "cod",`,
           "edit form selects merchant account for merchant-paid orders",
         );
-        code = replaceRequired(
-          code,
-          '    price_mode: manual ? "manual" : "system",',
-          '    price_mode: manual && !(finance.goodsValue === 0 && currentPrice <= 0) ? "manual" : "system",',
-          "edit form rejects zero manual delivery pricing",
-        );
+        if (code.includes('    price_mode: personal ? "system" : manual ? "manual" : "system",')) {
+          code = replaceRequired(
+            code,
+            '    price_mode: personal ? "system" : manual ? "manual" : "system",',
+            '    price_mode: personal ? "system" : manual && !(finance.goodsValue === 0 && currentPrice <= 0) ? "manual" : "system",',
+            "edit personal order form rejects zero manual delivery pricing",
+          );
+        } else {
+          code = replaceRequired(
+            code,
+            '    price_mode: manual ? "manual" : "system",',
+            '    price_mode: manual && !(finance.goodsValue === 0 && currentPrice <= 0) ? "manual" : "system",',
+            "edit form rejects zero manual delivery pricing",
+          );
+        }
         code = replaceRequired(
           code,
           /  function setField<K extends keyof FinancialOpsOrderInput>\(key: K, value: FinancialOpsOrderInput\[K\]\) \{[\s\S]*?\n  \}\n\n  function chooseMerchant/,
@@ -340,18 +349,22 @@ function FinancialMetric`,
                   />`,
           "edit settlement wording and signed amount",
         );
-        code = replaceRequired(
-          code,
-          '                    ? "تحديث الطلب الآن"',
-          '                    ? "حفظ التحديث الآن"',
-          "Arabic update button label",
-        );
-        code = replaceRequired(
-          code,
-          '                    : "Update order now"}',
-          '                    : "Save order updates"}',
-          "English update button label",
-        );
+        if (!code.includes('? "حفظ التعديلات الآن"')) {
+          code = replaceRequired(
+            code,
+            '                    ? "تحديث الطلب الآن"',
+            '                    ? "حفظ التحديث الآن"',
+            "Arabic update button label",
+          );
+        }
+        if (!code.includes(': "Save changes now"}')) {
+          code = replaceRequired(
+            code,
+            '                    : "Update order now"}',
+            '                    : "Save order updates"}',
+            "English update button label",
+          );
+        }
         return { code, map: null };
       }
 
