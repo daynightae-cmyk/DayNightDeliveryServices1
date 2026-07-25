@@ -1,79 +1,118 @@
 name: Production Gate
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    branches: [main]
-    types: [opened, synchronize]
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: production-gate-repair-${{ github.ref }}
+  group: production-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  protected-repair:
-    name: Apply order controls and personal orders repair
-    if: github.head_ref == 'fix/order-save-bulk-export-personal-orders' && github.actor != 'github-actions[bot]'
+  day-night-web:
+    name: DAY NIGHT web validation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repair branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
+    timeout-minutes: 25
 
-      - name: Execute protected repair and push real files
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          workflow=.github/workflows/apply-personal-orders-admin-repair.yml
-          if [ ! -f "$workflow" ]; then
-            echo "Repair source already consumed."
-            exit 0
-          fi
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee pnpm-install.log
 
-          python3 - <<'PY'
-          from pathlib import Path
-          workflow = Path('.github/workflows/apply-personal-orders-admin-repair.yml')
-          text = workflow.read_text(encoding='utf-8')
-          start_marker = "          python3 - <<'PY'\n"
-          end_marker = "\n          PY\n"
-          start = text.index(start_marker) + len(start_marker)
-          end = text.index(end_marker, start)
-          lines = text[start:end].splitlines()
-          script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
-          original_helper = "def replace_once(text, old, new, label):\n    count = text.count(old)\n    if count != 1:\n        raise SystemExit(f'{label}: expected 1 match, found {count}')\n    return text.replace(old, new, 1)\n"
-          hardened_helper = "def replace_once(text, old, new, label):\n    count = text.count(old)\n    if count == 1:\n        return text.replace(old, new, 1)\n    if label == 'personal coupon optional field':\n        pattern = r'(value=\\{form\\.coupon_number \\|\\| \"\"\\}[\\s\\S]{0,260}?)required(\\s+dir=\"ltr\")'\n        next_text, replaced = re.subn(pattern, r'\\1required={!personalOrder}\\2', text, count=1)\n        if replaced == 1:\n            return next_text\n    if label == 'add personal gate to production gate':\n        anchor = text.find('\\\"production:gate\\\"')\n        index = text.find(old, anchor) if anchor >= 0 else -1\n        if index >= 0:\n            return text[:index] + new + text[index + len(old):]\n    raise SystemExit(f'{label}: expected 1 match, found {count}')\n"
-          if original_helper not in script:
-              raise SystemExit('replace_once helper contract not found')
-          script = script.replace(original_helper, hardened_helper, 1)
-          script = script.replace("'         merchant: selectedMerchant,'", "'merchant: selectedMerchant,'")
-          script = script.replace("'         merchant: personalOrder ? null : selectedMerchant,'", "'merchant: personalOrder ? null : selectedMerchant,'")
-          Path('/tmp/day-night-personal-orders-repair.py').write_text(script, encoding='utf-8')
-          PY
+      - name: Upload pnpm install diagnostics
+        if: steps.install.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-install-diagnostic
+          path: pnpm-install.log
+          if-no-files-found: error
+          retention-days: 7
 
-          set +e
-          python3 /tmp/day-night-personal-orders-repair.py > repair-error.txt 2>&1
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            cat repair-error.txt
-            git config user.name "DAY NIGHT Production Repair"
-            git config user.email "daynight.ae@gmail.com"
-            git add repair-error.txt
-            git commit -m "Record personal orders repair failure"
-            git push origin HEAD:${{ github.head_ref }}
-            exit "$status"
-          fi
+      - name: Fail when dependency installation failed
+        if: steps.install.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "pnpm installation failed. Last 140 log lines:"
+          tail -n 140 pnpm-install.log
+          exit 1
 
-          rm -f repair-error.txt
-          rm -f artifacts/day-night-delivery/public/personal-orders-repair-trigger.txt
-          git checkout origin/main -- .github/workflows/production-gate.yml
-          git config user.name "DAY NIGHT Production Repair"
-          git config user.email "daynight.ae@gmail.com"
-          git add -A
-          git commit -m "Fix order editing, bulk export, and personal orders"
-          git push origin HEAD:${{ github.head_ref }}
+      - name: TypeScript check
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:typecheck 2>&1 | tee typescript-check.log
+
+      - name: Upload TypeScript diagnostics
+        if: steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-check-diagnostic
+          path: typescript-check.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when TypeScript validation failed
+        if: steps.typecheck.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "TypeScript validation failed. Last 180 log lines:"
+          tail -n 180 typescript-check.log
+          exit 1
+
+      - name: Production hardening gate
+        id: production_gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:gate 2>&1 | tee production-gate.log
+
+      - name: Upload production gate diagnostics
+        if: steps.production_gate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-gate-diagnostic
+          path: production-gate.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail when production gate failed
+        if: steps.production_gate.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Production gate failed. Last 220 log lines:"
+          tail -n 220 production-gate.log
+          exit 1
+
+      - name: Build production app
+        run: pnpm run web:build

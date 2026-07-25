@@ -14,6 +14,7 @@ const SCOPE_TTL_MS = 60_000;
 
 const ORDER_SECTIONS = new Set([
   "all_orders",
+  "personal_orders",
   "cancelled",
   "review",
   "postponed",
@@ -278,7 +279,7 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     return visibleSectionOrders.filter((order) => selected.has(orderId(order)));
   }, [selectedOrderIds, visibleSectionOrders]);
 
-  const workspaceOrders = selectedOrders.length ? selectedOrders : filteredOrders;
+  const workspaceOrders = filteredOrders;
   const showBulkConsole = ORDER_SECTIONS.has(props.id);
 
   return (
@@ -326,6 +327,7 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
       {showBulkConsole && (
         <div className="mb-4">
           <AdminOrderBulkOperations
+            sectionId={props.id}
             isArabic={props.isArabic}
             orders={visibleSectionOrders}
             merchants={props.merchants}

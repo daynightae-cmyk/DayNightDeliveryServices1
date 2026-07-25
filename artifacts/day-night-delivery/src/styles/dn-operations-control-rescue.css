@@ -263,3 +263,39 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Order editor must remain inside the viewport and expose save actions at all times. */
+.dn-admin-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  padding: 12px !important;
+}
+.dn-admin-action-modal {
+  width: min(1180px, calc(100vw - 24px)) !important;
+  height: min(94dvh, 980px) !important;
+  max-height: 94dvh !important;
+  margin: 0 !important;
+}
+.dn-admin-action-modal > header,
+.dn-admin-action-modal > footer {
+  position: relative !important;
+  z-index: 50 !important;
+  flex: 0 0 auto !important;
+}
+.dn-admin-action-modal > footer {
+  position: sticky !important;
+  bottom: 0 !important;
+}
+.dn-admin-bulk-selector[open] > summary {
+  border-bottom: 1px solid rgba(99, 179, 237, 0.2);
+}
+@media (max-width: 640px) {
+  .dn-admin-modal-backdrop { padding: 0 !important; align-items: stretch !important; }
+  .dn-admin-action-modal { width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; }
+}

@@ -59,6 +59,7 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: LayoutDashboard },
   { id: "live_drivers", ar: "المندوبون المباشرون", en: "Live Drivers", groupAr: "التوزيع", groupEn: "Dispatch", Icon: Truck },
   { id: "new_order", ar: "إضافة طلب جديد", en: "New Order", groupAr: "العمليات", groupEn: "Operations", Icon: PackagePlus },
+  { id: "personal_orders", ar: "الطلبيات الشخصية", en: "Personal Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: PackagePlus },
   { id: "new_merchant", ar: "إضافة تاجر", en: "New Merchant", groupAr: "العمليات", groupEn: "Operations", Icon: UserRoundPlus },
   { id: "merchants", ar: "التجار", en: "Merchants", groupAr: "العمليات", groupEn: "Operations", Icon: Store },
   { id: "new_employee", ar: "إضافة موظف", en: "Add Employee", groupAr: "الموارد البشرية", groupEn: "Human Resources", Icon: UserRoundPlus },

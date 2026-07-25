@@ -24,6 +24,7 @@ import AdminFinanceOperationsCenter from "./AdminFinanceOperationsCenter";
 import { AdminEmptyState, AdminIconBadge, AdminStateChip, type AdminIconName, type AdminIconTone } from "./adminIconSystem";
 import AdminLiveOperationsMap from "./AdminLiveOperationsMap";
 import AdminOrderDeleteModal from "./AdminOrderDeleteModal";
+import AdminPersonalOrderForm from "./AdminPersonalOrderForm";
 import AdminOrderEditModal from "./AdminOrderEditModal";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import { adminSectionById, type AdminSectionId } from "./AdminSectionRegistry";
@@ -428,6 +429,15 @@ export default function AdminSectionWorkspaceComplete({
       </header>
 
       {id === "dashboard" && <AdminLiveOperationsMap isArabic={isArabic} orders={liveOrders} />}
+      {id === "personal_orders" && (
+        <AdminPersonalOrderForm
+          isArabic={isArabic}
+          onSaved={async () => {
+            setNotice(isArabic ? "تم إنشاء الطلب الشخصي وتحديث القائمة." : "Personal order created and list refreshed.");
+            await refresh();
+          }}
+        />
+      )}
       {financeWarning && (
         <p className="dn-clean-note">
           {isArabic
@@ -508,7 +518,7 @@ export default function AdminSectionWorkspaceComplete({
               <tr>
                 <th>{isArabic ? "التتبع والكوبون" : "Tracking / coupon"}</th>
                 <th>{isArabic ? "الحالة" : "Status"}</th>
-                <th>{isArabic ? "التاجر والعميل" : "Merchant / customer"}</th>
+                <th>{id === "personal_orders" ? (isArabic ? "المرسل والمستلم" : "Sender / recipient") : (isArabic ? "التاجر والعميل" : "Merchant / customer")}</th>
                 <th>{isArabic ? "المسار" : "Route"}</th>
                 <th>{isArabic ? "تفصيل الحساب" : "Financial breakdown"}</th>
                 <th>{isArabic ? "إدارة الطلب" : "Actions"}</th>

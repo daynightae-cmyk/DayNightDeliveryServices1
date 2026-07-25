@@ -1,0 +1,46 @@
+import fs from "node:fs";
+import path from "node:path";
+const root = process.cwd();
+let failed = false;
+const read = (relative, repo = false) => {
+  const file = path.resolve(repo ? root + "/../.." : root, relative);
+  if (!fs.existsSync(file)) { console.error(`FAIL missing ${relative}`); failed = true; return ""; }
+  return fs.readFileSync(file, "utf8");
+};
+const expect = (content, pattern, label) => { if (!pattern.test(content)) { console.error(`FAIL ${label}`); failed = true; } else console.log(`PASS ${label}`); };
+const reject = (content, pattern, label) => { if (pattern.test(content)) { console.error(`FAIL ${label}`); failed = true; } else console.log(`PASS ${label}`); };
+
+const modal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
+expect(modal, /حفظ التعديلات/, "edit modal has visible save action");
+expect(modal, /h-\[94dvh\]/, "edit modal is viewport constrained");
+expect(modal, /personalOrder[\s\S]*merchant: personalOrder \? null/, "personal edit saves without merchant");
+const persistence = read("src/lib/adminOrderEditPersistence.ts");
+expect(persistence, /isPersonalAdminOrder[\s\S]*personalFullPatch/, "personal edit persistence bypasses merchant requirement");
+const bulk = read("src/components/admin/AdminOrderBulkOperations.tsx");
+expect(bulk, /تحديد الطلبات والتصدير الجماعي/, "bulk selector is generic and visible");
+expect(bulk, /تصدير كل النتائج PDF/, "all visible results export exists");
+expect(bulk, /<details[^>]+open>/, "order selector stays open");
+reject(bulk, /طلبات التجار المحددة/, "bulk export is not merchant-only");
+const workspace = read("src/components/admin/AdminSectionWorkspace.tsx");
+expect(workspace, /sectionId=\{props\.id\}/, "bulk export receives section identity");
+expect(workspace, /const workspaceOrders = filteredOrders/, "selection no longer hides unselected rows");
+const personal = read("src/components/admin/AdminPersonalOrderForm.tsx");
+expect(personal, /إنشاء طلب شخصي بدون تاجر/, "personal order form is present");
+expect(personal, /25\.00 AED/, "personal order UI shows fixed 25 AED");
+const operations = read("src/lib/personalOrderOperations.ts");
+expect(operations, /PERSONAL_ORDER_DELIVERY_FEE = 25/, "personal order runtime fixes fee at 25");
+expect(operations, /merchant_id: null/, "personal order has no merchant linkage");
+expect(operations, /admin_create_personal_order/, "personal order uses protected RPC");
+const logic = read("src/lib/adminOrderLogic.ts");
+expect(logic, /isPersonalAdminOrder/, "personal orders have explicit detection");
+expect(logic, /sectionId === "personal_orders"/, "personal section filters only personal rows");
+const registry = read("src/components/admin/AdminSectionRegistry.ts");
+expect(registry, /"personal_orders","الطلبيات الشخصية"/, "personal section is registered");
+const command = read("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
+expect(command, /id: "personal_orders"/, "personal section appears in command center");
+const migration = read("supabase/migrations/20260725043000_admin_personal_orders_fixed25.sql", true);
+expect(migration, /admin_create_personal_order/, "personal order RPC migration exists");
+expect(migration, /v_delivery numeric\(14,2\) := 25/, "database enforces 25 AED delivery");
+expect(migration, /'merchant_id', null/, "database enforces null merchant");
+if (failed) process.exit(1);
+console.log("DAY NIGHT personal orders and admin controls gate PASSED");

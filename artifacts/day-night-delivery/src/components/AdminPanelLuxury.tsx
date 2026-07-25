@@ -121,6 +121,14 @@ const menu = [
     Icon: PackagePlus,
   },
   {
+    id: "personal_orders",
+    ar: "الطلبيات الشخصية",
+    en: "Personal Orders",
+    groupAr: "الطلبات",
+    groupEn: "Orders",
+    Icon: PackagePlus,
+  },
+  {
     id: "new_merchant",
     ar: "إضافة تاجر",
     en: "New Merchant",
