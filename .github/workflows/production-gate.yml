@@ -52,7 +52,21 @@ jobs:
           Path('/tmp/day-night-personal-orders-repair.py').write_text(script, encoding='utf-8')
           PY
 
-          python3 /tmp/day-night-personal-orders-repair.py
+          set +e
+          python3 /tmp/day-night-personal-orders-repair.py > repair-error.txt 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            cat repair-error.txt
+            git config user.name "DAY NIGHT Production Repair"
+            git config user.email "daynight.ae@gmail.com"
+            git add repair-error.txt
+            git commit -m "Record personal orders repair failure"
+            git push origin HEAD:${{ github.head_ref }}
+            exit "$status"
+          fi
+
+          rm -f repair-error.txt
           rm -f artifacts/day-night-delivery/public/personal-orders-repair-trigger.txt
           git checkout origin/main -- .github/workflows/production-gate.yml
           git config user.name "DAY NIGHT Production Repair"
