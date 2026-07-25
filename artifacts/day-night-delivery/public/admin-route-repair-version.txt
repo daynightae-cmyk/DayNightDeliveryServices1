@@ -1,0 +1,5 @@
+DAY NIGHT admin route and messaging repair
+Canonical employee routes: /admin?hr=new and /admin?hr=employees
+Canonical Message Center route: /admin?cx=messages
+Driver WhatsApp action templates: distinct with duplicate/corruption fallback
+Generated: 2026-07-25

@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type { AdminSectionId } from "../AdminSectionRegistry";
 
-export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees";
+export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees" | "customer_experience";
 
 export type AdminCommandMenuItem = {
   id: AdminCommandSectionId;

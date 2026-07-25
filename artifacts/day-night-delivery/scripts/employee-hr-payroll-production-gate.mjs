@@ -54,8 +54,8 @@ expect(launcher, /EmployeePayrollStatementActions/, "Employee card mounts premiu
 expect(commandCenter, /id:\s*"new_employee"[\s\S]*ar:\s*"إضافة موظف"/, "Add employee is a native command-center menu item");
 expect(commandCenter, /id:\s*"employees"[\s\S]*ar:\s*"الموظفون"/, "Employee directory is a native command-center menu item");
 expect(commandCenter, /groupAr:\s*"الموارد البشرية"/, "Employee menu has a permanent HR group");
-expect(commandCenter, /navigateRouter\(path\)[\s\S]*announceEmployeePath/, "Native employee menu opens the real employee route");
-expect(commandShell, /AdminCommandSectionId\s*=\s*AdminSectionId\s*\|\s*"new_employee"\s*\|\s*"employees"/, "Command shell recognizes permanent employee sections");
+expect(commandCenter, /employeeRouteFor[\s\S]*announceEmployeeRoute/, "Native employee menu opens the canonical registered admin route");
+expect(commandShell, /AdminCommandSectionId[\s\S]*"new_employee"[\s\S]*"employees"/, "Command shell recognizes permanent employee sections");
 expect(commandShell, /data-dn-command-section=\{item\.id\}/, "Native command items expose stable section markers");
 reject(launcher, /selector:\s*"\.dncc-navigation"/, "Employee links are no longer injected dynamically into command navigation");
 expect(center, /محاسب|Accountant/, "Employee types include accountant");
@@ -89,7 +89,10 @@ expect(pdfExport, /تاريخ الراتب الأساسي|Base salary history/, 
 expect(pdfExport, /الخصومات والسلف|Deductions & advances/, "PDF summarizes deductions and advances");
 expect(pdfExport, /اعتماد الإدارة|Management approval/, "PDF includes management and employee signature areas");
 expect(pdfExport, /createEmployeePayrollPdfBlob/, "PDF generator supports sharing as a real file");
-expect(main, /AdminEmployeeLauncher/, "Employee launcher mounts globally and on direct admin routes");
+expect(main, /AdminEmployeeLauncher/, "Employee launcher mounts globally");
+expect(main, /normalizeLegacyAdminFeaturePath[\s\S]*hr\", \"new\"[\s\S]*hr\", \"employees\"/, "Legacy employee URLs normalize to canonical admin query routes");
+expect(commandCenter, /NEW_EMPLOYEE_ROUTE = \"\/admin\?hr=new\"[\s\S]*EMPLOYEES_ROUTE = \"\/admin\?hr=employees\"/, "Employee command items remain inside the registered admin route");
+expect(launcher, /routeFromEventDetail/, "Employee launcher normalizes semantic and legacy navigation events");
 expect(migration, /create table if not exists public\.employees/, "Employee directory table exists");
 expect(migration, /create table if not exists public\.employee_salary_history/, "Salary history table exists");
 expect(migration, /create table if not exists public\.employee_payroll_entries/, "Payroll entry table exists");

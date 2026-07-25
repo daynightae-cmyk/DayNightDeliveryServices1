@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPinned,
+  MessageSquareWarning,
   PackagePlus,
   Printer,
   ReceiptText,
@@ -46,8 +47,13 @@ import AdminCommandCenterShell, {
 import "../../../styles/dn-admin-command-center-v1.css";
 
 const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
-const NEW_EMPLOYEE_PATH = "/admin/new-employee";
-const EMPLOYEES_PATH = "/admin/employees";
+const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
+const LEGACY_NEW_EMPLOYEE_PATH = "/admin/new-employee";
+const LEGACY_EMPLOYEES_PATH = "/admin/employees";
+const LEGACY_CUSTOMER_EXPERIENCE_PATH = "/admin/customer-experience";
+const NEW_EMPLOYEE_ROUTE = "/admin?hr=new";
+const EMPLOYEES_ROUTE = "/admin?hr=employees";
+const CUSTOMER_EXPERIENCE_ROUTE = "/admin?cx=messages";
 
 const menu: readonly AdminCommandMenuItem[] = [
   { id: "dashboard", ar: "لوحة التحكم", en: "Dashboard", groupAr: "القيادة", groupEn: "Command", Icon: LayoutDashboard },
@@ -62,6 +68,7 @@ const menu: readonly AdminCommandMenuItem[] = [
   { id: "review", ar: "الطلبات قيد المراجعة", en: "Under Review", groupAr: "الطلبات", groupEn: "Orders", Icon: SearchCheck },
   { id: "postponed", ar: "الطلبات المؤجلة", en: "Postponed Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: CalendarClock },
   { id: "returned", ar: "الطلبات الراجعة", en: "Returned Orders", groupAr: "الطلبات", groupEn: "Orders", Icon: RotateCcw },
+  { id: "customer_experience", ar: "مركز الرسائل", en: "Message Center", groupAr: "تجربة العملاء", groupEn: "Customer Experience", Icon: MessageSquareWarning },
   { id: "pickup", ar: "الطلبات قيد الإحضار", en: "Pickup Orders", groupAr: "التوزيع", groupEn: "Dispatch", Icon: Truck },
   { id: "abu_dhabi", ar: "طلبات أبوظبي", en: "Abu Dhabi Orders", groupAr: "التوزيع", groupEn: "Dispatch", Icon: MapPinned },
   { id: "external", ar: "الطلبات الدولية", en: "International Orders", groupAr: "التوزيع", groupEn: "Dispatch", Icon: Globe2 },
@@ -89,10 +96,14 @@ function pathname() {
   return window.location.pathname.replace(/\/+$/, "") || "/";
 }
 
-function employeeSectionFromPath(): "new_employee" | "employees" | null {
+function specialSectionFromLocation(): "new_employee" | "employees" | "customer_experience" | null {
+  const url = new URL(window.location.href);
   const path = pathname();
-  if (path === NEW_EMPLOYEE_PATH) return "new_employee";
-  if (path === EMPLOYEES_PATH) return "employees";
+  const hr = url.searchParams.get("hr");
+  const customerExperience = url.searchParams.get("cx");
+  if (path === LEGACY_NEW_EMPLOYEE_PATH || (path === "/admin" && hr === "new")) return "new_employee";
+  if (path === LEGACY_EMPLOYEES_PATH || (path === "/admin" && hr === "employees")) return "employees";
+  if (path === LEGACY_CUSTOMER_EXPERIENCE_PATH || (path === "/admin" && customerExperience === "messages")) return "customer_experience";
   return null;
 }
 
@@ -100,16 +111,31 @@ function isEmployeeSection(id: AdminCommandSectionId): id is "new_employee" | "e
   return id === "new_employee" || id === "employees";
 }
 
+function isCustomerExperienceSection(id: AdminCommandSectionId): id is "customer_experience" {
+  return id === "customer_experience";
+}
+
+function isSpecialSection(id: AdminCommandSectionId) {
+  return isEmployeeSection(id) || isCustomerExperienceSection(id);
+}
+
 function isLegacySection(id: AdminCommandSectionId): id is AdminSectionId {
-  return !isEmployeeSection(id);
+  return !isSpecialSection(id);
 }
 
-function employeePathFor(id: "new_employee" | "employees") {
-  return id === "new_employee" ? NEW_EMPLOYEE_PATH : EMPLOYEES_PATH;
+function employeeRouteFor(id: "new_employee" | "employees") {
+  return id === "new_employee" ? NEW_EMPLOYEE_ROUTE : EMPLOYEES_ROUTE;
 }
 
-function announceEmployeePath(path: string) {
-  window.dispatchEvent(new CustomEvent<string>(EMPLOYEE_PATH_EVENT, { detail: path }));
+function announceEmployeeRoute(id: "new_employee" | "employees" | null) {
+  const detail = id === "new_employee" ? "employee:new" : id === "employees" ? "employee:directory" : "/admin";
+  window.dispatchEvent(new CustomEvent<string>(EMPLOYEE_PATH_EVENT, { detail }));
+}
+
+function announceCustomerExperienceRoute(active: boolean) {
+  window.dispatchEvent(new CustomEvent<string>(CUSTOMER_EXPERIENCE_PATH_EVENT, {
+    detail: active ? CUSTOMER_EXPERIENCE_ROUTE : "/admin",
+  }));
 }
 
 function normalizeMenuText(value: unknown) {
@@ -163,7 +189,7 @@ export default function AdminPanelCommandCenter() {
   const navigateRouter = useNavigate();
   const { language, toggleLanguage, theme, toggleTheme } = useAppContext();
   const isArabic = language === "ar";
-  const [active, setActive] = useState<AdminCommandSectionId>(() => employeeSectionFromPath() ?? "dashboard");
+  const [active, setActive] = useState<AdminCommandSectionId>(() => specialSectionFromLocation() ?? "dashboard");
   const [operatorLabel, setOperatorLabel] = useState("DAY NIGHT Operations Admin");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -236,29 +262,26 @@ export default function AdminPanelCommandCenter() {
   }, []);
 
   useEffect(() => {
-    const syncRoute = () => {
-      const employeeSection = employeeSectionFromPath();
-      if (employeeSection) setActive(employeeSection);
-    };
-    const syncCustom = (event: Event) => {
-      const path = (event as CustomEvent<string>).detail || pathname();
-      if (path === NEW_EMPLOYEE_PATH) setActive("new_employee");
-      else if (path === EMPLOYEES_PATH) setActive("employees");
-    };
-    window.addEventListener("popstate", syncRoute);
-    window.addEventListener(EMPLOYEE_PATH_EVENT, syncCustom);
-    syncRoute();
-    return () => {
-      window.removeEventListener("popstate", syncRoute);
-      window.removeEventListener(EMPLOYEE_PATH_EVENT, syncCustom);
-    };
-  }, []);
+  const syncRoute = () => {
+    const section = specialSectionFromLocation();
+    if (section) setActive(section);
+  };
+  window.addEventListener("popstate", syncRoute);
+  window.addEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+  window.addEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+  syncRoute();
+  return () => {
+    window.removeEventListener("popstate", syncRoute);
+    window.removeEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+    window.removeEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+  };
+}, []);
 
-  useEffect(() => {
-    const syncFromLegacyPanel = () => {
-      const employeeSection = employeeSectionFromPath();
-      if (employeeSection) {
-        setActive(employeeSection);
+useEffect(() => {
+  const syncFromLegacyPanel = () => {
+      const specialSection = specialSectionFromLocation();
+      if (specialSection) {
+        setActive(specialSection);
       } else {
         const selectedButton = legacySidebarButtons().find((button) => button.classList.contains("is-active")) ?? null;
         const selectedItem = menuItemFromLegacyButton(selectedButton);
@@ -277,29 +300,37 @@ export default function AdminPanelCommandCenter() {
   }, []);
 
   const navigate = (id: AdminCommandSectionId) => {
-    if (isEmployeeSection(id)) {
-      const path = employeePathFor(id);
-      navigateRouter(path);
-      setActive(id);
-      window.setTimeout(() => announceEmployeePath(path), 0);
-      return;
-    }
-
-    const button = legacySidebarButtonFor(id);
-    const currentEmployeeSection = employeeSectionFromPath();
-    if (currentEmployeeSection) {
-      navigateRouter("/admin");
-      announceEmployeePath("/admin");
-      window.setTimeout(() => button?.click(), 0);
-    } else if (button) {
-      button.click();
-    } else if (id === "logout") {
-      navigateRouter("/auth");
-    }
+  if (isEmployeeSection(id)) {
+    navigateRouter(employeeRouteFor(id));
     setActive(id);
-  };
+    window.setTimeout(() => announceEmployeeRoute(id), 0);
+    return;
+  }
 
-  const selectSearchItem = (item: AdminCommandSearchItem) => {
+  if (isCustomerExperienceSection(id)) {
+    navigateRouter(CUSTOMER_EXPERIENCE_ROUTE);
+    setActive(id);
+    window.setTimeout(() => announceCustomerExperienceRoute(true), 0);
+    return;
+  }
+
+  if (!isLegacySection(id)) return;
+  const button = legacySidebarButtonFor(id);
+  const currentSpecialSection = specialSectionFromLocation();
+  if (currentSpecialSection) {
+    navigateRouter("/admin");
+    announceEmployeeRoute(null);
+    announceCustomerExperienceRoute(false);
+    window.setTimeout(() => button?.click(), 0);
+  } else if (button) {
+    button.click();
+  } else if (id === "logout") {
+    navigateRouter("/auth");
+  }
+  setActive(id);
+};
+
+const selectSearchItem = (item: AdminCommandSearchItem) => {
     navigate(item.sectionId);
     if (item.kind === "order") applyWorkspaceSearch(item.labelEn);
   };

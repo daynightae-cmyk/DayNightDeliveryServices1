@@ -44,6 +44,14 @@ function modeFromRoute(route: EmployeeRouteState | string): EmployeeCenterMode |
   return null;
 }
 
+function routeFromEventDetail(detail: string | undefined): EmployeeRouteState | string {
+  const value = String(detail || "").trim();
+  if (value === NEW_EMPLOYEE_ROUTE || value === EMPLOYEES_ROUTE || value === ADMIN_PATH) return value;
+  if (value === LEGACY_NEW_EMPLOYEE_PATH || value.includes("hr=new")) return NEW_EMPLOYEE_ROUTE;
+  if (value === LEGACY_EMPLOYEES_PATH || value.includes("hr=employees")) return EMPLOYEES_ROUTE;
+  return routeState();
+}
+
 function replaceRoute(route: EmployeeRouteState) {
   const url = new URL(window.location.href);
   url.pathname = ADMIN_PATH;
@@ -144,7 +152,7 @@ export default function AdminEmployeeLauncher() {
 
   useEffect(() => {
     const sync = () => setRoute(routeState());
-    const custom = (event: Event) => setRoute((event as CustomEvent<EmployeeRouteState>).detail || routeState());
+    const custom = (event: Event) => setRoute(routeFromEventDetail((event as CustomEvent<string>).detail));
     window.addEventListener("popstate", sync);
     window.addEventListener(EMPLOYEE_PATH_EVENT, custom);
     return () => {

@@ -120,6 +120,23 @@ for (const value of [
   "window.confirm",
 ]) requireText(adminActions, value, "AdminCustomerExperienceActions.tsx");
 
+const launcher = requireFile("src/components/admin/AdminCustomerExperienceLauncher.tsx");
+for (const value of [
+  "AdminCustomerExperiencePage",
+  "AdminCustomerExperienceActions",
+  "AdminMessageControlCenter",
+  'url.searchParams.get("cx") === "messages"',
+  "dn-customer-experience-path",
+]) requireText(launcher, value, "AdminCustomerExperienceLauncher.tsx");
+
+const commandCenter = requireFile("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
+for (const value of [
+  'id: "customer_experience"',
+  'ar: "مركز الرسائل"',
+  'CUSTOMER_EXPERIENCE_ROUTE = "/admin?cx=messages"',
+  "announceCustomerExperienceRoute",
+]) requireText(commandCenter, value, "AdminPanelCommandCenter.tsx");
+
 const merchantFeedback = requireFile("src/components/merchant/MerchantFeedbackSummaryLauncher.tsx");
 for (const value of [
   "merchant_order_feedback",
@@ -130,13 +147,14 @@ for (const value of [
 const main = requireFile("src/main.tsx");
 for (const value of [
   "FeedbackPage",
-  "AdminCustomerExperiencePage",
-  "AdminCustomerExperienceActions",
+  "AdminCustomerExperienceLauncher",
   "MerchantFeedbackSummaryLauncher",
-  "ProtectedAdminRoute",
   "WhatsAppRuntimeGuard",
   "normalizeTrackingNumberQuery",
+  "normalizeLegacyAdminFeaturePath",
+  'url.searchParams.set("cx", "messages")',
 ]) requireText(main, value, "main.tsx");
+rejectText(main, 'if (/^\\/admin\\/(?:customer-experience|new-employee|employees)', "main.tsx");
 
 const migrationPath = path.resolve(root, "../../supabase/migrations/20260723140000_smart_whatsapp_feedback_complaints.sql");
 const migration = fs.readFileSync(migrationPath, "utf8");

@@ -26,12 +26,25 @@ expect(driverContact,/order\.cod_amount[\s\S]*order\.customer_total[\s\S]*order\
 expect(driverContact,/مبلغ الشحنة المسجل|Recorded shipment amount/,"Driver UI clearly previews the recorded shipment amount");
 expect(driverContact,/recordedShipmentAmount/,"Outbound-message metadata records the shipment amount used");
 expect(whatsappService,/https:\/\/wa\.me\/|buildWhatsAppUrl/,"Central service produces a prefilled WhatsApp URL");
+expect(whatsappService,/DRIVER_TEMPLATE_KEYS/,"Driver actions have an explicit template-key set");
+expect(whatsappService,/normalizeTemplateFingerprint[\s\S]*duplicated/,"Duplicated database driver templates are rejected");
+expect(whatsappService,/containsCorruptedTemplateText/,"Corrupted database templates fall back safely");
+expect(whatsappService,/activeDriverTemplateBody/,"Each driver action resolves through the action-specific template guard");
 
 const messageLauncher=read("src/components/admin/AdminCustomerExperienceLauncher.tsx");
 expect(messageLauncher,/مركز الرسائل|Message Center/,"Admin navigation exposes a permanent Message Center");
 expect(messageLauncher,/dn-customer-experience-native-section/,"Message Center owns a stable native admin navigation section");
 expect(messageLauncher,/AdminMessageControlCenter/,"Message Center mounts the operational message-control workspace");
-expect(messageLauncher,/ensureLegacyTarget/,"Message Center no longer depends solely on a returned-order button injection");
+expect(messageLauncher,/ensureLegacyTarget/,"Message Center preserves legacy sidebar compatibility");
+expect(messageLauncher,/cx\"\) === \"messages\"|searchParams\.get\(\"cx\"\)/,"Message Center recognizes its canonical admin query route");
+reject(messageLauncher,/querySelectorAll<HTMLElement>\(\"\.dncc-navigation\"\)/,"Message Center is not injected dynamically into command navigation");
+const commandCenter=read("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
+const commandShell=read("src/components/admin/command-center/AdminCommandCenterShell.tsx");
+const mainEntry=read("src/main.tsx");
+expect(commandCenter,/id:\s*\"customer_experience\"[\s\S]*مركز الرسائل/,"Message Center is a native permanent command item");
+expect(commandCenter,/CUSTOMER_EXPERIENCE_ROUTE = \"\/admin\?cx=messages\"/,"Message Center uses the registered admin route");
+expect(commandShell,/\"customer_experience\"/,"Command shell recognizes Message Center");
+expect(mainEntry,/normalizeLegacyAdminFeaturePath/,"Legacy direct admin feature URLs are normalized before mounting");
 expect(messageLauncher,/heading && heading\.textContent !== nextHeading/,"Message Center changes injected headings only when their text actually changes");
 expect(messageLauncher,/requestAnimationFrame[\s\S]*scheduleSync/,"Admin DOM synchronization is coalesced to one animation frame");
 expect(messageLauncher,/cancelAnimationFrame/,"Admin DOM synchronization cancels pending work during cleanup");

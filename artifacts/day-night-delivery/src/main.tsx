@@ -61,6 +61,32 @@ function normalizeTrackingNumberQuery() {
   window.history.replaceState({}, "", url);
 }
 
+function normalizeLegacyAdminFeaturePath() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  let changed = false;
+
+  if (path === "/admin/new-employee") {
+    url.pathname = "/admin";
+    url.search = "";
+    url.searchParams.set("hr", "new");
+    changed = true;
+  } else if (path === "/admin/employees") {
+    url.pathname = "/admin";
+    url.search = "";
+    url.searchParams.set("hr", "employees");
+    changed = true;
+  } else if (path === "/admin/customer-experience") {
+    url.pathname = "/admin";
+    url.search = "";
+    url.searchParams.set("cx", "messages");
+    changed = true;
+  }
+
+  if (changed) window.history.replaceState(window.history.state, "", url);
+}
+
 function installGlobalRuntimeHandlers() {
   if (typeof window === "undefined") return;
   initializeDayNightNativeRuntime();
@@ -150,35 +176,13 @@ async function mountStandaloneAdminFeatures() {
     return true;
   }
 
-  if (/^\/admin\/(?:customer-experience|new-employee|employees)\/?$/i.test(pathname)) {
-    // AdminCustomerExperiencePage and AdminCustomerExperienceActions remain mounted by
-    // AdminCustomerExperienceLauncher inside the authenticated admin workspace.
-    const [{ default: AdminPanelLuxury }, { default: ProtectedAdminRoute }] = await Promise.all([
-      import("./components/AdminPanelLuxury"),
-      import("./components/ProtectedAdminRoute"),
-    ]);
-    createRoot(rootElement()).render(
-      <StrictMode>
-        <BrowserRouter>
-          <AppProvider>
-            <ProtectedAdminRoute>
-              <AdminPanelLuxury />
-            </ProtectedAdminRoute>
-            <AdminCustomerExperienceLauncher />
-            <AdminEmployeeLauncher />
-            <WhatsAppRuntimeGuard />
-          </AppProvider>
-        </BrowserRouter>
-      </StrictMode>,
-    );
-    return true;
-  }
 
   return false;
 }
 
 async function bootstrapApplication() {
   normalizeTrackingNumberQuery();
+  normalizeLegacyAdminFeaturePath();
   installGlobalRuntimeHandlers();
   try {
     if (await mountStandaloneAdminFeatures()) return;
