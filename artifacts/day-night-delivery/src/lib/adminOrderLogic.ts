@@ -17,6 +17,7 @@ export type CanonicalOrderStatus =
 
 export type AdminOrderBucket =
   | "all_orders"
+  | "personal_orders"
   | "cancelled"
   | "review"
   | "postponed"
@@ -150,6 +151,18 @@ function locationText(order: OrderLike) {
   ].join(" ");
 }
 
+export function isPersonalAdminOrder(order: Order) {
+  const o = order as OrderLike;
+  const source = normalizeAdminKey(o.source_channel);
+  const orderType = normalizeAdminKey(o.order_type || o.order_kind);
+  return (
+    source === "admin_personal_order" ||
+    source === "personal_order" ||
+    orderType === "personal" ||
+    orderType === "personal_order"
+  );
+}
+
 export function isInternationalAdminOrder(order: Order) {
   const o = order as OrderLike;
   const scope = normalizeAdminKey(
@@ -183,6 +196,7 @@ export function matchesAdminSection(
   sectionId: AdminSectionId | AdminOrderBucket,
 ) {
   if (["all_orders", "reports", "print"].includes(sectionId)) return true;
+  if (sectionId === "personal_orders") return isPersonalAdminOrder(order);
   const status = normalizeOrderStatus(order);
   if (sectionId === "cancelled") return status === "cancelled";
   if (sectionId === "review") return status === "review";
@@ -199,6 +213,7 @@ export function matchesAdminSection(
 export function buildAdminSectionStats(orders: Order[]): AdminSectionStats {
   return {
     all_orders: orders.length,
+    personal_orders: orders.filter((order) => isPersonalAdminOrder(order)).length,
     cancelled: orders.filter((order) => matchesAdminSection(order, "cancelled"))
       .length,
     review: orders.filter((order) => matchesAdminSection(order, "review"))

@@ -36,6 +36,8 @@ export type OpsOrderInput = {
   merchant_id?: string;
   merchant_name?: string;
   merchant_code?: string;
+  sender_name?: string;
+  sender_phone?: string;
   coupon_number?: string;
   shipping_scope: "local" | "international";
   order_count: number;

@@ -24,6 +24,8 @@ import {
   getDefaultAreaForEmirate,
 } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
+import { isPersonalAdminOrder } from "../../lib/adminOrderLogic";
+import { PERSONAL_ORDER_DELIVERY_FEE, calculatePersonalOrderFinancials } from "../../lib/personalOrderOperations";
 
 type Props = {
   order: Order | null;
@@ -55,6 +57,7 @@ function merchantOptionLabel(merchant: Merchant) {
 }
 
 function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInput {
+  const personal = isPersonalAdminOrder(order);
   const merchant = merchants.find((item) => item.id === order.merchant_id) || null;
   const currentPrice = Number(order.delivery_fee || order.delivery_price || order.price || 0);
   const manual = order.price_source === "manual" || Number(order.manual_delivery_price || 0) > 0;
@@ -66,6 +69,8 @@ function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInpu
     merchant_id: order.merchant_id || "",
     merchant_name: order.merchant_name || merchant?.trade_name || order.sender_name || "",
     merchant_code: order.merchant_code || merchant?.merchant_code || "",
+    sender_name: order.sender_name || "",
+    sender_phone: order.sender_phone || "",
     coupon_number: order.coupon_number || "",
     shipping_scope: order.shipping_scope === "international" ? "international" : "local",
     order_count: Math.max(1, Number(order.order_count || order.pieces || 1)),
@@ -86,11 +91,11 @@ function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInpu
     cod_amount: numberOrBlank(order.cod_amount),
     notes: order.notes || "",
     status: order.status || "pending",
-    price_mode: manual ? "manual" : "system",
-    manual_delivery_price: manual ? currentPrice : "",
+    price_mode: personal ? "system" : manual ? "manual" : "system",
+    manual_delivery_price: personal ? "" : manual ? currentPrice : "",
     goods_value: finance.goodsValue,
     discount_amount: finance.discountAmount,
-    delivery_fee_mode: finance.deliveryFeeMode,
+    delivery_fee_mode: personal ? "customer_pays" : finance.deliveryFeeMode,
   };
 }
 
@@ -122,6 +127,7 @@ export default function AdminOrderEditModalComplete({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const personalOrder = Boolean(order && isPersonalAdminOrder(order));
 
   useEffect(() => {
     if (!open || !order) return;
@@ -141,12 +147,21 @@ export default function AdminOrderEditModalComplete({
     [form?.delivery_city],
   );
   const pricing = useMemo(
-    () => (form ? calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }) : null),
-    [form, selectedMerchant],
+    () => (form && !personalOrder ? calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }) : null),
+    [form, personalOrder, selectedMerchant],
   );
+  const activeDeliveryFee = personalOrder ? PERSONAL_ORDER_DELIVERY_FEE : pricing?.total ?? 0;
   const financials = useMemo(() => {
-    if (!form || !pricing) return null;
+    if (!form) return null;
     try {
+      if (personalOrder) {
+        return calculatePersonalOrderFinancials({
+goodsValue: form.goods_value,
+discountAmount: form.discount_amount,
+deliveryFee: PERSONAL_ORDER_DELIVERY_FEE,
+        });
+      }
+      if (!pricing) return null;
       return calculateOrderFinancials({
         goodsValue: form.goods_value,
         deliveryFee: pricing.total,
@@ -156,7 +171,7 @@ export default function AdminOrderEditModalComplete({
     } catch {
       return null;
     }
-  }, [form, pricing]);
+  }, [form, personalOrder, pricing]);
 
   if (!open || !order || !form) return null;
   const currentOrder = order;
@@ -192,8 +207,8 @@ export default function AdminOrderEditModalComplete({
 
   function validate() {
     const missing = [
-      !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !clean(currentForm.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
+      !personalOrder && !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
+      !personalOrder && !clean(currentForm.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
       !clean(currentForm.receiver_name) ? (isArabic ? "اسم العميل" : "customer name") : "",
       !clean(currentForm.receiver_phone) ? (isArabic ? "هاتف العميل" : "customer phone") : "",
       currentForm.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
@@ -204,14 +219,14 @@ export default function AdminOrderEditModalComplete({
         : `Required fields: ${missing.join(", ")}`;
     }
     if (
-      currentForm.price_mode === "manual" &&
+      !personalOrder && currentForm.price_mode === "manual" &&
       (currentForm.manual_delivery_price === "" || Number(currentForm.manual_delivery_price) < 0)
     ) {
       return isArabic ? "أدخل رسوم توصيل يدوية صحيحة." : "Enter a valid manual delivery fee.";
     }
     const financeError = orderFinancialValidation({
       goodsValue: currentForm.goods_value,
-      deliveryFee: pricing?.total,
+      deliveryFee: activeDeliveryFee,
       discountAmount: currentForm.discount_amount,
       deliveryFeeMode: currentForm.delivery_fee_mode,
     });
@@ -243,7 +258,7 @@ export default function AdminOrderEditModalComplete({
       const result = await saveAdminOrderEdit({
         ...currentForm,
         coupon_number: clean(currentForm.coupon_number),
-        merchant: selectedMerchant,
+        merchant: personalOrder ? null : selectedMerchant,
         receiver_address: clean(currentForm.receiver_address),
         delivery_street: clean(currentForm.delivery_street),
         package_type: packageValue,
@@ -284,7 +299,7 @@ export default function AdminOrderEditModalComplete({
   return (
     <div className="dn-admin-modal-backdrop" role="dialog" aria-modal="true" dir={isArabic ? "rtl" : "ltr"}>
       <form
-        className="dn-admin-action-modal flex max-h-[94vh] !max-w-6xl flex-col overflow-hidden"
+        className="dn-admin-action-modal flex h-[94dvh] max-h-[94dvh] !max-w-6xl flex-col overflow-hidden"
         onSubmit={save}
       >
         <header className="shrink-0">
@@ -292,9 +307,15 @@ export default function AdminOrderEditModalComplete({
             <span>{isArabic ? "تعديل بيانات الطلب والحساب" : "Edit order and financials"}</span>
             <strong>{orderReference(order)}</strong>
           </div>
-          <button type="button" onClick={onClose} aria-label={isArabic ? "إغلاق" : "Close"}>
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="submit" disabled={busy || !financials} className="!inline-flex !items-center !gap-2 !bg-brand-gold !text-brand-deep disabled:opacity-40">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {busy ? (isArabic ? "جارٍ الحفظ..." : "Saving...") : (isArabic ? "حفظ التعديلات" : "Save changes")}
+            </button>
+            <button type="button" onClick={onClose} aria-label={isArabic ? "إغلاق" : "Close"}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 pt-2 sm:px-2">
@@ -324,15 +345,15 @@ export default function AdminOrderEditModalComplete({
                 {isArabic ? "بيانات الطلب الأساسية" : "Core order details"}
               </h3>
               <label className="block space-y-1 text-xs font-black text-white/65">
-                <span>{isArabic ? "التاجر *" : "Merchant *"}</span>
+                <span>{personalOrder ? (isArabic ? "نوع الطلب" : "Order type") : (isArabic ? "التاجر *" : "Merchant *")}</span>
                 <select
                   value={form.merchant_id || ""}
                   onChange={(event) => chooseMerchant(event.target.value)}
                   className={inputClass()}
-                  required
-                  disabled={financialLocked}
+                  required={!personalOrder}
+                  disabled={financialLocked || personalOrder}
                 >
-                  <option value="">{isArabic ? "اختر التاجر" : "Select merchant"}</option>
+                  <option value="">{personalOrder ? (isArabic ? "طلب شخصي بدون تاجر" : "Personal order without merchant") : (isArabic ? "اختر التاجر" : "Select merchant")}</option>
                   {merchants.map((merchant) => (
                     <option key={merchant.id} value={merchant.id}>
                       {merchantOptionLabel(merchant)}
@@ -346,7 +367,7 @@ export default function AdminOrderEditModalComplete({
                   value={form.coupon_number || ""}
                   onChange={(event) => setField("coupon_number", event.target.value)}
                   className={inputClass()}
-                  required
+                  required={!personalOrder}
                   dir="ltr"
                   disabled={financialLocked}
                 />
@@ -484,7 +505,7 @@ export default function AdminOrderEditModalComplete({
                     className="rounded-xl border border-brand-sky/25 bg-brand-sky/8 px-3 py-3 text-sm font-black text-brand-sky"
                     dir="ltr"
                   >
-                    {pricing?.total.toFixed(2)} AED
+                    {activeDeliveryFee.toFixed(2)} AED
                   </div>
                 </label>
               </div>
@@ -572,7 +593,8 @@ export default function AdminOrderEditModalComplete({
               >
                 <option value="cod">{isArabic ? "تحصيل من العميل عند التسليم" : "Collect on delivery"}</option>
                 <option value="receiver_pays">{isArabic ? "مدفوع من المستلم" : "Receiver paid"}</option>
-                <option value="merchant_pays">{isArabic ? "على حساب التاجر" : "Merchant account"}</option>
+                {!personalOrder && <option value="merchant_pays">{isArabic ? "على حساب التاجر" : "Merchant account"}</option>}
+                {personalOrder && <option value="prepaid">{isArabic ? "مدفوع مسبقًا" : "Prepaid"}</option>}
               </select>
             </section>
           </div>
@@ -631,8 +653,8 @@ export default function AdminOrderEditModalComplete({
                     ? "جارٍ تحديث الطلب..."
                     : "Updating order..."
                   : isArabic
-                    ? "تحديث الطلب الآن"
-                    : "Update order now"}
+                    ? "حفظ التعديلات الآن"
+                    : "Save changes now"}
               </button>
             </div>
           </div>

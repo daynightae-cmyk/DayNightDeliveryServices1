@@ -1,5 +1,7 @@
 import { supabase } from "../supabase";
 import type { Order } from "../types";
+import { isPersonalAdminOrder } from "./adminOrderLogic";
+import { PERSONAL_ORDER_DELIVERY_FEE, calculatePersonalOrderFinancials } from "./personalOrderOperations";
 import {
   calculateFinancialOpsOrder,
   updateFinancialOpsOrder,
@@ -56,7 +58,7 @@ function uniqueAddress(parts: unknown[]) {
 function normalizedPaymentMethod(value: unknown) {
   const normalized = clean(value || "cod").toLowerCase();
   if (normalized === "merchant_pays") return "sender_pays";
-  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) return normalized;
+  if (["sender_pays", "receiver_pays", "cod", "prepaid"].includes(normalized)) return normalized;
   return "cod";
 }
 
@@ -159,6 +161,71 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
   };
 }
 
+function personalCorePatch(input: FinancialOpsOrderUpdateInput) {
+  const isInternational = input.shipping_scope === "international";
+  const receiverCity = isInternational
+    ? clean(input.destination_country || input.delivery_city || "WORLD")
+    : clean(input.delivery_city || "Abu Dhabi");
+  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
+  return {
+    merchant_id: null,
+    merchant_name: null,
+    merchant_code: null,
+    source_channel: "admin_personal_order",
+    sender_name: clean(input.sender_name || input.order.sender_name),
+    sender_phone: clean(input.sender_phone || input.order.sender_phone),
+    sender_city: clean(input.pickup_city || input.order.sender_city || "Abu Dhabi"),
+    sender_address: uniqueAddress([input.pickup_area, input.pickup_street, input.order.sender_address]),
+    receiver_name: clean(input.receiver_name),
+    receiver_phone: clean(input.receiver_phone),
+    receiver_city: receiverCity,
+    receiver_address: uniqueAddress([input.delivery_area, input.delivery_street, input.receiver_address]),
+    package_type: packageValue,
+    package_description: packageValue,
+    weight: Math.max(0.1, Number(input.weight || 1)),
+    pieces: count,
+    order_count: count,
+    notes: [clean(input.notes), `Admin edit: ${clean(input.edit_reason || "Updated personal order")}`].filter(Boolean).join(" | "),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function personalFullPatch(input: FinancialOpsOrderUpdateInput) {
+  const core = personalCorePatch(input);
+  const financials = calculatePersonalOrderFinancials({
+    goodsValue: input.goods_value,
+    discountAmount: input.discount_amount,
+    deliveryFee: PERSONAL_ORDER_DELIVERY_FEE,
+  });
+  const paymentMethod = normalizedPaymentMethod(input.payment_method) === "sender_pays" ? "prepaid" : normalizedPaymentMethod(input.payment_method);
+  return {
+    ...core,
+    shipping_scope: "local",
+    destination_country: null,
+    service_type: "standard",
+    payment_method: paymentMethod,
+    cod_amount: paymentMethod === "cod" ? financials.customerTotal : 0,
+    goods_value: financials.goodsValue,
+    delivery_fee: PERSONAL_ORDER_DELIVERY_FEE,
+    discount_amount: financials.discountAmount,
+    delivery_fee_mode: "customer_pays",
+    customer_total: financials.customerTotal,
+    merchant_due: 0,
+    company_revenue: PERSONAL_ORDER_DELIVERY_FEE,
+    delivery_price: PERSONAL_ORDER_DELIVERY_FEE,
+    base_price: PERSONAL_ORDER_DELIVERY_FEE,
+    subtotal: financials.customerTotal,
+    total: financials.customerTotal,
+    total_price: financials.customerTotal,
+    amount: financials.customerTotal,
+    price: financials.customerTotal,
+    manual_delivery_price: null,
+    price_source: "system",
+    currency: "AED",
+  };
+}
+
 async function updateWithPatch(
   input: FinancialOpsOrderUpdateInput,
   patch: Record<string, unknown>,
@@ -200,6 +267,12 @@ async function updateWithPatch(
 export async function saveAdminOrderEdit(
   input: FinancialOpsOrderUpdateInput,
 ): Promise<AdminOrderEditSaveResult> {
+  if (isPersonalAdminOrder(input.order)) {
+    const locked = financialsAreLocked(input.order);
+    const row = await updateWithPatch(input, locked ? personalCorePatch(input) : personalFullPatch(input));
+    return { row, source: "db", financialsLocked: locked };
+  }
+
   if (financialsAreLocked(input.order)) {
     const row = await updateWithPatch(input, corePatch(input));
     return { row, source: "db", financialsLocked: true };

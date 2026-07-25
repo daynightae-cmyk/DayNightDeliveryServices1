@@ -56,6 +56,9 @@ export interface Order {
   shipping_scope?: "local" | "international" | string;
   destination_country?: string;
   source_channel?: string;
+  source_domain?: string;
+  order_type?: string;
+  order_kind?: string;
   sender_name: string;
   sender_phone: string;
   sender_email?: string;
