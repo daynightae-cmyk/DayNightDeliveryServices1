@@ -2,3 +2,4 @@ DAY NIGHT PERSONAL ORDERS ADMIN
 Fixed delivery fee: 25 AED
 Features: visible edit save, bulk selection/export, personal orders without merchant
 Release validation: 2026-07-25
+Validation round: final after Vite transform alignment
