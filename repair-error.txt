@@ -1,1 +1,1 @@
-save personal without merchant: expected 1 match, found 0
+personal coupon optional field: expected 1 match, found 0
