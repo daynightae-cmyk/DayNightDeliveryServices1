@@ -51,10 +51,13 @@ if (/value: ["']accepted["']/.test(driver)) {
 expect(driver, /requiresNote: true/, "Risk/closure driver actions require an operational note");
 
 const driverContact = read("src/components/driver/DriverCustomerCommunication.tsx");
+const deterministicDriverMessages = read("src/services/driverActionMessageService.ts");
 const messageService = read("src/services/whatsappMessageService.ts");
 const messageTemplates = read("src/config/messageTemplates.ts");
 expect(driver, /DriverCustomerCommunication/, "Driver card mounts the centralized customer communication console");
-expect(driverContact, /prepareWhatsAppMessage/, "Driver WhatsApp action is generated through the central message service");
+expect(driverContact, /prepareDeterministicDriverWhatsApp/, "Driver UI uses the deterministic per-action message layer");
+expect(deterministicDriverMessages, /prepareWhatsAppMessage/, "Deterministic driver messages still use the central message service for recipients and logging");
+expect(deterministicDriverMessages, /revisePreparedWhatsAppMessage/, "The action-specific body replaces stale database template content safely");
 expect(driverContact, /openPreparedWhatsApp/, "Driver WhatsApp action opens only a prepared non-empty message");
 expect(messageService, /buildWhatsAppUrl/, "Central message service creates encoded wa.me links");
 expect(messageTemplates, /مع حضرتك \{driver_name\}، مندوب شركة داي نايت/, "Driver customer message carries the DAY NIGHT professional identity");
@@ -106,7 +109,7 @@ if (/(?:PRICE|Price|price|سعر|درهم|AED).{0,55}\b30\b|\b30\b.{0,55}(?:PRIC
   console.log("PASS: all customer-facing local price paths are clear of 30 AED");
 }
 
-const combined = `${bulk}\n${workspace}\n${driver}\n${driverContact}\n${messageService}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
+const combined = `${bulk}\n${workspace}\n${driver}\n${driverContact}\n${deterministicDriverMessages}\n${messageService}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
 if (/Math\.random|demoOrders|mockOrders|localStorage\.setItem\([^)]*order/i.test(combined)) {
   console.error("FAIL: operational controls contain mock/random/local order persistence");
   failed = true;
