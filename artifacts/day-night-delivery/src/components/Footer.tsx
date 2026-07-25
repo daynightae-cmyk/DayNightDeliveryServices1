@@ -33,6 +33,7 @@ export default function Footer() {
     { label: isArabic ? "الشركات والعقود" : "Corporate & Contracts", path: "/corporate" },
     { label: isArabic ? "اطلب توصيل" : "Request Delivery", path: "/request" },
     { label: isArabic ? "تتبع شحنتك" : "Track Shipment", path: "/tracking" },
+    { label: isArabic ? "الدفع والتحويل البنكي" : "Bank Transfer & Payment", path: "/payment" },
     { label: isArabic ? "خدمات QR الذكية" : "QR Services", path: "/qr" },
   ];
 
@@ -45,6 +46,7 @@ export default function Footer() {
 
   const supportLinks = [
     { label: isArabic ? "الأسعار والحاسبة" : "Pricing & Calculator", path: "/pricing", route: true },
+    { label: isArabic ? "الدفع أونلاين وحسابات الشركة" : "Online Payment & Company Accounts", path: "/payment", route: true },
     { label: isArabic ? "سياسة الخدمة" : "Service Policy", path: "/policy", route: true },
     { label: isArabic ? "سياسة الخصوصية" : "Privacy Policy", path: "/privacy", route: true },
     { label: isArabic ? "الشروط والأحكام" : "Terms & Conditions", path: "/terms", route: true },
