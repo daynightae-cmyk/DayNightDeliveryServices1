@@ -52,18 +52,22 @@ export function normalizeDeliveryFeeMode(value: unknown): DeliveryFeeMode {
 
 /**
  * DAY NIGHT accounting rule:
- * A merchant order with zero goods/customer value and a positive delivery fee
- * is always charged to the merchant. The operator does not need to choose the
- * fee mode manually, and the order can never appear as "due to merchant 0".
+ *
+ * The settlement owner is explicit. A zero goods value does not, by itself,
+ * decide who pays delivery:
+ * - customer_pays: the delivery fee is added to the customer total;
+ * - deduct_from_merchant: the customer pays no delivery and the fee becomes a
+ *   signed negative merchant liability.
+ *
+ * The admin pricing layer converts an explicitly entered zero delivery price
+ * into the official system fee and selects deduct_from_merchant. This core
+ * calculator then applies that resolved mode without silently changing it.
  */
 export function resolveDeliveryFeeMode(
-  goodsValue: unknown,
-  deliveryFee: unknown,
+  _goodsValue: unknown,
+  _deliveryFee: unknown,
   requestedMode: unknown,
 ): DeliveryFeeMode {
-  const goods = roundMoney(Math.max(0, financialNumber(goodsValue, 0)));
-  const fee = roundMoney(Math.max(0, financialNumber(deliveryFee, 0)));
-  if (goods === 0 && fee > 0) return "deduct_from_merchant";
   return normalizeDeliveryFeeMode(requestedMode);
 }
 
