@@ -73,8 +73,8 @@ export function adminStepUpRulePlugin(): Plugin {
         );
         code = replaceRequired(
           code,
-          "export async function deleteOpsOrder(order: Order): Promise<OpsDeleteResult> {",
-          'export async function deleteOpsOrder(order: Order): Promise<OpsDeleteResult> {\n  await requireAdminStepUp("delete_order");',
+          /export async function deleteOpsOrder\(\n  order: Order,\n  reason: string,\n\): Promise<OpsDeleteResult> \{/,
+          'export async function deleteOpsOrder(\n  order: Order,\n  reason: string,\n): Promise<OpsDeleteResult> {\n  await requireAdminStepUp("delete_order");',
           "order deletion requires step-up",
         );
         return { code, map: null };
