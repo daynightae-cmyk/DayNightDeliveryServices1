@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import DriverPortal from "../driver/DriverPortal";
 import MerchantPortal from "../merchant/MerchantPortalCommandCenter";
 import DriverRuntimeVisualAcceptance from "./DriverRuntimeVisualAcceptance";
+import NativeBiometricAuthRevocation from "./NativeBiometricAuthRevocation";
 import NativeBiometricBoundary from "./NativeBiometricBoundary";
 import "../../styles/dn-merchant-native-scroll-final.css";
 
@@ -146,6 +147,7 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
 
   return (
     <NativeBiometricBoundary role={role}>
+      <NativeBiometricAuthRevocation role={role} />
       {role === "driver" ? <DriverPortal /> : <MerchantPortal />}
     </NativeBiometricBoundary>
   );
