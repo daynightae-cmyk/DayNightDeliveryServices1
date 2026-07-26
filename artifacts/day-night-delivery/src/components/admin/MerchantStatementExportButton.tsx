@@ -4,7 +4,6 @@ import {
   buildMerchantStatementCsv,
   buildMerchantStatementPdf,
   type MerchantStatementPayload,
-  type MerchantStatementRow,
 } from "../../lib/merchantStatementExport";
 
 type Props = {
@@ -14,66 +13,52 @@ type Props = {
 };
 
 const EPSILON = 0.005;
-const DEFAULT_ZERO_ORDER_DELIVERY_FEE = 180;
+const CUSTOMER_PAID_ZERO_GOODS_SENTINEL = 0.01;
 
 function numeric(value: unknown) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function isUnresolvedZeroOrder(row: MerchantStatementRow) {
-  const goods = row.goodsValue;
-  const goodsAreZero = goods === undefined || Math.abs(numeric(goods)) <= EPSILON;
-  return (
-    goodsAreZero &&
-    Math.abs(numeric(row.customerTotal)) <= EPSILON &&
-    Math.abs(numeric(row.merchantDue)) <= EPSILON
-  );
-}
-
-function normalizeZeroOrderPayload(payload: MerchantStatementPayload): MerchantStatementPayload {
-  const positiveFees = payload.rows
-    .map((row) => numeric(row.deliveryFee))
-    .filter((value) => value > EPSILON)
-    .sort((a, b) => a - b);
-  const statementBaseFee = positiveFees[0] || DEFAULT_ZERO_ORDER_DELIVERY_FEE;
-
-  const rows = payload.rows.map((row) => {
-    if (!isUnresolvedZeroOrder(row)) return row;
-    const effectiveFee = numeric(row.deliveryFee) > EPSILON
-      ? numeric(row.deliveryFee)
-      : statementBaseFee;
-    return {
-      ...row,
-      goodsValue: 0,
-      deliveryFee: effectiveFee,
-      customerTotal: 0,
-      merchantDue: -effectiveFee,
-    };
-  });
-
+/**
+ * The legacy PDF renderer used goods_value=0 as a heuristic for charging every
+ * delivery fee to the merchant. The current rule is more precise: a zero-goods
+ * row may still be customer-paid when customer_total equals the delivery fee.
+ *
+ * The PDF does not render row.goodsValue and its totals use payload.totals, so a
+ * tiny export-only sentinel safely prevents the old heuristic from rewriting a
+ * correctly persisted customer-paid row. Merchant-liability rows remain signed.
+ */
+function preservePreciseSettlement(payload: MerchantStatementPayload): MerchantStatementPayload {
   return {
     ...payload,
-    rows,
-    totals: {
-      orders: rows.length,
-      goodsValue: numeric(payload.totals.goodsValue),
-      deliveryFees: rows.reduce((sum, row) => sum + numeric(row.deliveryFee), 0),
-      customerTotal: rows.reduce((sum, row) => sum + numeric(row.customerTotal), 0),
-      merchantBalance: rows.reduce((sum, row) => sum + numeric(row.merchantDue), 0),
-    },
+    rows: payload.rows.map((row) => {
+      const goodsAreZero = Math.abs(numeric(row.goodsValue)) <= EPSILON;
+      const deliveryFee = numeric(row.deliveryFee);
+      const customerTotal = numeric(row.customerTotal);
+      const merchantDue = numeric(row.merchantDue);
+      const customerPaysDelivery =
+        goodsAreZero &&
+        deliveryFee > EPSILON &&
+        Math.abs(customerTotal - deliveryFee) <= EPSILON &&
+        Math.abs(merchantDue) <= EPSILON;
+
+      return customerPaysDelivery
+        ? { ...row, goodsValue: CUSTOMER_PAID_ZERO_GOODS_SENTINEL }
+        : row;
+    }),
   };
 }
 
 export default function MerchantStatementExportButton({ payload, isArabic, disabled = false }: Props) {
   const [busy, setBusy] = useState<"pdf" | "csv" | null>(null);
-  const normalizedPayload = useMemo(() => normalizeZeroOrderPayload(payload), [payload]);
+  const protectedPayload = useMemo(() => preservePreciseSettlement(payload), [payload]);
 
   async function exportPdf() {
     if (disabled || busy) return;
     setBusy("pdf");
     try {
-      await buildMerchantStatementPdf(normalizedPayload);
+      await buildMerchantStatementPdf(protectedPayload);
     } catch (error) {
       console.error("Merchant statement PDF export failed.", error);
       window.alert(
@@ -90,7 +75,7 @@ export default function MerchantStatementExportButton({ payload, isArabic, disab
     if (disabled || busy) return;
     setBusy("csv");
     try {
-      buildMerchantStatementCsv(normalizedPayload);
+      buildMerchantStatementCsv(protectedPayload);
     } finally {
       setBusy(null);
     }
