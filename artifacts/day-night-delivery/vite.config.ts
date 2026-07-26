@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { adminStepUpRulePlugin } from "./scripts/admin-step-up-rule-plugin";
 import { preciseFinancialRulePlugin } from "./scripts/precise-financial-rule-plugin";
 import { friendlyErrorMessagePlugin } from "./scripts/friendly-error-message-plugin";
 import { merchantStatementLayoutPlugin } from "./scripts/merchant-statement-layout-plugin";
@@ -47,6 +48,7 @@ function buildMetadataPlugin(): Plugin {
             supabaseKeyConfigured: Boolean(publicSupabaseAnonKey),
             supabaseConfigSource: "authoritative-vite-build-config",
             adminFinancialRule: "zero-goods-zero-delivery-merchant-v3",
+            adminStepUpRule: "sensitive-admin-actions-v1",
           },
           null,
           2,
@@ -81,6 +83,7 @@ export default defineConfig({
     "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(publicSupabaseAnonKey),
   },
   plugins: [
+    adminStepUpRulePlugin(),
     preciseFinancialRulePlugin(),
     friendlyErrorMessagePlugin(),
     merchantStatementLayoutPlugin(),
