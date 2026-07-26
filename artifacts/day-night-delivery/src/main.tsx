@@ -7,6 +7,7 @@ import { reportError } from "./lib/monitoring";
 import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
 import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
 import { installMerchantCredentialAutofill } from "./lib/merchantCredentialAutofill";
+import { installAlAinLocationOptions } from "./data/installAlAinLocation";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
@@ -182,6 +183,7 @@ async function mountStandaloneAdminFeatures() {
 }
 
 async function bootstrapApplication() {
+  installAlAinLocationOptions();
   normalizeTrackingNumberQuery();
   normalizeLegacyAdminFeaturePath();
   installMerchantCredentialAutofill();

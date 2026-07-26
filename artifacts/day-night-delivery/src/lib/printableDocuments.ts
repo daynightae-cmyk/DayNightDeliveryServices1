@@ -13,9 +13,19 @@ function escapeHtml(value: unknown) {
 export function createDayNightInvoiceNumber(seed?: unknown, date = new Date()) {
   const year = date.getUTCFullYear();
   const fallback = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  const clean = String(seed || fallback).replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const rawSeed = String(seed || fallback);
+  const clean = rawSeed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   const core = clean.replace(/^DNINV/i, "").replace(/^INV/i, "").replace(/^DN/i, "").slice(-12) || fallback.toUpperCase();
-  return `DN-INV-${year}-${core}`;
+
+  // Existing DAY NIGHT tracking references remain deterministic when a missing
+  // invoice is rendered later. Plain coupon/business references receive a
+  // timestamp component so reusing the same coupon cannot recreate the same
+  // orders_tracking_number_key value.
+  const alreadyDayNightReference = /^DN(?:-?INV)?[-_ ]?\d{4}/i.test(rawSeed);
+  if (alreadyDayNightReference) return `DN-INV-${year}-${core}`;
+
+  const timestamp = Math.max(0, date.getTime()).toString(36).toUpperCase().slice(-9);
+  return `DN-INV-${year}-${core}-${timestamp}`;
 }
 
 export function orderInvoiceNumber(data: OrderPDFData) {
