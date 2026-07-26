@@ -61,7 +61,7 @@ const statementSummaryFunctions = `function drawStatementSummary(
       "900",
       index === 2 && payload.totals.merchantBalance < 0 ? "#b42318" : "#0b172a",
     );
-    ctx.direction = "ltr";
+    ctx.direction = isArabic ? "rtl" : "ltr";
     ctx.fillText(
       fitSingleLine(ctx, value, cardWidth - 16),
       x + cardWidth / 2,
