@@ -1,4 +1,4 @@
-name: Android Role v1.1.4 Visual Acceptance
+name: Android Role v1.2.0 Visual Acceptance
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-role-v114-visual-${{ github.ref }}
+  group: android-role-v120-visual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,9 +57,10 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run web:typecheck
           pnpm run web:build
+          pnpm --dir artifacts/day-night-delivery run biometric-security:gate
           test -s artifacts/day-night-delivery/dist/public/index.html
           grep -F '<BrowserRouter>' artifacts/day-night-delivery/src/main.tsx
-          grep -F 'return role === "driver" ? <DriverPortal /> : <MerchantPortal />' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
+          grep -F '<NativeBiometricBoundary role={role}>' artifacts/day-night-delivery/src/components/native/NativeRoleRoot.tsx
           grep -F 'data-driver-runtime-acceptance="ready"' artifacts/day-night-delivery/src/components/native/DriverRuntimeVisualAcceptance.tsx
           grep -F 'data-driver-map-ready' artifacts/day-night-delivery/src/components/tracking/TrackingMap.tsx
           grep -F 'localAssets.logo' artifacts/day-night-delivery/src/portal-designs/merchant/MerchantDesktopSidebar.tsx
@@ -124,13 +125,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-v114-api${{ matrix.api }}-avd"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-v120-api${{ matrix.api }}-avd"
           out="android-role-shell/visual-api${{ matrix.api }}"
           mkdir -p "$ANDROID_AVD_HOME" "$out/emulator"
-          echo no | avdmanager create avd --force --name daynight_v114_api${{ matrix.api }} --package "system-images;android-${{ matrix.api }};google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_v114_api${{ matrix.api }}.avd"
+          echo no | avdmanager create avd --force --name daynight_v120_api${{ matrix.api }} --package "system-images;android-${{ matrix.api }};google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_v120_api${{ matrix.api }}.avd"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
           nohup "$ANDROID_HOME/emulator/emulator" \
-            -avd daynight_v114_api${{ matrix.api }} -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data \
+            -avd daynight_v120_api${{ matrix.api }} -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data \
             > "$out/emulator/boot.log" 2>&1 &
           echo $! > "$out/emulator/pid"
           timeout 240 adb wait-for-device
@@ -166,7 +167,7 @@ jobs:
             ready=""
             for attempt in $(seq 1 75); do
               adb logcat -d -s DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I chromium:I '*:S' > "$out/${role}-runtime.log" || true
-              if grep -F '\"roleReady\":true' "$out/${role}-runtime.log" >/dev/null; then
+              if grep -F '"roleReady":true' "$out/${role}-runtime.log" >/dev/null; then
                 ready=1
                 break
               fi
@@ -176,12 +177,12 @@ jobs:
             test "$ready" = "1"
 
             if [ "$role" = "driver" ]; then
-              grep -F '\"driverRuntime\":true' "$out/${role}-runtime.log"
-              grep -F '\"map\":true' "$out/${role}-runtime.log"
-              grep -F '\"vehicle\":true' "$out/${role}-runtime.log"
+              grep -F '"driverRuntime":true' "$out/${role}-runtime.log"
+              grep -F '"map":true' "$out/${role}-runtime.log"
+              grep -F '"vehicle":true' "$out/${role}-runtime.log"
             else
-              if ! grep -F '\"merchantLogin\":true' "$out/${role}-runtime.log" >/dev/null; then
-                grep -F '\"merchantApp\":true' "$out/${role}-runtime.log" >/dev/null
+              if ! grep -F '"merchantLogin":true' "$out/${role}-runtime.log" >/dev/null; then
+                grep -F '"merchantApp":true' "$out/${role}-runtime.log" >/dev/null
               fi
             fi
 
@@ -233,7 +234,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-v1.1.4-Android-${{ matrix.android_release }}-Evidence
+          name: DAY-NIGHT-v1.2.0-Android-${{ matrix.android_release }}-Evidence
           path: android-role-shell/visual-api${{ matrix.api }}/
           if-no-files-found: error
           retention-days: 30
