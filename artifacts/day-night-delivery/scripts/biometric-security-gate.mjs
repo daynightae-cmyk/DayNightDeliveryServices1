@@ -45,8 +45,13 @@ const manager = read("../../android-role-shell/app/src/main/java/com/daynightae/
 const bridge = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/DayNightBiometricBridge.java");
 const nativeRuntime = read("src/lib/nativeBiometric.ts");
 const boundary = read("src/components/native/NativeBiometricBoundary.tsx");
+const revocation = read("src/components/native/NativeBiometricAuthRevocation.tsx");
 const passkeys = read("src/lib/supabasePasskeys.ts");
 const adminSecurity = read("src/components/admin/AdminSecuritySettings.tsx");
+const adminStepUp = read("src/lib/adminStepUp.ts");
+const adminStepUpProvider = read("src/components/admin/AdminStepUpProvider.tsx");
+const adminStepUpPlugin = read("scripts/admin-step-up-rule-plugin.ts");
+const adminExport = read("src/components/admin/AdminPdfExportButton.tsx");
 const auth = read("src/components/Auth.tsx");
 const auditMigration = read("../../supabase/migrations/20260727123000_auth_security_audit.sql");
 
@@ -83,6 +88,7 @@ expect(nativeRuntime, /signOut\(\{ scope: "local" \}\)/, "Invalid restored sessi
 expect(boundary, /autoPromptAttempted/, "Automatic prompting occurs at most once per launch");
 expect(boundary, /daynight-native-resume/, "Background return is governed by the role policy");
 expect(boundary, /استخدام حساب آخر/, "Account switching explicitly removes device binding");
+expect(revocation, /USER_UPDATED/, "Password and account-security updates revoke biometric binding");
 
 expect(passkeys, /VITE_ENABLE_SUPABASE_PASSKEYS/, "Passkeys are protected by an explicit feature flag");
 expect(passkeys, /experimental:\s*\{ passkey: true \}/, "Supabase passkey support is explicitly enabled only in the isolated client");
@@ -91,6 +97,17 @@ expect(adminSecurity, /registerAdminPasskey/, "Admin can register a passkey afte
 expect(adminSecurity, /removeAdminPasskey/, "Admin can remove registered passkeys");
 expect(auth, /adminSignInWithPasskey/, "Admin login supports passkey authentication behind the flag");
 reject(auth, /console\.(?:log|error)[\s\S]{0,120}(password|token|email)/i, "Admin auth does not log credentials or account identifiers");
+
+expect(adminStepUp, /RECENT_AUTH_MS\s*=\s*2 \* 60 \* 1000/, "Sensitive admin verification expires after two minutes");
+expect(adminStepUp, /getAuthenticatorAssuranceLevel/, "Step-up checks Supabase AAL");
+expect(adminStepUpProvider, /mfa\.challenge/, "MFA factors receive a real Supabase challenge");
+expect(adminStepUpProvider, /mfa\.verify/, "MFA codes are verified by Supabase");
+expect(adminStepUpProvider, /signInWithPassword/, "Password re-authentication remains available without storing the password");
+expect(adminStepUpPlugin, /delete_order/, "Order deletion requires step-up");
+expect(adminStepUpPlugin, /change_salary/, "Salary changes require step-up");
+expect(adminStepUpPlugin, /modify_bank_details/, "Bank details require step-up");
+expect(adminStepUpPlugin, /create_employee/, "Employee creation requires step-up");
+expect(adminExport, /export_sensitive_data/, "Sensitive report exports require step-up");
 
 expect(auditMigration, /auth_security_audit/, "Security audit table exists");
 expect(auditMigration, /record_auth_security_event/, "Audit events are written through a constrained RPC");
