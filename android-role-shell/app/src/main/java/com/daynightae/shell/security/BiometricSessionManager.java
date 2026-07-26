@@ -142,7 +142,7 @@ public final class BiometricSessionManager {
                             result.put("expectedRole", payload.getExpectedRole());
                             result.put("createdAt", payload.getCreatedAtEpochMs());
                             callback.onResult(result);
-                        } catch (AEADBadTagException | KeyPermanentlyInvalidatedException error) {
+                        } catch (AEADBadTagException error) {
                             clearInternal();
                             callback.onResult(failure("biometric_session_revoked", false));
                         } catch (Exception error) {
