@@ -7,6 +7,12 @@ import "../../styles/dn-merchant-native-scroll-final.css";
 export type NativeRole = "driver" | "merchant";
 
 const DRIVER_RUNTIME_VISUAL_TEST = (import.meta as any).env?.VITE_DRIVER_RUNTIME_VISUAL_TEST === "1";
+const MERCHANT_OVERLAY_SELECTOR = [
+  ".dn-merchant-mobile-drawer-backdrop",
+  ".dn-merchant-command-backdrop",
+  ".dn-merchant-modal-backdrop",
+  ".dn-merchant-command-palette-backdrop",
+].join(",");
 
 /**
  * The role portals own their complete Supabase authentication and authorization
@@ -35,25 +41,43 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
       rootMinHeight: root?.style.minHeight || "",
     };
 
+    const unlockMerchantScroll = () => {
+      const visibleOverlay = document.querySelector(MERCHANT_OVERLAY_SELECTOR);
+      if (visibleOverlay) return;
+
+      html.style.overflow = "";
+      html.style.overflowX = "hidden";
+      html.style.overflowY = "auto";
+      html.style.height = "auto";
+      body.style.overflow = "";
+      body.style.overflowX = "hidden";
+      body.style.overflowY = "auto";
+      body.style.height = "auto";
+      body.style.position = "static";
+      if (root) {
+        root.style.overflow = "visible";
+        root.style.height = "auto";
+        root.style.minHeight = "100dvh";
+      }
+    };
+
     html.classList.add("dn-native-merchant-scroll");
-    html.style.overflow = "";
-    html.style.overflowX = "hidden";
-    html.style.overflowY = "auto";
-    html.style.height = "auto";
+    unlockMerchantScroll();
 
-    body.style.overflow = "";
-    body.style.overflowX = "hidden";
-    body.style.overflowY = "auto";
-    body.style.height = "auto";
-    body.style.position = "static";
-
-    if (root) {
-      root.style.overflow = "visible";
-      root.style.height = "auto";
-      root.style.minHeight = "100dvh";
-    }
+    const observer = new MutationObserver(() => unlockMerchantScroll());
+    observer.observe(body, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+      childList: true,
+      subtree: true,
+    });
+    window.addEventListener("pageshow", unlockMerchantScroll);
+    window.addEventListener("orientationchange", unlockMerchantScroll);
 
     return () => {
+      observer.disconnect();
+      window.removeEventListener("pageshow", unlockMerchantScroll);
+      window.removeEventListener("orientationchange", unlockMerchantScroll);
       html.classList.remove("dn-native-merchant-scroll");
       html.style.overflow = previous.htmlOverflow;
       html.style.overflowX = previous.htmlOverflowX;
