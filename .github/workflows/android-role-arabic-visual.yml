@@ -167,7 +167,7 @@ jobs:
             ready=""
             for attempt in $(seq 1 75); do
               adb logcat -d -s DAYNIGHT_VISUAL:I DAYNIGHT_CONSOLE:I chromium:I '*:S' > "$out/${role}-runtime.log" || true
-              if grep -F '"roleReady":true' "$out/${role}-runtime.log" >/dev/null; then
+              if grep -F 'roleReady\":true' "$out/${role}-runtime.log" >/dev/null; then
                 ready=1
                 break
               fi
@@ -177,12 +177,12 @@ jobs:
             test "$ready" = "1"
 
             if [ "$role" = "driver" ]; then
-              grep -F '"driverRuntime":true' "$out/${role}-runtime.log"
-              grep -F '"map":true' "$out/${role}-runtime.log"
-              grep -F '"vehicle":true' "$out/${role}-runtime.log"
+              grep -F 'driverRuntime\":true' "$out/${role}-runtime.log"
+              grep -F 'map\":true' "$out/${role}-runtime.log"
+              grep -F 'vehicle\":true' "$out/${role}-runtime.log"
             else
-              if ! grep -F '"merchantLogin":true' "$out/${role}-runtime.log" >/dev/null; then
-                grep -F '"merchantApp":true' "$out/${role}-runtime.log" >/dev/null
+              if ! grep -F 'merchantLogin\":true' "$out/${role}-runtime.log" >/dev/null; then
+                grep -F 'merchantApp\":true' "$out/${role}-runtime.log" >/dev/null
               fi
             fi
 
