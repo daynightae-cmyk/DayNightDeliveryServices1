@@ -30,6 +30,7 @@ const statement = read("src/components/admin/AdminMerchantStatementsCenter.tsx")
 const exporter = read("src/lib/merchantStatementExport.ts");
 const exportButton = read("src/components/admin/MerchantStatementExportButton.tsx");
 const editModal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
+const editModalBoundary = read("src/components/admin/AdminOrderEditModal.tsx");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
 const migration = read("../../supabase/migrations/20260724070000_recover_zero_order_delivery_fee.sql");
 
@@ -54,6 +55,9 @@ expect(editModal, /حفظ التعديلات(?: الآن)?|Save changes(?: now)?
 expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");
 expect(editModal, /saveAdminOrderEdit/, "Order edits use verified persistence");
 expect(editModal, /dn-admin-orders-updated/, "Successful edits notify the live admin workspace");
+expect(editModalBoundary, /setLastSavedOrder\(savedOrder\)/, "Verified saves keep the order editor mounted");
+expect(editModalBoundary, /if \(lastSavedOrder\) await onSaved\?\.\(lastSavedOrder\)/, "Parent refresh is deferred until explicit close");
+expect(editModalBoundary, /onClose=\{\(\) => void handleExplicitClose\(\)\}/, "Only the explicit close action exits the order editor");
 expect(
   persistence,
   /select\("\*"\)[\s\S]*\.limit\(1\)[\s\S]*data\?\.\[0\]\?\.id/s,
