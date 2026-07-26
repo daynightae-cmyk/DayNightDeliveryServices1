@@ -5,12 +5,11 @@ plugins {
 def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
 def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
-def roleRuntimeVersion = "1.1.4"
+def roleRuntimeVersion = "1.2.0"
 
-// Both production role apps enter the isolated role root. The role root owns a
+// Both production role apps enter the isolated role root. The role root owns the
 // real BrowserRouter, Supabase session lifecycle, role guard, error boundary,
-// and role-only layout. No public website chrome or synthetic native login is
-// mounted inside the Android applications.
+// role-only layout, and the native biometric unlock boundary.
 def roleStartUrl = { String role ->
     def visualSuffix = roleVisualQuery ? "&${roleVisualQuery}" : ""
     return "${roleWebBaseUrl}/${role}?nativeShell=${role}&nosplash=1&__dn_live=role-v${roleRuntimeVersion}${visualSuffix}"
@@ -23,8 +22,9 @@ android {
     defaultConfig {
         minSdk 24
         targetSdk 36
-        versionCode 7
-        versionName "1.1.4"
+        versionCode 8
+        versionName "1.2.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -45,12 +45,16 @@ android {
             applicationId "com.daynightae.driver"
             buildConfigField "String", "ROLE", '"driver"'
             buildConfigField "String", "START_URL", "\"${roleStartUrl('driver')}\""
+            buildConfigField "String", "BIOMETRIC_KEY_ALIAS", '"daynight_driver_biometric_session_v1"'
+            buildConfigField "long", "BIOMETRIC_MAX_AGE_SECONDS", "86400L"
         }
         merchant {
             dimension "role"
             applicationId "com.daynightae.merchant"
             buildConfigField "String", "ROLE", '"merchant"'
             buildConfigField "String", "START_URL", "\"${roleStartUrl('merchant')}\""
+            buildConfigField "String", "BIOMETRIC_KEY_ALIAS", '"daynight_merchant_biometric_session_v1"'
+            buildConfigField "long", "BIOMETRIC_MAX_AGE_SECONDS", "43200L"
         }
     }
 
@@ -82,6 +86,10 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
     lint {
         abortOnError true
         checkReleaseBuilds true
@@ -93,4 +101,11 @@ android {
             excludes += ["META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*"]
         }
     }
+}
+
+dependencies {
+    implementation "androidx.biometric:biometric:1.1.0"
+    implementation "androidx.fragment:fragment:1.8.5"
+
+    testImplementation "junit:junit:4.13.2"
 }
