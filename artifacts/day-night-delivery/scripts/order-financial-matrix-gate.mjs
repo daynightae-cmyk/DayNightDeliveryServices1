@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
-import ts from "typescript";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const ts = require("typescript");
 
 const root = process.cwd();
 let failed = false;
