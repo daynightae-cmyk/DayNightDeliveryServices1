@@ -12,11 +12,9 @@ function isMerchantRoute() {
 function decodeBase64Url(value: string) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-  return decodeURIComponent(
-    Array.prototype.map
-      .call(atob(padded), (character: string) => `%${character.charCodeAt(0).toString(16).padStart(2, "0")}`)
-      .join(""),
-  );
+  const binary = window.atob(padded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 function normalizeCredentials(value: unknown): MerchantPrefillCredentials | null {
