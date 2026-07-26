@@ -91,7 +91,8 @@ android {
     lint {
         abortOnError true
         checkReleaseBuilds true
-        disable "GestureBackNavigation"
+        // Back exits the isolated role task instead of navigating to public/other-role pages.
+        disable "GestureBackNavigation", "MissingSuperCall"
     }
 
     packaging {
