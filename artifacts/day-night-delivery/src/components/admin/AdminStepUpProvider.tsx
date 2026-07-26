@@ -72,14 +72,16 @@ export default function AdminStepUpProvider({ children }: { children: ReactNode 
   }, []);
 
   useEffect(() => {
-    if (!request || !supabase) return;
+    const client = supabase;
+    const activeRequest = request;
+    if (!activeRequest || !client) return;
     let active = true;
     async function prepare() {
-      const userResult = await supabase.auth.getUser();
+      const userResult = await client.auth.getUser();
       if (!active) return;
       setEmail(userResult.data.user?.email || "");
-      if (!request.requiresMfa) return;
-      const factors = await supabase.auth.mfa.listFactors();
+      if (!activeRequest.requiresMfa) return;
+      const factors = await client.auth.mfa.listFactors();
       if (!active) return;
       if (factors.error) {
         setError(friendlyError(factors.error, isArabic));
@@ -96,7 +98,7 @@ export default function AdminStepUpProvider({ children }: { children: ReactNode 
         return;
       }
       setFactor(verified);
-      const challenged = await supabase.auth.mfa.challenge({ factorId: verified.id });
+      const challenged = await client.auth.mfa.challenge({ factorId: verified.id });
       if (!active) return;
       if (challenged.error || !challenged.data?.id) {
         setError(friendlyError(challenged.error, isArabic));
@@ -120,18 +122,20 @@ export default function AdminStepUpProvider({ children }: { children: ReactNode 
   }
 
   async function finishVerification() {
-    if (!request || !supabase) return;
-    const userResult = await supabase.auth.getUser();
+    const client = supabase;
+    const activeRequest = request;
+    if (!activeRequest || !client) return;
+    const userResult = await client.auth.getUser();
     const user = userResult.data.user;
-    if (userResult.error || !user?.id || user.id !== request.userId || !(await isAdminUser(user.id))) {
+    if (userResult.error || !user?.id || user.id !== activeRequest.userId || !(await isAdminUser(user.id))) {
       throw new Error("admin_role_required");
     }
-    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (request.nextLevel === "aal2" && assurance.data.currentLevel !== "aal2") {
+    const assurance = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (activeRequest.nextLevel === "aal2" && assurance.data?.currentLevel !== "aal2") {
       throw new Error("admin_mfa_required");
     }
     markAdminStepUp(user.id);
-    const resolve = request.resolve;
+    const resolve = activeRequest.resolve;
     setRequest(null);
     setPassword("");
     setCode("");
@@ -143,11 +147,12 @@ export default function AdminStepUpProvider({ children }: { children: ReactNode 
   }
 
   async function verifyMfa() {
-    if (!supabase || !factor?.id || !challengeId || !code.trim()) return;
+    const client = supabase;
+    if (!client || !factor?.id || !challengeId || !code.trim()) return;
     setBusy(true);
     setError("");
     try {
-      const result = await supabase.auth.mfa.verify({
+      const result = await client.auth.mfa.verify({
         factorId: factor.id,
         challengeId,
         code: code.trim(),
@@ -161,11 +166,12 @@ export default function AdminStepUpProvider({ children }: { children: ReactNode 
   }
 
   async function verifyPassword() {
-    if (!supabase || !email || !password) return;
+    const client = supabase;
+    if (!client || !email || !password) return;
     setBusy(true);
     setError("");
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password });
+      const result = await client.auth.signInWithPassword({ email, password });
       setPassword("");
       if (result.error || result.data.user?.id !== request?.userId) throw result.error || new Error("identity_changed");
       await finishVerification();
