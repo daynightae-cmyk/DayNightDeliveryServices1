@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { FileArchive, FileSpreadsheet, Loader2 } from "lucide-react";
 import {
   buildMerchantStatementCsv,
+  buildMerchantStatementPdf,
   type MerchantStatementPayload,
 } from "../../lib/merchantStatementExport";
-import { buildMerchantStatementPdfV2 } from "../../lib/merchantStatementPdfV2";
 
 type Props = {
   payload: MerchantStatementPayload;
@@ -53,7 +53,7 @@ export default function MerchantStatementExportButton({ payload, isArabic, disab
     if (disabled || busy) return;
     setBusy("pdf");
     try {
-      await buildMerchantStatementPdfV2(protectedPayload);
+      await buildMerchantStatementPdf(protectedPayload);
     } catch (error) {
       console.error("Merchant statement PDF export failed.", error);
       window.alert(
