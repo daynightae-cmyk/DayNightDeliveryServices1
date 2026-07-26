@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
+import AdminSecuritySettings from "./admin/AdminSecuritySettings";
 
 type ProtectedAdminRouteProps = {
   children: React.ReactNode;
@@ -38,10 +39,12 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
       }
     }
 
-    verifyAdminAccess();
+    void verifyAdminAccess();
+    const { data } = supabase?.auth.onAuthStateChange(() => void verifyAdminAccess()) || { data: null };
 
     return () => {
       active = false;
+      data?.subscription.unsubscribe();
     };
   }, []);
 
@@ -59,5 +62,5 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
     return <Navigate to="/auth" replace />;
   }
 
-  return <>{children}</>;
+  return <>{children}<AdminSecuritySettings /></>;
 }
