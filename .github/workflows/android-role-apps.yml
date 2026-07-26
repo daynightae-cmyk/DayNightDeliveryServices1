@@ -113,13 +113,27 @@ jobs:
       - name: Test, build APK/AAB, and Android lint
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          mkdir -p android-role-shell/build-diagnostic-v120
           gradle -p android-role-shell --no-daemon --console=plain --stacktrace \
             clean testDriverDebugUnitTest testMerchantDebugUnitTest \
             assembleDriverDebug assembleMerchantDebug \
             assembleDriverRelease assembleMerchantRelease \
             bundleDriverRelease bundleMerchantRelease \
-            lintDriverRelease lintMerchantRelease
+            lintDriverRelease lintMerchantRelease \
+            2>&1 | tee android-role-shell/build-diagnostic-v120/gradle-build.txt
+          status=${PIPESTATUS[0]}
+          find android-role-shell/app/build/reports -type f -print > android-role-shell/build-diagnostic-v120/report-files.txt 2>/dev/null || true
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+
+      - name: Upload Android build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Android-v1.2.0-Build-Diagnostic
+          path: android-role-shell/build-diagnostic-v120/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Stage and verify packages
         shell: bash
