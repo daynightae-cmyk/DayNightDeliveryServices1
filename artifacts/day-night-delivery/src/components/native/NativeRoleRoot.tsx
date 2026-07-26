@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import DriverPortal from "../driver/DriverPortal";
 import MerchantPortal from "../merchant/MerchantPortalCommandCenter";
 import DriverRuntimeVisualAcceptance from "./DriverRuntimeVisualAcceptance";
+import NativeBiometricAuthRevocation from "./NativeBiometricAuthRevocation";
+import NativeBiometricBoundary from "./NativeBiometricBoundary";
 import "../../styles/dn-merchant-native-scroll-final.css";
 
 export type NativeRole = "driver" | "merchant";
@@ -11,9 +13,10 @@ const MERCHANT_SCROLL_CLASS = "dn-native-merchant-scroll";
 const MERCHANT_DASHBOARD_CLASS = "dn-native-merchant-dashboard";
 
 /**
- * The role portals own their complete Supabase authentication and authorization
- * lifecycle. The native root only selects the requested role. It deliberately
- * does not add a second session check, fixed loading cover, or duplicate login.
+ * The role portals remain the source of Supabase authentication and role data.
+ * NativeBiometricBoundary can only restore a Supabase refresh session after the
+ * Android system prompt, then repeats server-side role/status validation before
+ * allowing the existing portal to remain unlocked.
  */
 export default function NativeRoleRoot({ role }: { role: NativeRole }) {
   useEffect(() => {
@@ -53,9 +56,6 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
         );
 
         html.classList.toggle(MERCHANT_DASHBOARD_CLASS, dashboardMounted);
-
-        // Remove stale position-lock values left by an interrupted drawer/modal.
-        // The scoped CSS class owns the authenticated dashboard scroll contract.
         body.style.position = "static";
         body.style.inset = "";
         body.style.top = "";
@@ -81,8 +81,6 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
           return;
         }
 
-        // Authentication, loading, and linkage states can be taller than one
-        // viewport, so they retain normal document scrolling.
         html.style.overflow = "";
         html.style.overflowX = "hidden";
         html.style.overflowY = "auto";
@@ -147,5 +145,10 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
     return <DriverRuntimeVisualAcceptance />;
   }
 
-  return role === "driver" ? <DriverPortal /> : <MerchantPortal />;
+  return (
+    <NativeBiometricBoundary role={role}>
+      <NativeBiometricAuthRevocation role={role} />
+      {role === "driver" ? <DriverPortal /> : <MerchantPortal />}
+    </NativeBiometricBoundary>
+  );
 }

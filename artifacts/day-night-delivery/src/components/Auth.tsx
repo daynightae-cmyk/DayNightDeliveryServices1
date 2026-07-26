@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
 import { useAppContext } from "../lib/AppContext";
 import { armAdminLoadingAudio } from "../lib/adminLoadingAudio";
+import { adminSignInWithPasskey, SUPABASE_PASSKEYS_ENABLED } from "../lib/supabasePasskeys";
 import companyMeta from "../data/companyMeta";
 
 import AuthIntroScreen from "./auth-clean/AuthIntroScreen";
@@ -20,14 +21,16 @@ type AuthStage = "intro" | "login" | "loading";
 const copy = {
   ar: {
     invalid: "بيانات الدخول غير صحيحة أو غير مخولة.",
-    adminOnly: "هذه البوابة مخصصة للإدارة فقط.",
+    adminOnly: "هذا الحساب لا يمتلك صلاحية الإدارة.",
     unavailable: "خدمة الدخول غير متاحة حالياً.",
+    passkeyUnavailable: "تعذر استخدام Passkey. استخدم كلمة المرور أو تحقق من إعدادات Passkeys في Supabase.",
     generic: "حدث خطأ أثناء تسجيل الدخول.",
   },
   en: {
     invalid: "Invalid or unauthorized login details.",
-    adminOnly: "This portal is for administrators only.",
+    adminOnly: "This account does not have administrator access.",
     unavailable: "Login service is currently unavailable.",
+    passkeyUnavailable: "Passkey sign-in could not be completed. Use your password or check Supabase passkey settings.",
     generic: "An error occurred during login.",
   },
 } as const;
@@ -43,6 +46,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
 
   function handleBackToSite() {
     window.location.assign("/");
@@ -71,7 +75,6 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
 
       if (error || !data?.user) {
-        if (error) console.error("[DAY NIGHT auth signIn error]", { message: error.message, status: error.status, name: error.name, email: cleanEmail });
         setErrorMessage(t.invalid);
         return;
       }
@@ -79,7 +82,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       const isAdmin = await isAdminUser(data.user.id);
 
       if (!isAdmin) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         setErrorMessage(t.adminOnly);
         return;
       }
@@ -87,12 +90,32 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       if (rememberMe) window.localStorage.setItem("dn-admin-remember", "true");
       else window.localStorage.removeItem("dn-admin-remember");
 
+      setPassword("");
       setStage("loading");
-    } catch (error) {
-      console.error("[DAY NIGHT auth signIn error]", error);
+    } catch {
       setErrorMessage(t.generic);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasskeySignIn() {
+    setErrorMessage("");
+    setPasskeyBusy(true);
+    void armAdminLoadingAudio();
+    try {
+      const user = await adminSignInWithPasskey();
+      if (!user?.id || !(await isAdminUser(user.id))) {
+        await supabase?.auth.signOut({ scope: "local" });
+        setErrorMessage(t.adminOnly);
+        return;
+      }
+      setPassword("");
+      setStage("loading");
+    } catch {
+      setErrorMessage(t.passkeyUnavailable);
+    } finally {
+      setPasskeyBusy(false);
     }
   }
 
@@ -111,11 +134,14 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       rememberMe={rememberMe}
       errorMessage={errorMessage}
       isSubmitting={isSubmitting}
+      passkeyEnabled={SUPABASE_PASSKEYS_ENABLED}
+      passkeyBusy={passkeyBusy}
       language={authLanguage}
       onEmailChange={setEmail}
       onPasswordChange={setPassword}
       onRememberChange={setRememberMe}
       onSubmit={handleSubmit}
+      onPasskeySignIn={handlePasskeySignIn}
       onForgotPassword={() => { window.location.href = `mailto:${companyMeta.email}`; }}
       onToggleLanguage={toggleLanguage}
       onBackToSite={handleBackToSite}

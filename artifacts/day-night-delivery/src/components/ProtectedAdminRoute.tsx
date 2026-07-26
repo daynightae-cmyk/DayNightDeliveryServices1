@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
+import { clearAdminStepUp } from "../lib/adminStepUp";
+import AdminSecuritySettings from "./admin/AdminSecuritySettings";
+import AdminStepUpProvider from "./admin/AdminStepUpProvider";
 
 type ProtectedAdminRouteProps = {
   children: React.ReactNode;
@@ -24,6 +27,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         const { data, error } = await supabase.auth.getUser();
 
         if (error || !data.user?.id) {
+          clearAdminStepUp();
           if (active) setStatus("denied");
           return;
         }
@@ -31,17 +35,24 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         const allowed = await isAdminUser(data.user.id);
 
         if (active) {
+          if (!allowed) clearAdminStepUp(data.user.id);
           setStatus(allowed ? "allowed" : "denied");
         }
       } catch {
+        clearAdminStepUp();
         if (active) setStatus("denied");
       }
     }
 
-    verifyAdminAccess();
+    void verifyAdminAccess();
+    const { data } = supabase?.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" || event === "USER_UPDATED") clearAdminStepUp();
+      void verifyAdminAccess();
+    }) || { data: null };
 
     return () => {
       active = false;
+      data?.subscription.unsubscribe();
     };
   }, []);
 
@@ -59,5 +70,10 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
     return <Navigate to="/auth" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <AdminStepUpProvider>
+      {children}
+      <AdminSecuritySettings />
+    </AdminStepUpProvider>
+  );
 }
