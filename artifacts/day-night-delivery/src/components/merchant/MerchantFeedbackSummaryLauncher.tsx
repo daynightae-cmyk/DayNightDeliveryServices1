@@ -12,6 +12,10 @@ export default function MerchantFeedbackSummaryLauncher() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
   const isMerchantRoute = /^\/merchant(?:\/|$)/.test(window.location.pathname);
+  const nativeRole = (window as Window & { __DAY_NIGHT_NATIVE_ROLE__?: string }).__DAY_NIGHT_NATIVE_ROLE__;
+  const isNativeMerchantShell = document.documentElement.dataset.nativeShell === "merchant"
+    || new URLSearchParams(window.location.search).get("nativeShell") === "merchant"
+    || nativeRole === "merchant";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -44,7 +48,10 @@ export default function MerchantFeedbackSummaryLauncher() {
     driver: average(feedback.map((item) => item.driver_rating)),
   }), [feedback]);
 
-  if (!isMerchantRoute) return null;
+  // The standalone Merchant APK must remain a clean role-only dashboard. Ratings
+  // continue to be available on the web portal without mounting a fixed overlay
+  // above the native dashboard or its bottom navigation.
+  if (!isMerchantRoute || isNativeMerchantShell) return null;
   return (
     <>
       <button
