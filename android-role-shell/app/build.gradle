@@ -6,6 +6,7 @@ def releaseKeystorePath = System.getenv("DAYNIGHT_ANDROID_KEYSTORE")
 def roleWebBaseUrl = (System.getenv("DAYNIGHT_ROLE_WEB_BASE_URL") ?: "https://www.daynightae.com").replaceAll('/+$', '')
 def roleVisualQuery = System.getenv("DAYNIGHT_ROLE_VISUAL_QUERY") ?: ""
 def roleRuntimeVersion = "1.2.0"
+def kotlinStdlibVersion = "1.8.22"
 
 def roleStartUrl = { String role ->
     def visualSuffix = roleVisualQuery ? "&${roleVisualQuery}" : ""
@@ -96,6 +97,15 @@ android {
     packaging {
         resources {
             excludes += ["META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*"]
+        }
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == "org.jetbrains.kotlin" && details.requested.name.startsWith("kotlin-stdlib")) {
+            details.useVersion(kotlinStdlibVersion)
+            details.because("Align AndroidX test and biometric transitive Kotlin runtime to avoid duplicate JDK7/JDK8 classes")
         }
     }
 }
