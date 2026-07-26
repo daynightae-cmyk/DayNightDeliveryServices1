@@ -1,0 +1,84 @@
+/* DAY NIGHT Merchant native dashboard — mobile scroll recovery.
+   Scoped to the standalone merchant shell so public/admin/driver layouts are not changed. */
+
+html.dn-native-merchant-scroll,
+html.dn-native-merchant-scroll body {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.dn-native-merchant-scroll body {
+  position: static;
+  overflow-y: auto;
+}
+
+html.dn-native-merchant-scroll #root {
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  height: auto;
+  overflow: visible;
+}
+
+html.dn-native-merchant-scroll .dn-merchant-app,
+html.dn-native-merchant-scroll .dn-merchant-main-column {
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+html.dn-native-merchant-scroll .dn-merchant-content,
+html.dn-native-merchant-scroll .dn-merchant-content-inner {
+  min-width: 0;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+html.dn-native-merchant-scroll .dn-merchant-app::before,
+html.dn-native-merchant-scroll .dn-merchant-app::after,
+html.dn-native-merchant-scroll .dn-merchant-main-column::before,
+html.dn-native-merchant-scroll .dn-merchant-main-column::after {
+  pointer-events: none;
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  html.dn-native-merchant-scroll .dn-merchant-app {
+    display: block;
+    min-height: 100dvh;
+    padding: 0;
+    isolation: isolate;
+  }
+
+  html.dn-native-merchant-scroll .dn-merchant-header {
+    position: sticky;
+    inset-block-start: 0;
+    top: 0;
+  }
+
+  html.dn-native-merchant-scroll .dn-merchant-content {
+    position: relative;
+    z-index: 1;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  }
+
+  html.dn-native-merchant-scroll .dn-merchant-bottom-nav {
+    max-height: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  html.dn-native-merchant-scroll .dn-merchant-dashboard-hero,
+  html.dn-native-merchant-scroll .dn-merchant-card,
+  html.dn-native-merchant-scroll .dn-merchant-section-v3,
+  html.dn-native-merchant-scroll .dn-merchant-content-inner {
+    max-width: 100%;
+  }
+}
