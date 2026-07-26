@@ -1,0 +1,3 @@
+DAY NIGHT final merchant statement production redeploy.
+Uses the original PDF exporter with the registered bottom-summary Vite transform.
+Removes the unresolved merchantStatementPdfV2 import.
