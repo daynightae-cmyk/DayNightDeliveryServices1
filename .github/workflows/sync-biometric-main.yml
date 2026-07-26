@@ -1,0 +1,45 @@
+name: Sync biometric branch with main
+
+on:
+  push:
+    branches:
+      - feature/biometric-secure-session-v120
+    paths:
+      - .github/workflows/sync-biometric-main.yml
+
+permissions:
+  contents: write
+
+jobs:
+  merge-main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout biometric branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/biometric-secure-session-v120
+          fetch-depth: 0
+
+      - name: Merge current main without losing biometric rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT CI"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main
+          if git merge --no-edit origin/main; then
+            echo "Main merged without conflicts."
+          else
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            expected="artifacts/day-night-delivery/vite.config.ts"
+            if [ "$conflicts" != "$expected" ]; then
+              echo "Unexpected merge conflicts:"
+              printf '%s\n' "$conflicts"
+              exit 1
+            fi
+            git checkout --ours -- "$expected"
+            git add "$expected"
+            git commit --no-edit
+          fi
+          git push origin HEAD:feature/biometric-secure-session-v120
