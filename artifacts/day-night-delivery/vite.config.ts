@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { preciseFinancialRulePlugin } from "./scripts/precise-financial-rule-plugin";
+import { friendlyErrorMessagePlugin } from "./scripts/friendly-error-message-plugin";
 
 const port = Number(process.env.PORT || 3000);
 const basePath = process.env.BASE_PATH || "/";
@@ -78,7 +79,13 @@ export default defineConfig({
     "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(approvedSupabaseUrl),
     "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(publicSupabaseAnonKey),
   },
-  plugins: [preciseFinancialRulePlugin(), react(), tailwindcss(), buildMetadataPlugin()],
+  plugins: [
+    preciseFinancialRulePlugin(),
+    friendlyErrorMessagePlugin(),
+    react(),
+    tailwindcss(),
+    buildMetadataPlugin(),
+  ],
   resolve: {
     alias: [
       { find: "@", replacement: path.resolve(appRoot, "src") },
