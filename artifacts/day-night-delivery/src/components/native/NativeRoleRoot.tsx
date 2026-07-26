@@ -65,12 +65,7 @@ export default function NativeRoleRoot({ role }: { role: NativeRole }) {
     unlockMerchantScroll();
 
     const observer = new MutationObserver(() => unlockMerchantScroll());
-    observer.observe(body, {
-      attributes: true,
-      attributeFilter: ["class", "style"],
-      childList: true,
-      subtree: true,
-    });
+    observer.observe(body, { childList: true, subtree: true });
     window.addEventListener("pageshow", unlockMerchantScroll);
     window.addEventListener("orientationchange", unlockMerchantScroll);
 
