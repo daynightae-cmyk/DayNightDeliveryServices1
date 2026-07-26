@@ -54,6 +54,7 @@ const adminStepUpPlugin = read("scripts/admin-step-up-rule-plugin.ts");
 const adminExport = read("src/components/admin/AdminPdfExportButton.tsx");
 const auth = read("src/components/Auth.tsx");
 const auditMigration = read("../../supabase/migrations/20260727123000_auth_security_audit.sql");
+const visualWorkflow = read("../../.github/workflows/android-role-arabic-visual.yml");
 
 expect(gradle, /versionName\s+"1\.2\.0"/, "Android role apps are version 1.2.0");
 expect(gradle, /androidx\.biometric:biometric:1\.1\.0/, "Official stable AndroidX biometric library is used");
@@ -113,6 +114,10 @@ expect(auditMigration, /auth_security_audit/, "Security audit table exists");
 expect(auditMigration, /record_auth_security_event/, "Audit events are written through a constrained RPC");
 expect(auditMigration, /enable row level security/, "Security audit table uses RLS");
 reject(auditMigration, /^\s*(?:password|access_token|refresh_token|credential_secret)\s+[a-z]/im, "Audit table defines no credential-secret column");
+
+expect(visualWorkflow, /roleReady\\+":true/, "Visual acceptance matches escaped role-ready Android diagnostics");
+expect(visualWorkflow, /driverRuntime\\+":true/, "Visual acceptance matches escaped Driver runtime diagnostics");
+expect(visualWorkflow, /merchantLogin\\+":true/, "Visual acceptance matches escaped Merchant login diagnostics");
 
 if (failed) {
   console.error("Biometric and passkey security gate FAILED.\n");
