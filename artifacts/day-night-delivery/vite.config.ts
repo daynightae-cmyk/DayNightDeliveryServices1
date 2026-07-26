@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { preciseFinancialRulePlugin } from "./scripts/precise-financial-rule-plugin";
 import { friendlyErrorMessagePlugin } from "./scripts/friendly-error-message-plugin";
+import { merchantStatementLayoutPlugin } from "./scripts/merchant-statement-layout-plugin";
 
 const port = Number(process.env.PORT || 3000);
 const basePath = process.env.BASE_PATH || "/";
@@ -82,6 +83,7 @@ export default defineConfig({
   plugins: [
     preciseFinancialRulePlugin(),
     friendlyErrorMessagePlugin(),
+    merchantStatementLayoutPlugin(),
     react(),
     tailwindcss(),
     buildMetadataPlugin(),
