@@ -24,6 +24,15 @@ function expect(content, pattern, label) {
   }
 }
 
+function reject(content, pattern, label) {
+  if (pattern.test(content)) {
+    console.error(`FAIL: ${label}`);
+    failed = true;
+  } else {
+    console.log(`PASS: ${label}`);
+  }
+}
+
 console.log("\n--- DAY NIGHT merchant statement & order edit gate ---");
 
 const statement = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
@@ -32,7 +41,8 @@ const exportButton = read("src/components/admin/MerchantStatementExportButton.ts
 const editModal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
 const editModalBoundary = read("src/components/admin/AdminOrderEditModal.tsx");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
-const migration = read("../../supabase/migrations/20260724070000_recover_zero_order_delivery_fee.sql");
+const migration = read("../../supabase/migrations/20260727090000_precise_zero_goods_delivery_settlement.sql");
+const precisePlugin = read("scripts/precise-financial-rule-plugin.ts");
 
 expect(statement, /MerchantStatementExportButton/, "Merchant statements use the specialized exporter");
 expect(statement, /متابعة الطلبية|Track order/, "Every merchant order exposes a tracking action");
@@ -46,10 +56,12 @@ expect(exporter, /Admin@daynightae\.com/, "PDF contains the official email");
 expect(exporter, /columnRects/, "PDF uses weighted columns rather than equal compressed columns");
 expect(exporter, /type ColumnKey[\s\S]*\| "tracking";/, "Merchant PDF column contract ends with tracking and excludes status");
 expect(exportButton, /buildMerchantStatementPdf/, "PDF button calls the merchant-specific generator");
-expect(exportButton, /DEFAULT_ZERO_ORDER_DELIVERY_FEE\s*=\s*180/, "Unresolved zero-value orders receive the approved 180 AED fallback fee");
-expect(exportButton, /merchantDue:\s*-effectiveFee/, "Zero-value statement rows are charged fully to the merchant");
-expect(exportButton, /normalizeZeroOrderPayload/, "PDF and CSV normalize zero-value rows before export");
-expect(migration, /greatest\([\s\S]*180[\s\S]*merchant_due\s*=\s*-r\.effective_fee/, "Database backfill recovers hidden fees and charges zero-value rows to merchant");
+expect(exportButton, /CUSTOMER_PAID_ZERO_GOODS_SENTINEL/, "Zero-goods customer-paid rows retain their real customer total in PDF and CSV");
+expect(exportButton, /Math\.abs\(customerTotal - deliveryFee\)/, "Statement protection requires customer total to equal delivery");
+reject(exportButton, /DEFAULT_ZERO_ORDER_DELIVERY_FEE\s*=\s*180/, "Statement export does not fabricate the obsolete 180 AED fallback");
+expect(migration, /manual_delivery_price[\s\S]*resolved_mode/, "Database migration resolves explicit zero and positive manual delivery separately");
+reject(migration, /if\s+v_goods\s*=\s*0\s+and\s+v_fee\s*>\s*0/i, "Database function does not force all zero-goods orders onto merchant");
+expect(precisePlugin, /manual !== null && manual > 0/, "Manual zero uses official pricing while retaining merchant liability intent");
 
 expect(editModal, /حفظ التعديلات(?: الآن)?|Save changes(?: now)?/, "Order edit has an explicit visible save button");
 expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");
