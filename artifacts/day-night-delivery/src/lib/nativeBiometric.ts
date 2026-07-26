@@ -137,7 +137,7 @@ export function isNativeRoleShell(role?: NativeBiometricRole) {
   return Boolean(window.DAYNIGHT_BIOMETRIC) && (!role || nativeRole === role);
 }
 
-export async function getNativeBiometricAvailability() {
+export async function getNativeBiometricAvailability(): Promise<NativeBiometricAvailability> {
   const result = await bridgeCall("isAvailable");
   return {
     available: Boolean(result.available),
@@ -145,10 +145,10 @@ export async function getNativeBiometricAvailability() {
     deviceCredentialAvailable: Boolean(result.deviceCredentialAvailable),
     biometricType: result.biometricType,
     reason: result.reason || result.error,
-  } satisfies NativeBiometricAvailability;
+  };
 }
 
-export async function hasNativeBiometricEnrollment() {
+export async function hasNativeBiometricEnrollment(): Promise<boolean> {
   const result = await bridgeCall("hasEnrollment");
   return Boolean(result.success && result.enrolled);
 }
@@ -163,7 +163,7 @@ export async function recordAuthSecurityEvent(
     | "biometric_login_failed"
     | "biometric_session_revoked",
   input: { role?: string; packageId?: string; success?: boolean; reason?: string } = {},
-) {
+): Promise<void> {
   if (!supabase) return;
   try {
     await supabase.rpc("record_auth_security_event", {
@@ -228,16 +228,19 @@ export async function validateNativeRole(
   }
 }
 
-export async function enableNativeBiometric(role: NativeBiometricRole, isArabic: boolean) {
+export async function enableNativeBiometric(
+  role: NativeBiometricRole,
+  isArabic: boolean,
+): Promise<NativeBiometricResult> {
   if (!supabase || !isNativeRoleShell(role)) {
-    return { success: false, error: "native_bridge_unavailable" } satisfies NativeBiometricResult;
+    return { success: false, error: "native_bridge_unavailable" };
   }
 
   const sessionResult = await supabase.auth.getSession();
   const session = sessionResult.data.session;
   const validation = await validateNativeRole(role, session?.user?.id);
   if (!session?.refresh_token || !validation.valid || !validation.user?.id) {
-    return { success: false, error: validation.reason || "verified_session_required" } satisfies NativeBiometricResult;
+    return { success: false, error: validation.reason || "verified_session_required" };
   }
 
   const result = await bridgeCall("enableForCurrentSession", {
@@ -255,9 +258,12 @@ export async function enableNativeBiometric(role: NativeBiometricRole, isArabic:
   return result;
 }
 
-export async function restoreNativeBiometricSession(role: NativeBiometricRole, isArabic: boolean) {
+export async function restoreNativeBiometricSession(
+  role: NativeBiometricRole,
+  isArabic: boolean,
+): Promise<NativeBiometricResult> {
   if (!supabase || !isNativeRoleShell(role)) {
-    return { success: false, error: "native_bridge_unavailable" } satisfies NativeBiometricResult;
+    return { success: false, error: "native_bridge_unavailable" };
   }
 
   const result = await bridgeCall("authenticate", { isArabic });
@@ -283,12 +289,12 @@ export async function restoreNativeBiometricSession(role: NativeBiometricRole, i
       packageId: role === "driver" ? "com.daynightae.driver" : "com.daynightae.merchant",
       success: true,
     });
-    return { success: true, userId: result.userId, expectedRole: role } satisfies NativeBiometricResult;
+    return { success: true, userId: result.userId, expectedRole: role };
   } catch (error) {
     const reason = error instanceof Error ? error.message : "secure_session_restore_failed";
     await disableNativeBiometric(role, "biometric_session_revoked", reason);
     await supabase.auth.signOut({ scope: "local" });
-    return { success: false, error: reason } satisfies NativeBiometricResult;
+    return { success: false, error: reason };
   }
 }
 
@@ -296,7 +302,7 @@ export async function disableNativeBiometric(
   role: NativeBiometricRole,
   eventType: "biometric_disabled" | "biometric_session_revoked" = "biometric_disabled",
   reason?: string,
-) {
+): Promise<NativeBiometricResult> {
   const result = await bridgeCall("disable");
   await recordAuthSecurityEvent(eventType, {
     role,
@@ -307,6 +313,6 @@ export async function disableNativeBiometric(
   return result;
 }
 
-export async function cancelNativeBiometric() {
+export async function cancelNativeBiometric(): Promise<NativeBiometricResult> {
   return bridgeCall("cancel");
 }
