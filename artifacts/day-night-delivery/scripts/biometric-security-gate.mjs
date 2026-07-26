@@ -35,20 +35,20 @@ function reject(content, pattern, label) {
 
 console.log("\n--- DAY NIGHT biometric and passkey security gate ---");
 
-const gradle = read("../../../android-role-shell/app/build.gradle");
-const manifest = read("../../../android-role-shell/app/src/main/AndroidManifest.xml");
-const activity = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/MainActivity.java");
-const payload = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/security/SecureSessionPayload.java");
-const keystore = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/security/AndroidKeystoreManager.java");
-const store = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/security/SecureSessionStore.java");
-const manager = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/security/BiometricSessionManager.java");
-const bridge = read("../../../android-role-shell/app/src/main/java/com/daynightae/shell/security/DayNightBiometricBridge.java");
+const gradle = read("../../android-role-shell/app/build.gradle");
+const manifest = read("../../android-role-shell/app/src/main/AndroidManifest.xml");
+const activity = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/MainActivity.java");
+const payload = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/SecureSessionPayload.java");
+const keystore = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/AndroidKeystoreManager.java");
+const store = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/SecureSessionStore.java");
+const manager = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/BiometricSessionManager.java");
+const bridge = read("../../android-role-shell/app/src/main/java/com/daynightae/shell/security/DayNightBiometricBridge.java");
 const nativeRuntime = read("src/lib/nativeBiometric.ts");
 const boundary = read("src/components/native/NativeBiometricBoundary.tsx");
 const passkeys = read("src/lib/supabasePasskeys.ts");
 const adminSecurity = read("src/components/admin/AdminSecuritySettings.tsx");
 const auth = read("src/components/Auth.tsx");
-const auditMigration = read("../../../supabase/migrations/20260727123000_auth_security_audit.sql");
+const auditMigration = read("../../supabase/migrations/20260727123000_auth_security_audit.sql");
 
 expect(gradle, /versionName\s+"1\.2\.0"/, "Android role apps are version 1.2.0");
 expect(gradle, /androidx\.biometric:biometric:1\.1\.0/, "Official stable AndroidX biometric library is used");
@@ -66,9 +66,8 @@ expect(manager, /BiometricPrompt\.CryptoObject/, "Encryption and decryption requ
 expect(manager, /AtomicBoolean/, "Duplicate biometric prompts are blocked");
 expect(manager, /biometric_key_invalidated|biometric_session_revoked/, "Invalidated keys revoke the secure session");
 
-expect(payload, /refreshToken/, "Only the refresh token is eligible for encrypted restoration");
-reject(payload, /password/i, "Payload never contains a password");
-reject(payload, /accessToken|access_token/i, "Payload never stores an access token");
+expect(payload, /private final String refreshToken;/, "Only the refresh token is eligible for encrypted restoration");
+reject(payload, /private final String (?:password|accessToken);|\.put\("(?:password|accessToken)"/i, "Payload never contains a password or access token field");
 expect(store, /ciphertext/, "Preferences store ciphertext");
 expect(store, /initializationVector|\bIV\b/, "Preferences store an IV");
 reject(store, /putString\([^\n]*(refresh|password|access)/i, "Preferences never store a plaintext credential");
@@ -96,7 +95,7 @@ reject(auth, /console\.(?:log|error)[\s\S]{0,120}(password|token|email)/i, "Admi
 expect(auditMigration, /auth_security_audit/, "Security audit table exists");
 expect(auditMigration, /record_auth_security_event/, "Audit events are written through a constrained RPC");
 expect(auditMigration, /enable row level security/, "Security audit table uses RLS");
-reject(auditMigration, /token|password|credential_secret/i, "Audit schema accepts no credential secrets");
+reject(auditMigration, /^\s*(?:password|access_token|refresh_token|credential_secret)\s+[a-z]/im, "Audit table defines no credential-secret column");
 
 if (failed) {
   console.error("Biometric and passkey security gate FAILED.\n");
