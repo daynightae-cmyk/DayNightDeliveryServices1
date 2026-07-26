@@ -1,0 +1,139 @@
+name: Android Biometric API Compatibility
+
+on:
+  pull_request:
+    paths:
+      - "android-role-shell/**"
+      - ".github/workflows/android-biometric-api-compatibility.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-biometric-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-tests:
+    name: Build biometric instrumentation APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          python -m pip install --disable-pip-version-check "pillow>=10,<13"
+          python android-role-shell/scripts/prepare_icons.py
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Build app and instrumentation packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-role-shell --no-daemon --console=plain \
+            assembleDriverDebug assembleMerchantDebug \
+            assembleDriverDebugAndroidTest assembleMerchantDebugAndroidTest
+          mkdir -p android-role-shell/api-test-apks
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*driver*debug*' ! -path '*androidTest*' -exec cp {} android-role-shell/api-test-apks/driver-app.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*merchant*debug*' ! -path '*androidTest*' -exec cp {} android-role-shell/api-test-apks/merchant-app.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*androidTest*' -path '*driver*' -exec cp {} android-role-shell/api-test-apks/driver-test.apk \;
+          find android-role-shell/app/build/outputs/apk -type f -name '*.apk' -path '*androidTest*' -path '*merchant*' -exec cp {} android-role-shell/api-test-apks/merchant-test.apk \;
+          test -s android-role-shell/api-test-apks/driver-app.apk
+          test -s android-role-shell/api-test-apks/merchant-app.apk
+          test -s android-role-shell/api-test-apks/driver-test.apk
+          test -s android-role-shell/api-test-apks/merchant-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Biometric-Instrumentation-APKs
+          path: android-role-shell/api-test-apks/
+          if-no-files-found: error
+          retention-days: 7
+
+  api-matrix:
+    name: Biometric API ${{ matrix.api }}
+    needs: build-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 28, 30, 33, 35, 36]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+      - name: Install API ${{ matrix.api }} emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "emulator" "system-images;android-${{ matrix.api }};google_apis;x86_64"
+      - uses: actions/download-artifact@v4
+        with:
+          name: DAY-NIGHT-Biometric-Instrumentation-APKs
+          path: android-role-shell/api-test-apks
+      - name: Boot API ${{ matrix.api }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/daynight-bio-api${{ matrix.api }}"
+          mkdir -p "$ANDROID_AVD_HOME" "android-role-shell/api${{ matrix.api }}-evidence"
+          echo no | avdmanager create avd --force --name daynight_bio_api${{ matrix.api }} --package "system-images;android-${{ matrix.api }};google_apis;x86_64" --path "$ANDROID_AVD_HOME/daynight_bio_api${{ matrix.api }}.avd"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          nohup "$ANDROID_HOME/emulator/emulator" -avd daynight_bio_api${{ matrix.api }} -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -wipe-data > "android-role-shell/api${{ matrix.api }}-evidence/emulator.log" 2>&1 &
+          echo $! > "android-role-shell/api${{ matrix.api }}-evidence/emulator.pid"
+          timeout 240 adb wait-for-device
+          for attempt in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
+          adb shell getprop ro.build.version.sdk | tee "android-role-shell/api${{ matrix.api }}-evidence/sdk.txt"
+          grep -Fx "${{ matrix.api }}" "android-role-shell/api${{ matrix.api }}-evidence/sdk.txt"
+      - name: Run Driver and Merchant biometric instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="android-role-shell/api${{ matrix.api }}-evidence"
+          adb install -r android-role-shell/api-test-apks/driver-app.apk
+          adb install -r android-role-shell/api-test-apks/driver-test.apk
+          adb shell am instrument -w -r com.daynightae.driver.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/driver-instrumentation.txt"
+          grep -F 'OK (3 tests)' "$out/driver-instrumentation.txt"
+          adb uninstall com.daynightae.driver.test || true
+          adb uninstall com.daynightae.driver || true
+
+          adb install -r android-role-shell/api-test-apks/merchant-app.apk
+          adb install -r android-role-shell/api-test-apks/merchant-test.apk
+          adb shell am instrument -w -r com.daynightae.merchant.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/merchant-instrumentation.txt"
+          grep -F 'OK (3 tests)' "$out/merchant-instrumentation.txt"
+          adb shell am start -n com.daynightae.merchant/com.daynightae.shell.MainActivity | tee "$out/merchant-launch.txt"
+          sleep 5
+          adb shell pidof com.daynightae.merchant | tee "$out/merchant-pid.txt"
+          test -s "$out/merchant-pid.txt"
+          adb exec-out screencap -p > "$out/merchant-api${{ matrix.api }}.png"
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: |
+          adb emu kill || true
+          pidfile="android-role-shell/api${{ matrix.api }}-evidence/emulator.pid"
+          if [ -f "$pidfile" ]; then kill "$(cat "$pidfile")" 2>/dev/null || true; fi
+      - name: Upload API ${{ matrix.api }} evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Biometric-API-${{ matrix.api }}-Evidence
+          path: android-role-shell/api${{ matrix.api }}-evidence/
+          if-no-files-found: error
+          retention-days: 14
