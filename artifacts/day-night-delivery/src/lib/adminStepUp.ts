@@ -57,16 +57,17 @@ export function hasRecentAdminStepUp(userId: string) {
 }
 
 export async function requireAdminStepUp(action: AdminSensitiveAction): Promise<void> {
-  if (!supabase) throw new Error("supabase_unavailable");
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const client = supabase;
+  if (!client) throw new Error("supabase_unavailable");
+  const { data: userData, error: userError } = await client.auth.getUser();
   const user = userData.user;
   if (userError || !user?.id) throw new Error("admin_session_required");
   if (!(await isAdminUser(user.id))) throw new Error("admin_role_required");
 
-  const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const assurance = await client.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assurance.error) throw new Error(assurance.error.message || "aal_check_failed");
-  const currentLevel = assurance.data.currentLevel || "aal1";
-  const nextLevel = assurance.data.nextLevel || currentLevel;
+  const currentLevel = assurance.data?.currentLevel || "aal1";
+  const nextLevel = assurance.data?.nextLevel || currentLevel;
   const requiresMfa = nextLevel === "aal2" && currentLevel !== "aal2";
 
   if (!requiresMfa && hasRecentAdminStepUp(user.id)) return;
@@ -110,14 +111,14 @@ export async function requireAdminStepUp(action: AdminSensitiveAction): Promise<
     }));
   });
 
-  const verified = await supabase.auth.getUser();
+  const verified = await client.auth.getUser();
   if (verified.error || verified.data.user?.id !== user.id || !(await isAdminUser(user.id))) {
     clearAdminStepUp(user.id);
     throw new Error("admin_step_up_identity_changed");
   }
 
-  const afterAssurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (nextLevel === "aal2" && afterAssurance.data.currentLevel !== "aal2") {
+  const afterAssurance = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (nextLevel === "aal2" && afterAssurance.data?.currentLevel !== "aal2") {
     clearAdminStepUp(user.id);
     throw new Error("admin_mfa_required");
   }
