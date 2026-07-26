@@ -6,6 +6,7 @@ import { AppProvider } from "./lib/AppContext.tsx";
 import { reportError } from "./lib/monitoring";
 import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
 import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
+import { installMerchantCredentialAutofill } from "./lib/merchantCredentialAutofill";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
@@ -183,6 +184,7 @@ async function mountStandaloneAdminFeatures() {
 async function bootstrapApplication() {
   normalizeTrackingNumberQuery();
   normalizeLegacyAdminFeaturePath();
+  installMerchantCredentialAutofill();
   installGlobalRuntimeHandlers();
   try {
     if (await mountStandaloneAdminFeatures()) return;
