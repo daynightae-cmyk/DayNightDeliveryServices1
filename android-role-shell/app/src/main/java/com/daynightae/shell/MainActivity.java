@@ -2,7 +2,6 @@ package com.daynightae.shell;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -40,15 +39,27 @@ import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import androidx.fragment.app.FragmentActivity;
+
+import com.daynightae.shell.security.BiometricSessionManager;
+import com.daynightae.shell.security.DayNightBiometricBridge;
+
 import org.json.JSONObject;
 
 import java.util.Locale;
 
-public final class MainActivity extends Activity {
+/**
+ * Thin, role-isolated Android host for the real DAY NIGHT React application.
+ * Authentication remains owned by Supabase. Native biometrics only decrypt a
+ * role- and package-bound refresh token after a successful system prompt.
+ */
+public final class MainActivity extends FragmentActivity {
     private static final int LOCATION_PERMISSION_REQUEST = 4001;
     private static final int FILE_CHOOSER_REQUEST = 4002;
     private static final String WEB_CACHE_PREFERENCES = "daynight_web_cache";
     private static final String WEB_CACHE_VERSION_KEY = "version_name";
+    private static final String OFFLINE_BRIDGE_NAME = "DAYNIGHT";
+    private static final String BIOMETRIC_BRIDGE_NAME = "DAYNIGHT_BIOMETRIC";
 
     private WebView webView;
     private ProgressBar loadingIndicator;
@@ -56,6 +67,10 @@ public final class MainActivity extends Activity {
     private GeolocationPermissions.Callback pendingGeoCallback;
     private String pendingGeoOrigin;
     private boolean offlineVisible;
+    private boolean biometricBridgeAttached;
+    private long backgroundedAt;
+    private BiometricSessionManager biometricSessionManager;
+    private DayNightBiometricBridge biometricBridge;
 
     @Override
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -90,18 +105,32 @@ public final class MainActivity extends Activity {
         root.addView(loadingIndicator, loadingLayout);
         setContentView(root);
 
+        biometricSessionManager = new BiometricSessionManager(
+                this,
+                BuildConfig.ROLE,
+                BuildConfig.BIOMETRIC_KEY_ALIAS,
+                BuildConfig.BIOMETRIC_MAX_AGE_SECONDS
+        );
+        biometricBridge = new DayNightBiometricBridge(
+                webView,
+                biometricSessionManager,
+                BuildConfig.ROLE,
+                getPackageName()
+        );
+
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         configureWebView();
         clearWebCacheAfterUpgrade();
 
         if (savedInstanceState != null && webView.restoreState(savedInstanceState) != null) {
+            syncBiometricBridge(webView.getUrl());
             hideLoadingIndicator();
             return;
         }
         openStartRoute();
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void configureWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -119,7 +148,7 @@ public final class MainActivity extends Activity {
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " DAYNIGHT/1.0 " + BuildConfig.ROLE);
+        settings.setUserAgentString(settings.getUserAgentString() + " DAYNIGHT/1.2 " + BuildConfig.ROLE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
@@ -131,7 +160,8 @@ public final class MainActivity extends Activity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        webView.addJavascriptInterface(new OfflineBridge(), "DAYNIGHT");
+        webView.addJavascriptInterface(new OfflineBridge(), OFFLINE_BRIDGE_NAME);
+        syncBiometricBridge(BuildConfig.START_URL);
         webView.setWebViewClient(new RoleWebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -141,8 +171,8 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // The current role portals require text/location workflows only.
-                // Camera/microphone WebRTC permissions remain denied unless a real feature is added.
+                // Camera/microphone WebRTC stays denied. Normal file/camera upload
+                // continues through the system file chooser below.
                 request.deny();
             }
 
@@ -202,6 +232,7 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
+            syncBiometricBridge(url);
             if (!offlineVisible) {
                 showLoadingIndicator();
             }
@@ -210,6 +241,7 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageCommitVisible(WebView view, String url) {
             super.onPageCommitVisible(view, url);
+            syncBiometricBridge(url);
             if (!offlineVisible) {
                 injectNativeRoleShell();
                 hideLoadingIndicator();
@@ -219,6 +251,7 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
+            syncBiometricBridge(url);
             if (offlineVisible) {
                 hideLoadingIndicator();
                 return;
@@ -276,6 +309,8 @@ public final class MainActivity extends Activity {
             return true;
         }
         if (host.endsWith(".supabase.co")) {
+            // OAuth callbacks may load Supabase pages. The biometric interface is
+            // detached by onPageStarted before those documents execute.
             return false;
         }
 
@@ -362,6 +397,7 @@ public final class MainActivity extends Activity {
             showOfflinePage("offline");
             return;
         }
+        syncBiometricBridge(BuildConfig.START_URL);
         webView.loadUrl(BuildConfig.START_URL);
     }
 
@@ -370,11 +406,12 @@ public final class MainActivity extends Activity {
             return;
         }
         offlineVisible = true;
+        syncBiometricBridge(null);
         hideLoadingIndicator();
         String title = isArabic() ? "لا يوجد اتصال بالإنترنت" : "No internet connection";
         String body = isArabic()
-                ? "تحقق من الشبكة ثم اضغط إعادة المحاولة. ستظل جلسة حسابك محفوظة بأمان داخل التطبيق."
-                : "Check your connection, then retry. Your account session remains securely stored in the app.";
+                ? "تحقق من الشبكة ثم اضغط إعادة المحاولة. ستظل جلسة حسابك المشفرة محفوظة داخل التطبيق."
+                : "Check your connection, then retry. Your encrypted account session remains stored in the app.";
         String retry = isArabic() ? "إعادة المحاولة" : "Retry";
         String html = "<!doctype html><html lang=\"" + (isArabic() ? "ar" : "en") + "\" dir=\""
                 + (isArabic() ? "rtl" : "ltr") + "\"><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\"><style>"
@@ -387,6 +424,20 @@ public final class MainActivity extends Activity {
                 + "</p><button onclick=\"DAYNIGHT.retry()\">" + retry + "</button><small>" + BuildConfig.ROLE + " · " + reason
                 + "</small></main></body></html>";
         webView.loadDataWithBaseURL("https://offline.daynight.invalid/", html, "text/html", "UTF-8", null);
+    }
+
+    @SuppressLint("AddJavascriptInterface")
+    private void syncBiometricBridge(String value) {
+        boolean shouldAttach = isRoleUrl(value);
+        if (shouldAttach && !biometricBridgeAttached) {
+            webView.addJavascriptInterface(biometricBridge, BIOMETRIC_BRIDGE_NAME);
+            biometricBridgeAttached = true;
+        } else if (!shouldAttach && biometricBridgeAttached) {
+            biometricBridge.setAttached(false);
+            webView.removeJavascriptInterface(BIOMETRIC_BRIDGE_NAME);
+            biometricBridgeAttached = false;
+        }
+        biometricBridge.setAttached(shouldAttach && biometricBridgeAttached);
     }
 
     private void injectNativeRoleShell() {
@@ -406,6 +457,7 @@ public final class MainActivity extends Activity {
                 + "var style=document.getElementById('dn-native-shell-style');if(!style){style=document.createElement('style');style.id='dn-native-shell-style';document.head.appendChild(style);}"
                 + "style.textContent=" + JSONObject.quote(css) + ";"
                 + "document.body&&document.body.setAttribute('data-native-role',role);"
+                + "if(window.DAYNIGHT_BIOMETRIC){window.dispatchEvent(new CustomEvent('daynight-biometric-bridge-ready',{detail:{role:role}}));}"
                 + "}catch(error){console.error('DAY_NIGHT_NATIVE_SHELL',error);}})();";
         webView.evaluateJavascript(script, null);
     }
@@ -442,10 +494,6 @@ public final class MainActivity extends Activity {
             return false;
         }
         NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
-        // NET_CAPABILITY_VALIDATED can arrive late or be absent on otherwise
-        // working Wi-Fi/mobile networks. Let WebView attempt the HTTPS request
-        // whenever an Internet-capable transport exists, then rely on the real
-        // main-frame loading callback to decide whether Offline UI is needed.
         return capabilities != null
                 && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     }
@@ -465,7 +513,10 @@ public final class MainActivity extends Activity {
 
     private boolean isRoleUrl(String value) {
         Uri uri = safeUri(value);
-        return uri != null && isOfficialHost(uri.getHost()) && isRolePath(uri.getPath());
+        return uri != null
+                && "https".equalsIgnoreCase(uri.getScheme())
+                && isOfficialHost(uri.getHost())
+                && isRolePath(uri.getPath());
     }
 
     private void openExternal(Uri uri) {
@@ -504,6 +555,7 @@ public final class MainActivity extends Activity {
         setIntent(intent);
         Uri data = intent == null ? null : intent.getData();
         if (data != null && isOfficialHost(data.getHost()) && isRolePath(data.getPath())) {
+            syncBiometricBridge(data.toString());
             webView.loadUrl(data.toString());
         } else {
             openStartRoute();
@@ -530,11 +582,20 @@ public final class MainActivity extends Activity {
         webView.onResume();
         if (offlineVisible && hasInternetTransport()) {
             openStartRoute();
+            return;
         }
+        if (backgroundedAt > 0L && isRoleUrl(webView.getUrl())) {
+            long backgroundMs = Math.max(0L, System.currentTimeMillis() - backgroundedAt);
+            String script = "window.dispatchEvent(new CustomEvent('daynight-native-resume',{detail:{backgroundMs:"
+                    + backgroundMs + "}}));";
+            webView.evaluateJavascript(script, null);
+        }
+        backgroundedAt = 0L;
     }
 
     @Override
     protected void onPause() {
+        backgroundedAt = System.currentTimeMillis();
         webView.onPause();
         CookieManager.getInstance().flush();
         super.onPause();
@@ -553,7 +614,14 @@ public final class MainActivity extends Activity {
             fileChooserCallback.onReceiveValue(null);
             fileChooserCallback = null;
         }
-        webView.removeJavascriptInterface("DAYNIGHT");
+        if (biometricSessionManager != null) {
+            biometricSessionManager.cancel();
+        }
+        if (biometricBridge != null) {
+            biometricBridge.setAttached(false);
+        }
+        webView.removeJavascriptInterface(BIOMETRIC_BRIDGE_NAME);
+        webView.removeJavascriptInterface(OFFLINE_BRIDGE_NAME);
         webView.stopLoading();
         webView.setWebChromeClient(null);
         webView.setWebViewClient(null);
