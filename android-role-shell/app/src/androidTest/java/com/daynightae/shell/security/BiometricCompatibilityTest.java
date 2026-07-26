@@ -22,15 +22,17 @@ import java.util.List;
 @RunWith(AndroidJUnit4.class)
 public final class BiometricCompatibilityTest {
     @Test
-    public void flavorIsBoundToExpectedPackageAndRole() {
+    public void flavorIsBoundToExpectedPackageRoleKeyAndPolicy() {
         Context context = ApplicationProvider.getApplicationContext();
         if ("driver".equals(BuildConfig.ROLE)) {
             assertEquals("com.daynightae.driver", context.getPackageName());
             assertEquals("daynight_driver_biometric_session_v1", BuildConfig.BIOMETRIC_KEY_ALIAS);
+            assertEquals(86_400L, BuildConfig.BIOMETRIC_MAX_AGE_SECONDS);
         } else {
             assertEquals("merchant", BuildConfig.ROLE);
             assertEquals("com.daynightae.merchant", context.getPackageName());
             assertEquals("daynight_merchant_biometric_session_v1", BuildConfig.BIOMETRIC_KEY_ALIAS);
+            assertEquals(43_200L, BuildConfig.BIOMETRIC_MAX_AGE_SECONDS);
         }
     }
 
