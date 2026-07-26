@@ -1,0 +1,3 @@
+DAY NIGHT production redeploy trigger
+Triggered after Vercel build limit removal on 2026-07-27.
+Includes merchant statement bottom summary, friendly error messages, Al Ain locations, and tracking collision fixes.
