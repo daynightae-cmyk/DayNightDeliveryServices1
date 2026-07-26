@@ -1,5 +1,6 @@
-/* DAY NIGHT Merchant native dashboard — mobile scroll recovery.
-   Scoped to the standalone merchant shell so public/admin/driver layouts are not changed. */
+/* DAY NIGHT Merchant native dashboard — deterministic mobile scroll contract.
+   Scoped to the standalone Merchant shell. The authenticated dashboard uses one
+   explicit scroll container; the sign-in/loading states keep normal page scroll. */
 
 html.dn-native-merchant-scroll,
 html.dn-native-merchant-scroll body {
@@ -7,7 +8,9 @@ html.dn-native-merchant-scroll body {
   min-width: 0;
   min-height: 100%;
   height: auto;
-  overflow-x: hidden;
+  max-height: none;
+  overflow-x: hidden !important;
+  overflow-y: auto;
   overscroll-behavior-y: auto;
   touch-action: pan-y pinch-zoom;
   -webkit-overflow-scrolling: touch;
@@ -15,7 +18,7 @@ html.dn-native-merchant-scroll body {
 
 html.dn-native-merchant-scroll body {
   position: static;
-  overflow-y: auto;
+  margin: 0;
 }
 
 html.dn-native-merchant-scroll #root {
@@ -23,25 +26,80 @@ html.dn-native-merchant-scroll #root {
   min-width: 0;
   min-height: 100dvh;
   height: auto;
+  max-height: none;
   overflow: visible;
 }
 
-html.dn-native-merchant-scroll .dn-merchant-app,
-html.dn-native-merchant-scroll .dn-merchant-main-column {
+/* Once the authenticated Merchant shell is mounted, lock the document itself
+   and scroll only the dashboard content. This is substantially more reliable in
+   Android WebView than depending on body scrolling beneath fixed navigation. */
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard,
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard body {
+  width: 100%;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: manipulation;
+}
+
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard #root {
+  width: 100%;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-app {
   width: 100%;
   min-width: 0;
-  min-height: 100dvh;
-  height: auto;
-  max-height: none;
-  overflow: visible;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
 }
 
-html.dn-native-merchant-scroll .dn-merchant-content,
-html.dn-native-merchant-scroll .dn-merchant-content-inner {
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-main-column {
+  width: 100%;
   min-width: 0;
-  height: auto;
-  max-height: none;
-  overflow: visible;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-header,
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-connectivity-banner {
+  flex: 0 0 auto;
+}
+
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-content {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+}
+
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-content-inner {
+  width: 100%;
+  min-width: 0;
+  min-height: min-content;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 html.dn-native-merchant-scroll .dn-merchant-app::before,
@@ -52,26 +110,25 @@ html.dn-native-merchant-scroll .dn-merchant-main-column::after {
 }
 
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
-  html.dn-native-merchant-scroll .dn-merchant-app {
-    display: block;
-    min-height: 100dvh;
+  html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-app {
+    display: block !important;
     padding: 0;
     isolation: isolate;
   }
 
-  html.dn-native-merchant-scroll .dn-merchant-header {
-    position: sticky;
-    inset-block-start: 0;
-    top: 0;
+  html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-main-column {
+    display: flex !important;
+    flex-direction: column !important;
   }
 
-  html.dn-native-merchant-scroll .dn-merchant-content {
-    position: relative;
-    z-index: 1;
-    padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-header {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    z-index: 25;
   }
 
-  html.dn-native-merchant-scroll .dn-merchant-bottom-nav {
+  html.dn-native-merchant-scroll.dn-native-merchant-dashboard .dn-merchant-bottom-nav {
     max-height: calc(78px + env(safe-area-inset-bottom));
   }
 
@@ -81,4 +138,17 @@ html.dn-native-merchant-scroll .dn-merchant-main-column::after {
   html.dn-native-merchant-scroll .dn-merchant-content-inner {
     max-width: 100%;
   }
+}
+
+/* Prevent the dashboard underneath a genuine modal/drawer from moving while the
+   overlay owns the gesture. Closed overlays are unmounted, so this cannot leave
+   the dashboard permanently locked. */
+html.dn-native-merchant-scroll.dn-native-merchant-dashboard:has(
+  .dn-merchant-mobile-drawer-backdrop,
+  .dn-merchant-command-backdrop,
+  .dn-merchant-modal-backdrop,
+  .dn-merchant-command-palette-backdrop
+) .dn-merchant-content {
+  overflow-y: hidden !important;
+  touch-action: none !important;
 }
