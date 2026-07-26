@@ -11,6 +11,7 @@ import {
 import { createDayNightInvoiceNumber } from "./printableDocuments";
 import {
   calculateOrderFinancials,
+  financialNumber,
   normalizeDeliveryFeeMode,
   orderFinancialValidation,
   type DeliveryFeeMode,
@@ -43,11 +44,29 @@ function normalizePaymentMethod(value: unknown) {
   return "cod";
 }
 
-function effectiveDeliveryFeeMode(input: FinancialOpsOrderInput): DeliveryFeeMode {
+export function hasExplicitZeroManualDelivery(input: FinancialOpsOrderInput) {
+  const raw = input.manual_delivery_price;
+  return (
+    input.price_mode === "manual" &&
+    raw !== "" &&
+    raw !== null &&
+    raw !== undefined &&
+    Number.isFinite(Number(raw)) &&
+    Number(raw) === 0
+  );
+}
+
+export function effectiveDeliveryFeeMode(input: FinancialOpsOrderInput): DeliveryFeeMode {
   const paymentMethod = clean(input.payment_method).toLowerCase();
   if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") {
     return "deduct_from_merchant";
   }
+
+  const goodsAreZero = financialNumber(input.goods_value, 0) === 0;
+  if (goodsAreZero && hasExplicitZeroManualDelivery(input)) {
+    return "deduct_from_merchant";
+  }
+
   return normalizeDeliveryFeeMode(input.delivery_fee_mode);
 }
 
@@ -60,9 +79,9 @@ function operationError(error: unknown, fallback: string) {
 
 function buildFinanceNote(financials: OrderFinancialBreakdown) {
   const settlementLine =
-    financials.merchantDue < 0
+    financials.merchantDue <= 0
       ? `Due from merchant ${Math.abs(financials.merchantDue).toFixed(2)} AED`
-      : `Due to merchant ${financials.merchantDue.toFixed(2)} AED`;
+      : `Merchant net ${financials.merchantDue.toFixed(2)} AED`;
   const lines = [
     `Goods value ${financials.goodsValue.toFixed(2)} AED`,
     `Delivery fee ${financials.deliveryFee.toFixed(2)} AED`,
@@ -103,6 +122,14 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
     systemDeliveryFee: pricing.systemTotal,
     priceSource: pricing.priceSource,
   };
+}
+
+function persistedManualDeliveryPrice(
+  input: FinancialOpsOrderInput,
+  financials: ReturnType<typeof calculateFinancialOpsOrder>,
+) {
+  if (hasExplicitZeroManualDelivery(input)) return 0;
+  return financials.priceSource === "manual" ? financials.deliveryFee : null;
 }
 
 function buildFinancialOrderPayload(
@@ -169,7 +196,7 @@ function buildFinancialOrderPayload(
     merchant_due: financials.merchantDue,
     company_revenue: financials.companyRevenue,
     collected_amount: 0,
-    financial_version: 1,
+    financial_version: 2,
     delivery_price: financials.deliveryFee,
     base_price: financials.deliveryFee,
     subtotal: financials.customerTotal,
@@ -177,7 +204,7 @@ function buildFinancialOrderPayload(
     total_price: financials.customerTotal,
     amount: financials.customerTotal,
     price: financials.customerTotal,
-    manual_delivery_price: financials.priceSource === "manual" ? financials.deliveryFee : null,
+    manual_delivery_price: persistedManualDeliveryPrice(input, financials),
     price_source: financials.priceSource,
     currency: "AED",
     notes: [clean(input.notes), financeNote].filter(Boolean).join(" | "),
@@ -265,7 +292,7 @@ function buildCorePatch(
     total_price: financials.customerTotal,
     amount: financials.customerTotal,
     price: financials.customerTotal,
-    manual_delivery_price: financials.priceSource === "manual" ? financials.deliveryFee : null,
+    manual_delivery_price: persistedManualDeliveryPrice(input, financials),
     price_source: financials.priceSource,
     currency: "AED",
     notes: clean(input.notes),
