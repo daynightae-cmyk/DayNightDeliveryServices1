@@ -1,0 +1,2 @@
+DAY NIGHT Merchant PDF V2 production deployment trigger.
+Source includes the direct PDF renderer and corrected Git branch ancestry.

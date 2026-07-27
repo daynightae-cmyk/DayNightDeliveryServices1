@@ -1,0 +1,2 @@
+Trigger a clean Vercel preview build from the fully merged merchant statement fix.
+Base commit: c60c5fe07240c532728bd57387e72c4ca82ebe61

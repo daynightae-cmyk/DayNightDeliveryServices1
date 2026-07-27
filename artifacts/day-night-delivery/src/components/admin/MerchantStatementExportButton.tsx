@@ -21,13 +21,8 @@ function numeric(value: unknown) {
 }
 
 /**
- * The legacy PDF renderer used goods_value=0 as a heuristic for charging every
- * delivery fee to the merchant. The current rule is more precise: a zero-goods
- * row may still be customer-paid when customer_total equals the delivery fee.
- *
- * The PDF does not render row.goodsValue and its totals use payload.totals, so a
- * tiny export-only sentinel safely prevents the old heuristic from rewriting a
- * correctly persisted customer-paid row. Merchant-liability rows remain signed.
+ * Preserve the exact settlement owner recorded in the database. A zero-goods
+ * order may still be customer-paid when customer_total equals delivery_fee.
  */
 function preservePreciseSettlement(payload: MerchantStatementPayload): MerchantStatementPayload {
   return {
