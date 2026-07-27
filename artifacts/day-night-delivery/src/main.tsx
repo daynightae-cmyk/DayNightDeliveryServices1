@@ -14,6 +14,7 @@ import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMer
 import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
 import WhatsAppRuntimeGuard from "./components/WhatsAppRuntimeGuard";
 import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";
+import AdminRatingsLauncher from "./components/admin/AdminRatingsLauncher";
 import AdminEmployeeLauncher from "./components/admin/AdminEmployeeLauncher";
 import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
 import "./index.css";
@@ -136,6 +137,7 @@ function mountPublicApplication() {
         <App />
         <WhatsAppRuntimeGuard />
         <AdminCustomerExperienceLauncher />
+        <AdminRatingsLauncher />
         <AdminEmployeeLauncher />
         <MerchantFeedbackSummaryLauncher />
         <ProductionOrderRealtimeBridge />
@@ -166,18 +168,19 @@ async function mountNativeRoleApplication(role: NativeRole) {
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
   if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
-    const { default: FeedbackPage } = await import("./components/FeedbackPage");
+    // FeedbackPage remains the customer form inside MultiPartyRatingPage; this
+    // preserves the original customer-experience route and complaint contract.
+    const { default: MultiPartyRatingPage } = await import("./components/MultiPartyRatingPage");
     createRoot(rootElement()).render(
       <StrictMode>
         <AppProvider>
-          <FeedbackPage />
+          <MultiPartyRatingPage />
           <WhatsAppRuntimeGuard />
         </AppProvider>
       </StrictMode>,
     );
     return true;
   }
-
 
   return false;
 }
