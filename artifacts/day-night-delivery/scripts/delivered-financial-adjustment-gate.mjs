@@ -38,6 +38,7 @@ expect(migration, /financial_adjustment_readback_mismatch/, "Database verifies p
 expect(migration, /financial_version = coalesce\(o\.financial_version, 1\) \+ 1/, "Financial version increments on correction");
 expect(migration, /collected_amount = case/, "Delivered collection is recalculated with the corrected customer total");
 expect(migration, /financial_adjustment_reason/, "Adjustment reason is stored on the order");
+expect(migration, /'cod', 'receiver_pays', 'sender_pays', 'prepaid'/, "Database uses only the production payment modes");
 expect(service, /adjustDeliveredOrderFinancials/, "Frontend uses a dedicated audited adjustment client");
 expect(service, /financial_adjustment_readback_mismatch/, "Frontend verifies returned totals");
 expect(panel, /سعر التوصيل اليدوي/, "Delivered order panel exposes an editable manual delivery amount");
