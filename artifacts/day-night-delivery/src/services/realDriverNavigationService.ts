@@ -6,9 +6,18 @@ export type RoadRoute = {
   durationSeconds: number;
 };
 
+type CachedRouteRequest = {
+  expiresAt: number;
+  promise: Promise<RoadRoute>;
+};
+
 const DEFAULT_ROUTING_ENDPOINT = "https://router.project-osrm.org";
 const DEFAULT_GEOCODING_ENDPOINT = "https://nominatim.openstreetmap.org";
 const UAE_BOUNDS = { minLat: 22.45, maxLat: 26.55, minLng: 51.45, maxLng: 56.65 };
+const ROUTE_CACHE_PRECISION = 3;
+const ROUTE_CACHE_TTL_MS = 20_000;
+const ROUTE_NETWORK_TIMEOUT_MS = 15_000;
+const inFlightRouteRequests = new Map<string, CachedRouteRequest>();
 
 function endpoint(value: unknown, fallback: string) {
   const text = String(value || fallback).trim().replace(/\/+$/, "");
@@ -104,29 +113,63 @@ export function snapPointToRoadRoute(
   return { point: bestPoint, snapped: true, segmentIndex: bestSegment, distanceMeters: bestDistance };
 }
 
+function routeRequestKey(start: NavigationPoint, destination: NavigationPoint) {
+  return [start, destination]
+    .flatMap(([lat, lng]) => [lat.toFixed(ROUTE_CACHE_PRECISION), lng.toFixed(ROUTE_CACHE_PRECISION)])
+    .join(":");
+}
+
+async function requestRoadRoute(start: NavigationPoint, destination: NavigationPoint): Promise<RoadRoute> {
+  const waypoints = [start, destination]
+    .map(([lat, lng]) => `${lng.toFixed(ROUTE_CACHE_PRECISION)},${lat.toFixed(ROUTE_CACHE_PRECISION)}`)
+    .join(";");
+  const url = `${routingEndpoint}/route/v1/driving/${waypoints}?overview=full&geometries=geojson&alternatives=false&steps=true&annotations=false`;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), ROUTE_NETWORK_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`routing_http_${response.status}`);
+    const payload = await response.json();
+    const route = payload?.routes?.[0];
+    const coordinates = route?.geometry?.coordinates;
+    if (payload?.code !== "Ok" || !Array.isArray(coordinates) || coordinates.length < 2) throw new Error("routing_no_road_route");
+    const points = coordinates
+      .map(([lng, lat]: [number, number]) => [Number(lat), Number(lng)] as NavigationPoint)
+      .filter(isValidNavigationPoint);
+    if (points.length < 2) throw new Error("routing_invalid_geometry");
+    return {
+      points,
+      distanceMeters: Number(route.distance || 0),
+      durationSeconds: Number(route.duration || 0),
+    };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 export async function fetchRealDrivingRoute(
   start: NavigationPoint,
   destination: NavigationPoint,
   signal?: AbortSignal,
 ): Promise<RoadRoute> {
   if (!isValidNavigationPoint(start) || !isValidNavigationPoint(destination)) throw new Error("invalid_route_coordinates");
-  const waypoints = [start, destination].map(([lat, lng]) => `${lng.toFixed(6)},${lat.toFixed(6)}`).join(";");
-  const url = `${routingEndpoint}/route/v1/driving/${waypoints}?overview=full&geometries=geojson&alternatives=false&steps=true&annotations=false`;
-  const response = await fetch(url, { signal, headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`routing_http_${response.status}`);
-  const payload = await response.json();
-  const route = payload?.routes?.[0];
-  const coordinates = route?.geometry?.coordinates;
-  if (payload?.code !== "Ok" || !Array.isArray(coordinates) || coordinates.length < 2) throw new Error("routing_no_road_route");
-  const points = coordinates
-    .map(([lng, lat]: [number, number]) => [Number(lat), Number(lng)] as NavigationPoint)
-    .filter(isValidNavigationPoint);
-  if (points.length < 2) throw new Error("routing_invalid_geometry");
-  return {
-    points,
-    distanceMeters: Number(route.distance || 0),
-    durationSeconds: Number(route.duration || 0),
-  };
+  if (signal?.aborted) throw new Error("routing_request_aborted");
+
+  const key = routeRequestKey(start, destination);
+  const now = Date.now();
+  const cached = inFlightRouteRequests.get(key);
+  if (cached && cached.expiresAt > now) return cached.promise;
+  if (cached) inFlightRouteRequests.delete(key);
+
+  // The network request deliberately owns its AbortController. Rapid one-second
+  // GPS updates may replace React effects, but they reuse this coalesced request
+  // instead of repeatedly cancelling routing before geometry can arrive.
+  const promise = requestRoadRoute(start, destination).catch((error) => {
+    inFlightRouteRequests.delete(key);
+    throw error;
+  });
+  inFlightRouteRequests.set(key, { promise, expiresAt: now + ROUTE_CACHE_TTL_MS });
+  return promise;
 }
 
 function geocodeCacheKey(query: string) {
