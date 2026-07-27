@@ -120,7 +120,13 @@ begin
     v_mode := 'customer_pays';
   end if;
 
-  if v_discount > case when v_mode = 'customer_pays' then v_goods + v_delivery else v_goods end then
+  -- Parentheses are required around CASE in a PL/pgSQL IF comparison.
+  if v_discount > (
+    case
+      when v_mode = 'customer_pays' then v_goods + v_delivery
+      else v_goods
+    end
+  ) then
     raise exception 'discount_exceeds_allowed_total';
   end if;
 
