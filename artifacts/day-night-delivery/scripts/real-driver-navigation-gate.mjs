@@ -15,6 +15,17 @@ function read(relative) {
   return fs.readFileSync(target, "utf8");
 }
 
+function readRepositoryFile(relative) {
+  const target = path.resolve(root, "../..", relative);
+  if (!fs.existsSync(target)) {
+    console.error(`FAIL: missing repository file ${relative}`);
+    failed = true;
+    return "";
+  }
+  console.log(`PASS: repository ${relative}`);
+  return fs.readFileSync(target, "utf8");
+}
+
 function expect(content, pattern, label) {
   if (!pattern.test(content)) {
     console.error(`FAIL: ${label}`);
@@ -34,11 +45,15 @@ const map = read("src/components/tracking/TrackingMap.tsx");
 const marker = read("src/components/maps/DayNightVehicleMarker.tsx");
 const navigation = read("src/services/realDriverNavigationService.ts");
 const styles = read("src/styles/dn-real-driver-navigation.css");
+const appVercel = read("vercel.json");
+const rootVercel = readRepositoryFile("vercel.json");
 
 expect(navigation, /rawLat === null[\s\S]*rawLng === null/, "Null database coordinates are rejected instead of becoming 0,0");
 expect(navigation, /fetchRealDrivingRoute/, "Road geometry is fetched from a routing engine");
 expect(navigation, /geometries=geojson/, "Routing requests return full road geometry");
 expect(navigation, /snapPointToRoadRoute/, "Live GPS can be visually aligned to the road within a bounded threshold");
+expect(navigation, /inFlightRouteRequests/, "Rapid GPS updates coalesce in-flight routing requests");
+expect(navigation, /ROUTE_CACHE_PRECISION = 3/, "Rerouting is throttled to meaningful road movement");
 expect(map, /color: "#1A73E8"/, "The active route is rendered in Google-style blue");
 expect(map, /appearance=\{navigationMode \|\| nativeDriver \? "navigation-arrow"/, "Driver navigation uses the blue directional arrow");
 expect(map, /تعذر تحميل مسار الطرق الحقيقي الآن؛ لن يعرض النظام خطًا مستقيمًا وهميًا/, "Routing failures explicitly suppress fake straight lines");
@@ -50,6 +65,8 @@ expect(styles, /dn-real-navigation-marker__arrow/, "Blue arrow rotation and smoo
 expect(map, /enableHighAccuracy: true/, "Phone GPS requests high-accuracy fixes");
 expect(map, /tracking_live_driver_location/, "Operations tracking still consumes the authoritative Supabase location RPC");
 expect(map, /driver_locations/, "Realtime driver location updates remain connected");
+expect(rootVercel, /connect-src[^\"]*https:\/\/nominatim\.openstreetmap\.org/, "Root production CSP allows UAE address geocoding");
+expect(appVercel, /connect-src[^\"]*https:\/\/nominatim\.openstreetmap\.org/, "App production CSP allows UAE address geocoding");
 
 if (failed) {
   console.error("Real driver navigation gate FAILED.");
