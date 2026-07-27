@@ -35,7 +35,9 @@ function money(value: unknown) {
 function normalizedPaymentMethod(value: unknown) {
   const raw = clean(value || "cod").toLowerCase().replace(/[\s-]+/g, "_");
   if (raw === "merchant_pays") return "sender_pays";
-  if (["cod", "receiver_pays", "sender_pays", "prepaid", "cash", "card", "bank_transfer"].includes(raw)) {
+  if (raw === "cash") return "cod";
+  if (raw === "card" || raw === "bank_transfer") return "prepaid";
+  if (["cod", "receiver_pays", "sender_pays", "prepaid"].includes(raw)) {
     return raw;
   }
   return "cod";

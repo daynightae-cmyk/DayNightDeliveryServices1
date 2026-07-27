@@ -220,8 +220,7 @@ export default function AdminDeliveredFinancialAdjustment({
                 <option value="cod">{isArabic ? "تحصيل من العميل عند التسليم" : "Collect from customer on delivery"}</option>
                 <option value="receiver_pays">{isArabic ? "المستلم دفع مسبقًا" : "Receiver prepaid"}</option>
                 <option value="merchant_pays">{isArabic ? "على حساب التاجر" : "Merchant account"}</option>
-                <option value="bank_transfer">{isArabic ? "تحويل بنكي" : "Bank transfer"}</option>
-                <option value="card">{isArabic ? "بطاقة" : "Card"}</option>
+                <option value="prepaid">{isArabic ? "مدفوع مسبقًا" : "Prepaid"}</option>
               </select>
             </label>
             <div className="space-y-1 text-[11px] font-black text-white/65">

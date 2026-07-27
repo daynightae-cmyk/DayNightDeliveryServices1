@@ -105,8 +105,12 @@ begin
 
   if v_payment = 'merchant_pays' then
     v_payment := 'sender_pays';
+  elsif v_payment = 'cash' then
+    v_payment := 'cod';
+  elsif v_payment in ('card', 'bank_transfer') then
+    v_payment := 'prepaid';
   end if;
-  if v_payment not in ('cod', 'receiver_pays', 'sender_pays', 'prepaid', 'cash', 'card', 'bank_transfer') then
+  if v_payment not in ('cod', 'receiver_pays', 'sender_pays', 'prepaid') then
     raise exception 'invalid_payment_method: %', v_payment;
   end if;
 
@@ -146,7 +150,7 @@ begin
     2
   );
   v_company_revenue := v_delivery;
-  v_cod_amount := case when v_payment in ('cod', 'cash') then v_customer_total else 0 end;
+  v_cod_amount := case when v_payment = 'cod' then v_customer_total else 0 end;
 
   update public.orders o
   set
