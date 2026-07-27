@@ -41,7 +41,7 @@ function escapeAttribute(value: string) {
 }
 
 function navigationArrowHtml(size: number, bearing: number, label: string) {
-  return `<span class="dn-real-navigation-marker" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${bearing}deg" role="img" aria-label="${label}"><span class="dn-real-navigation-marker__accuracy" aria-hidden="true"></span><span class="dn-real-navigation-marker__arrow" aria-hidden="true"><svg viewBox="0 0 48 54" width="${size}" height="${size}" focusable="false"><path d="M24 2.8 44 48 24 38.4 4 48Z" fill="#1A73E8" stroke="#FFFFFF" stroke-width="3.2" stroke-linejoin="round"/></svg></span></span>`;
+  return `<span class="dn-official-vehicle is-driving dn-real-navigation-marker" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${bearing}deg" role="img" aria-label="${label}"><span class="dn-real-navigation-marker__accuracy" aria-hidden="true"></span><span class="dn-real-navigation-marker__arrow" aria-hidden="true"><svg viewBox="0 0 48 54" width="${size}" height="${size}" focusable="false"><path d="M24 2.8 44 48 24 38.4 4 48Z" fill="#1A73E8" stroke="#FFFFFF" stroke-width="3.2" stroke-linejoin="round"/></svg></span></span>`;
 }
 
 export function createDayNightVehicleIcon({
@@ -65,7 +65,7 @@ export function createDayNightVehicleIcon({
   const isNavigationArrow = appearance === "navigation-arrow";
 
   return L.divIcon({
-    className: isNavigationArrow ? "dn-real-navigation-leaflet-icon" : "dn-official-vehicle-leaflet-icon",
+    className: isNavigationArrow ? "dn-real-navigation-leaflet-icon dn-official-vehicle-leaflet-icon" : "dn-official-vehicle-leaflet-icon",
     html: isNavigationArrow
       ? navigationArrowHtml(size, safeBearing, safeLabel)
       : `<span class="dn-official-vehicle is-${resolvedState}" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${safeBearing}deg" role="img" aria-label="${safeLabel}"><span class="dn-official-vehicle__pulse" aria-hidden="true"></span><img class="dn-official-vehicle__image" src="${vehicleUrl}" width="${size}" height="${size}" alt="" decoding="async" draggable="false" /></span>`,
