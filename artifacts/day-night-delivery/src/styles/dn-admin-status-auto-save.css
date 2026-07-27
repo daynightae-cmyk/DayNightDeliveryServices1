@@ -1,0 +1,88 @@
+/* DAY NIGHT — Admin order status auto-save
+   Selecting a status is the save action. The legacy button is retained only as
+   a visible retry control when automatic persistence fails. */
+
+.dn-order-status-control[data-auto-save-enabled="true"] {
+  position: relative;
+  display: grid;
+  gap: 0.38rem;
+  min-width: 190px;
+}
+
+.dn-order-status-control[data-auto-save-enabled="true"] > select {
+  width: 100%;
+}
+
+.dn-order-status-control[data-auto-save-enabled="true"] > button {
+  display: none !important;
+}
+
+.dn-order-status-control[data-auto-save-enabled="true"]::after {
+  content: attr(data-auto-save-label);
+  display: block;
+  min-height: 1.15rem;
+  padding-inline: 0.2rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.dn-order-status-control[data-auto-save-state="pending"]::after,
+.dn-order-status-control[data-auto-save-state="saving"]::after {
+  color: #f4ce58;
+}
+
+.dn-order-status-control[data-auto-save-state="saving"] > select {
+  pointer-events: none;
+  cursor: progress;
+  opacity: 0.74;
+}
+
+.dn-order-status-control[data-auto-save-state="saved"]::after {
+  color: #86efac;
+}
+
+.dn-order-status-control[data-auto-save-state="error"]::after {
+  color: #fda4af;
+}
+
+.dn-order-status-control[data-auto-save-state="error"] > button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  border: 1px solid rgba(251, 113, 133, 0.42) !important;
+  background: rgba(127, 29, 29, 0.2) !important;
+  color: #fecdd3 !important;
+}
+
+html:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-enabled="true"]::after,
+.dncc-shell:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-enabled="true"]::after {
+  color: #52667d;
+}
+
+html:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="pending"]::after,
+html:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="saving"]::after,
+.dncc-shell:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="pending"]::after,
+.dncc-shell:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="saving"]::after {
+  color: #9a6c00;
+}
+
+html:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="saved"]::after,
+.dncc-shell:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="saved"]::after {
+  color: #15803d;
+}
+
+html:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="error"]::after,
+.dncc-shell:not([data-theme="dark"]) .dn-order-status-control[data-auto-save-state="error"]::after {
+  color: #be123c;
+}
+
+@media (max-width: 760px) {
+  .dn-order-status-control[data-auto-save-enabled="true"] {
+    min-width: 0;
+    width: 100%;
+  }
+}
