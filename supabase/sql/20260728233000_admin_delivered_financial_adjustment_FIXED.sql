@@ -1,7 +1,7 @@
 -- DAY NIGHT DELIVERY SERVICES
--- Audited financial correction for delivered/posted orders.
--- Allows an authorized admin/support user to correct goods, delivery, discount,
--- payer mode and payment method without corrupting merchant/company totals.
+-- Corrected standalone copy of migration 20260728233000.
+-- Run this complete file in Supabase SQL Editor when the original copy fails at
+-- the discount CASE comparison. The repository migration contains the same fix.
 
 begin;
 
@@ -120,7 +120,6 @@ begin
     v_mode := 'customer_pays';
   end if;
 
-  -- Parentheses are required around CASE in a PL/pgSQL IF comparison.
   if v_discount > (
     case
       when v_mode = 'customer_pays' then v_goods + v_delivery

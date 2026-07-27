@@ -24,6 +24,15 @@ function expect(content, pattern, label) {
   }
 }
 
+function reject(content, pattern, label) {
+  if (pattern.test(content)) {
+    console.error(`FAIL: ${label}`);
+    failed = true;
+  } else {
+    console.log(`PASS: ${label}`);
+  }
+}
+
 console.log("\n--- DAY NIGHT audited delivered financial adjustment gate ---");
 
 const migration = read("../../supabase/migrations/20260728233000_admin_delivered_financial_adjustment.sql");
@@ -39,6 +48,8 @@ expect(migration, /financial_version = coalesce\(o\.financial_version, 1\) \+ 1/
 expect(migration, /collected_amount = case/, "Delivered collection is recalculated with the corrected customer total");
 expect(migration, /financial_adjustment_reason/, "Adjustment reason is stored on the order");
 expect(migration, /'cod', 'receiver_pays', 'sender_pays', 'prepaid'/, "Database uses only the production payment modes");
+expect(migration, /if v_discount > \([\s\S]*case[\s\S]*end[\s\S]*\) then/, "PL/pgSQL CASE comparison is parenthesized and parse-safe");
+reject(migration, /if v_discount > case when/, "Migration cannot regress to the invalid unparenthesized CASE comparison");
 expect(service, /adjustDeliveredOrderFinancials/, "Frontend uses a dedicated audited adjustment client");
 expect(service, /financial_adjustment_readback_mismatch/, "Frontend verifies returned totals");
 expect(panel, /سعر التوصيل اليدوي/, "Delivered order panel exposes an editable manual delivery amount");
