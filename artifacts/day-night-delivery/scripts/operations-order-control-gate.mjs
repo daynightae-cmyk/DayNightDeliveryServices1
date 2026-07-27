@@ -24,6 +24,15 @@ function expect(content, pattern, label) {
   }
 }
 
+function reject(content, pattern, label) {
+  if (pattern.test(content)) {
+    console.error(`FAIL: ${label}`);
+    failed = true;
+  } else {
+    console.log(`PASS: ${label}`);
+  }
+}
+
 console.log("\n--- DAY NIGHT operations order-control gate ---");
 
 const bulk = read("src/components/admin/AdminOrderBulkOperations.tsx");
@@ -69,6 +78,23 @@ expect(driverDashboard, /<TrackingMap[\s\S]*navigationMode/, "Driver orders open
 const driverData = read("src/lib/driverData.ts");
 expect(driverData, /rpc\(["']driver_update_order_status["']/, "Driver status helper writes through driver_update_order_status");
 
+const adminStatus = read("src/supabaseAdminOps.ts");
+expect(adminStatus, /admin_update_order_status_verified/, "Admin status updates use the verified exact-order RPC first");
+expect(adminStatus, /fetchPersistedOrder/, "Admin status changes are read back from the production orders row");
+expect(adminStatus, /persistedStatusIsValid/, "Admin status success requires persisted status verification");
+expect(adminStatus, /financial_posted_at/, "Delivered status verifies financial posting before success");
+expect(adminStatus, /affected_zero_rows/, "Zero affected rows are treated as a failure");
+expect(adminStatus, /\.eq\("id", existing\.id\)/, "Direct compatibility updates target one exact order UUID");
+reject(adminStatus, /if \(!rpcResult\.error && rpcResult\.data\)\s*\{\s*return true/, "A non-error RPC response cannot create false success without read-back");
+
+const statusMigration = read("../../supabase/migrations/20260727131500_admin_order_status_persistence_fix.sql");
+expect(statusMigration, /admin_update_order_status_verified/, "Status persistence migration creates the authoritative RPC");
+expect(statusMigration, /order_status_update_affected_zero_rows/, "Database RPC rejects zero-row updates");
+expect(statusMigration, /order_status_readback_mismatch/, "Database RPC verifies the stored status inside its transaction");
+expect(statusMigration, /financial_posted_at = coalesce\(financial_posted_at, \$4\)/, "Deliver and post is atomic for normal orders");
+expect(statusMigration, /deferred_zero_merchant/, "Intentional zero-value merchant accounting remains deferred");
+expect(statusMigration, /admin_order_status_persistence_health/, "Migration publishes a production health RPC");
+
 const statements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
 expect(statements, /merchants\.map/, "Merchant statements list every registered merchant");
 expect(statements, /selectedOrderIds/, "Merchant statements support exact multi-order selection");
@@ -109,7 +135,7 @@ if (/(?:PRICE|Price|price|سعر|درهم|AED).{0,55}\b30\b|\b30\b.{0,55}(?:PRIC
   console.log("PASS: all customer-facing local price paths are clear of 30 AED");
 }
 
-const combined = `${bulk}\n${workspace}\n${driver}\n${driverContact}\n${deterministicDriverMessages}\n${messageService}\n${driverDashboard}\n${driverData}\n${statements}\n${realtime}`;
+const combined = `${bulk}\n${workspace}\n${driver}\n${driverContact}\n${deterministicDriverMessages}\n${messageService}\n${driverDashboard}\n${driverData}\n${adminStatus}\n${statements}\n${realtime}`;
 if (/Math\.random|demoOrders|mockOrders|localStorage\.setItem\([^)]*order/i.test(combined)) {
   console.error("FAIL: operational controls contain mock/random/local order persistence");
   failed = true;
