@@ -6,14 +6,22 @@ import {
   FileCheck2,
   Languages,
   Loader2,
+  LogOut,
   MapPin,
   Phone,
   Save,
+  Settings2,
   ShieldCheck,
   Truck,
   UserRound,
 } from "lucide-react";
-import { driverErrorMessage, updateDriverOwnProfile, uploadDriverAvatarFile } from "../../lib/driverData";
+import { supabase } from "../../supabase";
+import {
+  driverErrorMessage,
+  setDriverPresence,
+  updateDriverOwnProfile,
+  uploadDriverAvatarFile,
+} from "../../lib/driverData";
 import type { DriverProfile, ProfileRole } from "../../types/driver";
 
 function daysUntil(value?: string | null) {
@@ -37,6 +45,7 @@ export default function DriverProfilePanel({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState(driver.avatar_url || "");
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const licenseDays = daysUntil(driver.license_expiry);
@@ -114,6 +123,32 @@ export default function DriverProfilePanel({
     }
   }
 
+  async function logoutFromSettings() {
+    if (saving || signingOut) return;
+    const confirmed = window.confirm(
+      isArabic
+        ? "هل تريد تسجيل الخروج من تطبيق المندوب؟ سيتم إنهاء حالة الاتصال الحالية والعودة إلى شاشة الدخول."
+        : "Sign out of the Driver app? Your current online status will end and the login screen will open.",
+    );
+    if (!confirmed) return;
+
+    setSigningOut(true);
+    setMessage("");
+    setError("");
+    try {
+      try {
+        await setDriverPresence(false, "offline", "Driver signed out from profile settings");
+      } catch {
+        // Signing out must remain available even if the presence update fails.
+      }
+      const { error: signOutError } = await supabase?.auth.signOut() || { error: null };
+      if (signOutError) throw signOutError;
+    } catch (signOutError) {
+      setError(driverErrorMessage(signOutError, isArabic));
+      setSigningOut(false);
+    }
+  }
+
   return (
     <form className="dn-driver-profile-editor dn-driver-profile-editor-v2" onSubmit={(event) => void submit(event)}>
       <section className="dn-driver-profile-hero dn-driver-profile-hero-v2">
@@ -164,7 +199,27 @@ export default function DriverProfilePanel({
       <p className="dn-driver-admin-managed-note"><ShieldCheck /> {isArabic ? "بيانات المركبة والرخصة والحالة الرسمية تُدار من لوحة الإدارة لحماية السجل التشغيلي." : "Vehicle, license and account status are admin-managed to protect the operational record."}</p>
       {message && <div className="dn-driver-profile-message is-success">{message}</div>}
       {error && <div className="dn-driver-profile-message is-error">{error}</div>}
-      <button className="dn-driver-profile-save" type="submit" disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />}{isArabic ? "حفظ ومزامنة الملف" : "Save and sync profile"}</button>
+      <button className="dn-driver-profile-save" type="submit" disabled={saving || signingOut}>{saving ? <Loader2 className="animate-spin" /> : <Save />}{isArabic ? "حفظ ومزامنة الملف" : "Save and sync profile"}</button>
+
+      <section className="dn-driver-profile-account-settings" aria-labelledby="dn-driver-account-settings-title">
+        <header>
+          <span><Settings2 /></span>
+          <div>
+            <small>{isArabic ? "الإعدادات" : "Settings"}</small>
+            <h3 id="dn-driver-account-settings-title">{isArabic ? "الحساب والأمان" : "Account and security"}</h3>
+            <p>{isArabic ? "يمكنك إنهاء الوردية وتسجيل الخروج بأمان من هذا الجهاز." : "End the current online session and securely sign out on this device."}</p>
+          </div>
+        </header>
+        <button
+          className="dn-driver-profile-logout"
+          type="button"
+          onClick={() => void logoutFromSettings()}
+          disabled={saving || signingOut}
+        >
+          {signingOut ? <Loader2 className="animate-spin" /> : <LogOut />}
+          <span>{signingOut ? (isArabic ? "جاري تسجيل الخروج..." : "Signing out...") : (isArabic ? "تسجيل الخروج" : "Sign out")}</span>
+        </button>
+      </section>
     </form>
   );
 }
