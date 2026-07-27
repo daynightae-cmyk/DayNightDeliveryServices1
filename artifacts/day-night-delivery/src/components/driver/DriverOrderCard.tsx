@@ -31,6 +31,7 @@ const actions: DriverStatusAction[] = [
   { value: "confirmed", ar: "بدء تنفيذ المهمة", en: "Start job" },
   { value: "picked_up", ar: "تم استلام الشحنة", en: "Picked up" },
   { value: "in_transit", ar: "في الطريق للتسليم", en: "In transit" },
+  { value: "delivered", ar: "تم التسليم وإرسال التقييم", en: "Deliver and send rating" },
   { value: "cancelled", ar: "تعذر التسليم / إلغاء", en: "Delivery issue / cancel", requiresNote: true },
   { value: "returned", ar: "إرجاع للتاجر", en: "Return to merchant", requiresNote: true },
 ];
