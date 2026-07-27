@@ -60,12 +60,17 @@ for (const label of [
   "طلب إرسال الموقع",
   "وصلت إلى الموقع",
   "تعذر التواصل",
-  "تم التسليم – طلب تقييم",
+  "تم التسليم وإرسال التقييم",
   "اتصال بالعميل",
   "فتح التتبع",
   "نسخ رقم الشحنة",
 ]) requireText(driver, label, "DriverCustomerCommunication.tsx");
-requireText(driver, "فتح واتساب لا يغيّر حالة الطلب", "DriverCustomerCommunication.tsx");
+for (const contract of [
+  "await onConfirmDelivered()",
+  "createMultiPartyRatingLink(order.id, \"customer\"",
+  "يسجل التسليم أولًا",
+  "openPreparedWhatsApp",
+]) requireText(driver, contract, "DriverCustomerCommunication.tsx");
 
 const feedback = requireFile("src/components/FeedbackPage.tsx");
 for (const value of [
