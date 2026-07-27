@@ -13,6 +13,7 @@ import {
 } from "./VehicleAnimations";
 
 export type DayNightVehicleState = "driving" | "stopped" | "assignment" | "selected" | "offline" | "emergency";
+export type DayNightMarkerAppearance = "vehicle" | "navigation-arrow";
 
 export type DayNightVehicleMarkerProps = {
   position: LatLngTuple;
@@ -21,6 +22,7 @@ export type DayNightVehicleMarkerProps = {
   label?: string;
   selected?: boolean;
   navigationMode?: boolean;
+  appearance?: DayNightMarkerAppearance;
   size?: number;
   animate?: boolean;
   eventHandlers?: LeafletEventHandlerFnMap;
@@ -38,26 +40,35 @@ function escapeAttribute(value: string) {
   }[character] || character));
 }
 
+function navigationArrowHtml(size: number, bearing: number, label: string) {
+  return `<span class="dn-real-navigation-marker" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${bearing}deg" role="img" aria-label="${label}"><span class="dn-real-navigation-marker__accuracy" aria-hidden="true"></span><span class="dn-real-navigation-marker__arrow" aria-hidden="true"><svg viewBox="0 0 48 54" width="${size}" height="${size}" focusable="false"><path d="M24 2.8 44 48 24 38.4 4 48Z" fill="#1A73E8" stroke="#FFFFFF" stroke-width="3.2" stroke-linejoin="round"/></svg></span></span>`;
+}
+
 export function createDayNightVehicleIcon({
   bearing = 0,
   size = 40,
   state = "driving",
   label = "DAY NIGHT vehicle",
   selected = false,
+  appearance = "vehicle",
 }: {
   bearing?: number;
   size?: number;
   state?: DayNightVehicleState;
   label?: string;
   selected?: boolean;
+  appearance?: DayNightMarkerAppearance;
 }) {
   const resolvedState = selected ? "selected" : state;
   const safeLabel = escapeAttribute(label);
   const safeBearing = Number.isFinite(bearing) ? bearing : 0;
+  const isNavigationArrow = appearance === "navigation-arrow";
 
   return L.divIcon({
-    className: "dn-official-vehicle-leaflet-icon",
-    html: `<span class="dn-official-vehicle is-${resolvedState}" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${safeBearing}deg" role="img" aria-label="${safeLabel}"><span class="dn-official-vehicle__pulse" aria-hidden="true"></span><img class="dn-official-vehicle__image" src="${vehicleUrl}" width="${size}" height="${size}" alt="" decoding="async" draggable="false" /></span>`,
+    className: isNavigationArrow ? "dn-real-navigation-leaflet-icon" : "dn-official-vehicle-leaflet-icon",
+    html: isNavigationArrow
+      ? navigationArrowHtml(size, safeBearing, safeLabel)
+      : `<span class="dn-official-vehicle is-${resolvedState}" style="--dn-vehicle-size:${size}px;--dn-vehicle-bearing:${safeBearing}deg" role="img" aria-label="${safeLabel}"><span class="dn-official-vehicle__pulse" aria-hidden="true"></span><img class="dn-official-vehicle__image" src="${vehicleUrl}" width="${size}" height="${size}" alt="" decoding="async" draggable="false" /></span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -(size / 2)],
@@ -116,6 +127,7 @@ export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
   label = "DAY NIGHT vehicle",
   selected = false,
   navigationMode = false,
+  appearance = "vehicle",
   size,
   animate = true,
   eventHandlers,
@@ -132,7 +144,7 @@ export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
     setZoom(map.getZoom());
   }, [map]);
 
-  const resolvedSize = size || vehicleSizeForZoom(zoom, navigationMode);
+  const resolvedSize = size || (appearance === "navigation-arrow" ? Math.max(42, vehicleSizeForZoom(zoom, true) - 4) : vehicleSizeForZoom(zoom, navigationMode));
   const targetBearing = bearing == null ? calculateBearing(previousTargetRef.current, position) : normalizeBearing(bearing);
   const resolvedBearing = useContinuousBearing(targetBearing);
   const smoothPosition = useSmoothPosition(position, animate);
@@ -148,8 +160,9 @@ export const DayNightVehicleMarker = memo(function DayNightVehicleMarker({
       state,
       label,
       selected,
+      appearance,
     }),
-    [label, resolvedBearing, resolvedSize, selected, state],
+    [appearance, label, resolvedBearing, resolvedSize, selected, state],
   );
 
   return (
