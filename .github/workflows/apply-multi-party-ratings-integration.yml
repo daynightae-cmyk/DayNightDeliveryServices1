@@ -1,5 +1,6 @@
 name: Apply Multi Party Ratings Integration
 
+# One-time branch integration workflow. It removes itself after applying the patches.
 on:
   push:
     branches:
@@ -33,87 +34,26 @@ jobs:
               print(f"patched: {label}")
 
           main = "artifacts/day-night-delivery/src/main.tsx"
-          replace(
-              main,
-              'import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";\n',
-              'import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";\nimport AdminRatingsLauncher from "./components/admin/AdminRatingsLauncher";\n',
-              "ratings launcher import",
-          )
-          replace(
-              main,
-              '        <AdminCustomerExperienceLauncher />\n        <AdminEmployeeLauncher />',
-              '        <AdminCustomerExperienceLauncher />\n        <AdminRatingsLauncher />\n        <AdminEmployeeLauncher />',
-              "ratings launcher mount",
-          )
-          replace(
-              main,
-              '    const { default: FeedbackPage } = await import("./components/FeedbackPage");',
-              '    const { default: MultiPartyRatingPage } = await import("./components/MultiPartyRatingPage");',
-              "role-aware rating route import",
-          )
-          replace(
-              main,
-              '          <FeedbackPage />',
-              '          <MultiPartyRatingPage />',
-              "role-aware rating route mount",
-          )
+          replace(main, 'import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";\n', 'import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";\nimport AdminRatingsLauncher from "./components/admin/AdminRatingsLauncher";\n', "ratings launcher import")
+          replace(main, '        <AdminCustomerExperienceLauncher />\n        <AdminEmployeeLauncher />', '        <AdminCustomerExperienceLauncher />\n        <AdminRatingsLauncher />\n        <AdminEmployeeLauncher />', "ratings launcher mount")
+          replace(main, '    const { default: FeedbackPage } = await import("./components/FeedbackPage");', '    const { default: MultiPartyRatingPage } = await import("./components/MultiPartyRatingPage");', "role-aware rating route import")
+          replace(main, '          <FeedbackPage />', '          <MultiPartyRatingPage />', "role-aware rating route mount")
 
           driver = "artifacts/day-night-delivery/src/components/driver/DriverCustomerCommunication.tsx"
-          replace(
-              driver,
-              '''      let feedbackUrl = "";\n      if (action.key === "driver_delivered_feedback") {\n        feedbackUrl = await createFeedbackLinkForOrder(order.id);\n      }''',
-              '''      // Generate one secure customer link for every order message. Before\n      // delivery it opens a safe waiting state; after delivery it accepts the rating.\n      const feedbackUrl = await createFeedbackLinkForOrder(order.id);''',
-              "rating link on every driver message",
-          )
-          replace(
-              driver,
-              'كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين. فتح واتساب لا يغيّر حالة الطلب.',
-              'كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التتبع ورابط التقييم الآمن. فتح واتساب لا يغيّر حالة الطلب.',
-              "driver communication description ar",
-          )
-          replace(
-              driver,
-              'Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected. Opening WhatsApp does not change the order status.',
-              'Every action uses its own message, including shipment number, amount, payment, tracking and the secure rating link. Opening WhatsApp does not change the order status.',
-              "driver communication description en",
-          )
+          replace(driver, '''      let feedbackUrl = "";\n      if (action.key === "driver_delivered_feedback") {\n        feedbackUrl = await createFeedbackLinkForOrder(order.id);\n      }''', '''      // Generate one secure customer link for every order message. Before\n      // delivery it opens a safe waiting state; after delivery it accepts the rating.\n      const feedbackUrl = await createFeedbackLinkForOrder(order.id);''', "rating link on every driver message")
+          replace(driver, 'كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين. فتح واتساب لا يغيّر حالة الطلب.', 'كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التتبع ورابط التقييم الآمن. فتح واتساب لا يغيّر حالة الطلب.', "driver communication description ar")
+          replace(driver, 'Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected. Opening WhatsApp does not change the order status.', 'Every action uses its own message, including shipment number, amount, payment, tracking and the secure rating link. Opening WhatsApp does not change the order status.', "driver communication description en")
 
           messages = "artifacts/day-night-delivery/src/services/driverActionMessageService.ts"
-          replace(
-              messages,
-              '''  const paymentInstruction = context.paymentMode === "online"\n    ? isArabic\n      ? `\\n🏦 الاختيار الحالي: تحويل أونلاين عبر ${bank.shortName}. افتح الرابط، انسخ الآيبان، واكتب رقم الشحنة ${reference} في مرجع التحويل ثم أرسل الإيصال.`\n      : `\\n🏦 Current choice: online transfer through ${bank.shortName}. Open the link, copy the IBAN, use shipment ${reference} as the reference, then send the receipt.`\n    : isArabic\n      ? "\\n💵 الاختيار الحالي: كاش عند الاستلام. ويمكنك التحويل أونلاين من نفس الرابط إذا رغبت."\n      : "\\n💵 Current choice: cash on delivery. You can switch to online payment from the same link.";''',
-              '''  const paymentInstruction = context.paymentMode === "online"\n    ? isArabic\n      ? `\\n🏦 الاختيار الحالي: تحويل أونلاين عبر ${bank.shortName}. افتح الرابط، انسخ الآيبان، واكتب رقم الشحنة ${reference} في مرجع التحويل ثم أرسل الإيصال.`\n      : `\\n🏦 Current choice: online transfer through ${bank.shortName}. Open the link, copy the IBAN, use shipment ${reference} as the reference, then send the receipt.`\n    : isArabic\n      ? "\\n💵 الاختيار الحالي: كاش عند الاستلام. ويمكنك التحويل أونلاين من نفس الرابط إذا رغبت."\n      : "\\n💵 Current choice: cash on delivery. You can switch to online payment from the same link.";\n  const ratingBlock = context.feedbackUrl\n    ? isArabic\n      ? `\\n\\n⭐ رابط تقييم الخدمة والمندوب بعد إتمام الطلب:\\n${context.feedbackUrl}`\n      : `\\n\\n⭐ Rate the service and driver after delivery:\\n${context.feedbackUrl}`\n    : "";''',
-              "shared rating footer",
-          )
-          replace(
-              messages,
-              '    paymentOptionsBlock: `${customerChoiceBlock}${paymentInstruction}`,',
-              '    paymentOptionsBlock: `${customerChoiceBlock}${paymentInstruction}${ratingBlock}`,',
-              "rating footer used by all actions",
-          )
-          replace(
-              messages,
-              '''\n\n⭐ رأيكم مهم لنا. قيّموا تجربة التوصيل والمندوب من هنا:\n${feedbackUrl}''',
-              '',
-              "remove duplicated delivered rating ar",
-          )
-          replace(
-              messages,
-              '''\n\n⭐ Rate the delivery experience and driver:\n${feedbackUrl}''',
-              '',
-              "remove duplicated delivered rating en",
-          )
+          replace(messages, '''  const paymentInstruction = context.paymentMode === "online"\n    ? isArabic\n      ? `\\n🏦 الاختيار الحالي: تحويل أونلاين عبر ${bank.shortName}. افتح الرابط، انسخ الآيبان، واكتب رقم الشحنة ${reference} في مرجع التحويل ثم أرسل الإيصال.`\n      : `\\n🏦 Current choice: online transfer through ${bank.shortName}. Open the link, copy the IBAN, use shipment ${reference} as the reference, then send the receipt.`\n    : isArabic\n      ? "\\n💵 الاختيار الحالي: كاش عند الاستلام. ويمكنك التحويل أونلاين من نفس الرابط إذا رغبت."\n      : "\\n💵 Current choice: cash on delivery. You can switch to online payment from the same link.";''', '''  const paymentInstruction = context.paymentMode === "online"\n    ? isArabic\n      ? `\\n🏦 الاختيار الحالي: تحويل أونلاين عبر ${bank.shortName}. افتح الرابط، انسخ الآيبان، واكتب رقم الشحنة ${reference} في مرجع التحويل ثم أرسل الإيصال.`\n      : `\\n🏦 Current choice: online transfer through ${bank.shortName}. Open the link, copy the IBAN, use shipment ${reference} as the reference, then send the receipt.`\n    : isArabic\n      ? "\\n💵 الاختيار الحالي: كاش عند الاستلام. ويمكنك التحويل أونلاين من نفس الرابط إذا رغبت."\n      : "\\n💵 Current choice: cash on delivery. You can switch to online payment from the same link.";\n  const ratingBlock = context.feedbackUrl\n    ? isArabic\n      ? `\\n\\n⭐ رابط تقييم الخدمة والمندوب بعد إتمام الطلب:\\n${context.feedbackUrl}`\n      : `\\n\\n⭐ Rate the service and driver after delivery:\\n${context.feedbackUrl}`\n    : "";''', "shared rating footer")
+          replace(messages, '    paymentOptionsBlock: `${customerChoiceBlock}${paymentInstruction}`,', '    paymentOptionsBlock: `${customerChoiceBlock}${paymentInstruction}${ratingBlock}`,', "rating footer used by all actions")
+          replace(messages, '''\n\n⭐ رأيكم مهم لنا. قيّموا تجربة التوصيل والمندوب من هنا:\n${feedbackUrl}''', '', "remove duplicated delivered rating ar")
+          replace(messages, '''\n\n⭐ Rate the delivery experience and driver:\n${feedbackUrl}''', '', "remove duplicated delivered rating en")
 
           whatsapp = "artifacts/day-night-delivery/src/services/whatsappMessageService.ts"
-          replace(
-              whatsapp,
-              '''export async function createFeedbackLinkForOrder(orderId: string) {\n  if (!supabase || !orderId) throw new Error("feedback_service_unavailable");\n  const { data, error } = await supabase.rpc("create_feedback_token_for_order", {\n    p_order_id: orderId,\n  });\n  if (error) throw error;\n  const row = Array.isArray(data) ? data[0] : data;\n  const url = String(row?.url || row?.feedback_url || "");\n  const token = String(row?.token || "");\n  const resolved = url || getFeedbackUrl(token);\n  if (!resolved) throw new Error("feedback_link_not_created");\n  return resolved;\n}''',
-              '''export async function createFeedbackLinkForOrder(orderId: string) {\n  if (!supabase || !orderId) throw new Error("feedback_service_unavailable");\n\n  // Prefer the role-aware customer invite. The legacy RPC remains a safe\n  // compatibility fallback until the production migration is applied.\n  let response = await supabase.rpc("create_experience_rating_token_for_order", {\n    p_order_id: orderId,\n    p_rater_type: "customer",\n    p_locale: "ar",\n  });\n  if (response.error) {\n    response = await supabase.rpc("create_feedback_token_for_order", { p_order_id: orderId });\n  }\n  if (response.error) throw response.error;\n  const row = Array.isArray(response.data) ? response.data[0] : response.data;\n  const url = String(row?.url || row?.feedback_url || "");\n  const token = String(row?.token || "");\n  const resolved = url || getFeedbackUrl(token);\n  if (!resolved) throw new Error("feedback_link_not_created");\n  return resolved;\n}''',
-              "role-aware customer rating helper",
-          )
+          replace(whatsapp, '''export async function createFeedbackLinkForOrder(orderId: string) {\n  if (!supabase || !orderId) throw new Error("feedback_service_unavailable");\n  const { data, error } = await supabase.rpc("create_feedback_token_for_order", {\n    p_order_id: orderId,\n  });\n  if (error) throw error;\n  const row = Array.isArray(data) ? data[0] : data;\n  const url = String(row?.url || row?.feedback_url || "");\n  const token = String(row?.token || "");\n  const resolved = url || getFeedbackUrl(token);\n  if (!resolved) throw new Error("feedback_link_not_created");\n  return resolved;\n}''', '''export async function createFeedbackLinkForOrder(orderId: string) {\n  if (!supabase || !orderId) throw new Error("feedback_service_unavailable");\n\n  // Prefer the role-aware customer invite. The legacy RPC remains a safe\n  // compatibility fallback until the production migration is applied.\n  let response = await supabase.rpc("create_experience_rating_token_for_order", {\n    p_order_id: orderId,\n    p_rater_type: "customer",\n    p_locale: "ar",\n  });\n  if (response.error) {\n    response = await supabase.rpc("create_feedback_token_for_order", { p_order_id: orderId });\n  }\n  if (response.error) throw response.error;\n  const row = Array.isArray(response.data) ? response.data[0] : response.data;\n  const url = String(row?.url || row?.feedback_url || "");\n  const token = String(row?.token || "");\n  const resolved = url || getFeedbackUrl(token);\n  if (!resolved) throw new Error("feedback_link_not_created");\n  return resolved;\n}''', "role-aware customer rating helper")
 
-          workflow = Path(".github/workflows/apply-multi-party-ratings-integration.yml")
-          workflow.unlink()
+          Path(".github/workflows/apply-multi-party-ratings-integration.yml").unlink()
           PY
       - name: Commit integrated runtime
         shell: bash
