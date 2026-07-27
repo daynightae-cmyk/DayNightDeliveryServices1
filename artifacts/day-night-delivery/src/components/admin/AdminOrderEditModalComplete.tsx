@@ -26,6 +26,7 @@ import {
 import type { Merchant, Order } from "../../types";
 import { isPersonalAdminOrder } from "../../lib/adminOrderLogic";
 import { PERSONAL_ORDER_DELIVERY_FEE, calculatePersonalOrderFinancials } from "../../lib/personalOrderOperations";
+import AdminDeliveredFinancialAdjustment from "./AdminDeliveredFinancialAdjustment";
 
 type Props = {
   order: Order | null;
@@ -336,6 +337,14 @@ deliveryFee: PERSONAL_ORDER_DELIVERY_FEE,
                 ? "الطلب مُسلّم وحسابه مُرحّل. يمكنك تحديث اسم العميل والهاتف والعنوان والشحنة والملاحظات، لكن القيم المالية تظل مقفلة لحماية كشف التاجر وحساب الشركة."
                 : "This order is delivered and financially posted. Customer, address, package, and notes remain editable, while financial values stay locked to protect the merchant statement."}
             </div>
+          )}
+
+          {financialLocked && (
+            <AdminDeliveredFinancialAdjustment
+              order={currentOrder}
+              isArabic={isArabic}
+              onSaved={onSaved}
+            />
           )}
 
           <div className="grid gap-4 lg:grid-cols-2">
