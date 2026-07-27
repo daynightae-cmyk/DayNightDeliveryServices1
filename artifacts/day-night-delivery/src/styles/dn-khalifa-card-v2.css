@@ -1,0 +1,256 @@
+/* DAY NIGHT — Khalifa compact command card v2
+   Loaded last by dn-admin-command-center-v1.css.
+   Keeps the assistant useful without consuming the admin workspace. */
+
+.dncc-shell .dn-admin-left-ai {
+  width: min(350px, calc(100vw - 32px)) !important;
+  max-width: 350px !important;
+  gap: 0.7rem !important;
+  padding: 0.72rem !important;
+  border-radius: 22px !important;
+  border-color: color-mix(in srgb, var(--dncc-border) 76%, #d4af37 24%) !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(212, 175, 55, 0.10), transparent 15rem),
+    color-mix(in srgb, var(--dncc-surface) 97%, transparent) !important;
+  box-shadow: 0 28px 90px rgba(2, 10, 20, 0.30) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card {
+  position: relative !important;
+  isolation: isolate !important;
+  display: grid !important;
+  grid-template-columns: 82px minmax(0, 1fr) !important;
+  grid-template-areas:
+    "avatar title"
+    "avatar role"
+    "avatar description"
+    "live live"
+    "stats stats"
+    "action action" !important;
+  align-items: center !important;
+  gap: 0.32rem 0.8rem !important;
+  padding: 0.9rem !important;
+  overflow: hidden !important;
+  text-align: start !important;
+  border: 1px solid color-mix(in srgb, var(--dncc-border) 72%, #d4af37 28%) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--dncc-surface-2) 94%, #0ea5e9 6%), var(--dncc-surface-2)) !important;
+  box-shadow: 0 12px 32px rgba(7, 26, 51, 0.10) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: -1 !important;
+  inset-inline: 0 !important;
+  top: 0 !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, #d4af37, #38bdf8, #d4af37) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: -1 !important;
+  width: 150px !important;
+  height: 150px !important;
+  inset-inline-end: -72px !important;
+  top: -78px !important;
+  border-radius: 999px !important;
+  background: rgba(56, 189, 248, 0.10) !important;
+  filter: blur(10px) !important;
+  pointer-events: none !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > img {
+  grid-area: avatar !important;
+  align-self: stretch !important;
+  width: 82px !important;
+  height: 108px !important;
+  min-width: 82px !important;
+  margin: 0 !important;
+  padding: 0.35rem !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  border: 1px solid rgba(56, 189, 248, 0.22) !important;
+  border-radius: 16px !important;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(56, 189, 248, 0.18), transparent 66%),
+    color-mix(in srgb, var(--dncc-surface) 88%, #071a33 12%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.dncc-shell .dn-khalifa-profile-title {
+  grid-area: title !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  min-width: 0 !important;
+}
+
+.dncc-shell .dn-khalifa-profile-title .dn-admin-icon-badge {
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 1.85rem !important;
+  min-height: 1.85rem !important;
+}
+
+.dncc-shell .dn-khalifa-profile-title h2 {
+  margin: 0 !important;
+  overflow: hidden !important;
+  color: var(--dncc-text) !important;
+  font-size: 1.12rem !important;
+  font-weight: 1000 !important;
+  line-height: 1.15 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > p {
+  grid-area: role !important;
+  margin: 0 !important;
+  color: #b78a00 !important;
+  font-size: 0.73rem !important;
+  font-weight: 950 !important;
+  line-height: 1.35 !important;
+}
+
+.dncc-shell[data-theme="dark"] .dn-admin-khalifa-card > p {
+  color: #f4ce58 !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > small {
+  grid-area: description !important;
+  display: -webkit-box !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  color: var(--dncc-text-soft) !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  line-height: 1.45 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > .dn-admin-state-chip {
+  grid-area: live !important;
+  justify-self: start !important;
+  margin-top: 0.35rem !important;
+  min-height: 1.55rem !important;
+  padding: 0.25rem 0.55rem !important;
+  border-color: rgba(16, 185, 129, 0.34) !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+  color: #15803d !important;
+}
+
+.dncc-shell[data-theme="dark"] .dn-admin-khalifa-card > .dn-admin-state-chip {
+  color: #86efac !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > .mt-3.grid {
+  grid-area: stats !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 0.42rem !important;
+  margin: 0.35rem 0 0 !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card .dn-khalifa-status-row {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 0.3rem !important;
+  min-width: 0 !important;
+  min-height: 68px !important;
+  padding: 0.48rem 0.35rem !important;
+  text-align: center !important;
+  border: 1px solid var(--dncc-border) !important;
+  border-radius: 12px !important;
+  background: color-mix(in srgb, var(--dncc-surface) 88%, #38bdf8 12%) !important;
+  box-shadow: none !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card .dn-khalifa-status-row > span {
+  display: grid !important;
+  place-items: center !important;
+  gap: 0.2rem !important;
+  min-width: 0 !important;
+  color: var(--dncc-text-soft) !important;
+  font-size: 0.6rem !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card .dn-khalifa-status-row .dn-admin-icon-badge {
+  width: 1.45rem !important;
+  height: 1.45rem !important;
+  min-width: 1.45rem !important;
+  min-height: 1.45rem !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card .dn-khalifa-status-row > b {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  color: var(--dncc-text) !important;
+  font-size: 0.7rem !important;
+  font-weight: 1000 !important;
+  line-height: 1.2 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > button {
+  grid-area: action !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  margin: 0.35rem 0 0 !important;
+  padding: 0.65rem 0.8rem !important;
+  border: 1px solid rgba(212, 175, 55, 0.62) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #f7dc79, #d4af37 58%, #efbd22) !important;
+  color: #071a33 !important;
+  font-size: 0.78rem !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 10px 24px rgba(212, 175, 55, 0.18) !important;
+}
+
+.dncc-shell .dn-admin-khalifa-card > button:hover,
+.dncc-shell .dn-admin-khalifa-card > button:focus-visible {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.03) !important;
+  outline: none !important;
+}
+
+.dncc-shell .dn-khalifa-feed,
+.dncc-shell .dn-khalifa-live {
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+  .dncc-shell .dn-admin-left-ai {
+    width: auto !important;
+    max-width: none !important;
+    padding: 0.6rem !important;
+  }
+
+  .dncc-shell .dn-admin-khalifa-card {
+    grid-template-columns: 72px minmax(0, 1fr) !important;
+    padding: 0.75rem !important;
+  }
+
+  .dncc-shell .dn-admin-khalifa-card > img {
+    width: 72px !important;
+    height: 96px !important;
+    min-width: 72px !important;
+  }
+
+  .dncc-shell .dn-admin-khalifa-card .dn-khalifa-status-row {
+    min-height: 62px !important;
+  }
+}
