@@ -37,7 +37,12 @@ import {
 } from "../../config/bankTransfer";
 import { getTrackingUrl } from "../../config/companyContact";
 
-type Props = { order: DriverOrder; isArabic: boolean };
+type Props = {
+  order: DriverOrder;
+  isArabic: boolean;
+  busy?: boolean;
+  onConfirmDelivered?: () => Promise<boolean>;
+};
 type PaymentChoice = "recorded" | DriverPaymentMode;
 
 type MessageAction = {
@@ -53,7 +58,7 @@ const MESSAGE_ACTIONS: MessageAction[] = [
   { key: "driver_request_location", ar: "طلب إرسال الموقع", en: "Request location", Icon: MapPin },
   { key: "driver_arrived", ar: "وصلت إلى الموقع", en: "I have arrived", Icon: MessageCircle },
   { key: "driver_unreachable", ar: "تعذر التواصل", en: "Unable to contact", Icon: TriangleAlert, tone: "warning" },
-  { key: "driver_delivered_feedback", ar: "تم التسليم – طلب تقييم", en: "Delivered – request feedback", Icon: CheckCircle2, tone: "success" },
+  { key: "driver_delivered_feedback", ar: "تم التسليم وإرسال التقييم", en: "Deliver and send rating", Icon: CheckCircle2, tone: "success" },
 ];
 
 function trackingReference(order: DriverOrder) {
@@ -104,7 +109,7 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
   );
 }
 
-export default function DriverCustomerCommunication({ order, isArabic }: Props) {
+export default function DriverCustomerCommunication({ order, isArabic, busy = false, onConfirmDelivered }: Props) {
   const reference = useMemo(() => trackingReference(order), [order]);
   const phone = useMemo(() => customerPhone(order), [order]);
   const shipmentAmount = useMemo(() => amountDue(order), [order]);
@@ -115,6 +120,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
   const [draft, setDraft] = useState("");
   const [preparing, setPreparing] = useState<DriverMessageActionKey | "">("");
   const [error, setError] = useState("");
+  const [successNotice, setSuccessNotice] = useState("");
   const [copied, setCopied] = useState(false);
   const [contactNote, setContactNote] = useState("");
   const [customNote, setCustomNote] = useState("");
@@ -143,13 +149,23 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
   async function prepare(action: MessageAction) {
     setPreparing(action.key);
     setError("");
+    setSuccessNotice("");
     setCopied(false);
     try {
+      const isDeliveryAction = action.key === "driver_delivered_feedback";
+      if (isDeliveryAction) {
+        if (!onConfirmDelivered) throw new Error("delivery_status_handler_missing");
+        const delivered = await onConfirmDelivered();
+        if (!delivered) throw new Error("delivery_status_failed");
+      }
+
       let feedbackUrl = "";
-      try {
-        feedbackUrl = (await createMultiPartyRatingLink(order.id, "customer", isArabic ? "ar" : "en")).url;
-      } catch {
-        feedbackUrl = await createFeedbackLinkForOrder(order.id);
+      if (isDeliveryAction) {
+        try {
+          feedbackUrl = (await createMultiPartyRatingLink(order.id, "customer", isArabic ? "ar" : "en")).url;
+        } catch {
+          feedbackUrl = await createFeedbackLinkForOrder(order.id);
+        }
       }
 
       const result = await prepareDeterministicDriverWhatsApp({
@@ -170,7 +186,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         deliveryAddress: [order.receiver_city, order.receiver_address].filter(Boolean).join("، "),
         trackingUrl,
         feedbackUrl,
-        orderStatus: order.status,
+        orderStatus: isDeliveryAction ? "delivered" : order.status,
         locale: isArabic ? "ar" : "en",
         paymentMode: effectivePaymentMode,
         preferredBank,
@@ -183,23 +199,42 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           preferredBank,
           recordedShipmentAmount: shipmentAmount,
           ratingLinkIncluded: Boolean(feedbackUrl),
+          deliveryStatusConfirmedBeforeRating: isDeliveryAction,
         },
       });
 
       setPrepared(result);
       setDraft(result.message);
+
+      if (isDeliveryAction) {
+        setSuccessNotice(
+          isArabic
+            ? "تم تسجيل التسليم وتجهيز رابط التقييم. جارٍ فتح واتساب للعميل."
+            : "Delivery recorded and the rating link is ready. Opening WhatsApp.",
+        );
+        try {
+          await openPreparedWhatsApp(result, { direct: true });
+        } catch {
+          // The preview remains visible as a reliable fallback when a browser
+          // blocks an asynchronous popup after the delivery transaction.
+        }
+      }
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "message_generation_failed";
       setError(
         isArabic
           ? code === "invalid_whatsapp_phone"
             ? "رقم هاتف العميل غير صالح لفتح واتساب. راجع بيانات الطلب أولًا."
-            : code === "feedback_service_unavailable" || code === "feedback_link_not_created" || code === "rating_link_not_created"
-              ? "تعذر إنشاء رابط التقييم الآمن لهذا الطلب."
-              : "تعذر تجهيز الرسالة المستقلة. راجع بيانات الطلب وحاول مجددًا."
+            : code === "delivery_status_failed" || code === "delivery_status_handler_missing"
+              ? "تعذر تسجيل حالة تم التسليم. لم يتم إنشاء رابط التقييم حتى لا يصل للعميل رابط غير نشط."
+              : code === "feedback_service_unavailable" || code === "feedback_link_not_created" || code === "rating_link_not_created"
+                ? "تم تسجيل التسليم، لكن تعذر إنشاء رابط التقييم الآمن لهذا الطلب."
+                : "تعذر تجهيز الرسالة المستقلة. راجع بيانات الطلب وحاول مجددًا."
           : code === "invalid_whatsapp_phone"
             ? "The customer phone is invalid for WhatsApp."
-            : "The action-specific message could not be prepared. Review the order and try again.",
+            : code === "delivery_status_failed" || code === "delivery_status_handler_missing"
+              ? "Delivery could not be recorded, so no inactive rating link was created."
+              : "The action-specific message could not be prepared. Review the order and try again.",
       );
     } finally {
       setPreparing("");
@@ -254,8 +289,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
             {isArabic
-              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التتبع ورابط التقييم الآمن. فتح واتساب لا يغيّر حالة الطلب."
-              : "Every action uses its own message, including shipment number, amount, payment, tracking and the secure rating link. Opening WhatsApp does not change the order status."}
+              ? "زر تم التسليم وإرسال التقييم يسجل التسليم أولًا، ثم ينشئ رابطًا فعالًا ويفتح رسالة واتساب للعميل في خطوة واحدة."
+              : "Deliver and send rating records delivery first, then creates an active link and opens the customer WhatsApp request in one step."}
           </p>
         </div>
         <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
@@ -313,10 +348,16 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {MESSAGE_ACTIONS.map(({ Icon, ...action }) => (
-          <button key={action.key} type="button" disabled={Boolean(preparing)} onClick={() => void prepare({ Icon, ...action })} className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition disabled:opacity-50 ${action.tone === "warning" ? "border-amber-400/35 bg-amber-50 text-amber-900" : action.tone === "success" ? "border-emerald-500/30 bg-emerald-50 text-emerald-900" : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"}`}>
+          <button
+            key={action.key}
+            type="button"
+            disabled={busy || Boolean(preparing)}
+            onClick={() => void prepare({ Icon, ...action })}
+            className={`min-h-20 rounded-2xl border p-3 text-start text-xs font-black transition disabled:opacity-50 ${action.tone === "warning" ? "border-amber-400/35 bg-amber-50 text-amber-900" : action.tone === "success" ? "border-emerald-500/30 bg-emerald-50 text-emerald-900" : "border-[#0057B8]/15 bg-[#EDF5FF] text-[#071A33]"}`}
+          >
             <Icon className="mb-2 h-5 w-5" />
             <span>{isArabic ? action.ar : action.en}</span>
-            {preparing === action.key && <small className="mt-2 block opacity-60">{isArabic ? "جارٍ تجهيز القالب الخاص…" : "Preparing this action…"}</small>}
+            {preparing === action.key && <small className="mt-2 block opacity-60">{isArabic ? "جارٍ تسجيل التسليم وتجهيز التقييم…" : "Recording delivery and preparing rating…"}</small>}
           </button>
         ))}
         <a href={phone ? `tel:${phone}` : undefined} aria-disabled={!phone} className="min-h-20 rounded-2xl border border-[#0057B8]/15 bg-[#EDF5FF] p-3 text-xs font-black text-[#071A33] aria-disabled:pointer-events-none aria-disabled:opacity-45">
@@ -333,6 +374,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         </button>
       </div>
 
+      {successNotice && <p className="mt-3 rounded-2xl border border-emerald-500/20 bg-emerald-50 p-3 text-xs font-black leading-6 text-emerald-800">{successNotice}</p>}
       {error && <p className="mt-3 rounded-2xl border border-red-500/20 bg-red-50 p-3 text-xs font-bold leading-6 text-red-800">{error}</p>}
 
       {prepared && (
@@ -341,7 +383,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#25D366]">WhatsApp preview</span>
-                <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "معاينة القالب الخاص بهذا الزر" : "Preview this action-specific message"}</h4>
+                <h4 className="mt-1 text-lg font-black text-[#071A33]">{isArabic ? "تم تجهيز رسالة العميل" : "Customer message is ready"}</h4>
                 <p className="mt-1 text-xs text-[#52627A]" dir="ltr">{prepared.phone}</p>
               </div>
               <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-full bg-[#071A33]/5 p-2"><X className="h-5 w-5" /></button>
@@ -357,7 +399,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
             <textarea value={draft} onChange={(event) => { setDraft(event.target.value); setCopied(false); }} rows={18} maxLength={7000} className="mt-4 min-h-[380px] w-full resize-y rounded-2xl border border-[#071A33]/10 bg-[#F5F8FD] p-4 text-sm font-medium leading-7 text-[#071A33] outline-none focus:border-[#0057B8]" />
 
             <div className="sticky bottom-0 mt-4 grid grid-cols-3 gap-2 bg-white pt-2">
-              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-2xl border border-[#071A33]/15 px-3 py-3 text-xs font-black">{isArabic ? "إلغاء" : "Cancel"}</button>
+              <button type="button" onClick={() => { setPrepared(null); setDraft(""); }} className="rounded-2xl border border-[#071A33]/15 px-3 py-3 text-xs font-black">{isArabic ? "إغلاق" : "Close"}</button>
               <button type="button" onClick={() => void copyMessage()} className="rounded-2xl border border-[#0057B8]/20 bg-[#EDF5FF] px-3 py-3 text-xs font-black text-[#0057B8]">{copied ? (isArabic ? "تم النسخ" : "Copied") : (isArabic ? "نسخ الرسالة" : "Copy")}</button>
               <button type="button" onClick={() => void openWhatsApp()} disabled={!draft.trim()} className="rounded-2xl bg-[#25D366] px-3 py-3 text-xs font-black text-[#071A33] shadow-lg disabled:opacity-50">{isArabic ? "فتح واتساب" : "Open WhatsApp"}</button>
             </div>
