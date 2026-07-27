@@ -30,7 +30,6 @@ const center = read("src/components/admin/AdminRatingsCenter.tsx");
 const launcher = read("src/components/admin/AdminRatingsLauncher.tsx");
 const driverCommunication = read("src/components/driver/DriverCustomerCommunication.tsx");
 const driverMessages = read("src/services/driverActionMessageService.ts");
-const whatsapp = read("src/services/whatsappMessageService.ts");
 const main = read("src/main.tsx");
 
 expect(migration, /rater_type[^\n]+customer[^\n]+merchant[^\n]+driver/, "Database distinguishes customer, merchant and driver raters");
@@ -45,9 +44,9 @@ expect(center, /قسم التقييمات/, "Administration has a dedicated Rati
 expect(center, /customer_cooperation_rating/, "Customer cooperation score is visible");
 expect(center, /createMultiPartyRatingLink/, "Ratings Center creates order-linked requests");
 expect(launcher, /cx.*ratings/, "Ratings Center is mounted as an admin section");
-expect(driverCommunication, /createFeedbackLinkForOrder\(order\.id\)/, "Driver order messages create a secure customer rating link");
+expect(driverCommunication, /createMultiPartyRatingLink\(order\.id, "customer"/, "Every driver order action creates a secure customer rating link");
+expect(driverCommunication, /ratingLinkIncluded/, "Driver message logs declare the rating-link contract");
 expect(driverMessages, /رابط تقييم الخدمة/, "Every deterministic driver message carries the rating link footer");
-expect(whatsapp, /create_experience_rating_token_for_order/, "Legacy feedback helper prefers the new customer-rating RPC");
 expect(main, /MultiPartyRatingPage/, "Public rating routes mount the role-aware page");
 expect(main, /AdminRatingsLauncher/, "Admin Ratings section is globally mounted");
 
