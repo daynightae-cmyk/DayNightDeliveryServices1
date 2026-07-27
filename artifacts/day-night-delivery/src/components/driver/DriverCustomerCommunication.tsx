@@ -24,6 +24,7 @@ import {
   type MessagePresentationOptions,
   type PreparedWhatsAppMessage,
 } from "../../services/whatsappMessageService";
+import { createMultiPartyRatingLink } from "../../services/multiPartyRatingsService";
 import {
   prepareDeterministicDriverWhatsApp,
   type DriverMessageActionKey,
@@ -145,7 +146,9 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
     setCopied(false);
     try {
       let feedbackUrl = "";
-      if (action.key === "driver_delivered_feedback") {
+      try {
+        feedbackUrl = (await createMultiPartyRatingLink(order.id, "customer", isArabic ? "ar" : "en")).url;
+      } catch {
         feedbackUrl = await createFeedbackLinkForOrder(order.id);
       }
 
@@ -179,6 +182,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           paymentMode: effectivePaymentMode,
           preferredBank,
           recordedShipmentAmount: shipmentAmount,
+          ratingLinkIncluded: Boolean(feedbackUrl),
         },
       });
 
@@ -190,7 +194,7 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
         isArabic
           ? code === "invalid_whatsapp_phone"
             ? "رقم هاتف العميل غير صالح لفتح واتساب. راجع بيانات الطلب أولًا."
-            : code === "feedback_service_unavailable" || code === "feedback_link_not_created"
+            : code === "feedback_service_unavailable" || code === "feedback_link_not_created" || code === "rating_link_not_created"
               ? "تعذر إنشاء رابط التقييم الآمن لهذا الطلب."
               : "تعذر تجهيز الرسالة المستقلة. راجع بيانات الطلب وحاول مجددًا."
           : code === "invalid_whatsapp_phone"
@@ -250,8 +254,8 @@ export default function DriverCustomerCommunication({ order, isArabic }: Props) 
           <h4 className="mt-1 text-base font-black text-[#071A33]">{isArabic ? "التواصل الاحترافي مع العميل" : "Professional customer communication"}</h4>
           <p className="mt-1 text-xs leading-6 text-[#52627A]">
             {isArabic
-              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التحويل عند اختيار الدفع أونلاين. فتح واتساب لا يغيّر حالة الطلب."
-              : "Every action uses its own message, including shipment number, amount, payment method, and an online-transfer link when selected. Opening WhatsApp does not change the order status."}
+              ? "كل زر يستخدم رسالة مستقلة حسب الإجراء، مع رقم الشحنة والمبلغ وطريقة الدفع ورابط التتبع ورابط التقييم الآمن. فتح واتساب لا يغيّر حالة الطلب."
+              : "Every action uses its own message, including shipment number, amount, payment, tracking and the secure rating link. Opening WhatsApp does not change the order status."}
           </p>
         </div>
         <MessageCircle className="h-8 w-8 shrink-0 text-[#25D366]" />
