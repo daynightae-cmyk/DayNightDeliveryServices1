@@ -31,7 +31,6 @@ const actions: DriverStatusAction[] = [
   { value: "confirmed", ar: "بدء تنفيذ المهمة", en: "Start job" },
   { value: "picked_up", ar: "تم استلام الشحنة", en: "Picked up" },
   { value: "in_transit", ar: "في الطريق للتسليم", en: "In transit" },
-  { value: "delivered", ar: "تأكيد التسليم", en: "Confirm delivery", requiresNote: true },
   { value: "cancelled", ar: "تعذر التسليم / إلغاء", en: "Delivery issue / cancel", requiresNote: true },
   { value: "returned", ar: "إرجاع للتاجر", en: "Return to merchant", requiresNote: true },
 ];
@@ -60,7 +59,7 @@ function nextActions(status: string) {
   if (normalized === "assigned") return actions.filter((action) => action.value === "confirmed" || action.value === "cancelled");
   if (normalized === "confirmed" || normalized === "accepted") return actions.filter((action) => action.value === "picked_up" || action.value === "cancelled");
   if (normalized === "picked_up") return actions.filter((action) => action.value === "in_transit" || action.value === "returned");
-  if (normalized === "in_transit" || normalized === "out_for_delivery") return actions.filter((action) => action.value === "delivered" || action.value === "cancelled" || action.value === "returned");
+  if (normalized === "in_transit" || normalized === "out_for_delivery") return actions.filter((action) => action.value === "cancelled" || action.value === "returned");
   return [];
 }
 
@@ -92,6 +91,16 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
       setSelectedAction(null);
       setNote("");
     }
+  }
+
+  async function confirmDeliveredForRating() {
+    if (normalizedStatus === "delivered") return true;
+    return onStatus(
+      "delivered",
+      isArabic
+        ? "تم تسليم الشحنة بنجاح وتجهيز رابط تقييم العميل."
+        : "Shipment delivered successfully and customer rating request prepared.",
+    );
   }
 
   async function copyReference() {
@@ -162,7 +171,12 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
         </button>
       </div>
 
-      <DriverCustomerCommunication order={order} isArabic={isArabic} />
+      <DriverCustomerCommunication
+        order={order}
+        isArabic={isArabic}
+        busy={busy}
+        onConfirmDelivered={confirmDeliveredForRating}
+      />
 
       {availableActions.length > 0 && (
         <div className="dn-driver-action-grid">
@@ -177,7 +191,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
                 else void runAction(action);
               }}
             >
-              {action.value === "delivered" || action.value === "confirmed" ? <CheckCircle2 /> : action.value === "cancelled" || action.value === "returned" ? <TriangleAlert /> : <Send />}
+              {action.value === "confirmed" ? <CheckCircle2 /> : action.value === "cancelled" || action.value === "returned" ? <TriangleAlert /> : <Send />}
               {isArabic ? action.ar : action.en}
             </button>
           ))}
