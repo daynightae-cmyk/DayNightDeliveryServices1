@@ -168,6 +168,8 @@ async function mountNativeRoleApplication(role: NativeRole) {
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
   if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
+    // FeedbackPage remains the customer form inside MultiPartyRatingPage; this
+    // preserves the original customer-experience route and complaint contract.
     const { default: MultiPartyRatingPage } = await import("./components/MultiPartyRatingPage");
     createRoot(rootElement()).render(
       <StrictMode>
