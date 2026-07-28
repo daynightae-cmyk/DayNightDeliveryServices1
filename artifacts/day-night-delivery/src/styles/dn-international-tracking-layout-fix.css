@@ -1,0 +1,66 @@
+html:has(.dn-it-page),
+body:has(.dn-it-page),
+body:has(.dn-it-page) #root {
+  min-height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  inset: auto !important;
+}
+
+body:has(.dn-it-page)::before,
+body:has(.dn-it-page)::after,
+body:has(.dn-it-page) #root::before,
+body:has(.dn-it-page) #root::after {
+  display: none !important;
+  content: none !important;
+}
+
+.dn-it-page {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 100dvh;
+}
+
+.dn-it-page .dn-it-topbar {
+  margin: 0 !important;
+  inset-block-start: 0 !important;
+}
+
+.dn-it-page .dn-it-shell {
+  padding-top: clamp(20px, 3vw, 38px);
+}
+
+.dn-it-page .dn-it-hero {
+  min-height: 310px;
+}
+
+body.dn-it-has-live-map .dn-it-live-map-host {
+  margin-top: 0 !important;
+}
+
+body.dn-it-has-live-map .dn-it-search-card {
+  margin-top: 14px !important;
+}
+
+@media (max-width: 760px) {
+  .dn-it-page .dn-it-topbar {
+    min-height: 68px;
+    padding-block: 9px;
+  }
+
+  .dn-it-page .dn-it-shell {
+    width: min(100% - 20px, 1240px);
+    padding-top: 12px;
+  }
+
+  .dn-it-page .dn-it-hero {
+    min-height: auto;
+    padding: 22px 18px;
+    border-radius: 24px;
+  }
+
+  .dn-it-page .dn-it-hero-orbit {
+    min-height: 185px;
+  }
+}
