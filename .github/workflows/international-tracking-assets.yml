@@ -1,0 +1,56 @@
+name: International Tracking Assets
+
+on:
+  push:
+    branches:
+      - feat/international-tracking-complete-rebuild
+    paths:
+      - artifacts/day-night-delivery/scripts/fetch-international-tracking-assets.mjs
+      - .github/workflows/international-tracking-assets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ingest-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout rebuild branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/international-tracking-complete-rebuild
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download strict asset registry
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/fetch-international-tracking-assets.mjs
+
+      - name: Verify all assets exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find artifacts/day-night-delivery/public/assets/international-tracking -type f \( -name '*.png' -o -name '*.jpg' \) | wc -l)
+          test "$count" -eq 32
+          test -f artifacts/day-night-delivery/public/assets/international-tracking/branding/daynight-official-master-logo.png
+          test ! -e artifacts/day-night-delivery/public/assets/international-tracking/15.png
+          echo "Verified $count strict assets and reserved asset 15."
+
+      - name: Commit downloaded binary assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT Asset Bot"
+          git config user.email "daynight.ae@gmail.com"
+          git add artifacts/day-night-delivery/public/assets/international-tracking
+          if git diff --cached --quiet; then
+            echo "No asset changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(international): store all 32 strict tracking assets [skip ci]"
+          git push origin HEAD:feat/international-tracking-complete-rebuild
