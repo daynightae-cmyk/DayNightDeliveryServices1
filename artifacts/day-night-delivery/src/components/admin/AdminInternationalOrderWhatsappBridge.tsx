@@ -11,6 +11,7 @@ import {
 import type { Merchant, Order } from "../../types";
 
 const ADMIN_ROUTE = /^\/admin(?:\/|$)/i;
+const EXTERNAL_SECTION_SELECTOR = '[data-dn-command-section="external"]';
 const ACTIONS_CLASS = "dn-intl-whatsapp-actions";
 
 type TrackingCenterData = {
@@ -223,9 +224,32 @@ export default function AdminInternationalOrderWhatsappBridge() {
       });
     };
 
+    // The tracking center has its own permanent sidebar button. Keep the original
+    // "International Orders" entry dedicated to the actual order table by letting
+    // React handle a nested click while temporarily hiding the tracking selector.
+    const openInternationalOrders = (event: MouseEvent) => {
+      const entry = event.target instanceof Element
+        ? event.target.closest<HTMLElement>(EXTERNAL_SECTION_SELECTOR)
+        : null;
+      if (!entry || entry.dataset.dnInternationalOrdersBypass === "1") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const sectionId = entry.getAttribute("data-dn-command-section");
+      entry.dataset.dnInternationalOrdersBypass = "1";
+      entry.removeAttribute("data-dn-command-section");
+      entry.click();
+      if (sectionId) entry.setAttribute("data-dn-command-section", sectionId);
+      delete entry.dataset.dnInternationalOrdersBypass;
+      window.setTimeout(() => void refreshData(), 80);
+    };
+
+    document.addEventListener("click", openInternationalOrders, true);
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
-    const interval = window.setInterval(() => void refreshData(), 20_000);
+    const interval = window.setInterval(() => void refreshData(), 12_000);
     window.addEventListener("focus", refreshData);
     window.addEventListener("dn-international-shipment-updated", refreshData as EventListener);
     schedule();
@@ -235,6 +259,7 @@ export default function AdminInternationalOrderWhatsappBridge() {
       window.cancelAnimationFrame(queuedFrame);
       window.clearInterval(interval);
       observer.disconnect();
+      document.removeEventListener("click", openInternationalOrders, true);
       window.removeEventListener("focus", refreshData);
       window.removeEventListener("dn-international-shipment-updated", refreshData as EventListener);
     };
