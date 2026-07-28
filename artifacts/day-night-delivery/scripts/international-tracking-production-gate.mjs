@@ -50,10 +50,12 @@ const adminFunction = read("supabase/functions/track17-admin/index.ts", true);
 const signature = read("supabase/functions/_shared/track17-signature.ts", true);
 const client = read("supabase/functions/_shared/track17-client.ts", true);
 const page = read("src/components/InternationalTrackingPage.tsx");
-const admin = read("src/components/admin/AdminInternationalTrackingLauncher.tsx");
+const nativeAdmin = read("src/components/admin/AdminInternationalOrdersWorkspace.tsx");
+const nativeActions = read("src/components/admin/AdminInternationalOrderTrackingActions.tsx");
 const merchant = read("src/components/merchant/MerchantInternationalTrackingLauncher.tsx");
 const entry = read("src/components/InternationalTrackingEntryLauncher.tsx");
 const main = read("src/main.tsx");
+const workspace = read("src/components/admin/AdminSectionWorkspace.tsx");
 const api = read("src/lib/internationalTrackingApi.ts");
 const styles = read("src/styles/dn-international-tracking.css");
 
@@ -85,13 +87,17 @@ expect(page, /BarcodeDetector/, "QR scanning has a progressive browser implement
 expect(page, /new jsPDF/, "Customer can export a tracking summary PDF");
 expect(page, /navigator\.share/, "Customer sharing is implemented");
 expect(page, /setInterval[\s\S]*45_000/, "Customer data automatically refreshes from Supabase without carrier polling");
-expect(admin, /registerAramexShipment/, "Admin can register Aramex AWBs");
-expect(admin, /syncAramexShipment/, "Admin can manually synchronize authorized shipments");
-expect(admin, /Webhook health|صحة Webhook/, "Admin can see webhook health");
+expect(nativeActions, /registerAramexShipment/, "Admin can register Aramex AWBs from each international order");
+expect(nativeActions, /إرسال للعميل/, "Admin can prepare a customer WhatsApp tracking message");
+expect(nativeActions, /إرسال للتاجر/, "Admin can prepare a merchant WhatsApp tracking message");
+expect(nativeActions, /AdminPdfExportButton/, "Admin can export one international order as PDF");
+expect(nativeAdmin, /PDF كل الطلبات/, "Admin can export all international orders as PDF");
+expect(nativeAdmin, /runTrack17Admin<TrackingCenterData>\("list"/, "Native international orders workspace reads registered shipments");
+expect(workspace, /props\.id === "external"[\s\S]*AdminInternationalOrdersWorkspace/, "International Orders opens the native order workspace");
 expect(merchant, /fetchInternationalTracking/, "Merchant view uses the public-safe tracking payload");
 expect(entry, /\/international-tracking/, "Public pages link to the dedicated international tracking center");
 expect(main, /InternationalTrackingPage/, "Dedicated international tracking route is mounted");
-expect(main, /AdminInternationalTrackingLauncher|AdminInternationalTrackingRouteBridge/, "Admin tracking center is mounted");
+reject(main, /AdminInternationalTrackingLauncher|AdminInternationalTrackingRouteBridge|AdminInternationalOrderWhatsappBridge/, "Legacy floating admin tracking launchers are removed");
 expect(main, /MerchantInternationalTrackingLauncher/, "Merchant tracking viewer is mounted");
 expect(styles, /@media \(max-width: 620px\)/, "Tracking page has dedicated phone layout");
 expect(styles, /@media print/, "Tracking result has print layout");
@@ -103,8 +109,6 @@ const frontendSource = frontendFiles
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
 
-// A diagnostic may safely mention the server-side secret name. What must never
-// exist in the browser bundle is code that reads or injects that secret.
 reject(
   frontendSource,
   /(?:Deno\.env\.get|process\.env|import\.meta\.env|window\.__ENV__)[\s\S]{0,80}TRACK17_API_KEY|TRACK17_API_KEY[\s\S]{0,80}(?:Deno\.env\.get|process\.env|import\.meta\.env|window\.__ENV__)/,
