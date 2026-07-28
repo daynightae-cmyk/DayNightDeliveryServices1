@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { fetchAdminOrders, fetchMerchants } from "../../lib/adminData";
 import {
   runTrack17Admin,
@@ -11,8 +11,8 @@ import {
 import type { Merchant, Order } from "../../types";
 
 const ADMIN_ROUTE = /^\/admin(?:\/|$)/i;
-const EXTERNAL_SECTION_SELECTOR = '[data-dn-command-section="external"]';
 const ACTIONS_CLASS = "dn-intl-whatsapp-actions";
+const INTERNATIONAL_SHIPMENT_UPDATED_EVENT = "dn-international-shipment-updated";
 
 type TrackingCenterData = {
   ok: boolean;
@@ -181,40 +181,13 @@ function installRowActions(
 }
 
 export default function AdminInternationalOrderWhatsappBridge() {
-  // Install before the tracking launcher's passive effect. The original
-  // International Orders item must open the order table; the dedicated
-  // International Tracking item remains responsible for opening the modal.
-  useLayoutEffect(() => {
-    if (!ADMIN_ROUTE.test(window.location.pathname)) return;
-
-    const openInternationalOrders = (event: MouseEvent) => {
-      const entry = event.target instanceof Element
-        ? event.target.closest<HTMLElement>(EXTERNAL_SECTION_SELECTOR)
-        : null;
-      if (!entry || entry.dataset.dnInternationalOrdersBypass === "1") return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      const sectionId = entry.getAttribute("data-dn-command-section");
-      entry.dataset.dnInternationalOrdersBypass = "1";
-      entry.removeAttribute("data-dn-command-section");
-      entry.click();
-      if (sectionId) entry.setAttribute("data-dn-command-section", sectionId);
-      delete entry.dataset.dnInternationalOrdersBypass;
-    };
-
-    document.addEventListener("click", openInternationalOrders, true);
-    return () => document.removeEventListener("click", openInternationalOrders, true);
-  }, []);
-
   useEffect(() => {
     if (!ADMIN_ROUTE.test(window.location.pathname)) return;
 
     let disposed = false;
     let queuedFrame = 0;
     let requestRunning = false;
+    let rerunAfterRequest = false;
     let orders: Order[] = [];
     let merchants: Merchant[] = [];
     let shipments: InternationalShipment[] = [];
@@ -225,8 +198,14 @@ export default function AdminInternationalOrderWhatsappBridge() {
     };
 
     const refreshData = async () => {
-      if (disposed || requestRunning || !currentSectionIsInternational()) return;
+      if (disposed || !currentSectionIsInternational()) return;
+      if (requestRunning) {
+        rerunAfterRequest = true;
+        return;
+      }
+
       requestRunning = true;
+      rerunAfterRequest = false;
       try {
         const [ordersResult, merchantsResult, trackingResult] = await Promise.allSettled([
           fetchAdminOrders(),
@@ -240,6 +219,7 @@ export default function AdminInternationalOrderWhatsappBridge() {
         apply();
       } finally {
         requestRunning = false;
+        if (!disposed && rerunAfterRequest) void refreshData();
       }
     };
 
@@ -252,11 +232,17 @@ export default function AdminInternationalOrderWhatsappBridge() {
       });
     };
 
+    const refreshImmediately = () => {
+      orders = [];
+      shipments = [];
+      void refreshData();
+    };
+
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
     const interval = window.setInterval(() => void refreshData(), 12_000);
     window.addEventListener("focus", refreshData);
-    window.addEventListener("dn-international-shipment-updated", refreshData as EventListener);
+    window.addEventListener(INTERNATIONAL_SHIPMENT_UPDATED_EVENT, refreshImmediately);
     schedule();
 
     return () => {
@@ -265,7 +251,7 @@ export default function AdminInternationalOrderWhatsappBridge() {
       window.clearInterval(interval);
       observer.disconnect();
       window.removeEventListener("focus", refreshData);
-      window.removeEventListener("dn-international-shipment-updated", refreshData as EventListener);
+      window.removeEventListener(INTERNATIONAL_SHIPMENT_UPDATED_EVENT, refreshImmediately);
     };
   }, []);
 
