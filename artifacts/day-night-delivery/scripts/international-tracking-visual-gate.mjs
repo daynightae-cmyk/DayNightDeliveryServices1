@@ -28,28 +28,29 @@ expect("src/components/public/InternationalTrackingVisualBridge.tsx", [
   "dn-it-has-live-map",
   "scrollRestoration = \"manual\"",
   "fetchInternationalTracking",
+  "dn-international-tracking-layout-fix.css",
 ]);
 
-expect("src/components/admin/AdminInternationalOrderWhatsappBridge.tsx", [
+expect("src/components/admin/AdminInternationalOrdersWorkspace.tsx", [
+  "AdminInternationalOrderTrackingActions",
+  "PDF كل الطلبات",
+  "matchesAdminSection(order, \"external\")",
+  "dn-international-shipment-updated",
+  "AdminDriverAssignmentModal",
+]);
+
+expect("src/components/admin/AdminInternationalOrderTrackingActions.tsx", [
+  "إضافة رقم التتبع",
   "إرسال للعميل",
   "إرسال للتاجر",
-  "runTrack17Admin",
+  "registerAramexShipment",
   "buildInternationalTrackingWhatsappMessage",
-  "dn-intl-whatsapp-actions",
-  "dn-international-shipment-updated",
-  "refreshImmediately",
+  "AdminPdfExportButton",
 ]);
 
-expect("src/components/admin/AdminInternationalTrackingLauncher.tsx", [
-  "announceInternationalShipmentUpdate",
-  "dn-international-shipment-updated",
-  "dn-it-admin-launch",
-  "أزرار واتساب للعميل والتاجر أصبحت جاهزة",
-]);
-
-expect("src/components/admin/AdminInternationalTrackingRouteBridge.tsx", [
-  "data-dn-track17-sidebar",
-  ".dn-it-admin-launch",
+expect("src/components/admin/AdminSectionWorkspace.tsx", [
+  "AdminInternationalOrdersWorkspace",
+  "props.id === \"external\"",
 ]);
 
 expect("src/lib/internationalTrackingLinks.ts", [
@@ -72,12 +73,21 @@ expect("src/styles/dn-international-live-map.css", [
   "@media (max-width: 760px)",
 ]);
 
+expect("src/styles/dn-international-tracking-layout-fix.css", [
+  "body:has(.dn-it-page)",
+  ".dn-it-page .dn-it-shell",
+  ".dn-it-page .dn-it-hero",
+]);
+
 expect("src/main.tsx", [
-  "AdminInternationalOrderWhatsappBridge",
   "InternationalTrackingVisualBridge",
   "dn-international-live-map.css",
-  "dn-international-whatsapp-actions.css",
 ]);
+
+const mainSource = read("src/main.tsx");
+for (const forbidden of ["AdminInternationalTrackingRouteBridge", "AdminInternationalOrderWhatsappBridge"]) {
+  checks.push({ file: "src/main.tsx", pattern: `forbidden:${forbidden}`, ok: !mainSource.includes(forbidden) });
+}
 
 const failed = checks.filter((check) => !check.ok);
 if (failed.length) {
