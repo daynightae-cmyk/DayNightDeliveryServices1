@@ -27,6 +27,8 @@ export type FinancialOpsOrderInput = OpsOrderInput & {
 export type FinancialOpsOrderUpdateInput = Omit<OpsOrderUpdateInput, keyof OpsOrderInput> &
   FinancialOpsOrderInput;
 
+export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;
+
 const clean = (value: unknown) => String(value ?? "").trim();
 const numberValue = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -56,17 +58,20 @@ export function hasExplicitZeroManualDelivery(input: FinancialOpsOrderInput) {
   );
 }
 
+/**
+ * Manual price rules are intentionally explicit:
+ * - any positive manual value is used exactly as entered, including 1000 AED;
+ * - an explicitly entered manual zero is a settlement instruction, not free
+ *   delivery: the official 25 AED fee is charged to the merchant.
+ */
 export function effectiveDeliveryFeeMode(input: FinancialOpsOrderInput): DeliveryFeeMode {
   const paymentMethod = clean(input.payment_method).toLowerCase();
   if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") {
     return "deduct_from_merchant";
   }
-
-  const goodsAreZero = financialNumber(input.goods_value, 0) === 0;
-  if (goodsAreZero && hasExplicitZeroManualDelivery(input)) {
+  if (hasExplicitZeroManualDelivery(input)) {
     return "deduct_from_merchant";
   }
-
   return normalizeDeliveryFeeMode(input.delivery_fee_mode);
 }
 
@@ -103,10 +108,14 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
   priceSource: "system" | "manual";
 } {
   const pricing = calculateOpsOrderPrice(input);
+  const explicitZero = hasExplicitZeroManualDelivery(input);
+  const deliveryFee = explicitZero
+    ? EXPLICIT_ZERO_MANUAL_DELIVERY_FEE
+    : pricing.total;
   const deliveryFeeMode = effectiveDeliveryFeeMode(input);
   const validation = orderFinancialValidation({
     goodsValue: input.goods_value,
-    deliveryFee: pricing.total,
+    deliveryFee,
     discountAmount: input.discount_amount,
     deliveryFeeMode,
   });
@@ -115,12 +124,12 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
   return {
     ...calculateOrderFinancials({
       goodsValue: input.goods_value,
-      deliveryFee: pricing.total,
+      deliveryFee,
       discountAmount: input.discount_amount,
       deliveryFeeMode,
     }),
     systemDeliveryFee: pricing.systemTotal,
-    priceSource: pricing.priceSource,
+    priceSource: input.price_mode === "manual" ? "manual" : pricing.priceSource,
   };
 }
 

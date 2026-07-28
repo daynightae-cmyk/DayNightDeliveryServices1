@@ -30,8 +30,7 @@ function preciseDeliveryFeeMode(input: FinancialOpsOrderInput) {
   if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") {
     return "deduct_from_merchant" as const;
   }
-  const goodsAreZero = input.goods_value !== "" && Number(input.goods_value) === 0;
-  if (goodsAreZero && hasExplicitZeroManualDelivery(input)) {
+  if (hasExplicitZeroManualDelivery(input)) {
     return "deduct_from_merchant" as const;
   }
   return input.delivery_fee_mode === "deduct_from_merchant"
@@ -44,8 +43,7 @@ const preciseSetField = `  function setField<K extends keyof FinancialOpsOrderIn
       const next = { ...current, [key]: value } as FinancialOpsOrderInput;
       const paymentMethod = String(next.payment_method || "").trim().toLowerCase();
       const merchantPayment = paymentMethod === "merchant_pays" || paymentMethod === "sender_pays";
-      const goodsAreZero = next.goods_value !== "" && Number(next.goods_value) === 0;
-      const explicitZeroDelivery = goodsAreZero && hasExplicitZeroManualDelivery(next);
+      const explicitZeroDelivery = hasExplicitZeroManualDelivery(next);
 
       if (merchantPayment || explicitZeroDelivery) {
         next.delivery_fee_mode = "deduct_from_merchant";
@@ -71,8 +69,7 @@ const preciseEditSetField = `  function setField<K extends keyof FinancialOpsOrd
       const next = { ...current, [key]: value } as FinancialOpsOrderInput;
       const paymentMethod = String(next.payment_method || "").trim().toLowerCase();
       const merchantPayment = paymentMethod === "merchant_pays" || paymentMethod === "sender_pays";
-      const goodsAreZero = next.goods_value !== "" && Number(next.goods_value) === 0;
-      const explicitZeroDelivery = goodsAreZero && hasExplicitZeroManualDelivery(next);
+      const explicitZeroDelivery = hasExplicitZeroManualDelivery(next);
 
       if (merchantPayment || explicitZeroDelivery) {
         next.delivery_fee_mode = "deduct_from_merchant";
@@ -93,7 +90,7 @@ const preciseEditSetField = `  function setField<K extends keyof FinancialOpsOrd
 
 export function preciseFinancialRulePlugin(): Plugin {
   return {
-    name: "day-night-precise-financial-rule-v3",
+    name: "day-night-precise-financial-rule-v4",
     enforce: "pre",
     transform(source, id) {
       const normalized = id.replace(/\\/g, "/").split("?")[0];
@@ -263,6 +260,101 @@ function initialForm`,
     : \`Merchant net \${money(parsed, false)}\`;
 }`,
           "merchant statement settlement wording",
+        );
+        return { code, map: null };
+      }
+
+      if (normalized.endsWith("/src/components/SmartChat.tsx")) {
+        const code = replaceRequired(
+          source,
+          '["special", "al ain", "dhafra", "liwa", "ruwais", "western", "العين", "الظفرة", "ليوا", "الرويس", "الغربية", "خاص", "الممتدة"]',
+          '["special", "dhafra", "liwa", "ruwais", "western", "ghayathi", "sila", "mirfa", "الظفرة", "ليوا", "الرويس", "الغربية", "غياثي", "السلع", "المرفأ", "خاص", "الممتدة"]',
+          "smart chat keeps Al Ain at 25 AED",
+        );
+        return { code, map: null };
+      }
+
+      if (normalized.endsWith("/src/data/aiAgentKnowledge.ts")) {
+        let code = source;
+        const replacements: Array<[string, string, string]> = [
+          [
+            "Special UAE routes such as Al Ain and Western Region: 50 AED per local order.",
+            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain and all its districts are 25 AED.",
+            "AI English extended price",
+          ],
+          [
+            "المسارات الخاصة داخل الإمارات مثل العين والمنطقة الغربية: 50 درهم للطلب المحلي الواحد.",
+            "المناطق الممتدة في الظفرة / المنطقة الغربية: 50 درهم للطلب المحلي الواحد. العين وكل مناطقها 25 درهماً.",
+            "AI Arabic extended price",
+          ],
+          [
+            "Al Ain: special UAE route — 50 AED per local order.",
+            "Al Ain and all its districts: normal UAE route — 25 AED per local order.",
+            "AI Al Ain price",
+          ],
+          [
+            'extendedAreas: ["Al Ain", "Western Region", "Al Dhafra", "Ruwais", "Liwa", "Ghayathi", "Sila"]',
+            'extendedAreas: ["Western Region", "Al Dhafra", "Ruwais", "Liwa", "Ghayathi", "Sila", "Al Mirfa"]',
+            "AI extended area list",
+          ],
+          [
+            'extendedAreasAr: ["العين", "المنطقة الغربية", "الظفرة", "الرويس", "ليوا", "غياثي", "السيلة"]',
+            'extendedAreasAr: ["المنطقة الغربية", "الظفرة", "الرويس", "ليوا", "غياثي", "السلع", "المرفأ"]',
+            "AI Arabic extended list",
+          ],
+          [
+            "Special UAE routes (Al Ain, Western Region): 50 AED per local order.",
+            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain: 25 AED.",
+            "AI pricing answer",
+          ],
+          [
+            "المسارات الخاصة (العين، المنطقة الغربية): 50 درهم للطلب المحلي الواحد.",
+            "المناطق الممتدة في الظفرة / المنطقة الغربية: 50 درهماً. العين: 25 درهماً.",
+            "AI Arabic pricing answer",
+          ],
+          [
+            "العين: مسار خاص داخل الإمارات — 50 درهم للطلب المحلي الواحد.",
+            "العين وجميع مناطقها: مسار عادي داخل الإمارات — 25 درهماً للطلب المحلي الواحد.",
+            "AI Arabic Al Ain answer",
+          ],
+        ];
+        for (const [from, to, label] of replacements) {
+          code = replaceRequired(code, from, to, label);
+        }
+        return { code, map: null };
+      }
+
+      if (normalized.endsWith("/src/components/RequestDelivery.tsx")) {
+        let code = source;
+        code = replaceRequired(
+          code,
+          'import { translations } from "../data/translations";',
+          'import { translations } from "../data/translations";\nimport { calculateDomesticPrice } from "../lib/pricing";',
+          "public order imports authoritative local pricing",
+        );
+        code = replaceRequired(
+          code,
+          'const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان"];',
+          'const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان", "العين (Al Ain)"];',
+          "public order main cities",
+        );
+        code = replaceRequired(
+          code,
+          'const extendedCities = ["العين (Al Ain)", "المنطقة الغربية (Western Region)", "السلع", "الرويس", "غياثي", "ليوا"];',
+          'const extendedCities = ["المنطقة الغربية (Western Region)", "الظفرة", "السلع", "الرويس", "غياثي", "ليوا", "المرفأ"];',
+          "public order extended cities",
+        );
+        code = replaceRequired(
+          code,
+          /  const deliveryPricing = \{[\s\S]*?\n  \};\n  const deliveryPrice = deliveryPricing\.total;/,
+          `  const deliveryPricing = calculateDomesticPrice({
+    pickupCity: senderCity,
+    deliveryCity: receiverCity,
+    pieces: 1,
+    serviceType: "standard",
+  });
+  const deliveryPrice = deliveryPricing.total;`,
+          "public order uses 25/50 route pricing",
         );
         return { code, map: null };
       }
