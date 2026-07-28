@@ -68,9 +68,17 @@ export type PublicInternationalTrackingResult = {
   message_en?: string;
 };
 
+const SUPABASE_FUNCTIONS_BASE = "https://ngdwybpgacauorygoedi.supabase.co/functions/v1";
+const SUPABASE_ANON_KEY = String((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
+
 function requireSupabase() {
   if (!supabase) throw new Error("supabase_unavailable");
   return supabase;
+}
+
+function requireAnonKey() {
+  if (!SUPABASE_ANON_KEY) throw new Error("supabase_anon_key_missing");
+  return SUPABASE_ANON_KEY;
 }
 
 function normalizeReference(value: string) {
@@ -79,59 +87,90 @@ function normalizeReference(value: string) {
   return reference;
 }
 
-async function errorPayload(error: any, fallbackData: any) {
-  if (fallbackData && typeof fallbackData === "object") return fallbackData;
-  const response = error?.context;
-  if (response && typeof response.clone === "function") {
-    try {
-      return await response.clone().json();
-    } catch {
-      return null;
-    }
+async function parseResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message_en: text };
   }
-  return null;
 }
 
-async function invokeAuthenticated<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  const client = requireSupabase();
-  const { data: sessionData, error: sessionError } = await client.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
-  if (sessionError || !accessToken) throw new Error("not_authenticated");
+function trackingError(
+  name: string,
+  response: Response,
+  payload: any,
+) {
+  const message = payload?.message_en || payload?.message_ar || payload?.code || `HTTP ${response.status}` || `${name}_failed`;
+  const wrapped = new Error(String(message)) as Error & {
+    code?: string;
+    status?: number;
+    details?: string;
+  };
+  wrapped.code = String(payload?.code || `${name}_failed`);
+  wrapped.status = response.status;
+  wrapped.details = String(payload?.details || payload?.error_message || "");
+  return wrapped;
+}
 
-  const { data, error } = await client.functions.invoke(name, {
-    body,
+async function callFunction<T>(
+  name: string,
+  body: Record<string, unknown>,
+  accessToken?: string,
+): Promise<T> {
+  const anonKey = requireAnonKey();
+  const response = await fetch(`${SUPABASE_FUNCTIONS_BASE}/${name}`, {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    credentials: "omit",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken || anonKey}`,
+      "X-Client-Info": "day-night-web-track17/2.0",
     },
+    body: JSON.stringify(body),
   });
 
-  if (error) {
-    const payload = await errorPayload(error, data);
-    const message = payload?.message_en || payload?.message_ar || payload?.code || error.message || `${name}_failed`;
-    const wrapped = new Error(String(message)) as Error & { code?: string; status?: number };
-    wrapped.code = payload?.code || `${name}_failed`;
-    wrapped.status = Number(error.context?.status || 0) || undefined;
-    throw wrapped;
-  }
-
-  return data as T;
+  const payload = await parseResponse(response);
+  if (!response.ok) throw trackingError(name, response, payload);
+  return payload as T;
 }
 
-export async function fetchInternationalTracking(reference: string): Promise<PublicInternationalTrackingResult> {
+async function invokeAuthenticated<T>(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<T> {
   const client = requireSupabase();
-  const trackingNumber = normalizeReference(reference);
-  const { data, error } = await client.functions.invoke("public-international-tracking", {
-    body: { tracking_number: trackingNumber },
-  });
-  if (error) {
-    const payload = await errorPayload(error, data);
-    const message = typeof payload?.message_en === "string" ? payload.message_en : error.message;
-    const wrapped = new Error(message || "international_tracking_failed") as Error & { code?: string; status?: number };
-    wrapped.code = payload?.code || "international_tracking_failed";
-    wrapped.status = Number(error.context?.status || 0) || undefined;
-    throw wrapped;
+
+  let sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw new Error("not_authenticated");
+
+  if (!sessionResult.data.session?.access_token) {
+    const refreshed = await client.auth.refreshSession();
+    if (refreshed.error || !refreshed.data.session?.access_token) {
+      throw new Error("not_authenticated");
+    }
+    sessionResult = refreshed;
   }
-  return data as PublicInternationalTrackingResult;
+
+  return callFunction<T>(
+    name,
+    body,
+    sessionResult.data.session?.access_token,
+  );
+}
+
+export async function fetchInternationalTracking(
+  reference: string,
+): Promise<PublicInternationalTrackingResult> {
+  const trackingNumber = normalizeReference(reference);
+  return callFunction<PublicInternationalTrackingResult>(
+    "public-international-tracking",
+    { tracking_number: trackingNumber },
+  );
 }
 
 export async function registerAramexShipment(input: {
@@ -163,7 +202,10 @@ export async function syncAramexShipment(shipmentId: string) {
   }>("sync-track17-shipment", { shipment_id: shipmentId });
 }
 
-export async function runTrack17Admin<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {
+export async function runTrack17Admin<T = Record<string, unknown>>(
+  action: string,
+  payload: Record<string, unknown> = {},
+) {
   return invokeAuthenticated<T>("track17-admin", { action, ...payload });
 }
 
