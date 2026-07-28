@@ -5,7 +5,10 @@ import App from "./App.tsx";
 import { AppProvider } from "./lib/AppContext.tsx";
 import { reportError } from "./lib/monitoring";
 import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
-import { initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
+import {
+  ensureCurrentProtectedDeployment,
+  initializeLiveDeploymentWatcher,
+} from "./lib/liveDeploymentRuntime";
 import { installMerchantCredentialAutofill } from "./lib/merchantCredentialAutofill";
 import { installAlAinLocationOptions } from "./data/installAlAinLocation";
 import ProductionExperience from "./components/ProductionExperience";
@@ -207,6 +210,9 @@ async function mountStandaloneAdminFeatures() {
 }
 
 async function bootstrapApplication() {
+  const deploymentReady = await ensureCurrentProtectedDeployment();
+  if (!deploymentReady) return;
+
   installAlAinLocationOptions();
   normalizeTrackingNumberQuery();
   normalizeLegacyAdminFeaturePath();
