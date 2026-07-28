@@ -38,7 +38,15 @@ export function whatsappRatingRequest(trackingCode: string) {
 
 export function normalizeWhatsAppPhone(phone?: string | null) {
   if (!phone) return "";
-  return String(phone).replace(/[^\d]/g, "").replace(/^00/, "");
+  let digits = String(phone).replace(/[^\d]/g, "").replace(/^00/, "");
+  if (!digits) return "";
+
+  // UAE numbers are often saved locally as 05XXXXXXXX or 5XXXXXXXX.
+  if (/^05\d{8}$/.test(digits)) digits = `971${digits.slice(1)}`;
+  else if (/^5\d{8}$/.test(digits)) digits = `971${digits}`;
+  else if (/^9710/.test(digits)) digits = `971${digits.slice(4)}`;
+
+  return digits;
 }
 
 export function buildInternationalTrackingWhatsappMessage(params: {
