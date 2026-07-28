@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import "../styles/dn-international-tracking.css";
+import "../styles/dn-international-entry.css";
 
 function usePortalSlot(pathname: string) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
