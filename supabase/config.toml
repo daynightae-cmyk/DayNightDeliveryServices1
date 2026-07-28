@@ -1,13 +1,16 @@
 project_id = "ngdwybpgacauorygoedi"
 
+# These operational functions enforce authentication and admin/support roles
+# internally through _shared/auth.ts. Disabling the gateway JWT verifier avoids
+# Supabase Edge gateway rejections while preserving the server-side role check.
 [functions.register-track17-shipment]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-track17-shipment]
-verify_jwt = true
+verify_jwt = false
 
 [functions.track17-admin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.track17-webhook]
 verify_jwt = false
