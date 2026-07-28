@@ -7,6 +7,7 @@ import {
   type InternationalShipment,
 } from "../../lib/internationalTrackingApi";
 import InternationalTrackingLiveMap from "./InternationalTrackingLiveMap";
+import "../../styles/dn-international-tracking-layout-fix.css";
 
 const ROUTE_PATTERN = /^\/international-tracking\/?$/i;
 const HOST_ID = "dn-it-live-map-host";
