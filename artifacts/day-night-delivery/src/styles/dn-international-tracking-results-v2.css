@@ -1,5 +1,5 @@
 @media (min-width: 1101px) {
-  .dn-it-workspace {
+  html .dn-it-workspace {
     grid-template-areas:
       "map summary"
       "metrics summary"
@@ -7,12 +7,12 @@
       "timeline side";
   }
 
-  .dn-it-summary-area,
-  .dn-it-side-lower {
+  html .dn-it-summary-area,
+  html .dn-it-side-lower {
     align-self: stretch;
   }
 
-  .dn-it-side-lower {
+  html .dn-it-side-lower {
     align-content: start;
   }
 }
