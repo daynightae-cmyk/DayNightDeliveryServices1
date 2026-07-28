@@ -1,0 +1,170 @@
+name: iOS Role Apps v1.2.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios-role-shell/**"
+      - "android-role-shell/app/src/driver/res/drawable-nodpi/app_icon.png"
+      - "android-role-shell/app/src/merchant/res/drawable-nodpi/app_icon.png"
+      - "artifacts/day-night-delivery/**"
+      - ".github/workflows/ios-role-apps.yml"
+  pull_request:
+    paths:
+      - "ios-role-shell/**"
+      - "android-role-shell/app/src/driver/res/drawable-nodpi/app_icon.png"
+      - "android-role-shell/app/src/merchant/res/drawable-nodpi/app_icon.png"
+      - "artifacts/day-night-delivery/**"
+      - ".github/workflows/ios-role-apps.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-role-apps-v120-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-role-apps:
+    name: Build Driver and Merchant iOS v1.2.0
+    runs-on: macos-15
+    timeout-minutes: 55
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inspect Xcode toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen and icon tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          python3 -m venv ios-role-shell/.venv
+          ios-role-shell/.venv/bin/pip install --disable-pip-version-check "pillow>=10,<13"
+          ios-role-shell/.venv/bin/python ios-role-shell/scripts/prepare_icons.py
+
+      - name: Validate iOS source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          plutil -lint ios-role-shell/Config/Driver-Info.plist
+          plutil -lint ios-role-shell/Config/Merchant-Info.plist
+          grep -F 'PRODUCT_BUNDLE_IDENTIFIER: com.daynightae.driver' ios-role-shell/project.yml
+          grep -F 'PRODUCT_BUNDLE_IDENTIFIER: com.daynightae.merchant' ios-role-shell/project.yml
+          grep -F 'daynight_driver_biometric_session_v1' ios-role-shell/Sources/DayNightApp.swift
+          grep -F 'daynight_merchant_biometric_session_v1' ios-role-shell/Sources/DayNightApp.swift
+          grep -F 'kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly' ios-role-shell/Sources/SecureBiometricStore.swift
+          grep -F '.userPresence' ios-role-shell/Sources/SecureBiometricStore.swift
+          grep -F 'window.DAYNIGHT_BIOMETRIC' ios-role-shell/Sources/RoleWebViewController.swift
+          if grep -R -E 'print\(|NSLog\(' ios-role-shell/Sources; then
+            echo 'Native iOS security code must not log session material.'
+            exit 1
+          fi
+
+      - name: Generate Xcode project
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen generate --spec ios-role-shell/project.yml
+          test -d ios-role-shell/DayNightRoleApps.xcodeproj
+          xcodebuild -project ios-role-shell/DayNightRoleApps.xcodeproj -list
+
+      - name: Build Driver for iPhone Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios-role-shell/DayNightRoleApps.xcodeproj \
+            -scheme DayNightDriver \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios-role-shell/build/driver \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build | tee ios-role-shell/driver-build.log
+
+      - name: Build Merchant for iPhone Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios-role-shell/DayNightRoleApps.xcodeproj \
+            -scheme DayNightMerchant \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios-role-shell/build/merchant \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build | tee ios-role-shell/merchant-build.log
+
+      - name: Verify and package simulator applications
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ios-role-shell/dist-v120
+          DRIVER_APP="$(find ios-role-shell/build/driver/Build/Products -type d -name 'DAY NIGHT Driver.app' | head -n 1)"
+          MERCHANT_APP="$(find ios-role-shell/build/merchant/Build/Products -type d -name 'DAY NIGHT Merchant.app' | head -n 1)"
+          test -d "$DRIVER_APP"
+          test -d "$MERCHANT_APP"
+
+          test "$(plutil -extract CFBundleIdentifier raw "$DRIVER_APP/Info.plist")" = "com.daynightae.driver"
+          test "$(plutil -extract CFBundleIdentifier raw "$MERCHANT_APP/Info.plist")" = "com.daynightae.merchant"
+          test "$(plutil -extract CFBundleShortVersionString raw "$DRIVER_APP/Info.plist")" = "1.2.0"
+          test "$(plutil -extract CFBundleShortVersionString raw "$MERCHANT_APP/Info.plist")" = "1.2.0"
+
+          ditto -c -k --sequesterRsrc --keepParent "$DRIVER_APP" ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip
+          ditto -c -k --sequesterRsrc --keepParent "$MERCHANT_APP" ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip
+
+          (cd ios-role-shell/dist-v120 && shasum -a 256 DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip > DAY-NIGHT-Driver-v1.2.0-iOS.sha256)
+          (cd ios-role-shell/dist-v120 && shasum -a 256 DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip > DAY-NIGHT-Merchant-v1.2.0-iOS.sha256)
+          (cd ios-role-shell/dist-v120 && zip -9 DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR.zip \
+            DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip DAY-NIGHT-Driver-v1.2.0-iOS.sha256 \
+            DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip DAY-NIGHT-Merchant-v1.2.0-iOS.sha256)
+
+      - name: Upload iOS build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-iOS-v1.2.0-Build-Diagnostic
+          path: |
+            ios-role-shell/driver-build.log
+            ios-role-shell/merchant-build.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload Driver iOS simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Driver-iOS-v1.2.0-Simulator
+          path: |
+            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip
+            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Merchant iOS simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Merchant-iOS-v1.2.0-Simulator
+          path: |
+            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip
+            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload complete iOS v1.2.0 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR
+          path: ios-role-shell/dist-v120/DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR.zip
+          if-no-files-found: error
+          retention-days: 30
