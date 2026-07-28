@@ -29,6 +29,8 @@ import {
 } from "../../lib/internationalTrackingApi";
 import "../../styles/dn-international-admin.css";
 
+const TRACKING_NAV_SELECTOR = '[data-dn-command-section="external"]';
+
 type WebhookLog = {
   id: string;
   event_type?: string | null;
@@ -66,7 +68,6 @@ type OrderOption = {
   service_type?: string | null;
   receiver_name?: string | null;
   status?: string | null;
-  created_at?: string | null;
 };
 
 type RegistrationForm = {
@@ -77,6 +78,16 @@ type RegistrationForm = {
   destination_country: string;
   destination_city: string;
   ship_date: string;
+};
+
+const INITIAL_FORM: RegistrationForm = {
+  order_id: "",
+  tracking_number: "",
+  origin_country: "AE",
+  origin_city: "",
+  destination_country: "",
+  destination_city: "",
+  ship_date: "",
 };
 
 function clean(value: unknown) {
@@ -99,7 +110,6 @@ function normalizeOrder(order: Record<string, unknown>): OrderOption | null {
     service_type: clean(order.service_type) || null,
     receiver_name: clean(order.receiver_name) || null,
     status: clean(order.status) || null,
-    created_at: clean(order.created_at) || null,
   };
 }
 
@@ -152,7 +162,7 @@ function statusLabel(value?: string | null, isArabic = true) {
   return (map[key] || map.unknown)[isArabic ? 0 : 1];
 }
 
-function date(value?: string | null, isArabic = true) {
+function formatDate(value?: string | null, isArabic = true) {
   if (!value) return "—";
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString(isArabic ? "ar-AE" : "en-AE");
@@ -166,6 +176,7 @@ function operationErrorText(cause: unknown, isArabic: boolean) {
   const combined = `${code} ${details} ${rawMessage}`.toLowerCase();
 
   const known: Array<[RegExp, string, string]> = [
+    [/international_shipments|schema cache|shipment_list_failed/, "جداول التتبع الدولي غير موجودة في قاعدة البيانات. طبّق هجرة إصلاح Track17.", "The international tracking tables are missing. Apply the Track17 schema repair migration."],
     [/not_authenticated|jwt|session/, "انتهت جلسة المدير. سجّل الخروج ثم الدخول مرة واحدة.", "The administrator session has expired. Sign out and in once."],
     [/not_authorized|403/, "الحساب الحالي لا يحمل صلاحية مدير في جدول profiles.", "The current account does not have an administrator role."],
     [/track17_api_key_missing/, "مفتاح TRACK17_API_KEY غير متاح داخل وظيفة Supabase.", "TRACK17_API_KEY is unavailable inside the Supabase Function."],
@@ -188,19 +199,8 @@ function upsertShipment(rows: InternationalShipment[], shipment: InternationalSh
   return [shipment, ...rows.filter((row) => row.id !== shipment.id)].slice(0, 100);
 }
 
-const INITIAL_FORM: RegistrationForm = {
-  order_id: "",
-  tracking_number: "",
-  origin_country: "AE",
-  origin_city: "",
-  destination_country: "",
-  destination_city: "",
-  ship_date: "",
-};
-
 export default function AdminInternationalTrackingLauncher() {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const visible = /^\/admin(?:\/|$)/.test(pathname);
+  const visible = /^\/admin(?:\/|$)/.test(window.location.pathname);
   const [open, setOpen] = useState(false);
   const [isArabic, setIsArabic] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -217,12 +217,8 @@ export default function AdminInternationalTrackingLauncher() {
     const needle = orderSearch.trim().toLowerCase();
     if (!needle) return orders;
     return orders.filter((order) => [
-      orderReference(order),
-      order.sender_city,
-      order.receiver_city,
-      order.destination_country,
-      order.receiver_name,
-      order.status,
+      orderReference(order), order.sender_city, order.receiver_city,
+      order.destination_country, order.receiver_name, order.status,
     ].some((value) => String(value || "").toLowerCase().includes(needle)));
   }, [orders, orderSearch]);
 
@@ -233,12 +229,9 @@ export default function AdminInternationalTrackingLauncher() {
     const needle = search.trim().toLowerCase();
     if (!needle) return data.shipments;
     return data.shipments.filter((shipment) => [
-      shipment.public_tracking_number,
-      shipment.tracking_number,
-      shipment.carrier_tracking_number_full,
-      shipment.latest_location,
-      shipment.destination_city,
-      shipment.destination_country,
+      shipment.public_tracking_number, shipment.tracking_number,
+      shipment.carrier_tracking_number_full, shipment.latest_location,
+      shipment.destination_city, shipment.destination_country,
     ].some((value) => String(value || "").toLowerCase().includes(needle)));
   }, [data.shipments, search]);
 
@@ -259,9 +252,6 @@ export default function AdminInternationalTrackingLauncher() {
         .map((order) => normalizeOrder(order as unknown as Record<string, unknown>))
         .filter((order): order is OrderOption => Boolean(order));
       setOrders(normalized);
-      if (!normalized.length && !preserveMessage) {
-        setError(isArabic ? "لم يتم العثور على طلبات متاحة في جدول orders." : "No orders were found in the orders table.");
-      }
     } else if (!preserveMessage) {
       setOrders([]);
       setError(operationErrorText(ordersResult.reason, isArabic));
@@ -290,11 +280,54 @@ export default function AdminInternationalTrackingLauncher() {
     setLoading(false);
   }
 
+  // The old floating button has been removed completely. The existing fixed
+  // sidebar item "International Orders" is now the sole entry point for this
+  // center, so it is present from the first normal admin render.
+  useEffect(() => {
+    if (!visible) return;
+
+    const applySidebarLabel = () => {
+      document.querySelectorAll<HTMLElement>(TRACKING_NAV_SELECTOR).forEach((button) => {
+        const strong = button.querySelector("strong");
+        const small = button.querySelector("small");
+        if (strong) strong.textContent = isArabic ? "التتبع الدولي" : "International Tracking";
+        if (small) small.textContent = isArabic ? "International Tracking" : "التتبع الدولي";
+        button.classList.toggle("is-active", open);
+        button.setAttribute("aria-current", open ? "page" : "false");
+      });
+    };
+
+    const handleSidebarClick = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest(TRACKING_NAV_SELECTOR) : null;
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      setOpen(true);
+    };
+
+    applySidebarLabel();
+    const observer = new MutationObserver(applySidebarLabel);
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("click", handleSidebarClick, true);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("click", handleSidebarClick, true);
+    };
+  }, [visible, isArabic, open]);
+
   useEffect(() => {
     if (visible && open) void load(false);
   }, [visible, open]);
 
-  if (!visible) return null;
+  if (!visible || !open) return null;
+
+  function closeCenter() {
+    setOpen(false);
+    setError("");
+    setSuccess("");
+  }
 
   function selectOrder(orderId: string) {
     const order = orders.find((item) => item.id === orderId);
@@ -309,7 +342,7 @@ export default function AdminInternationalTrackingLauncher() {
   }
 
   async function register() {
-    if (!form.order_id || !form.tracking_number) {
+    if (!form.order_id || !form.tracking_number.trim()) {
       setError(isArabic ? "اختر طلبًا واكتب رقم بوليصة أرامكس." : "Select an order and enter the Aramex AWB.");
       return;
     }
@@ -320,24 +353,17 @@ export default function AdminInternationalTrackingLauncher() {
     try {
       const result = await registerAramexShipment(form);
       if (!result?.ok) throw new Error("registration_returned_not_ok");
-
       if (result.shipment) {
         setData((current) => ({ ...current, shipments: upsertShipment(current.shipments, result.shipment as InternationalShipment) }));
       }
-
       const already = Boolean(result.already_registered || result.already_registered_at_provider);
       const warning = clean(result.sync_warning);
-      setSuccess(
-        already
-          ? (isArabic ? "البوليصة مسجلة مسبقًا وتم ربطها وعرضها بنجاح." : "The AWB was already registered and is now linked and displayed.")
-          : warning
-            ? (isArabic ? `تم تسجيل وربط الشحنة. المزامنة الأولى مؤجلة: ${warning}` : `Shipment registered and linked. Initial sync is pending: ${warning}`)
-            : (isArabic ? "تم تسجيل شحنة أرامكس وربطها بالطلب بنجاح." : "The Aramex shipment was registered and linked successfully."),
-      );
-
+      setSuccess(already
+        ? (isArabic ? "البوليصة مسجلة مسبقًا وتم ربطها وعرضها بنجاح." : "The AWB was already registered and is now linked and displayed.")
+        : warning
+          ? (isArabic ? `تم تسجيل وربط الشحنة. المزامنة الأولى مؤجلة: ${warning}` : `Shipment registered and linked. Initial sync is pending: ${warning}`)
+          : (isArabic ? "تم تسجيل شحنة أرامكس وربطها بالطلب بنجاح." : "The Aramex shipment was registered and linked successfully."));
       setForm((current) => ({ ...current, tracking_number: "" }));
-      // Do not call load() here. A secondary list failure must never overwrite a
-      // confirmed registration with the old generic red error.
     } catch (cause) {
       setError(operationErrorText(cause, isArabic));
     } finally {
@@ -380,95 +406,76 @@ export default function AdminInternationalTrackingLauncher() {
   const healthyWebhook = Boolean(lastWebhook?.signature_valid && lastWebhook?.http_result === 200);
 
   return (
-    <>
-      <button type="button" className="dn-it-admin-launch" onClick={() => setOpen(true)}>
-        <Globe2 /><span>{isArabic ? "التتبع الدولي" : "International tracking"}</span>
-        {data.shipments.length > 0 && <b>{data.shipments.length}</b>}
-      </button>
+    <div className="dn-it-admin-modal" dir={isArabic ? "rtl" : "ltr"} role="dialog" aria-modal="true" aria-label={isArabic ? "مركز تتبع أرامكس" : "Aramex tracking center"}>
+      <button type="button" className="dn-it-admin-shade" onClick={closeCenter} aria-label="Close" />
+      <section className="dn-it-admin-panel">
+        <header className="dn-it-admin-head">
+          <div className="dn-it-admin-title-icon"><Plane /></div>
+          <div><span>17TRACK V2.4 · ARAMEX</span><h1>{isArabic ? "مركز التتبع الدولي" : "International Tracking Center"}</h1><p>{isArabic ? "تسجيل بوليصات أرامكس وربطها مباشرة بطلبات النظام." : "Register Aramex AWBs and link them directly to system orders."}</p></div>
+          <div className="dn-it-admin-head-actions">
+            <button type="button" onClick={() => setIsArabic((value) => !value)}>{isArabic ? "EN" : "ع"}</button>
+            <button type="button" onClick={() => void load(true)} disabled={loading}>{loading ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}</button>
+            <button type="button" onClick={closeCenter}><X /></button>
+          </div>
+        </header>
 
-      {open && (
-        <div className="dn-it-admin-modal" dir={isArabic ? "rtl" : "ltr"} role="dialog" aria-modal="true" aria-label={isArabic ? "مركز تتبع أرامكس" : "Aramex tracking center"}>
-          <button type="button" className="dn-it-admin-shade" onClick={() => setOpen(false)} aria-label="Close" />
-          <section className="dn-it-admin-panel">
-            <header className="dn-it-admin-head">
-              <div className="dn-it-admin-title-icon"><Plane /></div>
-              <div><span>17TRACK V2.4 · ARAMEX</span><h1>{isArabic ? "مركز التتبع الدولي" : "International Tracking Center"}</h1><p>{isArabic ? "تسجيل بوليصات أرامكس وربطها مباشرة بطلبات النظام." : "Register Aramex AWBs and link them directly to system orders."}</p></div>
-              <div className="dn-it-admin-head-actions">
-                <button type="button" onClick={() => setIsArabic((value) => !value)}>{isArabic ? "EN" : "ع"}</button>
-                <button type="button" onClick={() => void load(true)} disabled={loading}>{loading ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}</button>
-                <button type="button" onClick={() => setOpen(false)}><X /></button>
-              </div>
-            </header>
+        <div className="dn-it-admin-scroll">
+          <section className="dn-it-admin-kpis">
+            <article><span><ShieldCheck /></span><small>{isArabic ? "حالة API" : "API status"}</small><b className="is-good">{isArabic ? "المفتاح على الخادم" : "Server secured"}</b></article>
+            <article><span><Gauge /></span><small>{isArabic ? "الرصيد المتبقي" : "Remaining quota"}</small><b>{quota?.quota_remain ?? "—"}</b></article>
+            <article><span><Activity /></span><small>{isArabic ? "مستهلك اليوم" : "Used today"}</small><b>{quota?.today_used ?? "—"}</b></article>
+            <article><span><Webhook /></span><small>{isArabic ? "صحة Webhook" : "Webhook health"}</small><b className={healthyWebhook ? "is-good" : "is-warn"}>{healthyWebhook ? (isArabic ? "سليم" : "Healthy") : (isArabic ? "بانتظار البيانات" : "Awaiting data")}</b></article>
+            <article><span><Globe2 /></span><small>{isArabic ? "طلبات النظام" : "System orders"}</small><b>{orders.length}</b></article>
+          </section>
 
-            <div className="dn-it-admin-scroll">
-              <section className="dn-it-admin-kpis">
-                <article><span><ShieldCheck /></span><small>{isArabic ? "حالة API" : "API status"}</small><b className="is-good">{isArabic ? "المفتاح على الخادم" : "Server secured"}</b></article>
-                <article><span><Gauge /></span><small>{isArabic ? "الرصيد المتبقي" : "Remaining quota"}</small><b>{quota?.quota_remain ?? "—"}</b></article>
-                <article><span><Activity /></span><small>{isArabic ? "مستهلك اليوم" : "Used today"}</small><b>{quota?.today_used ?? "—"}</b></article>
-                <article><span><Webhook /></span><small>{isArabic ? "صحة Webhook" : "Webhook health"}</small><b className={healthyWebhook ? "is-good" : "is-warn"}>{healthyWebhook ? (isArabic ? "سليم" : "Healthy") : (isArabic ? "بانتظار البيانات" : "Awaiting data")}</b></article>
-                <article><span><Globe2 /></span><small>{isArabic ? "طلبات النظام" : "System orders"}</small><b>{orders.length}</b></article>
-              </section>
+          {(error || success) && <div className={`dn-it-admin-message ${error ? "is-error" : "is-success"}`}>{error ? <AlertCircle /> : <CheckCircle2 />}<span>{error || success}</span><button type="button" onClick={() => { setError(""); setSuccess(""); }}><X /></button></div>}
 
-              {(error || success) && <div className={`dn-it-admin-message ${error ? "is-error" : "is-success"}`}>{error ? <AlertCircle /> : <CheckCircle2 />}<span>{error || success}</span><button type="button" onClick={() => { setError(""); setSuccess(""); }}><X /></button></div>}
-
-              <section className="dn-it-admin-register">
-                <header><PackagePlus /><div><small>{isArabic ? "إضافة وربط" : "REGISTER & LINK"}</small><h2>{isArabic ? "تسجيل بوليصة أرامكس" : "Register an Aramex AWB"}</h2></div></header>
-                <div className="dn-it-admin-form">
-                  <label className="is-wide">
-                    <span>{isArabic ? `بحث في طلبات النظام (${orders.length})` : `Search system orders (${orders.length})`}</span>
-                    <input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder={isArabic ? "رقم الطلب، الفاتورة، المدينة أو اسم المستلم" : "Order number, invoice, city or receiver"} />
-                  </label>
-
-                  <label className="is-wide">
-                    <span>{isArabic ? "اختر الطلب الدولي أو أي طلب من النظام" : "Select an international or system order"}</span>
-                    <select value={form.order_id} onChange={(event) => selectOrder(event.target.value)}>
-                      <option value="">{loading ? (isArabic ? "جاري تحميل الطلبات…" : "Loading orders…") : (isArabic ? "اختر الطلب" : "Select order")}</option>
-                      {internationalOrders.length > 0 && (
-                        <optgroup label={isArabic ? `الطلبات الدولية (${internationalOrders.length})` : `International orders (${internationalOrders.length})`}>
-                          {internationalOrders.map((order) => <option value={order.id} key={order.id}>دولي · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || order.destination_country || "—"}</option>)}
-                        </optgroup>
-                      )}
-                      {systemOrders.length > 0 && (
-                        <optgroup label={isArabic ? `باقي طلبات النظام (${systemOrders.length})` : `Other system orders (${systemOrders.length})`}>
-                          {systemOrders.map((order) => <option value={order.id} key={order.id}>نظام · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || "—"}</option>)}
-                        </optgroup>
-                      )}
-                      {!loading && !matchingOrders.length && <option value="" disabled>{isArabic ? "لا توجد نتائج مطابقة" : "No matching orders"}</option>}
-                    </select>
-                  </label>
-
-                  <label className="is-wide"><span>{isArabic ? "رقم بوليصة أرامكس AWB" : "Aramex AWB"}</span><input dir="ltr" value={form.tracking_number} onChange={(event) => setForm({ ...form, tracking_number: event.target.value.toUpperCase() })} placeholder="37313304803" /></label>
-                  <label><span>{isArabic ? "دولة المنشأ" : "Origin country"}</span><input dir="ltr" maxLength={3} value={form.origin_country} onChange={(event) => setForm({ ...form, origin_country: event.target.value.toUpperCase() })} placeholder="AE" /></label>
-                  <label><span>{isArabic ? "مدينة المنشأ" : "Origin city"}</span><input value={form.origin_city} onChange={(event) => setForm({ ...form, origin_city: event.target.value })} placeholder="Ajman" /></label>
-                  <label><span>{isArabic ? "دولة الوجهة" : "Destination country"}</span><input dir="ltr" maxLength={3} value={form.destination_country} onChange={(event) => setForm({ ...form, destination_country: event.target.value.toUpperCase() })} placeholder="SA" /></label>
-                  <label><span>{isArabic ? "مدينة الوجهة" : "Destination city"}</span><input value={form.destination_city} onChange={(event) => setForm({ ...form, destination_city: event.target.value })} placeholder="Riyadh" /></label>
-                  <label className="is-wide"><span>{isArabic ? "تاريخ الشحن (اختياري)" : "Ship date (optional)"}</span><input type="date" value={form.ship_date} onChange={(event) => setForm({ ...form, ship_date: event.target.value })} /></label>
-                  <button type="button" className="dn-it-admin-primary" onClick={() => void register()} disabled={Boolean(operation) || !form.order_id || !form.tracking_number.trim()}>{operation === "register" ? <Loader2 className="dn-it-admin-spin" /> : <PackagePlus />}{isArabic ? "تسجيل وربط الشحنة" : "Register and link shipment"}</button>
-                </div>
-              </section>
-
-              <section className="dn-it-admin-list">
-                <header><div><span>{isArabic ? "العمليات الحية" : "LIVE OPERATIONS"}</span><h2>{isArabic ? "شحنات أرامكس الدولية" : "International Aramex shipments"}</h2></div><label><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={isArabic ? "بحث بالرقم أو الموقع" : "Search number or location"} /></label></header>
-
-                {loading && !data.shipments.length ? <div className="dn-it-admin-loading"><Loader2 /><span>{isArabic ? "تحميل بيانات التتبع…" : "Loading tracking data…"}</span></div> : !filtered.length ? <div className="dn-it-admin-empty"><Plane /><b>{isArabic ? "لا توجد شحنات مسجلة" : "No registered shipments"}</b><p>{isArabic ? "اختر طلبًا من النظام وسجّل بوليصة أرامكس من النموذج بالأعلى." : "Select a system order and register its Aramex AWB above."}</p></div> : <div className="dn-it-admin-cards">{filtered.map((shipment) => {
-                  const busy = operation.endsWith(`:${shipment.id}`);
-                  return <article key={shipment.id}>
-                    <div className="dn-it-admin-card-top"><div><small>ARAMEX AWB</small><b dir="ltr">{shipment.tracking_number || shipment.carrier_tracking_number_full || "—"}</b><span>{shipment.public_tracking_number || "—"}</span></div><i className={`is-${shipment.normalized_status || "unknown"}`}>{statusLabel(shipment.normalized_status, isArabic)}</i></div>
-                    <div className="dn-it-admin-route"><span>{shipment.origin_city || shipment.origin_country || "UAE"}</span><Plane /><span>{shipment.destination_city || shipment.destination_country || "—"}</span></div>
-                    <dl><div><dt>{isArabic ? "آخر موقع" : "Latest location"}</dt><dd>{shipment.latest_location || "—"}</dd></div><div><dt>{isArabic ? "آخر تحديث" : "Last update"}</dt><dd>{date(shipment.latest_update_at, isArabic)}</dd></div><div><dt>Webhook</dt><dd>{date(shipment.last_webhook_at, isArabic)}</dd></div><div><dt>{isArabic ? "مزامنة" : "Sync"}</dt><dd>{date(shipment.last_synced_at, isArabic)}</dd></div></dl>
-                    <div className="dn-it-admin-card-actions"><button type="button" onClick={() => void shipmentAction("sync", shipment)} disabled={busy}>{operation === `sync:${shipment.id}` ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}{isArabic ? "مزامنة" : "Sync"}</button><button type="button" onClick={() => void copyTracking(shipment)}><Copy />{isArabic ? "نسخ الرابط" : "Copy link"}</button><a href={internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || "")} target="_blank" rel="noreferrer"><Link2 />{isArabic ? "فتح" : "Open"}</a>{shipment.tracking_stopped_at ? <button type="button" onClick={() => void shipmentAction("retrack", shipment)} disabled={busy}><RotateCcw />{isArabic ? "إعادة التتبع" : "Retrack"}</button> : <button type="button" className="is-danger" onClick={() => void shipmentAction("stop", shipment)} disabled={busy}><Square />{isArabic ? "إيقاف" : "Stop"}</button>}</div>
-                  </article>;
-                })}</div>}
-              </section>
-
-              <section className="dn-it-admin-webhooks">
-                <header><Webhook /><div><small>17TRACK CALLBACKS</small><h2>{isArabic ? "آخر تحديثات Webhook" : "Latest webhook activity"}</h2></div></header>
-                <div>{data.webhook_logs.length ? data.webhook_logs.map((log) => <article key={log.id}><span className={log.signature_valid ? "is-good" : "is-bad"}>{log.signature_valid ? <ShieldCheck /> : <AlertCircle />}</span><div><b>{log.event_type || "TRACKING_UPDATED"}</b><small dir="ltr">{log.tracking_number || "Test webhook"}</small></div><i>{log.processing_status || "received"}</i><time>{date(log.received_at, isArabic)}</time></article>) : <p>{isArabic ? "لا توجد تحديثات Webhook معروضة بعد." : "No webhook activity is displayed yet."}</p>}</div>
-              </section>
+          <section className="dn-it-admin-register">
+            <header><PackagePlus /><div><small>{isArabic ? "إضافة وربط" : "REGISTER & LINK"}</small><h2>{isArabic ? "تسجيل بوليصة أرامكس" : "Register an Aramex AWB"}</h2></div></header>
+            <div className="dn-it-admin-form">
+              <label className="is-wide"><span>{isArabic ? `بحث في طلبات النظام (${orders.length})` : `Search system orders (${orders.length})`}</span><input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder={isArabic ? "رقم الطلب، الفاتورة، المدينة أو اسم المستلم" : "Order number, invoice, city or receiver"} /></label>
+              <label className="is-wide">
+                <span>{isArabic ? "اختر الطلب الدولي أو أي طلب من النظام" : "Select an international or system order"}</span>
+                <select value={form.order_id} onChange={(event) => selectOrder(event.target.value)}>
+                  <option value="">{loading ? (isArabic ? "جاري تحميل الطلبات…" : "Loading orders…") : (isArabic ? "اختر الطلب" : "Select order")}</option>
+                  {internationalOrders.length > 0 && <optgroup label={isArabic ? `الطلبات الدولية (${internationalOrders.length})` : `International orders (${internationalOrders.length})`}>{internationalOrders.map((order) => <option value={order.id} key={order.id}>دولي · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || order.destination_country || "—"}</option>)}</optgroup>}
+                  {systemOrders.length > 0 && <optgroup label={isArabic ? `باقي طلبات النظام (${systemOrders.length})` : `Other system orders (${systemOrders.length})`}>{systemOrders.map((order) => <option value={order.id} key={order.id}>نظام · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || "—"}</option>)}</optgroup>}
+                  {!loading && !matchingOrders.length && <option value="" disabled>{isArabic ? "لا توجد نتائج مطابقة" : "No matching orders"}</option>}
+                </select>
+              </label>
+              <label className="is-wide"><span>{isArabic ? "رقم بوليصة أرامكس AWB" : "Aramex AWB"}</span><input dir="ltr" value={form.tracking_number} onChange={(event) => setForm({ ...form, tracking_number: event.target.value.toUpperCase() })} placeholder="37313304803" /></label>
+              <label><span>{isArabic ? "دولة المنشأ" : "Origin country"}</span><input dir="ltr" maxLength={3} value={form.origin_country} onChange={(event) => setForm({ ...form, origin_country: event.target.value.toUpperCase() })} placeholder="AE" /></label>
+              <label><span>{isArabic ? "مدينة المنشأ" : "Origin city"}</span><input value={form.origin_city} onChange={(event) => setForm({ ...form, origin_city: event.target.value })} placeholder="Ajman" /></label>
+              <label><span>{isArabic ? "دولة الوجهة" : "Destination country"}</span><input dir="ltr" maxLength={3} value={form.destination_country} onChange={(event) => setForm({ ...form, destination_country: event.target.value.toUpperCase() })} placeholder="SA" /></label>
+              <label><span>{isArabic ? "مدينة الوجهة" : "Destination city"}</span><input value={form.destination_city} onChange={(event) => setForm({ ...form, destination_city: event.target.value })} placeholder="Riyadh" /></label>
+              <label className="is-wide"><span>{isArabic ? "تاريخ الشحن (اختياري)" : "Ship date (optional)"}</span><input type="date" value={form.ship_date} onChange={(event) => setForm({ ...form, ship_date: event.target.value })} /></label>
+              <button type="button" className="dn-it-admin-primary" onClick={() => void register()} disabled={Boolean(operation) || !form.order_id || !form.tracking_number.trim()}>{operation === "register" ? <Loader2 className="dn-it-admin-spin" /> : <PackagePlus />}{isArabic ? "تسجيل وربط الشحنة" : "Register and link shipment"}</button>
             </div>
           </section>
+
+          <section className="dn-it-admin-list">
+            <header><div><span>{isArabic ? "العمليات الحية" : "LIVE OPERATIONS"}</span><h2>{isArabic ? "شحنات أرامكس الدولية" : "International Aramex shipments"}</h2></div><label><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={isArabic ? "بحث بالرقم أو الموقع" : "Search number or location"} /></label></header>
+            {loading && !data.shipments.length
+              ? <div className="dn-it-admin-loading"><Loader2 /><span>{isArabic ? "تحميل بيانات التتبع…" : "Loading tracking data…"}</span></div>
+              : !filtered.length
+                ? <div className="dn-it-admin-empty"><Plane /><b>{isArabic ? "لا توجد شحنات مسجلة" : "No registered shipments"}</b><p>{isArabic ? "اختر طلبًا من النظام وسجّل بوليصة أرامكس من النموذج بالأعلى." : "Select a system order and register its Aramex AWB above."}</p></div>
+                : <div className="dn-it-admin-cards">{filtered.map((shipment) => {
+                    const busy = operation.endsWith(`:${shipment.id}`);
+                    return <article key={shipment.id}>
+                      <div className="dn-it-admin-card-top"><div><small>ARAMEX AWB</small><b dir="ltr">{shipment.tracking_number || shipment.carrier_tracking_number_full || "—"}</b><span>{shipment.public_tracking_number || "—"}</span></div><i className={`is-${shipment.normalized_status || "unknown"}`}>{statusLabel(shipment.normalized_status, isArabic)}</i></div>
+                      <div className="dn-it-admin-route"><span>{shipment.origin_city || shipment.origin_country || "UAE"}</span><Plane /><span>{shipment.destination_city || shipment.destination_country || "—"}</span></div>
+                      <dl><div><dt>{isArabic ? "آخر موقع" : "Latest location"}</dt><dd>{shipment.latest_location || "—"}</dd></div><div><dt>{isArabic ? "آخر تحديث" : "Last update"}</dt><dd>{formatDate(shipment.latest_update_at, isArabic)}</dd></div><div><dt>Webhook</dt><dd>{formatDate(shipment.last_webhook_at, isArabic)}</dd></div><div><dt>{isArabic ? "مزامنة" : "Sync"}</dt><dd>{formatDate(shipment.last_synced_at, isArabic)}</dd></div></dl>
+                      <div className="dn-it-admin-card-actions"><button type="button" onClick={() => void shipmentAction("sync", shipment)} disabled={busy}>{operation === `sync:${shipment.id}` ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}{isArabic ? "مزامنة" : "Sync"}</button><button type="button" onClick={() => void copyTracking(shipment)}><Copy />{isArabic ? "نسخ الرابط" : "Copy link"}</button><a href={internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || "")} target="_blank" rel="noreferrer"><Link2 />{isArabic ? "فتح" : "Open"}</a>{shipment.tracking_stopped_at ? <button type="button" onClick={() => void shipmentAction("retrack", shipment)} disabled={busy}><RotateCcw />{isArabic ? "إعادة التتبع" : "Retrack"}</button> : <button type="button" className="is-danger" onClick={() => void shipmentAction("stop", shipment)} disabled={busy}><Square />{isArabic ? "إيقاف" : "Stop"}</button>}</div>
+                    </article>;
+                  })}</div>}
+          </section>
+
+          <section className="dn-it-admin-webhooks">
+            <header><Webhook /><div><small>17TRACK CALLBACKS</small><h2>{isArabic ? "آخر تحديثات Webhook" : "Latest webhook activity"}</h2></div></header>
+            <div>{data.webhook_logs.length ? data.webhook_logs.map((log) => <article key={log.id}><span className={log.signature_valid ? "is-good" : "is-bad"}>{log.signature_valid ? <ShieldCheck /> : <AlertCircle />}</span><div><b>{log.event_type || "TRACKING_UPDATED"}</b><small dir="ltr">{log.tracking_number || "Test webhook"}</small></div><i>{log.processing_status || "received"}</i><time>{formatDate(log.received_at, isArabic)}</time></article>) : <p>{isArabic ? "لا توجد تحديثات Webhook معروضة بعد." : "No webhook activity is displayed yet."}</p>}</div>
+          </section>
         </div>
-      )}
-    </>
+      </section>
+    </div>
   );
 }
