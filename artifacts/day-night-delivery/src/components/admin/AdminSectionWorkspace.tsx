@@ -7,6 +7,7 @@ import {
 } from "react";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import AdminOrderBulkOperations from "./AdminOrderBulkOperations";
+import AdminInternationalOrdersWorkspace from "./AdminInternationalOrdersWorkspace";
 import AdminSectionWorkspaceComplete from "./AdminSectionWorkspaceComplete";
 
 const PENDING_SCOPE_KEY = "dn-admin-pending-merchant-order-scope";
@@ -347,7 +348,16 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
         </div>
       )}
 
-      <AdminSectionWorkspaceComplete {...props} orders={workspaceOrders} />
+      {props.id === "external" ? (
+        <AdminInternationalOrdersWorkspace
+          isArabic={props.isArabic}
+          orders={workspaceOrders}
+          merchants={props.merchants}
+          onRefresh={props.onRefresh}
+        />
+      ) : (
+        <AdminSectionWorkspaceComplete {...props} orders={workspaceOrders} />
+      )}
     </>
   );
 }
