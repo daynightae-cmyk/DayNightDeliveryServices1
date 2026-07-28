@@ -2,10 +2,24 @@ html:has(.dn-it-page),
 body:has(.dn-it-page),
 body:has(.dn-it-page) #root {
   min-height: 100% !important;
+  width: 100% !important;
+  max-width: none !important;
   margin: 0 !important;
   padding: 0 !important;
   transform: none !important;
+  translate: none !important;
+  scale: 1 !important;
+  zoom: 1 !important;
   inset: auto !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  display: block !important;
+  place-items: initial !important;
+}
+
+body:has(.dn-it-page) {
+  overflow-x: hidden !important;
 }
 
 body:has(.dn-it-page)::before,
@@ -17,18 +31,44 @@ body:has(.dn-it-page) #root::after {
 }
 
 .dn-it-page {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   min-height: 100dvh;
+  position: relative !important;
+  inset: 0 auto auto 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  transform-origin: top center !important;
+  translate: none !important;
+  scale: 1 !important;
+  zoom: 1 !important;
 }
 
 .dn-it-page .dn-it-topbar {
+  width: 100% !important;
   margin: 0 !important;
-  inset-block-start: 0 !important;
+  position: relative !important;
+  inset: 0 auto auto 0 !important;
+  top: 0 !important;
+  transform: none !important;
+  translate: none !important;
+  scale: 1 !important;
+  zoom: 1 !important;
 }
 
 .dn-it-page .dn-it-shell {
+  width: min(1240px, calc(100% - 32px)) !important;
+  max-width: 1240px !important;
+  margin: 0 auto !important;
   padding-top: clamp(20px, 3vw, 38px);
+  transform: none !important;
+  translate: none !important;
+  scale: 1 !important;
+  zoom: 1 !important;
 }
 
 .dn-it-page .dn-it-hero {
@@ -36,7 +76,13 @@ body:has(.dn-it-page) #root::after {
 }
 
 body.dn-it-has-live-map .dn-it-live-map-host {
+  width: 100% !important;
+  max-width: none !important;
   margin-top: 0 !important;
+  transform: none !important;
+  translate: none !important;
+  scale: 1 !important;
+  zoom: 1 !important;
 }
 
 body.dn-it-has-live-map .dn-it-search-card {
@@ -50,7 +96,7 @@ body.dn-it-has-live-map .dn-it-search-card {
   }
 
   .dn-it-page .dn-it-shell {
-    width: min(100% - 20px, 1240px);
+    width: min(100% - 20px, 1240px) !important;
     padding-top: 12px;
   }
 
