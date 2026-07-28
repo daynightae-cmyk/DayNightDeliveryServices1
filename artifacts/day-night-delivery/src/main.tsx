@@ -192,11 +192,16 @@ async function mountStandaloneAdminFeatures() {
   }
 
   if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
-    const { default: MultiPartyRatingPage } = await import("./components/MultiPartyRatingPage");
+    // MultiPartyRatingPage is the authoritative current experience. FeedbackPage
+    // remains a safe compatibility fallback for an older customer-feedback bundle.
+    const ratingModule = await import("./components/MultiPartyRatingPage").catch(() =>
+      import("./components/FeedbackPage"),
+    );
+    const RatingPage = ratingModule.default;
     createRoot(rootElement()).render(
       <StrictMode>
         <AppProvider>
-          <MultiPartyRatingPage />
+          <RatingPage />
           <WhatsAppRuntimeGuard />
         </AppProvider>
       </StrictMode>,
