@@ -15,8 +15,15 @@ export const coverageAreas: CoverageArea[] = [
   { id: "umm-al-quwain", nameEn: "Umm Al Quwain", nameAr: "أم القيوين", emirate: "Umm Al Quwain", zoneType: "main", active: true },
   { id: "ras-al-khaimah", nameEn: "Ras Al Khaimah", nameAr: "رأس الخيمة", emirate: "Ras Al Khaimah", zoneType: "main", active: true },
   { id: "fujairah", nameEn: "Fujairah", nameAr: "الفجيرة", emirate: "Fujairah", zoneType: "main", active: true },
-  { id: "al-ain", nameEn: "Al Ain", nameAr: "العين", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-ain", nameEn: "Al Ain", nameAr: "العين", emirate: "Al Ain", zoneType: "main", active: true },
   { id: "al-dhafra", nameEn: "Al Dhafra / Western Region", nameAr: "الظفرة / المنطقة الغربية", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-ruwais", nameEn: "Al Ruwais", nameAr: "الرويس", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-dhannah", nameEn: "Al Dhannah", nameAr: "الظنة", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "liwa", nameEn: "Liwa", nameAr: "ليوا", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "ghayathi", nameEn: "Ghayathi", nameAr: "غياثي", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "sila", nameEn: "Sila", nameAr: "السلع", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "madinat-zayed", nameEn: "Madinat Zayed", nameAr: "مدينة زايد - الظفرة", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-mirfa", nameEn: "Al Mirfa", nameAr: "المرفأ", emirate: "Abu Dhabi", zoneType: "extended", active: true },
   { id: "mussafah", nameEn: "Mussafah", nameAr: "مصفح", emirate: "Abu Dhabi", zoneType: "main", active: true },
   { id: "khalifa-city", nameEn: "Khalifa City", nameAr: "مدينة خليفة", emirate: "Abu Dhabi", zoneType: "main", active: true },
   { id: "mbz-city", nameEn: "Mohammed Bin Zayed City", nameAr: "مدينة محمد بن زايد", emirate: "Abu Dhabi", zoneType: "main", active: true },
@@ -30,21 +37,39 @@ export const coverageAreas: CoverageArea[] = [
   { id: "jebel-ali", nameEn: "Jebel Ali", nameAr: "جبل علي", emirate: "Dubai", zoneType: "main", active: true },
   { id: "dubai-marina", nameEn: "Dubai Marina", nameAr: "دبي مارينا", emirate: "Dubai", zoneType: "main", active: true },
   { id: "jvc", nameEn: "JVC", nameAr: "قرية جميرا الدائرية", emirate: "Dubai", zoneType: "main", active: true },
-  { id: "al-barsha", nameEn: "Al Barsha", nameAr: "البرشاء", emirate: "Dubai", zoneType: "main", active: true }
+  { id: "al-barsha", nameEn: "Al Barsha", nameAr: "البرشاء", emirate: "Dubai", zoneType: "main", active: true },
 ];
 
+function normalizeCoverageName(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[‐‑‒–—]/g, "-")
+    .replace(/[\s_]+/g, " ");
+}
+
 export function findCoverageArea(value: string | null | undefined) {
-  const normalized = (value || "").toLowerCase().trim();
+  const normalized = normalizeCoverageName(value);
   return coverageAreas.find((area) => {
-    return area.nameEn.toLowerCase() === normalized ||
-      area.nameAr.toLowerCase() === normalized ||
-      area.id === normalized;
+    return normalizeCoverageName(area.nameEn) === normalized
+      || normalizeCoverageName(area.nameAr) === normalized
+      || normalizeCoverageName(area.id) === normalized.replace(/ /g, "-");
   });
 }
 
+/**
+ * Official DAY NIGHT local pricing boundary:
+ * - Al Ain and every district inside Al Ain are normal 25 AED coverage.
+ * - Remote Al Dhafra / Western Region routes remain 50 AED.
+ */
 export function isExtendedCoverage(value: string | null | undefined) {
+  const normalized = normalizeCoverageName(value);
+  if (!normalized) return false;
+
+  if (/(^|\b)(al ain|al-ain)(\b|$)|العين/.test(normalized)) return false;
+
   const area = findCoverageArea(value);
   if (area) return area.zoneType === "extended";
-  const normalized = (value || "").toLowerCase();
-  return /al ain|western|dhafra|العين|الغربية|الظفرة|liwa|sila|ghayathi/.test(normalized);
+
+  return /(western region|al dhafra|dhafra|liwa|ruwais|al ruwais|al dhannah|dhannah|ghayathi|sila|al mirfa|mirfa|madinat zayed|bada mutawa|baynouna|habshan|hamim|asab|shuweihat|barakah|dalma|المنطقة الغربية|الغربية|الظفرة|ليوا|الرويس|الظنة|غياثي|السلع|المرفأ|بدع مطوع|بينونة|حبشان|حَمِيم|عصب|شويهات|براكة|دلما)/.test(normalized);
 }

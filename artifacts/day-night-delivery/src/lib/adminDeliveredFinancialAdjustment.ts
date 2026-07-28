@@ -22,6 +22,8 @@ export type AuditedFinancialAdjustmentResult = {
   adjustmentId: string;
 };
 
+export const AUDITED_ZERO_MANUAL_DELIVERY_FEE = 25;
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -51,6 +53,12 @@ function approximatelyEqual(left: unknown, right: number) {
   return Math.abs(financialNumber(left, Number.NaN) - right) < 0.005;
 }
 
+/**
+ * Delivered-order adjustment semantics:
+ * - positive delivery input is saved exactly as entered;
+ * - explicit zero is preserved as the manual marker sent to the RPC, while the
+ *   effective accounting fee becomes 25 AED and is deducted from the merchant.
+ */
 export async function adjustDeliveredOrderFinancials(
   input: AuditedFinancialAdjustmentInput,
 ): Promise<AuditedFinancialAdjustmentResult> {
@@ -62,14 +70,17 @@ export async function adjustDeliveredOrderFinancials(
   if (reason.length < 6) throw new Error("financial_adjustment_reason_required");
 
   const goodsValue = money(input.goodsValue);
-  const deliveryFee = money(input.deliveryFee);
+  const enteredDeliveryFee = money(input.deliveryFee);
+  const deliveryFee = enteredDeliveryFee === 0
+    ? AUDITED_ZERO_MANUAL_DELIVERY_FEE
+    : enteredDeliveryFee;
   const discountAmount = money(input.discountAmount ?? 0);
-  if (goodsValue < 0 || deliveryFee < 0 || discountAmount < 0) {
+  if (goodsValue < 0 || enteredDeliveryFee < 0 || discountAmount < 0) {
     throw new Error("negative_financial_value");
   }
 
   const paymentMethod = normalizedPaymentMethod(input.paymentMethod);
-  const deliveryFeeMode = paymentMethod === "sender_pays"
+  const deliveryFeeMode = enteredDeliveryFee === 0 || paymentMethod === "sender_pays"
     ? "deduct_from_merchant"
     : normalizeDeliveryFeeMode(input.deliveryFeeMode);
   const expected = calculateOrderFinancials({
@@ -82,7 +93,7 @@ export async function adjustDeliveredOrderFinancials(
   const { data, error } = await supabase.rpc("admin_adjust_order_financials_verified", {
     p_order_id: orderId,
     p_goods_value: goodsValue,
-    p_delivery_fee: deliveryFee,
+    p_delivery_fee: enteredDeliveryFee,
     p_discount_amount: discountAmount,
     p_delivery_fee_mode: deliveryFeeMode,
     p_payment_method: paymentMethod,
