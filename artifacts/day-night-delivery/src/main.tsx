@@ -17,6 +17,9 @@ import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExp
 import AdminRatingsLauncher from "./components/admin/AdminRatingsLauncher";
 import AdminEmployeeLauncher from "./components/admin/AdminEmployeeLauncher";
 import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
+import InternationalTrackingEntryLauncher from "./components/InternationalTrackingEntryLauncher";
+import AdminInternationalTrackingLauncher from "./components/admin/AdminInternationalTrackingLauncher";
+import MerchantInternationalTrackingLauncher from "./components/merchant/MerchantInternationalTrackingLauncher";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -140,6 +143,9 @@ function mountPublicApplication() {
         <AdminRatingsLauncher />
         <AdminEmployeeLauncher />
         <MerchantFeedbackSummaryLauncher />
+        <InternationalTrackingEntryLauncher />
+        <AdminInternationalTrackingLauncher />
+        <MerchantInternationalTrackingLauncher />
         <ProductionOrderRealtimeBridge />
         <AdminDeferredMerchantAccounting />
         <ProductionExperience />
@@ -158,6 +164,7 @@ async function mountNativeRoleApplication(role: NativeRole) {
             <NativeRoleRoot role={role} />
             <WhatsAppRuntimeGuard />
             {role === "merchant" && <MerchantFeedbackSummaryLauncher />}
+            {role === "merchant" && <MerchantInternationalTrackingLauncher />}
           </AppProvider>
         </NativeRoleErrorBoundary>
       </BrowserRouter>
@@ -167,6 +174,20 @@ async function mountNativeRoleApplication(role: NativeRole) {
 
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
+
+  if (/^\/international-tracking\/?$/i.test(pathname)) {
+    const { default: InternationalTrackingPage } = await import("./components/InternationalTrackingPage");
+    createRoot(rootElement()).render(
+      <StrictMode>
+        <AppProvider>
+          <InternationalTrackingPage />
+          <WhatsAppRuntimeGuard />
+        </AppProvider>
+      </StrictMode>,
+    );
+    return true;
+  }
+
   if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) {
     // FeedbackPage remains the customer form inside MultiPartyRatingPage; this
     // preserves the original customer-experience route and complaint contract.
