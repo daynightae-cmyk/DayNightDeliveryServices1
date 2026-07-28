@@ -3,6 +3,7 @@ import companyMeta from "../../data/companyMeta";
 import { internationalTrackingAssets } from "../../data/internationalTrackingAssets";
 import type { TrackingLanguage } from "./i18n";
 import { trackingCopy } from "./i18n";
+import "../../styles/dn-international-tracking-results-v2.css";
 
 type Props = {
   language: TrackingLanguage;
