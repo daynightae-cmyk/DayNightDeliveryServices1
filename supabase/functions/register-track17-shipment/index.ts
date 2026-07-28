@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
   const supabase = getSupabaseAdmin();
   let trackingNumber = "";
-  let started = Date.now();
+  const started = Date.now();
 
   try {
     const actor = await requireAdmin(req);
@@ -61,13 +61,14 @@ Deno.serve(async (req) => {
     const originCountry = String(body.origin_country || orderJson.sender_country || "AE").trim().toUpperCase();
     const destinationCountry = String(body.destination_country || orderJson.receiver_country || "").trim().toUpperCase();
     const destinationCity = String(body.destination_city || orderJson.receiver_city || "").trim();
-    const shipDate = String(body.ship_date || "").trim();
+    const rawShipDate = String(body.ship_date || "").trim();
+    const shipDate = /^\d{4}-\d{2}-\d{2}$/.test(rawShipDate) ? rawShipDate.replaceAll("-", "/") : rawShipDate;
 
+    // V2.4 registration accepts the carrier-specific additional fields directly.
+    // Do not request third-party translation: it can consume an extra quota.
     const registerItem: Record<string, unknown> = {
       number: trackingNumber,
       carrier: ARAMEX_CARRIER_CODE,
-      lang: "en",
-      order_no: publicTrackingNumber,
       tag: publicTrackingNumber,
       origin_country: originCountry || undefined,
       destination_country: destinationCountry || undefined,
