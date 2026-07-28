@@ -33,7 +33,7 @@ expect("src/components/public/InternationalTrackingVisualBridge.tsx", [
 expect("src/components/admin/AdminInternationalOrderWhatsappBridge.tsx", [
   "إرسال للعميل",
   "إرسال للتاجر",
-  "international_shipments",
+  "runTrack17Admin",
   "buildInternationalTrackingWhatsappMessage",
   "dn-intl-whatsapp-actions",
 ]);
