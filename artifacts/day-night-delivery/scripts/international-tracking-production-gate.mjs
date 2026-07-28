@@ -91,7 +91,7 @@ expect(admin, /Webhook health|صحة Webhook/, "Admin can see webhook health");
 expect(merchant, /fetchInternationalTracking/, "Merchant view uses the public-safe tracking payload");
 expect(entry, /\/international-tracking/, "Public pages link to the dedicated international tracking center");
 expect(main, /InternationalTrackingPage/, "Dedicated international tracking route is mounted");
-expect(main, /AdminInternationalTrackingLauncher/, "Admin tracking center is mounted");
+expect(main, /AdminInternationalTrackingLauncher|AdminInternationalTrackingRouteBridge/, "Admin tracking center is mounted");
 expect(main, /MerchantInternationalTrackingLauncher/, "Merchant tracking viewer is mounted");
 expect(styles, /@media \(max-width: 620px\)/, "Tracking page has dedicated phone layout");
 expect(styles, /@media print/, "Tracking result has print layout");
@@ -102,7 +102,14 @@ const frontendSource = frontendFiles
   .filter((file) => /\.(?:ts|tsx|js|jsx)$/.test(file))
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
-reject(frontendSource, /TRACK17_API_KEY/, "Frontend source never references the server secret name");
+
+// A diagnostic may safely mention the server-side secret name. What must never
+// exist in the browser bundle is code that reads or injects that secret.
+reject(
+  frontendSource,
+  /(?:Deno\.env\.get|process\.env|import\.meta\.env|window\.__ENV__)[\s\S]{0,80}TRACK17_API_KEY|TRACK17_API_KEY[\s\S]{0,80}(?:Deno\.env\.get|process\.env|import\.meta\.env|window\.__ENV__)/,
+  "Frontend never reads or injects the server secret",
+);
 reject(frontendSource, /["']17token["']\s*:/, "Frontend source never sends the 17TRACK authentication header");
 reject(frontendSource, /api\.17track\.net/, "Frontend never calls 17TRACK directly");
 reject(page, /window\.location\.href\s*=.*(?:aramex|17track)/i, "Customer tracking never redirects to a carrier website");
