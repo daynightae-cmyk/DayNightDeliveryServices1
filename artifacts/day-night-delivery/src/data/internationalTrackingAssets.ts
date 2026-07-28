@@ -9,6 +9,7 @@ export type InternationalTrackingAsset = {
 };
 
 const root = "/assets/international-tracking";
+export const internationalTrackingAssetSyncVersion = "2026-07-29.1";
 
 export const internationalTrackingAssets = {
   masterLogo: `${root}/branding/daynight-official-master-logo.png`,
