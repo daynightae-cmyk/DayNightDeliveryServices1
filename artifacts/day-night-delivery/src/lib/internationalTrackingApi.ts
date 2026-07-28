@@ -68,22 +68,39 @@ export type PublicInternationalTrackingResult = {
   message_en?: string;
 };
 
+export type TrackingOperationError = Error & {
+  code?: string;
+  status?: number;
+  details?: string;
+};
+
 const SUPABASE_FUNCTIONS_BASE = "https://ngdwybpgacauorygoedi.supabase.co/functions/v1";
 const SUPABASE_ANON_KEY = String((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
+const FUNCTION_TIMEOUT_MS = 35_000;
 
 function requireSupabase() {
-  if (!supabase) throw new Error("supabase_unavailable");
+  if (!supabase) throw operationError("supabase_unavailable", "Supabase client is unavailable.");
   return supabase;
 }
 
 function requireAnonKey() {
-  if (!SUPABASE_ANON_KEY) throw new Error("supabase_anon_key_missing");
+  if (!SUPABASE_ANON_KEY) throw operationError("supabase_anon_key_missing", "Supabase publishable key is missing from the web deployment.");
   return SUPABASE_ANON_KEY;
+}
+
+function operationError(code: string, message: string, details = "", status = 0): TrackingOperationError {
+  const error = new Error(message) as TrackingOperationError;
+  error.code = code;
+  error.details = details;
+  error.status = status;
+  return error;
 }
 
 function normalizeReference(value: string) {
   const reference = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-  if (!/^[A-Z0-9\-_.]{5,80}$/.test(reference)) throw new Error("invalid_tracking_reference");
+  if (!/^[A-Z0-9\-_.]{5,80}$/.test(reference)) {
+    throw operationError("invalid_tracking_reference", "Invalid tracking reference.");
+  }
   return reference;
 }
 
@@ -97,21 +114,11 @@ async function parseResponse(response: Response) {
   }
 }
 
-function trackingError(
-  name: string,
-  response: Response,
-  payload: any,
-) {
-  const message = payload?.message_en || payload?.message_ar || payload?.code || `HTTP ${response.status}` || `${name}_failed`;
-  const wrapped = new Error(String(message)) as Error & {
-    code?: string;
-    status?: number;
-    details?: string;
-  };
-  wrapped.code = String(payload?.code || `${name}_failed`);
-  wrapped.status = response.status;
-  wrapped.details = String(payload?.details || payload?.error_message || "");
-  return wrapped;
+function trackingError(name: string, response: Response, payload: any): TrackingOperationError {
+  const code = String(payload?.code || `${name}_failed`);
+  const message = String(payload?.message_ar || payload?.message_en || code || `HTTP ${response.status}`);
+  const details = String(payload?.details || payload?.error_message || payload?.provider_message || "");
+  return operationError(code, message, details, response.status);
 }
 
 async function callFunction<T>(
@@ -120,23 +127,36 @@ async function callFunction<T>(
   accessToken?: string,
 ): Promise<T> {
   const anonKey = requireAnonKey();
-  const response = await fetch(`${SUPABASE_FUNCTIONS_BASE}/${name}`, {
-    method: "POST",
-    mode: "cors",
-    cache: "no-store",
-    credentials: "omit",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: anonKey,
-      Authorization: `Bearer ${accessToken || anonKey}`,
-      "X-Client-Info": "day-night-web-track17/3.0",
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), FUNCTION_TIMEOUT_MS);
 
-  const payload = await parseResponse(response);
-  if (!response.ok) throw trackingError(name, response, payload);
-  return payload as T;
+  try {
+    const response = await fetch(`${SUPABASE_FUNCTIONS_BASE}/${name}`, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      credentials: "omit",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${accessToken || anonKey}`,
+        "X-Client-Info": "day-night-web-track17/4.0",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const payload = await parseResponse(response);
+    if (!response.ok) throw trackingError(name, response, payload);
+    return payload as T;
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw operationError("function_timeout", `The ${name} request timed out.`, "", 504);
+    }
+    throw cause;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 async function accessToken(forceRefresh = false) {
@@ -150,7 +170,9 @@ async function accessToken(forceRefresh = false) {
   }
 
   const sessionResult = await client.auth.getSession();
-  if (sessionResult.error) throw new Error("not_authenticated");
+  if (sessionResult.error) {
+    throw operationError("not_authenticated", "Administrator session could not be read.", sessionResult.error.message, 401);
+  }
 
   const session = sessionResult.data.session;
   const expiresSoon = !session?.expires_at || session.expires_at * 1000 <= Date.now() + 90_000;
@@ -159,7 +181,7 @@ async function accessToken(forceRefresh = false) {
   const refreshed = await client.auth.refreshSession();
   if (refreshed.error || !refreshed.data.session?.access_token) {
     if (session?.access_token) return session.access_token;
-    throw new Error("not_authenticated");
+    throw operationError("not_authenticated", "Administrator session has expired.", refreshed.error?.message || "", 401);
   }
   return refreshed.data.session.access_token;
 }
@@ -172,15 +194,16 @@ async function invokeAuthenticated<T>(
   try {
     return await callFunction<T>(name, body, token);
   } catch (cause) {
-    const status = Number((cause as { status?: number })?.status || 0);
-    const code = String((cause as { code?: string })?.code || "");
+    const error = cause as TrackingOperationError;
+    const status = Number(error?.status || 0);
+    const code = String(error?.code || "");
     if (status !== 401 && !/not_authenticated/i.test(code)) throw cause;
     token = await accessToken(true);
     return callFunction<T>(name, body, token);
   }
 }
 
-async function directAdminListFallback(limit: number) {
+async function directAdminList(limit: number) {
   const client = requireSupabase();
   const safeLimit = Math.max(1, Math.min(100, Number(limit || 100)));
   const [shipmentsResult, webhookResult, quotaResult] = await Promise.all([
@@ -201,7 +224,15 @@ async function directAdminListFallback(limit: number) {
       .maybeSingle(),
   ]);
 
-  if (shipmentsResult.error) throw new Error(`shipment_list_failed:${shipmentsResult.error.message}`);
+  if (shipmentsResult.error) {
+    throw operationError(
+      "shipment_list_failed",
+      "International shipments could not be read.",
+      shipmentsResult.error.message,
+      500,
+    );
+  }
+
   return {
     ok: true,
     shipments: shipmentsResult.data || [],
@@ -210,14 +241,14 @@ async function directAdminListFallback(limit: number) {
   };
 }
 
-async function directQuotaFallback() {
+async function directQuota() {
   const client = requireSupabase();
   const { data, error } = await client
     .from("track17_quota_cache")
     .select("*")
     .eq("id", true)
     .maybeSingle();
-  if (error) throw new Error(`quota_cache_failed:${error.message}`);
+  if (error) throw operationError("quota_cache_failed", "Quota cache could not be read.", error.message, 500);
   return { ok: true, cached: true, quota: data || null };
 }
 
@@ -244,6 +275,7 @@ export async function registerAramexShipment(input: {
     ok: boolean;
     shipment?: InternationalShipment;
     already_registered?: boolean;
+    already_registered_at_provider?: boolean;
     sync_warning?: string | null;
   }>("register-track17-shipment", {
     ...input,
@@ -264,18 +296,39 @@ export async function runTrack17Admin<T = Record<string, unknown>>(
   action: string,
   payload: Record<string, unknown> = {},
 ) {
-  try {
-    return await invokeAuthenticated<T>("track17-admin", { action, ...payload });
-  } catch (cause) {
-    const normalizedAction = String(action || "").trim().toLowerCase();
-    if (normalizedAction === "list") {
-      return await directAdminListFallback(Number(payload.limit || 100)) as T;
+  const normalizedAction = String(action || "").trim().toLowerCase();
+
+  // Listing is a normal authenticated database read and should not depend on an
+  // Edge Function round trip. This keeps the center usable even when a provider
+  // operation or Edge cold start is unavailable.
+  if (normalizedAction === "list") {
+    try {
+      return await directAdminList(Number(payload.limit || 100)) as T;
+    } catch (directCause) {
+      try {
+        return await invokeAuthenticated<T>("track17-admin", { action, ...payload });
+      } catch (edgeCause) {
+        const direct = directCause as TrackingOperationError;
+        const edge = edgeCause as TrackingOperationError;
+        throw operationError(
+          edge.code || direct.code || "tracking_center_load_failed",
+          edge.message || direct.message || "Tracking center data could not be loaded.",
+          [direct.details, edge.details].filter(Boolean).join(" | "),
+          edge.status || direct.status || 500,
+        );
+      }
     }
-    if (normalizedAction === "quota") {
-      return await directQuotaFallback() as T;
-    }
-    throw cause;
   }
+
+  if (normalizedAction === "quota") {
+    try {
+      return await invokeAuthenticated<T>("track17-admin", { action, ...payload });
+    } catch {
+      return await directQuota() as T;
+    }
+  }
+
+  return invokeAuthenticated<T>("track17-admin", { action, ...payload });
 }
 
 export function internationalTrackingUrl(reference: string) {
