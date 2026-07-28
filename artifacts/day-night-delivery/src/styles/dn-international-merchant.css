@@ -1,0 +1,72 @@
+.dn-it-merchant-launch { position: fixed; z-index: 170; inset-inline-end: 17px; bottom: 150px; min-height: 48px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(85,184,255,.5); border-radius: 15px; color: white; background: linear-gradient(135deg,#075bc9,#1698ff); box-shadow: 0 18px 42px rgba(0,52,116,.35); font: inherit; font-size: 10px; font-weight: 900; cursor: pointer; }
+.dn-it-merchant-launch svg { width: 18px; height: 18px; }
+.dn-it-merchant-modal { position: fixed; inset: 0; z-index: 1050; display: grid; place-items: center; padding: 16px; color: #f8fbff; }
+.dn-it-merchant-shade { position: absolute; inset: 0; border: 0; background: rgba(0,8,21,.83); backdrop-filter: blur(18px); }
+.dn-it-merchant-panel { width: min(950px,100%); max-height: 92dvh; position: relative; overflow: hidden; display: grid; grid-template-rows: auto minmax(0,1fr); border: 1px solid rgba(115,201,255,.23); border-radius: 27px; background: linear-gradient(145deg,#06152d,#0a2c55 65%,#071a33); box-shadow: 0 36px 110px rgba(0,0,0,.65); }
+.dn-it-merchant-panel > header { min-height: 78px; display: grid; grid-template-columns: 44px minmax(0,1fr) 40px 40px; align-items: center; gap: 9px; padding: 14px 17px; border-bottom: 1px solid rgba(119,204,255,.14); }
+.dn-it-merchant-panel > header > span { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; color: #071a33; background: linear-gradient(135deg,#d4af37,#f2d574); }
+.dn-it-merchant-panel > header > span svg { width: 20px; height: 20px; }
+.dn-it-merchant-panel header small { color: #e7c75f; font-size: 7px; font-weight: 950; letter-spacing: .12em; }
+.dn-it-merchant-panel header h2 { margin: 3px 0 0; font-size: 17px; }
+.dn-it-merchant-panel > header > button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(119,204,255,.15); border-radius: 11px; color: white; background: rgba(255,255,255,.04); font: inherit; font-size: 10px; font-weight: 900; cursor: pointer; }
+.dn-it-merchant-panel > header > button svg { width: 17px; height: 17px; }
+.dn-it-merchant-body { min-height: 0; overflow-y: auto; padding: 17px; }
+.dn-it-merchant-search { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 7px 7px 7px 13px; border: 1px solid rgba(212,175,55,.23); border-radius: 16px; background: rgba(3,17,37,.55); }
+[dir="rtl"] .dn-it-merchant-search { padding: 7px 13px 7px 7px; }
+.dn-it-merchant-search > svg { width: 18px; height: 18px; color: #d4af37; }
+.dn-it-merchant-search input { width: 100%; min-height: 43px; border: 0; outline: 0; color: white; background: transparent; font: inherit; font-size: 13px; font-weight: 750; text-align: center; }
+.dn-it-merchant-search button { min-height: 43px; padding: 0 17px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 12px; color: #071a33; background: linear-gradient(135deg,#d4af37,#efd16e); font: inherit; font-size: 10px; font-weight: 950; cursor: pointer; }
+.dn-it-merchant-search button:disabled { opacity: .55; }
+.dn-it-merchant-search button svg { width: 16px; height: 16px; }
+.dn-it-merchant-error { margin-top: 12px; padding: 11px 13px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(239,68,68,.24); border-radius: 13px; color: #ff848a; background: rgba(239,68,68,.08); font-size: 10px; font-weight: 800; }
+.dn-it-merchant-error svg { width: 18px; height: 18px; }
+.dn-it-merchant-empty { min-height: 290px; display: grid; place-items: center; align-content: center; gap: 10px; text-align: center; color: #91aac4; }
+.dn-it-merchant-empty svg { width: 48px; height: 48px; color: #d4af37; }
+.dn-it-merchant-empty b { color: white; font-size: 15px; }
+.dn-it-merchant-empty p { max-width: 520px; margin: 0; font-size: 10px; line-height: 1.8; }
+.dn-it-merchant-result { display: grid; gap: 12px; margin-top: 13px; }
+.dn-it-merchant-status { display: grid; grid-template-columns: 57px minmax(0,1fr) minmax(170px,.55fr); align-items: center; gap: 13px; padding: 16px; border: 1px solid rgba(119,204,255,.16); border-radius: 19px; background: rgba(255,255,255,.035); }
+.dn-it-merchant-status > span { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 18px; color: #75ceff; background: rgba(22,152,255,.1); border: 1px solid rgba(22,152,255,.23); }
+.dn-it-merchant-status > span.is-delivered { color: #59dfa0; background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.22); }
+.dn-it-merchant-status > span svg { width: 25px; height: 25px; }
+.dn-it-merchant-status > div small,
+.dn-it-merchant-status aside small { color: #d4af37; font-size: 7px; font-weight: 900; letter-spacing: .09em; }
+.dn-it-merchant-status h3 { margin: 3px 0; font-size: 20px; }
+.dn-it-merchant-status p { margin: 0; color: #90a8c2; font-size: 9px; line-height: 1.6; }
+.dn-it-merchant-status aside { display: grid; gap: 4px; padding: 11px; text-align: center; border-radius: 13px; background: rgba(212,175,55,.06); border: 1px solid rgba(212,175,55,.17); }
+.dn-it-merchant-status aside b { font-size: 12px; letter-spacing: .05em; }
+.dn-it-merchant-status aside strong { color: #9cb3cb; font-size: 8px; }
+.dn-it-merchant-facts { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+.dn-it-merchant-facts article { min-height: 101px; display: grid; align-content: start; gap: 6px; padding: 13px; border: 1px solid rgba(119,204,255,.13); border-radius: 16px; background: rgba(255,255,255,.028); }
+.dn-it-merchant-facts svg { width: 18px; height: 18px; color: #d4af37; }
+.dn-it-merchant-facts small { color: #89a2bd; font-size: 7px; }
+.dn-it-merchant-facts b { font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
+.dn-it-merchant-timeline { padding: 15px; border: 1px solid rgba(119,204,255,.13); border-radius: 18px; background: rgba(255,255,255,.028); }
+.dn-it-merchant-timeline > header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(119,204,255,.1); }
+.dn-it-merchant-timeline > header svg { width: 18px; height: 18px; color: #d4af37; }
+.dn-it-merchant-timeline h3 { margin: 0; font-size: 13px; }
+.dn-it-merchant-timeline article { position: relative; display: grid; grid-template-columns: 29px minmax(0,1fr); gap: 10px; padding-top: 13px; }
+.dn-it-merchant-timeline article:not(:last-child)::after { content: ""; position: absolute; top: 40px; bottom: -13px; inset-inline-start: 14px; width: 1px; background: linear-gradient(#d4af37,rgba(22,152,255,.08)); }
+.dn-it-merchant-timeline article > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; color: #071a33; background: linear-gradient(135deg,#d4af37,#efd16d); z-index: 1; }
+.dn-it-merchant-timeline article > span svg { width: 12px; height: 12px; }
+.dn-it-merchant-timeline article b { font-size: 10px; }
+.dn-it-merchant-timeline article p { margin: 3px 0; color: #91a9c3; font-size: 8px; }
+.dn-it-merchant-timeline article time { color: #e6c75f; font-size: 7px; }
+.dn-it-merchant-no-events { color: #91a9c3; font-size: 9px; text-align: center; }
+.dn-it-merchant-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dn-it-merchant-actions button,
+.dn-it-merchant-actions a { min-height: 43px; padding: 0 14px; flex: 1 1 170px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(119,204,255,.15); border-radius: 12px; color: white; background: rgba(255,255,255,.04); text-decoration: none; font: inherit; font-size: 9px; font-weight: 900; cursor: pointer; }
+.dn-it-merchant-actions svg { width: 16px; height: 16px; color: #d4af37; }
+.dn-it-merchant-spin { animation: dn-it-merchant-spin .9s linear infinite; }
+@keyframes dn-it-merchant-spin { to { transform: rotate(360deg); } }
+@media (max-width: 650px) {
+  .dn-it-merchant-launch { inset-inline-end: 10px; bottom: 128px; }
+  .dn-it-merchant-modal { padding: 0; }
+  .dn-it-merchant-panel { width: 100%; max-height: none; height: 100dvh; border: 0; border-radius: 0; }
+  .dn-it-merchant-body { padding: 11px; }
+  .dn-it-merchant-search { grid-template-columns: 20px minmax(0,1fr); }
+  .dn-it-merchant-search button { grid-column: 1 / -1; justify-content: center; }
+  .dn-it-merchant-status { grid-template-columns: 48px minmax(0,1fr); }
+  .dn-it-merchant-status aside { grid-column: 1 / -1; }
+  .dn-it-merchant-facts { grid-template-columns: 1fr; }
+}
