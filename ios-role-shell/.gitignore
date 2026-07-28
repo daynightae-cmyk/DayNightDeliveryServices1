@@ -1,0 +1,9 @@
+.venv/
+DayNightRoleApps.xcodeproj/
+build/
+build-signed/
+dist-v120/
+dist-signed-v120/
+*.log
+Resources/Assets.xcassets/DriverAppIcon.appiconset/*.png
+Resources/Assets.xcassets/MerchantAppIcon.appiconset/*.png
