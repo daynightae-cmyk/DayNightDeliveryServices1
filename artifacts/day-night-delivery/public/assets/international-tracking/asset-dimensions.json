@@ -1,0 +1,248 @@
+{
+  "aircraft/daynight-aircraft-long-side-profile.jpg": {
+    "width": 256,
+    "height": 58,
+    "mode": "RGB",
+    "format": "JPEG"
+  },
+  "aircraft/daynight-aircraft-side-transparent.png": {
+    "width": 1280,
+    "height": 853,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "aircraft/daynight-aircraft-three-quarter-front.png": {
+    "width": 1280,
+    "height": 853,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "aircraft/daynight-aircraft-flight-side.png": {
+    "width": 1280,
+    "height": 853,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "map/daynight-map-assets-master-sheet.png": {
+    "width": 1280,
+    "height": 853,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "aircraft/daynight-aircraft-front-transparent.png": {
+    "width": 1280,
+    "height": 853,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "references/daynight-desktop-master-layout-a.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-route-stats-grid.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-events-cargo-details-panel.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-desktop-master-layout-b.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-route-progress-wide-a.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-live-map-primary-reference.png": {
+    "width": 1279,
+    "height": 720,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-topbar-reference-a.png": {
+    "width": 1279,
+    "height": 548,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-cargo-details-grid-primary.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-shipment-summary-documents-card.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-global-network-map-reference.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-desktop-operations-layout.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-map-first-live-dashboard.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-shipment-overview-vertical-card.png": {
+    "width": 640,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-selected-shipment-card-primary.png": {
+    "width": 640,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-compact-shipment-list.png": {
+    "width": 640,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-shipment-timeline-primary.png": {
+    "width": 600,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-tracking-list-desktop-primary.png": {
+    "width": 600,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-tracking-list-narrow.png": {
+    "width": 600,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-shipment-lifecycle-timeline.png": {
+    "width": 600,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-mobile-tracking-dashboard-a.png": {
+    "width": 450,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-mobile-tracking-dashboard-b.png": {
+    "width": 450,
+    "height": 800,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-international-tracking-analytics.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-route-progress-component-primary.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-cinematic-shipment-hero.png": {
+    "width": 1280,
+    "height": 960,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "references/daynight-topbar-reference-primary.png": {
+    "width": 1280,
+    "height": 427,
+    "mode": "RGB",
+    "format": "PNG"
+  },
+  "branding/daynight-official-master-logo.png": {
+    "width": 800,
+    "height": 800,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-aircraft-front.png": {
+    "width": 359,
+    "height": 206,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-aircraft-side-partner.png": {
+    "width": 436,
+    "height": 204,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-aircraft-side-daynight.png": {
+    "width": 424,
+    "height": 206,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-pin-daynight.png": {
+    "width": 256,
+    "height": 301,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-pin-carrier.png": {
+    "width": 233,
+    "height": 301,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-pin-current-location.png": {
+    "width": 258,
+    "height": 301,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-route-dots-blue.png": {
+    "width": 582,
+    "height": 171,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-route-dots-gold.png": {
+    "width": 636,
+    "height": 296,
+    "mode": "RGBA",
+    "format": "PNG"
+  },
+  "markers/map-aircraft-light-white.png": {
+    "width": 196,
+    "height": 206,
+    "mode": "RGBA",
+    "format": "PNG"
+  }
+}
