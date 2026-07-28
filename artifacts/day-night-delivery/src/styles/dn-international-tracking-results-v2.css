@@ -1,0 +1,18 @@
+@media (min-width: 1101px) {
+  .dn-it-workspace {
+    grid-template-areas:
+      "map summary"
+      "metrics summary"
+      "progress side"
+      "timeline side";
+  }
+
+  .dn-it-summary-area,
+  .dn-it-side-lower {
+    align-self: stretch;
+  }
+
+  .dn-it-side-lower {
+    align-content: start;
+  }
+}
