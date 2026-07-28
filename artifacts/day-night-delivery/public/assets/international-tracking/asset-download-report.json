@@ -1,0 +1,198 @@
+{
+  "generatedAt": "2026-07-28T22:06:41.811Z",
+  "asset15": null,
+  "assets": [
+    {
+      "id": 1,
+      "relativePath": "aircraft/daynight-aircraft-long-side-profile.jpg",
+      "sourceUrl": "https://i.postimg.cc/05tJN1Hh/1.jpg",
+      "bytes": 4748
+    },
+    {
+      "id": 2,
+      "relativePath": "aircraft/daynight-aircraft-side-transparent.png",
+      "sourceUrl": "https://i.postimg.cc/7YdGgM4M/2.png",
+      "bytes": 507914
+    },
+    {
+      "id": 3,
+      "relativePath": "aircraft/daynight-aircraft-three-quarter-front.png",
+      "sourceUrl": "https://i.postimg.cc/fTptxjs7/3.png",
+      "bytes": 1014217
+    },
+    {
+      "id": 4,
+      "relativePath": "aircraft/daynight-aircraft-flight-side.png",
+      "sourceUrl": "https://i.postimg.cc/bNWDQHP1/4.png",
+      "bytes": 542583
+    },
+    {
+      "id": 5,
+      "relativePath": "map/daynight-map-assets-master-sheet.png",
+      "sourceUrl": "https://i.postimg.cc/9FKRGt2G/5.png",
+      "bytes": 447088
+    },
+    {
+      "id": 6,
+      "relativePath": "aircraft/daynight-aircraft-front-transparent.png",
+      "sourceUrl": "https://i.postimg.cc/MG8nL6vk/6.png",
+      "bytes": 1005416
+    },
+    {
+      "id": 7,
+      "relativePath": "references/daynight-desktop-master-layout-a.png",
+      "sourceUrl": "https://i.postimg.cc/7ZzCXGYk/7.png",
+      "bytes": 1293572
+    },
+    {
+      "id": 8,
+      "relativePath": "ui-panels/daynight-route-stats-grid.png",
+      "sourceUrl": "https://i.postimg.cc/d0KhfsLv/8.png",
+      "bytes": 772787
+    },
+    {
+      "id": 9,
+      "relativePath": "ui-panels/daynight-events-cargo-details-panel.png",
+      "sourceUrl": "https://i.postimg.cc/7Ly5RHbp/9.png",
+      "bytes": 798194
+    },
+    {
+      "id": 10,
+      "relativePath": "references/daynight-desktop-master-layout-b.png",
+      "sourceUrl": "https://i.postimg.cc/TPXKsdpy/10.png",
+      "bytes": 1275119
+    },
+    {
+      "id": 11,
+      "relativePath": "ui-panels/daynight-route-progress-wide-a.png",
+      "sourceUrl": "https://i.postimg.cc/PqkC7XP8/11.png",
+      "bytes": 640977
+    },
+    {
+      "id": 12,
+      "relativePath": "references/daynight-live-map-primary-reference.png",
+      "sourceUrl": "https://i.postimg.cc/cJMvypnt/12.png",
+      "bytes": 1487099
+    },
+    {
+      "id": 13,
+      "relativePath": "references/daynight-topbar-reference-a.png",
+      "sourceUrl": "https://i.postimg.cc/0NdzRTwz/13.png",
+      "bytes": 428900
+    },
+    {
+      "id": 14,
+      "relativePath": "ui-panels/daynight-cargo-details-grid-primary.png",
+      "sourceUrl": "https://i.postimg.cc/q7XNVP3s/14.png",
+      "bytes": 1365293
+    },
+    {
+      "id": 16,
+      "relativePath": "ui-panels/daynight-shipment-summary-documents-card.png",
+      "sourceUrl": "https://i.postimg.cc/N07Kq3Hd/16.png",
+      "bytes": 1090555
+    },
+    {
+      "id": 17,
+      "relativePath": "references/daynight-global-network-map-reference.png",
+      "sourceUrl": "https://i.postimg.cc/hjDfS28g/17.png",
+      "bytes": 1896279
+    },
+    {
+      "id": 18,
+      "relativePath": "references/daynight-desktop-operations-layout.png",
+      "sourceUrl": "https://i.postimg.cc/yd1kVLhs/18.png",
+      "bytes": 1638220
+    },
+    {
+      "id": 19,
+      "relativePath": "references/daynight-map-first-live-dashboard.png",
+      "sourceUrl": "https://i.postimg.cc/4dWnnpwG/19.png",
+      "bytes": 1610195
+    },
+    {
+      "id": 20,
+      "relativePath": "ui-panels/daynight-shipment-overview-vertical-card.png",
+      "sourceUrl": "https://i.postimg.cc/85ZssLwP/20.png",
+      "bytes": 632011
+    },
+    {
+      "id": 21,
+      "relativePath": "ui-panels/daynight-selected-shipment-card-primary.png",
+      "sourceUrl": "https://i.postimg.cc/0jrjSrHK/21.png",
+      "bytes": 683737
+    },
+    {
+      "id": 22,
+      "relativePath": "ui-panels/daynight-compact-shipment-list.png",
+      "sourceUrl": "https://i.postimg.cc/Zn0nN0DV/22.png",
+      "bytes": 487780
+    },
+    {
+      "id": 23,
+      "relativePath": "ui-panels/daynight-shipment-timeline-primary.png",
+      "sourceUrl": "https://i.postimg.cc/T1h1bhHt/23.png",
+      "bytes": 516628
+    },
+    {
+      "id": 24,
+      "relativePath": "ui-panels/daynight-tracking-list-desktop-primary.png",
+      "sourceUrl": "https://i.postimg.cc/j2C2fCkk/24.png",
+      "bytes": 496335
+    },
+    {
+      "id": 25,
+      "relativePath": "ui-panels/daynight-tracking-list-narrow.png",
+      "sourceUrl": "https://i.postimg.cc/fyFLfZ6C/25.png",
+      "bytes": 482828
+    },
+    {
+      "id": 26,
+      "relativePath": "ui-panels/daynight-shipment-lifecycle-timeline.png",
+      "sourceUrl": "https://i.postimg.cc/2yJ67msp/26.png",
+      "bytes": 554418
+    },
+    {
+      "id": 27,
+      "relativePath": "references/daynight-mobile-tracking-dashboard-a.png",
+      "sourceUrl": "https://i.postimg.cc/vTjBtMJd/27.png",
+      "bytes": 424570
+    },
+    {
+      "id": 28,
+      "relativePath": "references/daynight-mobile-tracking-dashboard-b.png",
+      "sourceUrl": "https://i.postimg.cc/90SMYV6W/28.png",
+      "bytes": 473878
+    },
+    {
+      "id": 29,
+      "relativePath": "references/daynight-international-tracking-analytics.png",
+      "sourceUrl": "https://i.postimg.cc/1RYfQcf6/29.png",
+      "bytes": 1477692
+    },
+    {
+      "id": 30,
+      "relativePath": "ui-panels/daynight-route-progress-component-primary.png",
+      "sourceUrl": "https://i.postimg.cc/2jXVDFV7/30.png",
+      "bytes": 1074590
+    },
+    {
+      "id": 31,
+      "relativePath": "references/daynight-cinematic-shipment-hero.png",
+      "sourceUrl": "https://i.postimg.cc/h43fBbfr/31.png",
+      "bytes": 1711473
+    },
+    {
+      "id": 32,
+      "relativePath": "references/daynight-topbar-reference-primary.png",
+      "sourceUrl": "https://i.postimg.cc/9XNrhtrb/32.png",
+      "bytes": 383328
+    },
+    {
+      "id": 33,
+      "relativePath": "branding/daynight-official-master-logo.png",
+      "sourceUrl": "https://i.postimg.cc/QNnH3kHz/33.png",
+      "bytes": 1015815
+    }
+  ]
+}
