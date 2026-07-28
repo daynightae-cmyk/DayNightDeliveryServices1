@@ -76,7 +76,7 @@ export default function AdminInternationalTrackingRouteBridge() {
 
   return (
     <>
-      <div className="dn-it-admin-legacy-host" aria-hidden="true">
+      <div className="dn-it-admin-legacy-host">
         <AdminInternationalTrackingLauncher />
       </div>
 
