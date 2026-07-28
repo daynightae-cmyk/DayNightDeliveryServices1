@@ -79,6 +79,44 @@ function normalizeReference(value: string) {
   return reference;
 }
 
+async function errorPayload(error: any, fallbackData: any) {
+  if (fallbackData && typeof fallbackData === "object") return fallbackData;
+  const response = error?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      return await response.clone().json();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function invokeAuthenticated<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const client = requireSupabase();
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (sessionError || !accessToken) throw new Error("not_authenticated");
+
+  const { data, error } = await client.functions.invoke(name, {
+    body,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (error) {
+    const payload = await errorPayload(error, data);
+    const message = payload?.message_en || payload?.message_ar || payload?.code || error.message || `${name}_failed`;
+    const wrapped = new Error(String(message)) as Error & { code?: string; status?: number };
+    wrapped.code = payload?.code || `${name}_failed`;
+    wrapped.status = Number(error.context?.status || 0) || undefined;
+    throw wrapped;
+  }
+
+  return data as T;
+}
+
 export async function fetchInternationalTracking(reference: string): Promise<PublicInternationalTrackingResult> {
   const client = requireSupabase();
   const trackingNumber = normalizeReference(reference);
@@ -86,9 +124,10 @@ export async function fetchInternationalTracking(reference: string): Promise<Pub
     body: { tracking_number: trackingNumber },
   });
   if (error) {
-    const message = typeof data?.message_en === "string" ? data.message_en : error.message;
+    const payload = await errorPayload(error, data);
+    const message = typeof payload?.message_en === "string" ? payload.message_en : error.message;
     const wrapped = new Error(message || "international_tracking_failed") as Error & { code?: string; status?: number };
-    wrapped.code = data?.code || "international_tracking_failed";
+    wrapped.code = payload?.code || "international_tracking_failed";
     wrapped.status = Number(error.context?.status || 0) || undefined;
     throw wrapped;
   }
@@ -104,30 +143,28 @@ export async function registerAramexShipment(input: {
   destination_city?: string;
   ship_date?: string;
 }) {
-  const client = requireSupabase();
-  const { data, error } = await client.functions.invoke("register-track17-shipment", {
-    body: { ...input, tracking_number: normalizeReference(input.tracking_number) },
+  return invokeAuthenticated<{
+    ok: boolean;
+    shipment?: InternationalShipment;
+    already_registered?: boolean;
+    sync_warning?: string | null;
+  }>("register-track17-shipment", {
+    ...input,
+    tracking_number: normalizeReference(input.tracking_number),
   });
-  if (error) throw new Error(data?.message_en || error.message || "registration_failed");
-  return data as { ok: boolean; shipment?: InternationalShipment; already_registered?: boolean; sync_warning?: string | null };
 }
 
 export async function syncAramexShipment(shipmentId: string) {
-  const client = requireSupabase();
-  const { data, error } = await client.functions.invoke("sync-track17-shipment", {
-    body: { shipment_id: shipmentId },
-  });
-  if (error) throw new Error(data?.message_en || error.message || "sync_failed");
-  return data as { ok: boolean; shipment?: InternationalShipment; status_changed?: boolean; events_received?: number };
+  return invokeAuthenticated<{
+    ok: boolean;
+    shipment?: InternationalShipment;
+    status_changed?: boolean;
+    events_received?: number;
+  }>("sync-track17-shipment", { shipment_id: shipmentId });
 }
 
 export async function runTrack17Admin<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {
-  const client = requireSupabase();
-  const { data, error } = await client.functions.invoke("track17-admin", {
-    body: { action, ...payload },
-  });
-  if (error) throw new Error(data?.message_en || error.message || `track17_admin_${action}_failed`);
-  return data as T;
+  return invokeAuthenticated<T>("track17-admin", { action, ...payload });
 }
 
 export function internationalTrackingUrl(reference: string) {
