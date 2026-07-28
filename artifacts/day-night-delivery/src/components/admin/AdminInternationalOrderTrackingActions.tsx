@@ -151,6 +151,22 @@ export default function AdminInternationalOrderTrackingActions({
 
   const pdfPayload = useMemo(() => orderPdfPayload(order, shipment, isArabic), [isArabic, order, shipment]);
 
+  function toggleEditor() {
+    setError("");
+    setSuccess("");
+    if (awb) {
+      setForm((current) => ({
+        ...current,
+        trackingNumber: awb,
+        originCountry: clean(shipment?.origin_country) || current.originCountry || "AE",
+        originCity: clean(shipment?.origin_city || order.sender_city) || current.originCity,
+        destinationCountry: clean(shipment?.destination_country) || current.destinationCountry || canonicalCountry(order.destination_country),
+        destinationCity: clean(shipment?.destination_city || order.receiver_city) || current.destinationCity,
+      }));
+    }
+    setOpen((value) => !value);
+  }
+
   async function saveTracking() {
     const number = clean(form.trackingNumber).toUpperCase();
     if (!number) {
@@ -195,7 +211,7 @@ export default function AdminInternationalOrderTrackingActions({
   return (
     <div className="dn-intl-native-actions">
       <div className="dn-intl-native-actions__buttons">
-        <button type="button" className="is-track" onClick={() => setOpen((value) => !value)}>
+        <button type="button" className="is-track" onClick={toggleEditor}>
           {open ? <X /> : <PackagePlus />}
           {awb
             ? (isArabic ? "تعديل رقم التتبع" : "Edit tracking number")
@@ -233,6 +249,7 @@ export default function AdminInternationalOrderTrackingActions({
           <Plane />
           <span>{isArabic ? "رقم التتبع الدولي" : "International tracking"}</span>
           <strong dir="ltr">{awb}</strong>
+          <a href={trackingUrl} target="_blank" rel="noreferrer" dir="ltr">{trackingUrl}</a>
         </div>
       )}
 
