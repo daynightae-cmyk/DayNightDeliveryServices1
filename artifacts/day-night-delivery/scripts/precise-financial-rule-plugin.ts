@@ -258,8 +258,8 @@ function initialForm`,
         const code = replaceRequired(
           source,
           '["special", "al ain", "dhafra", "liwa", "ruwais", "western", "العين", "الظفرة", "ليوا", "الرويس", "الغربية", "خاص", "الممتدة"]',
-          '["special", "dhafra", "liwa", "western", "ghayathi", "sila", "mirfa", "الظفرة", "ليوا", "الغربية", "غياثي", "السلع", "المرفأ", "خاص", "الممتدة"]',
-          "smart chat keeps Al Ain and Ruwais at 25 AED",
+          '["special", "dhafra", "liwa", "ruwais", "western", "ghayathi", "sila", "mirfa", "الظفرة", "ليوا", "الرويس", "الغربية", "غياثي", "السلع", "المرفأ", "خاص", "الممتدة"]',
+          "smart chat keeps Al Ain at 25 AED",
         );
         return { code, map: null };
       }
@@ -269,12 +269,12 @@ function initialForm`,
         const replacements: Array<[string, string, string]> = [
           [
             "Special UAE routes such as Al Ain and Western Region: 50 AED per local order.",
-            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain and Al Ruwais are 25 AED.",
+            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain and all its districts are 25 AED.",
             "AI English extended price",
           ],
           [
             "المسارات الخاصة داخل الإمارات مثل العين والمنطقة الغربية: 50 درهم للطلب المحلي الواحد.",
-            "المناطق البعيدة في الظفرة / المنطقة الغربية: 50 درهم للطلب المحلي الواحد. العين والرويس 25 درهماً.",
+            "المناطق الممتدة في الظفرة / المنطقة الغربية: 50 درهم للطلب المحلي الواحد. العين وكل مناطقها 25 درهماً.",
             "AI Arabic extended price",
           ],
           [
@@ -283,39 +283,29 @@ function initialForm`,
             "AI Al Ain price",
           ],
           [
-            "Western Region / Al Dhafra / Ruwais: special UAE route — 50 AED per local order.",
-            "Remote Western Region / Al Dhafra areas: 50 AED per local order. Al Ruwais remains 25 AED.",
-            "AI Western price",
-          ],
-          [
             'extendedAreas: ["Al Ain", "Western Region", "Al Dhafra", "Ruwais", "Liwa", "Ghayathi", "Sila"]',
-            'extendedAreas: ["Western Region", "Al Dhafra", "Liwa", "Ghayathi", "Sila", "Al Mirfa"]',
+            'extendedAreas: ["Western Region", "Al Dhafra", "Ruwais", "Liwa", "Ghayathi", "Sila", "Al Mirfa"]',
             "AI extended area list",
           ],
           [
             'extendedAreasAr: ["العين", "المنطقة الغربية", "الظفرة", "الرويس", "ليوا", "غياثي", "السيلة"]',
-            'extendedAreasAr: ["المنطقة الغربية", "الظفرة", "ليوا", "غياثي", "السلع", "المرفأ"]',
+            'extendedAreasAr: ["المنطقة الغربية", "الظفرة", "الرويس", "ليوا", "غياثي", "السلع", "المرفأ"]',
             "AI Arabic extended list",
           ],
           [
             "Special UAE routes (Al Ain, Western Region): 50 AED per local order.",
-            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain and Al Ruwais: 25 AED.",
+            "Remote Al Dhafra / Western Region routes: 50 AED per local order. Al Ain: 25 AED.",
             "AI pricing answer",
           ],
           [
             "المسارات الخاصة (العين، المنطقة الغربية): 50 درهم للطلب المحلي الواحد.",
-            "المناطق البعيدة في الظفرة / المنطقة الغربية: 50 درهم. العين والرويس: 25 درهماً.",
+            "المناطق الممتدة في الظفرة / المنطقة الغربية: 50 درهماً. العين: 25 درهماً.",
             "AI Arabic pricing answer",
           ],
           [
             "العين: مسار خاص داخل الإمارات — 50 درهم للطلب المحلي الواحد.",
             "العين وجميع مناطقها: مسار عادي داخل الإمارات — 25 درهماً للطلب المحلي الواحد.",
             "AI Arabic Al Ain answer",
-          ],
-          [
-            "المنطقة الغربية / الظفرة / الرويس / ليوا: مسار خاص داخل الإمارات — 50 درهم للطلب المحلي الواحد.",
-            "المناطق البعيدة في المنطقة الغربية / الظفرة / ليوا: 50 درهماً. الرويس: 25 درهماً.",
-            "AI Arabic Western answer",
           ],
         ];
         for (const [from, to, label] of replacements) {
@@ -335,13 +325,13 @@ function initialForm`,
         code = replaceRequired(
           code,
           'const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان"];',
-          'const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان", "العين (Al Ain)", "الرويس"];',
+          'const mainCities = ["أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "رأس الخيمة", "الفجيرة", "خورفكان", "العين (Al Ain)"];',
           "public order main cities",
         );
         code = replaceRequired(
           code,
           'const extendedCities = ["العين (Al Ain)", "المنطقة الغربية (Western Region)", "السلع", "الرويس", "غياثي", "ليوا"];',
-          'const extendedCities = ["المنطقة الغربية (Western Region)", "الظفرة", "السلع", "غياثي", "ليوا", "المرفأ"];',
+          'const extendedCities = ["المنطقة الغربية (Western Region)", "الظفرة", "السلع", "الرويس", "غياثي", "ليوا", "المرفأ"];',
           "public order extended cities",
         );
         code = replaceRequired(
