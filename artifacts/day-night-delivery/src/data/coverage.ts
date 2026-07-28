@@ -16,9 +16,9 @@ export const coverageAreas: CoverageArea[] = [
   { id: "ras-al-khaimah", nameEn: "Ras Al Khaimah", nameAr: "رأس الخيمة", emirate: "Ras Al Khaimah", zoneType: "main", active: true },
   { id: "fujairah", nameEn: "Fujairah", nameAr: "الفجيرة", emirate: "Fujairah", zoneType: "main", active: true },
   { id: "al-ain", nameEn: "Al Ain", nameAr: "العين", emirate: "Al Ain", zoneType: "main", active: true },
-  { id: "al-ruwais", nameEn: "Al Ruwais", nameAr: "الرويس", emirate: "Abu Dhabi", zoneType: "main", active: true },
-  { id: "al-dhannah", nameEn: "Al Dhannah", nameAr: "الظنة", emirate: "Abu Dhabi", zoneType: "main", active: true },
   { id: "al-dhafra", nameEn: "Al Dhafra / Western Region", nameAr: "الظفرة / المنطقة الغربية", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-ruwais", nameEn: "Al Ruwais", nameAr: "الرويس", emirate: "Abu Dhabi", zoneType: "extended", active: true },
+  { id: "al-dhannah", nameEn: "Al Dhannah", nameAr: "الظنة", emirate: "Abu Dhabi", zoneType: "extended", active: true },
   { id: "liwa", nameEn: "Liwa", nameAr: "ليوا", emirate: "Abu Dhabi", zoneType: "extended", active: true },
   { id: "ghayathi", nameEn: "Ghayathi", nameAr: "غياثي", emirate: "Abu Dhabi", zoneType: "extended", active: true },
   { id: "sila", nameEn: "Sila", nameAr: "السلع", emirate: "Abu Dhabi", zoneType: "extended", active: true },
@@ -59,19 +59,17 @@ export function findCoverageArea(value: string | null | undefined) {
 
 /**
  * Official DAY NIGHT local pricing boundary:
- * - Al Ain and every Al Ain district are normal 25 AED coverage.
- * - Al Ruwais / Al Dhannah are normal 25 AED coverage.
- * - Only remote Al Dhafra / Western Region routes are 50 AED.
+ * - Al Ain and every district inside Al Ain are normal 25 AED coverage.
+ * - Remote Al Dhafra / Western Region routes remain 50 AED.
  */
 export function isExtendedCoverage(value: string | null | undefined) {
   const normalized = normalizeCoverageName(value);
   if (!normalized) return false;
 
   if (/(^|\b)(al ain|al-ain)(\b|$)|العين/.test(normalized)) return false;
-  if (/(^|\b)(al ruwais|ruwais|al dhannah|dhannah)(\b|$)|الرويس|الظنة/.test(normalized)) return false;
 
   const area = findCoverageArea(value);
   if (area) return area.zoneType === "extended";
 
-  return /(western region|al dhafra|dhafra|liwa|ghayathi|sila|al mirfa|mirfa|madinat zayed|bada mutawa|baynouna|habshan|hamim|asab|shuweihat|barakah|dalma|المنطقة الغربية|الغربية|الظفرة|ليوا|غياثي|السلع|المرفأ|بدع مطوع|بينونة|حبشان|حَمِيم|عصب|شويهات|براكة|دلما)/.test(normalized);
+  return /(western region|al dhafra|dhafra|liwa|ruwais|al ruwais|al dhannah|dhannah|ghayathi|sila|al mirfa|mirfa|madinat zayed|bada mutawa|baynouna|habshan|hamim|asab|shuweihat|barakah|dalma|المنطقة الغربية|الغربية|الظفرة|ليوا|الرويس|الظنة|غياثي|السلع|المرفأ|بدع مطوع|بينونة|حبشان|حَمِيم|عصب|شويهات|براكة|دلما)/.test(normalized);
 }
