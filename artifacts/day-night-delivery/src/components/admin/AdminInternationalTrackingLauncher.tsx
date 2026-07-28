@@ -28,7 +28,7 @@ import {
 } from "../../lib/internationalTrackingApi";
 import "../../styles/dn-international-admin.css";
 
-const SIDEBAR_ENTRY = '[data-dn-command-section="external"]';
+const INTERNATIONAL_SHIPMENT_UPDATED_EVENT = "dn-international-shipment-updated";
 
 type OrderOption = {
   id: string;
@@ -188,6 +188,29 @@ function mergeShipment(current: InternationalShipment[], shipment: International
   return [shipment, ...current.filter((item) => item.id !== shipment.id)].slice(0, 100);
 }
 
+function shipmentTrackingNumber(shipment?: InternationalShipment | null) {
+  return text(
+    shipment?.carrier_tracking_number_full
+      || shipment?.tracking_number
+      || shipment?.carrier_tracking_number
+      || shipment?.public_tracking_number,
+  );
+}
+
+function announceInternationalShipmentUpdate(
+  shipment: InternationalShipment | null | undefined,
+  fallbackOrderId = "",
+  fallbackTrackingNumber = "",
+) {
+  window.dispatchEvent(new CustomEvent(INTERNATIONAL_SHIPMENT_UPDATED_EVENT, {
+    detail: {
+      orderId: text(shipment?.order_id || fallbackOrderId),
+      trackingNumber: shipmentTrackingNumber(shipment) || text(fallbackTrackingNumber),
+      shipment: shipment || null,
+    },
+  }));
+}
+
 export default function AdminInternationalTrackingLauncher() {
   const adminRoute = /^\/admin(?:\/|$)/.test(window.location.pathname);
   const [open, setOpen] = useState(false);
@@ -253,27 +276,24 @@ export default function AdminInternationalTrackingLauncher() {
     setLoading(false);
   }
 
-  // No floating launcher exists. The permanent sidebar item "International
-  // Orders" opens this center directly from the first normal admin render.
-  useEffect(() => {
-    if (!adminRoute) return;
-    const openFromSidebar = (event: MouseEvent) => {
-      const entry = event.target instanceof Element ? event.target.closest(SIDEBAR_ENTRY) : null;
-      if (!entry) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      setOpen(true);
-    };
-    document.addEventListener("click", openFromSidebar, true);
-    return () => document.removeEventListener("click", openFromSidebar, true);
-  }, [adminRoute]);
-
   useEffect(() => {
     if (adminRoute && open) void loadCenter(false);
   }, [adminRoute, open]);
 
-  if (!adminRoute || !open) return null;
+  if (!adminRoute) return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="dn-it-admin-launch"
+        onClick={() => setOpen(true)}
+        hidden
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+    );
+  }
 
   function close() {
     setOpen(false);
@@ -298,16 +318,30 @@ export default function AdminInternationalTrackingLauncher() {
       setError(arabic ? "اختر طلبًا واكتب رقم بوليصة أرامكس." : "Select an order and enter the Aramex AWB.");
       return;
     }
+
+    const savedOrderId = form.order_id;
+    const savedTrackingNumber = form.tracking_number.trim();
     setOperation("register");
     setError("");
     setSuccess("");
+
     try {
       const result = await registerAramexShipment(form);
       if (!result.ok) throw new Error("registration_returned_not_ok");
-      if (result.shipment) setCenter((current) => ({ ...current, shipments: mergeShipment(current.shipments, result.shipment as InternationalShipment) }));
+
+      const registeredShipment = result.shipment as InternationalShipment | undefined;
+      if (registeredShipment) {
+        setCenter((current) => ({ ...current, shipments: mergeShipment(current.shipments, registeredShipment) }));
+      }
+
+      announceInternationalShipmentUpdate(registeredShipment, savedOrderId, savedTrackingNumber);
       setSuccess(result.already_registered || result.already_registered_at_provider
-        ? (arabic ? "البوليصة مسجلة مسبقًا وتم ربطها بالطلب." : "The AWB was already registered and has been linked.")
-        : (arabic ? "تم تسجيل شحنة أرامكس وربطها بالطلب بنجاح." : "The Aramex shipment was registered and linked successfully."));
+        ? (arabic
+          ? "البوليصة مسجلة ومربوطة بالطلب. أزرار واتساب للعميل والتاجر أصبحت جاهزة بجانب الطلبية الدولية."
+          : "The AWB is linked. Customer and merchant WhatsApp actions are now ready beside the international order.")
+        : (arabic
+          ? "تم تسجيل الشحنة وربطها بالطلب. ظهر زر إرسال التتبع للعميل والتاجر بجانب الطلبية الدولية."
+          : "The shipment was registered and linked. Customer and merchant tracking buttons are now available beside the international order."));
       setForm((current) => ({ ...current, tracking_number: "" }));
     } catch (cause) {
       setError(operationMessage(cause, arabic));
@@ -321,15 +355,22 @@ export default function AdminInternationalTrackingLauncher() {
     setError("");
     setSuccess("");
     try {
+      let updatedShipment: InternationalShipment | null = null;
       if (action === "sync") {
         const result = await syncAramexShipment(shipment.id);
-        if (result.shipment) setCenter((current) => ({ ...current, shipments: mergeShipment(current.shipments, result.shipment as InternationalShipment) }));
+        updatedShipment = (result.shipment as InternationalShipment | undefined) || shipment;
+        if (result.shipment) {
+          setCenter((current) => ({ ...current, shipments: mergeShipment(current.shipments, result.shipment as InternationalShipment) }));
+        }
       } else {
         await runTrack17Admin(action, { shipment_id: shipment.id });
         await loadCenter(false);
+        updatedShipment = shipment;
       }
+
+      announceInternationalShipmentUpdate(updatedShipment, text(shipment.order_id), shipmentTrackingNumber(shipment));
       setSuccess(action === "sync"
-        ? (arabic ? "تم تحديث الشحنة." : "Shipment updated.")
+        ? (arabic ? "تم تحديث الشحنة ورابط واتساب بجانب الطلبية." : "Shipment and its WhatsApp tracking action were refreshed.")
         : action === "stop"
           ? (arabic ? "تم إيقاف التتبع." : "Tracking stopped.")
           : (arabic ? "تمت إعادة التتبع." : "Tracking restarted."));
