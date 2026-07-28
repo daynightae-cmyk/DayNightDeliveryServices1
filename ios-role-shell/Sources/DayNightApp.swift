@@ -2,7 +2,7 @@ import UIKit
 
 @main
 final class DayNightAppDelegate: UIResponder, UIApplicationDelegate {
-    private(set) var window: UIWindow?
+    var window: UIWindow?
 
     func application(
         _ application: UIApplication,
