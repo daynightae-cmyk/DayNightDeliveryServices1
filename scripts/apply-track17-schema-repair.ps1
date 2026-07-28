@@ -35,8 +35,9 @@ Write-Host 'IMPORTANT: Do not run supabase db push --include-all.' -ForegroundCo
 Write-Host 'That command would attempt to apply dozens of unrelated historical migrations.' -ForegroundColor Red
 Write-Host ''
 
-$confirmation = Read-Host 'After Supabase shows Success, type SUCCESS here'
-if ($confirmation.Trim().ToUpperInvariant() -ne 'SUCCESS') {
+$confirmation = (Read-Host 'After Supabase shows Success, type SUCCESS here').Trim()
+$normalizedConfirmation = ($confirmation -replace '\s+', ' ').Trim().ToUpperInvariant()
+if ($normalizedConfirmation -ne 'SUCCESS' -and $normalizedConfirmation -ne 'SUCCESS. NO ROWS RETURNED.' -and $normalizedConfirmation -ne 'SUCCESS. NO ROWS RETURNED') {
   throw 'Repair was not confirmed. Migration history was not changed.'
 }
 
@@ -47,8 +48,8 @@ if ($LASTEXITCODE -ne 0) {
   throw "Migration repair failed with exit code $LASTEXITCODE."
 }
 
-Write-Host 'Requesting a PostgREST schema reload...' -ForegroundColor Yellow
-Start-Sleep -Seconds 4
+Write-Host 'Waiting for the PostgREST schema cache reload...' -ForegroundColor Yellow
+Start-Sleep -Seconds 5
 
 $checkUri = "https://$projectRef.supabase.co/functions/v1/public-international-tracking"
 $checkBody = @{ tracking_number = 'DN-SCHEMA-CHECK-00000' } | ConvertTo-Json -Compress
