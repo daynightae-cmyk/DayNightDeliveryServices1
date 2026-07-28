@@ -9,6 +9,14 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/day-night-web-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "artifacts/day-night-delivery/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/day-night-web-validation.yml"
   workflow_dispatch:
 
 concurrency:
