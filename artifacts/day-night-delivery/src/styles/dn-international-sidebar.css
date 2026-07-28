@@ -1,0 +1,29 @@
+.dn-it-admin-legacy-host > .dn-it-admin-launch {
+  display: none !important;
+}
+
+.dn-it-admin-legacy-host {
+  position: static;
+}
+
+.dn-it-sidebar-section {
+  display: grid;
+  gap: 6px;
+}
+
+.dn-it-sidebar-section .dn-it-sidebar-button {
+  width: 100%;
+}
+
+.dn-it-sidebar-section .dn-it-sidebar-button span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .dn-it-sidebar-section .dn-it-sidebar-button {
+    min-height: 46px;
+  }
+}
