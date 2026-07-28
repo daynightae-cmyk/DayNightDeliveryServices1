@@ -1,0 +1,16 @@
+project_id = "ngdwybpgacauorygoedi"
+
+[functions.register-track17-shipment]
+verify_jwt = true
+
+[functions.sync-track17-shipment]
+verify_jwt = true
+
+[functions.track17-admin]
+verify_jwt = true
+
+[functions.track17-webhook]
+verify_jwt = false
+
+[functions.public-international-tracking]
+verify_jwt = false
