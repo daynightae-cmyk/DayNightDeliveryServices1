@@ -2,6 +2,7 @@ const VERSION = new URL(self.location.href).searchParams.get("v") || "legacy";
 const APP_SHELL_CACHE = `day-night-shell-${VERSION}`;
 const RUNTIME_CACHE = `day-night-runtime-${VERSION}`;
 const IMAGE_CACHE = `day-night-images-${VERSION}`;
+const PROTECTED_ROUTE_PATTERN = /^\/(admin|auth|driver|merchant|customer|update-password)(?:\/|$)/i;
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -52,23 +53,29 @@ self.addEventListener("message", (event) => {
   }
 });
 
+function isProtectedNavigation(request, url) {
+  return request.mode === "navigate" && PROTECTED_ROUTE_PATTERN.test(url.pathname);
+}
+
 function shouldBypass(request, url) {
   if (request.method !== "GET") return true;
   if (url.origin !== self.location.origin) return true;
+  if (isProtectedNavigation(request, url)) return true;
   if (url.pathname === "/sw.js" || url.pathname === "/version.json") return true;
   if (url.searchParams.has("__dn_deployment_check")) return true;
   if (url.searchParams.has("__dn_update_check")) return true;
   if (url.searchParams.has("__dn_live_reload")) return true;
   if (url.searchParams.has("__dn_live")) return true;
+  if (url.searchParams.has("__dn_cache_recovered")) return true;
   if (request.cache === "no-store") return true;
   return false;
 }
 
-async function fetchWithTimeout(request, timeoutMs = 5500) {
+async function fetchWithTimeout(request, timeoutMs = 5500, cacheMode = "default") {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(new Request(request, { signal: controller.signal }));
+    return await fetch(new Request(request, { signal: controller.signal, cache: cacheMode }));
   } finally {
     clearTimeout(timer);
   }
@@ -76,7 +83,9 @@ async function fetchWithTimeout(request, timeoutMs = 5500) {
 
 async function networkFirstNavigation(request) {
   try {
-    const response = await fetchWithTimeout(request);
+    // Navigation HTML is always revalidated from the network. Hashed assets remain
+    // cache-first, while an offline fallback is still available when the network fails.
+    const response = await fetchWithTimeout(request, 5500, "no-store");
     if (response.ok && response.type === "basic") {
       const cache = await caches.open(RUNTIME_CACHE);
       await cache.put(request, response.clone());
