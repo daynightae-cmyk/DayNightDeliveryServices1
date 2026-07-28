@@ -36,6 +36,20 @@ expect("src/components/admin/AdminInternationalOrderWhatsappBridge.tsx", [
   "runTrack17Admin",
   "buildInternationalTrackingWhatsappMessage",
   "dn-intl-whatsapp-actions",
+  "dn-international-shipment-updated",
+  "refreshImmediately",
+]);
+
+expect("src/components/admin/AdminInternationalTrackingLauncher.tsx", [
+  "announceInternationalShipmentUpdate",
+  "dn-international-shipment-updated",
+  "dn-it-admin-launch",
+  "أزرار واتساب للعميل والتاجر أصبحت جاهزة",
+]);
+
+expect("src/components/admin/AdminInternationalTrackingRouteBridge.tsx", [
+  "data-dn-track17-sidebar",
+  ".dn-it-admin-launch",
 ]);
 
 expect("src/lib/internationalTrackingLinks.ts", [
