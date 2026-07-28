@@ -29,7 +29,7 @@ jobs:
   build-role-apps:
     name: Build Driver and Merchant iOS v1.2.0
     runs-on: macos-15
-    timeout-minutes: 55
+    timeout-minutes: 70
 
     steps:
       - name: Checkout repository
@@ -88,9 +88,9 @@ jobs:
             -configuration Release \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios-role-shell/build/driver \
+            -derivedDataPath ios-role-shell/build/driver-simulator \
             CODE_SIGNING_ALLOWED=NO \
-            clean build | tee ios-role-shell/driver-build.log
+            clean build | tee ios-role-shell/driver-simulator-build.log
 
       - name: Build Merchant for iPhone Simulator
         shell: bash
@@ -102,33 +102,92 @@ jobs:
             -configuration Release \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios-role-shell/build/merchant \
+            -derivedDataPath ios-role-shell/build/merchant-simulator \
             CODE_SIGNING_ALLOWED=NO \
-            clean build | tee ios-role-shell/merchant-build.log
+            clean build | tee ios-role-shell/merchant-simulator-build.log
 
-      - name: Verify and package simulator applications
+      - name: Build unsigned Driver for physical iPhone
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ios-role-shell/dist-v120
-          DRIVER_APP="$(find ios-role-shell/build/driver/Build/Products -type d -name 'DAY NIGHT Driver.app' | head -n 1)"
-          MERCHANT_APP="$(find ios-role-shell/build/merchant/Build/Products -type d -name 'DAY NIGHT Merchant.app' | head -n 1)"
-          test -d "$DRIVER_APP"
-          test -d "$MERCHANT_APP"
+          xcodebuild \
+            -project ios-role-shell/DayNightRoleApps.xcodeproj \
+            -scheme DayNightDriver \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios-role-shell/build/driver-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=NO \
+            clean build | tee ios-role-shell/driver-device-build.log
 
-          test "$(plutil -extract CFBundleIdentifier raw "$DRIVER_APP/Info.plist")" = "com.daynightae.driver"
-          test "$(plutil -extract CFBundleIdentifier raw "$MERCHANT_APP/Info.plist")" = "com.daynightae.merchant"
-          test "$(plutil -extract CFBundleShortVersionString raw "$DRIVER_APP/Info.plist")" = "1.2.0"
-          test "$(plutil -extract CFBundleShortVersionString raw "$MERCHANT_APP/Info.plist")" = "1.2.0"
+      - name: Build unsigned Merchant for physical iPhone
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios-role-shell/DayNightRoleApps.xcodeproj \
+            -scheme DayNightMerchant \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios-role-shell/build/merchant-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=NO \
+            clean build | tee ios-role-shell/merchant-device-build.log
 
-          ditto -c -k --sequesterRsrc --keepParent "$DRIVER_APP" ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip
-          ditto -c -k --sequesterRsrc --keepParent "$MERCHANT_APP" ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip
+      - name: Verify and package simulator applications and unsigned IPA files
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST="ios-role-shell/dist-v120"
+          mkdir -p "$DIST"
 
-          (cd ios-role-shell/dist-v120 && shasum -a 256 DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip > DAY-NIGHT-Driver-v1.2.0-iOS.sha256)
-          (cd ios-role-shell/dist-v120 && shasum -a 256 DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip > DAY-NIGHT-Merchant-v1.2.0-iOS.sha256)
-          (cd ios-role-shell/dist-v120 && zip -9 DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR.zip \
-            DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip DAY-NIGHT-Driver-v1.2.0-iOS.sha256 \
-            DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip DAY-NIGHT-Merchant-v1.2.0-iOS.sha256)
+          DRIVER_SIM_APP="$(find ios-role-shell/build/driver-simulator/Build/Products -type d -name 'DAY NIGHT Driver.app' | head -n 1)"
+          MERCHANT_SIM_APP="$(find ios-role-shell/build/merchant-simulator/Build/Products -type d -name 'DAY NIGHT Merchant.app' | head -n 1)"
+          DRIVER_DEVICE_APP="$(find ios-role-shell/build/driver-device/Build/Products -type d -name 'DAY NIGHT Driver.app' | head -n 1)"
+          MERCHANT_DEVICE_APP="$(find ios-role-shell/build/merchant-device/Build/Products -type d -name 'DAY NIGHT Merchant.app' | head -n 1)"
+
+          test -d "$DRIVER_SIM_APP"
+          test -d "$MERCHANT_SIM_APP"
+          test -d "$DRIVER_DEVICE_APP"
+          test -d "$MERCHANT_DEVICE_APP"
+
+          test "$(plutil -extract CFBundleIdentifier raw "$DRIVER_DEVICE_APP/Info.plist")" = "com.daynightae.driver"
+          test "$(plutil -extract CFBundleIdentifier raw "$MERCHANT_DEVICE_APP/Info.plist")" = "com.daynightae.merchant"
+          test "$(plutil -extract CFBundleShortVersionString raw "$DRIVER_DEVICE_APP/Info.plist")" = "1.2.0"
+          test "$(plutil -extract CFBundleShortVersionString raw "$MERCHANT_DEVICE_APP/Info.plist")" = "1.2.0"
+
+          DRIVER_EXECUTABLE="$(plutil -extract CFBundleExecutable raw "$DRIVER_DEVICE_APP/Info.plist")"
+          MERCHANT_EXECUTABLE="$(plutil -extract CFBundleExecutable raw "$MERCHANT_DEVICE_APP/Info.plist")"
+          file "$DRIVER_DEVICE_APP/$DRIVER_EXECUTABLE" | tee "$DIST/driver-device-binary.txt"
+          file "$MERCHANT_DEVICE_APP/$MERCHANT_EXECUTABLE" | tee "$DIST/merchant-device-binary.txt"
+          grep -E 'arm64|Mach-O 64-bit' "$DIST/driver-device-binary.txt"
+          grep -E 'arm64|Mach-O 64-bit' "$DIST/merchant-device-binary.txt"
+
+          ditto -c -k --sequesterRsrc --keepParent "$DRIVER_SIM_APP" "$DIST/DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$MERCHANT_SIM_APP" "$DIST/DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip"
+
+          rm -rf "$DIST/driver-payload" "$DIST/merchant-payload"
+          mkdir -p "$DIST/driver-payload/Payload" "$DIST/merchant-payload/Payload"
+          ditto "$DRIVER_DEVICE_APP" "$DIST/driver-payload/Payload/DAY NIGHT Driver.app"
+          ditto "$MERCHANT_DEVICE_APP" "$DIST/merchant-payload/Payload/DAY NIGHT Merchant.app"
+          (cd "$DIST/driver-payload" && zip -qry "../DAY-NIGHT-Driver-v1.2.0-unsigned.ipa" Payload)
+          (cd "$DIST/merchant-payload" && zip -qry "../DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa" Payload)
+
+          test -s "$DIST/DAY-NIGHT-Driver-v1.2.0-unsigned.ipa"
+          test -s "$DIST/DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa"
+          unzip -l "$DIST/DAY-NIGHT-Driver-v1.2.0-unsigned.ipa" | grep -F 'Payload/DAY NIGHT Driver.app/Info.plist'
+          unzip -l "$DIST/DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa" | grep -F 'Payload/DAY NIGHT Merchant.app/Info.plist'
+
+          (cd "$DIST" && shasum -a 256 DAY-NIGHT-Driver-v1.2.0-unsigned.ipa > DAY-NIGHT-Driver-v1.2.0-unsigned.ipa.sha256)
+          (cd "$DIST" && shasum -a 256 DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa > DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa.sha256)
+          (cd "$DIST" && zip -9 DAY-NIGHT-iOS-Apps-v1.2.0-UNSIGNED-IPA.zip \
+            DAY-NIGHT-Driver-v1.2.0-unsigned.ipa DAY-NIGHT-Driver-v1.2.0-unsigned.ipa.sha256 \
+            DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa.sha256 \
+            driver-device-binary.txt merchant-device-binary.txt)
 
       - name: Upload iOS build diagnostics
         if: always()
@@ -136,35 +195,39 @@ jobs:
         with:
           name: DAY-NIGHT-iOS-v1.2.0-Build-Diagnostic
           path: |
-            ios-role-shell/driver-build.log
-            ios-role-shell/merchant-build.log
+            ios-role-shell/driver-simulator-build.log
+            ios-role-shell/merchant-simulator-build.log
+            ios-role-shell/driver-device-build.log
+            ios-role-shell/merchant-device-build.log
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload Driver iOS simulator build
+      - name: Upload Driver unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Driver-iOS-v1.2.0-Simulator
+          name: DAY-NIGHT-Driver-iOS-v1.2.0-Unsigned-IPA
           path: |
-            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS-Simulator.app.zip
-            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-iOS.sha256
+            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-unsigned.ipa
+            ios-role-shell/dist-v120/DAY-NIGHT-Driver-v1.2.0-unsigned.ipa.sha256
+            ios-role-shell/dist-v120/driver-device-binary.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Merchant iOS simulator build
+      - name: Upload Merchant unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-Merchant-iOS-v1.2.0-Simulator
+          name: DAY-NIGHT-Merchant-iOS-v1.2.0-Unsigned-IPA
           path: |
-            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS-Simulator.app.zip
-            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-iOS.sha256
+            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa
+            ios-role-shell/dist-v120/DAY-NIGHT-Merchant-v1.2.0-unsigned.ipa.sha256
+            ios-role-shell/dist-v120/merchant-device-binary.txt
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload complete iOS v1.2.0 bundle
+      - name: Upload complete unsigned IPA bundle
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR
-          path: ios-role-shell/dist-v120/DAY-NIGHT-iOS-Apps-v1.2.0-SOURCE-AND-SIMULATOR.zip
+          name: DAY-NIGHT-iOS-Apps-v1.2.0-UNSIGNED-IPA
+          path: ios-role-shell/dist-v120/DAY-NIGHT-iOS-Apps-v1.2.0-UNSIGNED-IPA.zip
           if-no-files-found: error
           retention-days: 30
