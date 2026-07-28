@@ -129,7 +129,7 @@ async function callFunction<T>(
       "Content-Type": "application/json",
       apikey: anonKey,
       Authorization: `Bearer ${accessToken || anonKey}`,
-      "X-Client-Info": "day-night-web-track17/2.0",
+      "X-Client-Info": "day-night-web-track17/3.0",
     },
     body: JSON.stringify(body),
   });
@@ -139,28 +139,86 @@ async function callFunction<T>(
   return payload as T;
 }
 
+async function accessToken(forceRefresh = false) {
+  const client = requireSupabase();
+
+  if (forceRefresh) {
+    const refreshed = await client.auth.refreshSession();
+    if (!refreshed.error && refreshed.data.session?.access_token) {
+      return refreshed.data.session.access_token;
+    }
+  }
+
+  const sessionResult = await client.auth.getSession();
+  if (sessionResult.error) throw new Error("not_authenticated");
+
+  const session = sessionResult.data.session;
+  const expiresSoon = !session?.expires_at || session.expires_at * 1000 <= Date.now() + 90_000;
+  if (session?.access_token && !expiresSoon) return session.access_token;
+
+  const refreshed = await client.auth.refreshSession();
+  if (refreshed.error || !refreshed.data.session?.access_token) {
+    if (session?.access_token) return session.access_token;
+    throw new Error("not_authenticated");
+  }
+  return refreshed.data.session.access_token;
+}
+
 async function invokeAuthenticated<T>(
   name: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const client = requireSupabase();
-
-  let sessionResult = await client.auth.getSession();
-  if (sessionResult.error) throw new Error("not_authenticated");
-
-  if (!sessionResult.data.session?.access_token) {
-    const refreshed = await client.auth.refreshSession();
-    if (refreshed.error || !refreshed.data.session?.access_token) {
-      throw new Error("not_authenticated");
-    }
-    sessionResult = refreshed;
+  let token = await accessToken(false);
+  try {
+    return await callFunction<T>(name, body, token);
+  } catch (cause) {
+    const status = Number((cause as { status?: number })?.status || 0);
+    const code = String((cause as { code?: string })?.code || "");
+    if (status !== 401 && !/not_authenticated/i.test(code)) throw cause;
+    token = await accessToken(true);
+    return callFunction<T>(name, body, token);
   }
+}
 
-  return callFunction<T>(
-    name,
-    body,
-    sessionResult.data.session?.access_token,
-  );
+async function directAdminListFallback(limit: number) {
+  const client = requireSupabase();
+  const safeLimit = Math.max(1, Math.min(100, Number(limit || 100)));
+  const [shipmentsResult, webhookResult, quotaResult] = await Promise.all([
+    client
+      .from("international_shipments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(safeLimit),
+    client
+      .from("track17_webhook_logs")
+      .select("id,event_type,tracking_number,signature_valid,processing_status,http_result,error_code,received_at,processed_at")
+      .order("received_at", { ascending: false })
+      .limit(20),
+    client
+      .from("track17_quota_cache")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle(),
+  ]);
+
+  if (shipmentsResult.error) throw new Error(`shipment_list_failed:${shipmentsResult.error.message}`);
+  return {
+    ok: true,
+    shipments: shipmentsResult.data || [],
+    webhook_logs: webhookResult.error ? [] : (webhookResult.data || []),
+    quota: quotaResult.error ? null : (quotaResult.data || null),
+  };
+}
+
+async function directQuotaFallback() {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from("track17_quota_cache")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle();
+  if (error) throw new Error(`quota_cache_failed:${error.message}`);
+  return { ok: true, cached: true, quota: data || null };
 }
 
 export async function fetchInternationalTracking(
@@ -206,7 +264,18 @@ export async function runTrack17Admin<T = Record<string, unknown>>(
   action: string,
   payload: Record<string, unknown> = {},
 ) {
-  return invokeAuthenticated<T>("track17-admin", { action, ...payload });
+  try {
+    return await invokeAuthenticated<T>("track17-admin", { action, ...payload });
+  } catch (cause) {
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (normalizedAction === "list") {
+      return await directAdminListFallback(Number(payload.limit || 100)) as T;
+    }
+    if (normalizedAction === "quota") {
+      return await directQuotaFallback() as T;
+    }
+    throw cause;
+  }
 }
 
 export function internationalTrackingUrl(reference: string) {
