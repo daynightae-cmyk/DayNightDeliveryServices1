@@ -22,7 +22,9 @@ import AdminEmployeeLauncher from "./components/admin/AdminEmployeeLauncher";
 import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
 import InternationalTrackingEntryLauncher from "./components/InternationalTrackingEntryLauncher";
 import AdminInternationalTrackingRouteBridge from "./components/admin/AdminInternationalTrackingRouteBridge";
+import AdminInternationalOrderWhatsappBridge from "./components/admin/AdminInternationalOrderWhatsappBridge";
 import MerchantInternationalTrackingLauncher from "./components/merchant/MerchantInternationalTrackingLauncher";
+import InternationalTrackingVisualBridge from "./components/public/InternationalTrackingVisualBridge";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -44,6 +46,8 @@ import "./styles/dn-merchant-mobile-drawer-final.css";
 import "./styles/dn-pointer-performance.css";
 import "./styles/dn-role-auth-mobile-final.css";
 import "./styles/dn-merchant-brand-v114.css";
+import "./styles/dn-international-live-map.css";
+import "./styles/dn-international-whatsapp-actions.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 type NativeRole = "driver" | "merchant";
@@ -148,7 +152,9 @@ function mountPublicApplication() {
         <MerchantFeedbackSummaryLauncher />
         <InternationalTrackingEntryLauncher />
         <AdminInternationalTrackingRouteBridge />
+        <AdminInternationalOrderWhatsappBridge />
         <MerchantInternationalTrackingLauncher />
+        <InternationalTrackingVisualBridge />
         <ProductionOrderRealtimeBridge />
         <AdminDeferredMerchantAccounting />
         <ProductionExperience />
@@ -184,6 +190,7 @@ async function mountStandaloneAdminFeatures() {
       <StrictMode>
         <AppProvider>
           <InternationalTrackingPage />
+          <InternationalTrackingVisualBridge />
           <WhatsAppRuntimeGuard />
         </AppProvider>
       </StrictMode>,
