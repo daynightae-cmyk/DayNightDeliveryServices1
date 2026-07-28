@@ -64,14 +64,14 @@ expect("src/data/internationalTrackingAssets.ts", [
   "daynight-aircraft-side-transparent.png",
   "daynight-map-assets-master-sheet.png",
   "reservedAsset15: null",
-  "id: 33",
+  /\b(?:asset\(\s*33\s*,|id\s*:\s*33\b)/,
 ]);
 
 expect("src/styles/dn-international-tracking.css", [
   "--dn-deep-navy:#020914",
   ".dn-it-workspace",
   ".dn-it-live-map__canvas",
-  "@media(max-width:620px)",
+  /@media\s*\(\s*max-width\s*:\s*620px\s*\)/,
   "@media print",
   "prefers-reduced-motion",
 ]);
