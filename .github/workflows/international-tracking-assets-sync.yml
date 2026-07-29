@@ -1,0 +1,207 @@
+name: International tracking assets sync
+
+on:
+  push:
+    branches:
+      - feature/international-tracking-world-class
+    paths:
+      - .github/workflows/international-tracking-assets-sync.yml
+      - artifacts/day-night-delivery/src/data/internationalTrackingAssets.ts
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: international-tracking-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-assets:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/international-tracking-world-class
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Download, validate, and optimize mandatory assets
+        shell: bash
+        run: |
+          python <<'PY'
+          from __future__ import annotations
+
+          import json
+          import time
+          import urllib.request
+          from pathlib import Path
+          from PIL import Image, ImageChops
+
+          ROOT = Path('artifacts/day-night-delivery/public/assets/international-tracking')
+          ASSETS = [
+              ('https://i.postimg.cc/05tJN1Hh/1.jpg', 'aircraft/daynight-aircraft-long-side-profile.jpg'),
+              ('https://i.postimg.cc/7YdGgM4M/2.png', 'aircraft/daynight-aircraft-side-transparent.png'),
+              ('https://i.postimg.cc/fTptxjs7/3.png', 'aircraft/daynight-aircraft-three-quarter-front.png'),
+              ('https://i.postimg.cc/bNWDQHP1/4.png', 'aircraft/daynight-aircraft-flight-side.png'),
+              ('https://i.postimg.cc/9FKRGt2G/5.png', 'map/daynight-map-assets-master-sheet.png'),
+              ('https://i.postimg.cc/MG8nL6vk/6.png', 'aircraft/daynight-aircraft-front-transparent.png'),
+              ('https://i.postimg.cc/7ZzCXGYk/7.png', 'references/daynight-desktop-master-layout-a.png'),
+              ('https://i.postimg.cc/d0KhfsLv/8.png', 'references/daynight-route-stats-grid.png'),
+              ('https://i.postimg.cc/7Ly5RHbp/9.png', 'references/daynight-events-cargo-details-panel.png'),
+              ('https://i.postimg.cc/TPXKsdpy/10.png', 'references/daynight-desktop-master-layout-b.png'),
+              ('https://i.postimg.cc/PqkC7XP8/11.png', 'references/daynight-route-progress-wide-a.png'),
+              ('https://i.postimg.cc/cJMvypnt/12.png', 'references/daynight-live-map-primary-reference.png'),
+              ('https://i.postimg.cc/0NdzRTwz/13.png', 'references/daynight-topbar-reference-a.png'),
+              ('https://i.postimg.cc/q7XNVP3s/14.png', 'references/daynight-cargo-details-grid-primary.png'),
+              ('https://i.postimg.cc/N07Kq3Hd/16.png', 'references/daynight-shipment-summary-documents-card.png'),
+              ('https://i.postimg.cc/hjDfS28g/17.png', 'references/daynight-global-network-map-reference.png'),
+              ('https://i.postimg.cc/yd1kVLhs/18.png', 'references/daynight-desktop-operations-layout.png'),
+              ('https://i.postimg.cc/4dWnnpwG/19.png', 'references/daynight-map-first-live-dashboard.png'),
+              ('https://i.postimg.cc/85ZssLwP/20.png', 'references/daynight-shipment-overview-vertical-card.png'),
+              ('https://i.postimg.cc/0jrjSrHK/21.png', 'references/daynight-selected-shipment-card-primary.png'),
+              ('https://i.postimg.cc/Zn0nN0DV/22.png', 'references/daynight-compact-shipment-list.png'),
+              ('https://i.postimg.cc/T1h1bhHt/23.png', 'references/daynight-shipment-timeline-primary.png'),
+              ('https://i.postimg.cc/j2C2fCkk/24.png', 'references/daynight-tracking-list-desktop-primary.png'),
+              ('https://i.postimg.cc/fyFLfZ6C/25.png', 'references/daynight-tracking-list-narrow.png'),
+              ('https://i.postimg.cc/2yJ67msp/26.png', 'references/daynight-shipment-lifecycle-timeline.png'),
+              ('https://i.postimg.cc/vTjBtMJd/27.png', 'references/daynight-mobile-tracking-dashboard-a.png'),
+              ('https://i.postimg.cc/90SMYV6W/28.png', 'references/daynight-mobile-tracking-dashboard-b.png'),
+              ('https://i.postimg.cc/1RYfQcf6/29.png', 'references/daynight-international-tracking-analytics.png'),
+              ('https://i.postimg.cc/2jXVDFV7/30.png', 'references/daynight-route-progress-component-primary.png'),
+              ('https://i.postimg.cc/h43fBbfr/31.png', 'references/daynight-cinematic-shipment-hero.png'),
+              ('https://i.postimg.cc/9XNrhtrb/32.png', 'references/daynight-topbar-reference-primary.png'),
+              ('https://i.postimg.cc/QNnH3kHz/33.png', 'branding/daynight-official-master-logo.png'),
+          ]
+
+          for directory in ('aircraft', 'branding', 'map', 'markers', 'references', 'ui-panels', 'optimized'):
+              (ROOT / directory).mkdir(parents=True, exist_ok=True)
+
+          headers = {
+              'User-Agent': 'Mozilla/5.0 DAY-NIGHT-Asset-Sync/1.0',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          }
+
+          def download(url: str, destination: Path) -> None:
+              if destination.exists() and destination.stat().st_size > 4096:
+                  try:
+                      with Image.open(destination) as image:
+                          image.verify()
+                      print(f'VALID {destination}')
+                      return
+                  except Exception:
+                      destination.unlink(missing_ok=True)
+              last_error: Exception | None = None
+              for attempt in range(1, 9):
+                  try:
+                      request = urllib.request.Request(url, headers=headers)
+                      with urllib.request.urlopen(request, timeout=120) as response:
+                          content_type = response.headers.get('Content-Type', '')
+                          payload = response.read()
+                      if not content_type.startswith('image/') or len(payload) < 4096:
+                          raise RuntimeError(f'Invalid image response: {content_type}, {len(payload)} bytes')
+                      temporary = destination.with_suffix(destination.suffix + '.part')
+                      temporary.write_bytes(payload)
+                      with Image.open(temporary) as image:
+                          image.verify()
+                      temporary.replace(destination)
+                      print(f'DOWNLOADED {url} -> {destination}')
+                      return
+                  except Exception as error:
+                      last_error = error
+                      print(f'RETRY {attempt}/8 {url}: {error}')
+                      time.sleep(min(5 * attempt, 30))
+              raise RuntimeError(f'Unable to download {url}: {last_error}')
+
+          for source_url, relative_path in ASSETS:
+              download(source_url, ROOT / relative_path)
+
+          sheet_path = ROOT / 'map/daynight-map-assets-master-sheet.png'
+          marker_boxes = {
+              'map-aircraft-front.png': (65, 45, 410, 235),
+              'map-aircraft-side-partner.png': (410, 45, 830, 235),
+              'map-aircraft-side-daynight.png': (835, 45, 1265, 235),
+              'map-pin-daynight.png': (110, 220, 350, 505),
+              'map-pin-carrier.png': (350, 220, 570, 505),
+              'map-pin-current-location.png': (570, 220, 815, 505),
+              'map-route-dots-blue.png': (20, 520, 590, 675),
+              'map-route-dots-gold.png': (650, 545, 1270, 825),
+              'map-aircraft-light-white.png': (790, 255, 970, 445),
+          }
+
+          def trim(image: Image.Image) -> Image.Image:
+              rgba = image.convert('RGBA')
+              alpha = rgba.getchannel('A')
+              bbox = alpha.getbbox()
+              if bbox:
+                  rgba = rgba.crop(bbox)
+              padded = Image.new('RGBA', (rgba.width + 16, rgba.height + 16), (0, 0, 0, 0))
+              padded.alpha_composite(rgba, (8, 8))
+              return padded
+
+          with Image.open(sheet_path) as master:
+              master = master.convert('RGBA')
+              width, height = master.size
+              for file_name, box in marker_boxes.items():
+                  bounded = (max(0, box[0]), max(0, box[1]), min(width, box[2]), min(height, box[3]))
+                  if bounded[2] <= bounded[0] or bounded[3] <= bounded[1]:
+                      raise RuntimeError(f'Invalid marker crop {file_name}: {bounded} for {master.size}')
+                  marker = trim(master.crop(bounded))
+                  marker.save(ROOT / 'markers' / file_name, optimize=True)
+
+          dimensions: dict[str, dict[str, object]] = {}
+          for _, relative_path in ASSETS:
+              path = ROOT / relative_path
+              with Image.open(path) as image:
+                  dimensions[relative_path] = {
+                      'width': image.width,
+                      'height': image.height,
+                      'mode': image.mode,
+                      'format': image.format,
+                  }
+                  if relative_path.startswith(('references/', 'aircraft/')):
+                      output = ROOT / 'optimized' / (Path(relative_path).stem + '.webp')
+                      converted = image.convert('RGBA' if 'A' in image.getbands() else 'RGB')
+                      converted.thumbnail((1920, 1920), Image.Resampling.LANCZOS)
+                      converted.save(output, 'WEBP', quality=86, method=6)
+
+          for file_name in marker_boxes:
+              path = ROOT / 'markers' / file_name
+              with Image.open(path) as image:
+                  dimensions[f'markers/{file_name}'] = {
+                      'width': image.width,
+                      'height': image.height,
+                      'mode': image.mode,
+                      'format': image.format,
+                  }
+
+          (ROOT / 'asset-dimensions.json').write_text(json.dumps(dimensions, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          expected = [ROOT / relative for _, relative in ASSETS] + [ROOT / 'markers' / name for name in marker_boxes]
+          missing = [str(path) for path in expected if not path.exists() or path.stat().st_size < 256]
+          if missing:
+              raise SystemExit('Missing mandatory assets:\n' + '\n'.join(missing))
+          print(f'Validated {len(expected)} mandatory original/cropped assets. Asset 15 remains intentionally absent.')
+          PY
+
+      - name: Commit synchronized assets
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/day-night-delivery/public/assets/international-tracking
+          if git diff --cached --quiet; then
+            echo "Asset tree already synchronized."
+          else
+            git commit -m "chore(international): sync strict tracking assets [skip ci]"
+            git push origin HEAD:feature/international-tracking-world-class
+          fi

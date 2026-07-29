@@ -14,21 +14,66 @@ function expect(file, patterns) {
   }
 }
 
+function reject(file, patterns) {
+  const source = read(file);
+  for (const pattern of patterns) {
+    const ok = pattern instanceof RegExp ? !pattern.test(source) : !source.includes(pattern);
+    checks.push({ file, pattern: `forbidden:${String(pattern)}`, ok });
+  }
+}
+
 expect("src/components/public/InternationalTrackingLiveMap.tsx", [
   "MapContainer",
-  "TileLayer",
+  "LayersControl",
   "Polyline",
+  "greatCircle",
   "dn-it-live-plane-marker",
   "resolveInternationalMapPoints",
-  "CITY_COORDINATES",
+  "t.estimatedPosition",
+  "internationalTrackingAssets.markers.aircraftDayNight",
 ]);
 
-expect("src/components/public/InternationalTrackingVisualBridge.tsx", [
-  "dn-it-live-map-host",
-  "dn-it-has-live-map",
-  "scrollRestoration = \"manual\"",
-  "fetchInternationalTracking",
-  "dn-international-tracking-layout-fix.css",
+expect("src/components/InternationalTrackingPage.tsx", [
+  'lazy(() => import("./public/InternationalTrackingLiveMap"))',
+  "TrackingTopbar",
+  "TrackingSearch",
+  "ShipmentHero",
+  "RouteProgressCard",
+  "ShipmentMetricsGrid",
+  "ShipmentTabs",
+  "BarcodeDetector",
+  "new jsPDF",
+  "navigator.share",
+  "setInterval",
+  "45_000",
+  "تتبّع شحنتك الدولية",
+  "not live GPS tracking",
+]);
+
+expect("src/components/international-tracking/ShipmentWorkspace.tsx", [
+  "ShipmentHero",
+  "RouteProgressCard",
+  "ShipmentTimeline",
+  "ShipmentTabs",
+  "protectedDocuments",
+  "shipment.documents || []",
+]);
+
+expect("src/data/internationalTrackingAssets.ts", [
+  "daynight-official-master-logo.png",
+  "daynight-aircraft-side-transparent.png",
+  "daynight-map-assets-master-sheet.png",
+  "reservedAsset15: null",
+  /\b(?:asset\(\s*33\s*,|id\s*:\s*33\b)/,
+]);
+
+expect("src/styles/dn-international-tracking.css", [
+  "--dn-deep-navy:#020914",
+  ".dn-it-workspace",
+  ".dn-it-live-map__canvas",
+  /@media\s*\(\s*max-width\s*:\s*620px\s*\)/,
+  "@media print",
+  "prefers-reduced-motion",
 ]);
 
 expect("src/components/admin/AdminInternationalOrdersWorkspace.tsx", [
@@ -66,28 +111,19 @@ expect("src/lib/whatsapp.ts", [
   "رقم التتبع الدولي",
 ]);
 
-expect("src/styles/dn-international-live-map.css", [
-  "body.dn-it-has-live-map .dn-it-map",
-  "body.dn-it-has-live-map .dn-it-hero",
-  ".dn-it-live-map__canvas",
-  "@media (max-width: 760px)",
-]);
-
-expect("src/styles/dn-international-tracking-layout-fix.css", [
-  "body:has(.dn-it-page)",
-  ".dn-it-page .dn-it-shell",
-  ".dn-it-page .dn-it-hero",
-]);
-
-expect("src/main.tsx", [
+expect("src/main.tsx", ["InternationalTrackingPage"]);
+reject("src/main.tsx", [
   "InternationalTrackingVisualBridge",
   "dn-international-live-map.css",
+  "AdminInternationalTrackingRouteBridge",
+  "AdminInternationalOrderWhatsappBridge",
 ]);
 
-const mainSource = read("src/main.tsx");
-for (const forbidden of ["AdminInternationalTrackingRouteBridge", "AdminInternationalOrderWhatsappBridge"]) {
-  checks.push({ file: "src/main.tsx", pattern: `forbidden:${forbidden}`, ok: !mainSource.includes(forbidden) });
-}
+reject("src/components/InternationalTrackingPage.tsx", [
+  "window.location.href =.*aramex",
+  "api.17track.net",
+  '"17token"',
+]);
 
 const failed = checks.filter((check) => !check.ok);
 if (failed.length) {
