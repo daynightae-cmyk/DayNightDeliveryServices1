@@ -31,6 +31,11 @@ expect("src/components/public/InternationalTrackingLiveMap.tsx", [
   "resolveInternationalMapPoints",
   "t.estimatedPosition",
   "internationalTrackingAssets.markers.aircraftDayNight",
+  "ResilientTileLayer",
+  'mode: "point"',
+  'mode: "world"',
+  "dn-it-map-data-pending",
+  "The carrier has not supplied a geographic location",
 ]);
 
 expect("src/components/InternationalTrackingPage.tsx", [
@@ -76,6 +81,12 @@ expect("src/styles/dn-international-tracking.css", [
   "prefers-reduced-motion",
 ]);
 
+expect("src/styles/dn-international-map-resilience.css", [
+  ".dn-it-map-data-pending",
+  ".dn-it-live-map--world",
+  "@media (max-width: 760px)",
+]);
+
 expect("src/components/admin/AdminInternationalOrdersWorkspace.tsx", [
   "AdminInternationalOrderTrackingActions",
   "PDF كل الطلبات",
@@ -111,7 +122,7 @@ expect("src/lib/whatsapp.ts", [
   "رقم التتبع الدولي",
 ]);
 
-expect("src/main.tsx", ["InternationalTrackingPage"]);
+expect("src/main.tsx", ["InternationalTrackingPage", "dn-international-map-resilience.css"]);
 reject("src/main.tsx", [
   "InternationalTrackingVisualBridge",
   "dn-international-live-map.css",
