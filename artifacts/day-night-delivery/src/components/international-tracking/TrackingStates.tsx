@@ -1,6 +1,6 @@
 import { AlertTriangle, Globe2, Headphones, RefreshCw, ShieldCheck } from "lucide-react";
 import companyMeta from "../../data/companyMeta";
-import { internationalTrackingAssets } from "../../data/internationalTrackingAssets";
+import { internationalTrackingAssets } from "../../lib/internationalTrackingAssets";
 import type { TrackingLanguage } from "./i18n";
 import { trackingCopy } from "./i18n";
 
