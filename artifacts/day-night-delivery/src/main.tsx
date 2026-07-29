@@ -40,6 +40,7 @@ import "./styles/dn-merchant-mobile-drawer-final.css";
 import "./styles/dn-pointer-performance.css";
 import "./styles/dn-role-auth-mobile-final.css";
 import "./styles/dn-merchant-brand-v114.css";
+import "./styles/dn-international-map-resilience.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 type NativeRole = "driver" | "merchant";
