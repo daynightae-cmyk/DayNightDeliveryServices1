@@ -1,6 +1,6 @@
 import { Bell, Globe2, Home, Languages, Moon, Plus, Sun, Truck } from "lucide-react";
 import companyMeta from "../../data/companyMeta";
-import { internationalTrackingAssets } from "../../data/internationalTrackingAssets";
+import { internationalTrackingAssets } from "../../lib/internationalTrackingAssets";
 import type { TrackingLanguage } from "./i18n";
 import { trackingCopy } from "./i18n";
 import "../../styles/dn-international-tracking-results-v2.css";
