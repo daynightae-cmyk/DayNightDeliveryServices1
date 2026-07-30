@@ -1,0 +1,123 @@
+name: Export language final follow-up generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/export-language-final-followup-generator.yml
+      - artifacts/day-night-delivery/scripts/apply-export-language-final-followup.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: export-language-final-followup-generator
+  cancel-in-progress: false
+
+jobs:
+  generate-followup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SOURCE_BRANCH: fix/export-language-final-followup
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
+
+      - name: Apply final export-language follow-up
+        id: patch
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          {
+            git switch -c "$SOURCE_BRANCH"
+            python artifacts/day-night-delivery/scripts/apply-export-language-final-followup.py
+            git rm artifacts/day-night-delivery/scripts/apply-export-language-final-followup.py
+            git rm .github/workflows/export-language-final-followup-generator.yml
+          } > "$RUNNER_TEMP/export-final-patch.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/export-final-patch.log"
+          exit "$status"
+
+      - name: Validate TypeScript, language policy, production gates, and build
+        id: validate
+        if: steps.patch.outcome == 'success'
+        continue-on-error: true
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: |
+          set +e
+          {
+            pnpm install --frozen-lockfile
+            pnpm exec tsc --noEmit
+            node scripts/export-language-policy-gate.mjs
+            pnpm run production:gate
+            pnpm build
+          } > "$RUNNER_TEMP/export-final-validate.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/export-final-validate.log"
+          exit "$status"
+
+      - name: Publish reviewed source branch
+        id: publish
+        if: steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          git commit -m "fix(exports): localize routed admin CSV and restore customer E2E"
+          git push origin "$SOURCE_BRANCH"
+
+      - name: Report sanitized outcome
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_tail="$(tail -n 24 "$RUNNER_TEMP/export-final-patch.log" 2>/dev/null || true)"
+          validate_tail="$(tail -n 24 "$RUNNER_TEMP/export-final-validate.log" 2>/dev/null || true)"
+          cat > "$RUNNER_TEMP/export-final-report.md" <<EOF
+          ## Final export-language follow-up generator
+
+          - Patch: ${{ steps.patch.outcome }}
+          - Validation/build: ${{ steps.validate.outcome }}
+          - Branch publish: ${{ steps.publish.outcome }}
+          - Run: ${{ github.run_id }}
+
+          ### Patch tail
+          ```text
+          $patch_tail
+          ```
+
+          ### Validation tail
+          ```text
+          $validate_tail
+          ```
+          EOF
+          gh pr comment 297 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/export-final-report.md"
+
+      - name: Fail closed unless all stages pass
+        if: steps.patch.outcome != 'success' || steps.validate.outcome != 'success' || steps.publish.outcome != 'success'
+        shell: bash
+        run: exit 1
