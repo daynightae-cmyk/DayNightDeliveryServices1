@@ -1,5 +1,6 @@
 name: P1 Final Runtime Recovery Evidence
 
+# Internal protected recovery pass for Issue #266.
 on:
   push:
     branches: [runtime/issue-266-evidence]
