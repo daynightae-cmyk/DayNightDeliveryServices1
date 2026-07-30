@@ -1,9 +1,59 @@
 /* DAY NIGHT Phase 4 admin interaction-acceptance layout.
-   The executive launcher is a required core admin action and must stay visible
-   at the 1366×768 desktop target and on the mobile drawer layout. */
+   Core administration controls must remain reachable at 1366×768 and on mobile.
+   This file also prevents the full-screen shell from trapping content below the fold. */
 
 :root {
-  --dn-admin-inp-acceptance-version: phase4-20260730-1;
+  --dn-admin-inp-acceptance-version: phase4-20260730-2;
+}
+
+html:has(.dn-admin-fullscreen),
+html body:has(.dn-admin-fullscreen),
+html body:has(.dn-admin-fullscreen) #root {
+  min-height: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+html body:has(.dn-admin-fullscreen) .dn-admin-fullscreen {
+  width: 100% !important;
+  min-height: 100dvh !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  box-sizing: border-box !important;
+}
+
+html body:has(.dn-admin-fullscreen) .dn-admin-layout-full {
+  width: 100% !important;
+  max-width: 100vw !important;
+  min-height: 100dvh !important;
+  height: auto !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+}
+
+html body:has(.dn-admin-fullscreen) .dn-admin-content-full {
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: calc(100dvh - 32px) !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+html body:has(.dn-admin-fullscreen) .dn-admin-home-full {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
 }
 
 html body:has(.dn-admin-fullscreen)
@@ -90,6 +140,14 @@ html body:has(.dn-admin-fullscreen)
 }
 
 @media (max-width: 1024px) {
+  html body:has(.dn-admin-fullscreen) .dn-admin-layout-full,
+  html body:has(.dn-admin-fullscreen) .dn-admin-content-full,
+  html body:has(.dn-admin-fullscreen) .dn-admin-home-full {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
   html body:has(.dn-admin-fullscreen)
     .dn-admin-fullscreen
     .dn-admin-left-ai.dn-admin-left-ai--executive {
