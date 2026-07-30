@@ -149,10 +149,11 @@ export default function AbuKhalifaExecutiveCardBridge() {
       window.removeEventListener("dn-international-shipment-updated", refreshMetrics);
       window.removeEventListener("dn-admin-settings-change", refreshMetrics);
       window.clearInterval(timer);
-      document.querySelector(".dn-admin-left-ai")?.classList.remove("dn-admin-left-ai--executive");
-      host?.remove();
+      const panel = document.querySelector<HTMLElement>(".dn-admin-left-ai");
+      panel?.classList.remove("dn-admin-left-ai--executive");
+      panel?.querySelector<HTMLElement>(":scope > .dn-abu-khalifa-executive-host")?.remove();
     };
-  }, [host, refreshMetrics]);
+  }, [refreshMetrics]);
 
   function navigate(action: AbuKhalifaAction) {
     if (action === "employees" || action === "payroll") {
