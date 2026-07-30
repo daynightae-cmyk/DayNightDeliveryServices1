@@ -1,5 +1,7 @@
 name: Apply Final P1 Recovery Patch
 
+# The workflow intentionally patches the existing internal branch, validates every
+# replacement contract, commits the result, and deletes itself in the same commit.
 on:
   push:
     branches: [runtime/issue-266-evidence]
