@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply export language policy
         id: patch
