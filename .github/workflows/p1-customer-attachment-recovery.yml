@@ -1,6 +1,6 @@
 name: P1 Customer Attachment Recovery
 
-# Dedicated protected verification for the complaint attachment policy helper.
+# Dedicated protected verification for Customer Experience storage and notifications.
 on:
   push:
     branches: [runtime/issue-266-evidence]
@@ -8,12 +8,14 @@ on:
       - .github/workflows/p1-customer-attachment-recovery.yml
       - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
       - supabase/migrations/20260730136000_complaint_attachment_folder_depth_fix.sql
+      - supabase/migrations/20260730137000_customer_experience_notification_schema_compat.sql
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/p1-customer-attachment-recovery.yml
       - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
       - supabase/migrations/20260730136000_complaint_attachment_folder_depth_fix.sql
+      - supabase/migrations/20260730137000_customer_experience_notification_schema_compat.sql
   workflow_dispatch:
 
 permissions:
@@ -25,7 +27,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Apply attachment permission repair and verify CX
+    name: Apply CX compatibility repairs and verify lifecycle
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -50,7 +52,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Apply isolated storage permission migrations
+      - name: Apply isolated Customer Experience compatibility migrations
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -66,20 +68,22 @@ jobs:
           supabase --workdir "$workdir" migration fetch --linked
           for migration in \
             20260730135000_anon_storage_policy_helper_grant.sql \
-            20260730136000_complaint_attachment_folder_depth_fix.sql
+            20260730136000_complaint_attachment_folder_depth_fix.sql \
+            20260730137000_customer_experience_notification_schema_compat.sql
           do
             if ! find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' | grep -Fxq "$migration"; then
               cp "supabase/migrations/$migration" "$workdir/supabase/migrations/$migration"
             fi
           done
           supabase --workdir "$workdir" db push --dry-run 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-dry-run.log
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-dry-run.log
           supabase --workdir "$workdir" db push --yes 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-push.log
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-push.log
           supabase --workdir "$workdir" migration list --linked 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
-          grep -Fq '20260730135000' artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
-          grep -Fq '20260730136000' artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-migrations.log
+          for version in 20260730135000 20260730136000 20260730137000; do
+            grep -Fq "$version" artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-migrations.log
+          done
 
       - name: Authenticate protected admin test session
         env:
@@ -112,7 +116,7 @@ jobs:
         run: |
           set -o pipefail
           pnpm --dir artifacts/day-night-delivery run p1:runtime-health 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-p1-health.log
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-p1-health.log
 
       - name: Run Customer Experience lifecycle
         env:
@@ -129,13 +133,13 @@ jobs:
         run: |
           set -o pipefail
           pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-customer-e2e.log
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/cx-compatibility-customer-e2e.log
 
       - name: Upload sanitized evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-P1-Customer-Attachment-Recovery
+          name: DAY-NIGHT-P1-Customer-Compatibility
           path: artifacts/day-night-delivery/p1-runtime-evidence/
           if-no-files-found: error
           retention-days: 30
