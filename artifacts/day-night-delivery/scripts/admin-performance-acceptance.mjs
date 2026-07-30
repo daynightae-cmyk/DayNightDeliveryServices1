@@ -143,17 +143,41 @@ async function readTrace(cdp, handle) {
   return Buffer.concat(chunks);
 }
 
-async function clickSection(page, profile, labels) {
+async function clickSection(page, profile, sectionId, labels) {
+  const desktopTarget = page.locator(
+    `.dncc-desktop-sidebar .dncc-navigation button[data-dn-command-section="${sectionId}"]`,
+  ).first();
+  if (await desktopTarget.isVisible().catch(() => false)) {
+    await desktopTarget.click();
+    return;
+  }
+
+  const commandMenu = page.locator('.dncc-mobile-menu');
+  if (await commandMenu.isVisible().catch(() => false)) {
+    await commandMenu.click();
+    const mobileLayer = page.locator('.dncc-mobile-layer');
+    await mobileLayer.waitFor({ state: 'visible' });
+    const mobileTarget = page.locator(
+      `.dncc-mobile-drawer .dncc-navigation button[data-dn-command-section="${sectionId}"]`,
+    ).first();
+    await mobileTarget.waitFor({ state: 'visible' });
+    await mobileTarget.click();
+    await mobileLayer.waitFor({ state: 'hidden' });
+    return;
+  }
+
   if (profile.mobile) {
     const opener = page.locator('.dn-admin-mobile-open');
     await opener.waitFor({ state: 'visible' });
     await opener.click();
     await page.locator('.dn-admin-sidebar-full.is-open').waitFor({ state: 'visible' });
   }
-  const nav = page.locator('.dn-admin-side-nav button');
-  const target = nav.filter({ hasText: labels }).first();
-  await target.waitFor({ state: 'visible' });
-  await target.click();
+  const legacyTarget = page
+    .locator('.dn-admin-side-nav button')
+    .filter({ hasText: labels })
+    .first();
+  await legacyTarget.waitFor({ state: 'visible' });
+  await legacyTarget.click();
 }
 
 async function scenario(page, name, action) {
@@ -270,6 +294,15 @@ async function runProfile(profile, session, storageKey) {
 
     if (profile.mobile) {
       scenarios.push(await scenario(page, 'expand-admin-sidebar', async () => {
+        const commandMenu = page.locator('.dncc-mobile-menu');
+        if (await commandMenu.isVisible().catch(() => false)) {
+          await commandMenu.click();
+          const mobileLayer = page.locator('.dncc-mobile-layer');
+          await mobileLayer.waitFor({ state: 'visible' });
+          await page.locator('.dncc-mobile-backdrop').click();
+          await mobileLayer.waitFor({ state: 'hidden' });
+          return;
+        }
         await page.locator('.dn-admin-mobile-open').click();
         await page.locator('.dn-admin-sidebar-full.is-open').waitFor({ state: 'visible' });
         await page.locator('.dn-admin-mobile-shade').click();
@@ -277,7 +310,12 @@ async function runProfile(profile, session, storageKey) {
     }
 
     scenarios.push(await scenario(page, 'open-new-order-and-move-across-fields', async () => {
-      await clickSection(page, profile, /إضافة\s*طلب\s*جديد|New\s*Order/i);
+      await clickSection(
+        page,
+        profile,
+        'new_order',
+        /إضافة\s*طلب\s*جديد|New\s*Order/i,
+      );
       const fields = page.locator(
         '.dn-admin-center-zone input:not([disabled]), .dn-admin-center-zone select:not([disabled]), .dn-admin-center-zone textarea:not([disabled])',
       );
@@ -301,7 +339,12 @@ async function runProfile(profile, session, storageKey) {
     }));
 
     scenarios.push(await scenario(page, 'open-finance-center-and-change-tabs', async () => {
-      await clickSection(page, profile, /لوحة\s*المالية|Finance\s*Dashboard/i);
+      await clickSection(
+        page,
+        profile,
+        'finance_dashboard',
+        /لوحة\s*المالية|Finance\s*Dashboard/i,
+      );
       const finance = page.locator('.dn-admin-center-zone');
       await finance.getByText(/الملخص\s*المالي|Finance\s*summary/i).first().waitFor();
       await finance.getByRole('button', { name: /كشوفات\s*التجار|Merchant\s*statements/i }).first().click();
@@ -310,7 +353,12 @@ async function runProfile(profile, session, storageKey) {
     }));
 
     scenarios.push(await scenario(page, 'select-order-and-open-details', async () => {
-      await clickSection(page, profile, /كافة\s*الطلبات|All\s*Orders/i);
+      await clickSection(
+        page,
+        profile,
+        'all_orders',
+        /كافة\s*الطلبات|All\s*Orders/i,
+      );
       const workspace = page.locator('.dn-admin-center-zone');
       await workspace.waitFor({ state: 'visible' });
       const labelled = workspace.getByRole('button', { name: /تفاصيل|عرض|Details|View/i }).first();
