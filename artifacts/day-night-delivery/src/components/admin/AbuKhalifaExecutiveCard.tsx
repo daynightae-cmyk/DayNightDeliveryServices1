@@ -27,6 +27,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ADMIN_IDENTITY } from "../../config/adminIdentity";
+import { fetchAdminStats } from "../../lib/adminData";
 
 export type AbuKhalifaAction =
   | "new-order"
@@ -45,6 +46,13 @@ type Props = {
   lastSync?: string;
   currentSection?: string;
   onNavigate: (action: AbuKhalifaAction) => void;
+};
+
+type RuntimeMetrics = {
+  isAvailable: boolean;
+  ordersToday?: number;
+  activeServices?: number;
+  lastSync: string;
 };
 
 type QuickAction = {
@@ -122,10 +130,17 @@ function displayMetric(value: number | undefined): string {
     : "—";
 }
 
+function responsiveSidebarWidth(): number {
+  if (typeof window === "undefined") return 320;
+  if (window.innerWidth > 1280) return 320;
+  if (window.innerWidth > 1100) return 280;
+  return 0;
+}
+
 export default function AbuKhalifaExecutiveCard({
   isArabic,
   isAvailable = true,
-  sidebarWidth = 288,
+  sidebarWidth,
   ordersToday,
   activeServices,
   lastSync = "—",
@@ -133,6 +148,13 @@ export default function AbuKhalifaExecutiveCard({
   onNavigate,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [responsiveWidth, setResponsiveWidth] = useState(responsiveSidebarWidth);
+  const [runtimeMetrics, setRuntimeMetrics] = useState<RuntimeMetrics>({
+    isAvailable,
+    ordersToday,
+    activeServices,
+    lastSync,
+  });
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -145,6 +167,62 @@ export default function AbuKhalifaExecutiveCard({
   const secondaryName = isArabic ? ADMIN_IDENTITY.nameEn : ADMIN_IDENTITY.nameAr;
   const role = isArabic ? ADMIN_IDENTITY.roleAr : ADMIN_IDENTITY.roleEn;
   const secondaryRole = isArabic ? ADMIN_IDENTITY.roleEn : ADMIN_IDENTITY.roleAr;
+  const resolvedSidebarWidth = sidebarWidth ?? responsiveWidth;
+
+  useEffect(() => {
+    setRuntimeMetrics((current) => ({
+      ...current,
+      isAvailable,
+      ordersToday,
+      activeServices,
+      lastSync,
+    }));
+  }, [isAvailable, ordersToday, activeServices, lastSync]);
+
+  useEffect(() => {
+    const updateResponsiveWidth = () => setResponsiveWidth(responsiveSidebarWidth());
+    updateResponsiveWidth();
+    window.addEventListener("resize", updateResponsiveWidth, { passive: true });
+    return () => window.removeEventListener("resize", updateResponsiveWidth);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshMetrics = async () => {
+      try {
+        const stats = await fetchAdminStats();
+        if (cancelled) return;
+        setRuntimeMetrics({
+          isAvailable,
+          ordersToday: stats.today_orders,
+          activeServices: stats.pending + stats.in_transit,
+          lastSync: new Date().toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        });
+      } catch (error) {
+        console.warn("Abu Khalifa executive metrics could not be refreshed.", error);
+        if (!cancelled) {
+          setRuntimeMetrics((current) => ({ ...current, isAvailable: false }));
+        }
+      }
+    };
+
+    const requestRefresh = () => void refreshMetrics();
+    void refreshMetrics();
+    const timer = window.setInterval(requestRefresh, 60_000);
+    window.addEventListener("dn-international-shipment-updated", requestRefresh);
+    window.addEventListener("dn-admin-settings-change", requestRefresh);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("dn-international-shipment-updated", requestRefresh);
+      window.removeEventListener("dn-admin-settings-change", requestRefresh);
+    };
+  }, [isArabic, isAvailable]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -201,11 +279,15 @@ export default function AbuKhalifaExecutiveCard({
   }
 
   const portalStyle = {
-    "--admin-sidebar-width": `${sidebarWidth}px`,
+    "--admin-sidebar-width": `${resolvedSidebarWidth}px`,
   } as CSSProperties;
 
   return (
-    <div className="abu-khalifa-card-shell" dir={direction} data-testid="abu-khalifa-executive-card">
+    <div
+      className="abu-khalifa-card-shell"
+      dir={direction}
+      data-testid="abu-khalifa-executive-card"
+    >
       <button
         ref={launcherRef}
         type="button"
@@ -224,7 +306,7 @@ export default function AbuKhalifaExecutiveCard({
               alt={isArabic ? "شعار أبو خليفه" : "Abu Khalifa logo"}
             />
             <span
-              className={`abu-khalifa-status-dot ${isAvailable ? "is-online" : "is-offline"}`}
+              className={`abu-khalifa-status-dot ${runtimeMetrics.isAvailable ? "is-online" : "is-offline"}`}
               aria-hidden="true"
             />
           </span>
@@ -234,7 +316,7 @@ export default function AbuKhalifaExecutiveCard({
             <small>{role}</small>
             <span className="abu-khalifa-launcher__status">
               <Wifi size={12} aria-hidden="true" />
-              {isAvailable
+              {runtimeMetrics.isAvailable
                 ? isArabic
                   ? "متاح الآن"
                   : "Available now"
@@ -308,9 +390,11 @@ export default function AbuKhalifaExecutiveCard({
                       <h2 id={dialogTitleId}>{name}</h2>
                       <p>{secondaryName}</p>
                     </div>
-                    <span className={`abu-khalifa-availability ${isAvailable ? "is-online" : "is-offline"}`}>
+                    <span
+                      className={`abu-khalifa-availability ${runtimeMetrics.isAvailable ? "is-online" : "is-offline"}`}
+                    >
                       <span aria-hidden="true" />
-                      {isAvailable
+                      {runtimeMetrics.isAvailable
                         ? isArabic
                           ? "متاح الآن"
                           : "Available"
@@ -363,21 +447,21 @@ export default function AbuKhalifaExecutiveCard({
                   <span><ClipboardList size={16} aria-hidden="true" /></span>
                   <div>
                     <small>{isArabic ? "طلبات اليوم" : "Orders Today"}</small>
-                    <strong>{displayMetric(ordersToday)}</strong>
+                    <strong>{displayMetric(runtimeMetrics.ordersToday)}</strong>
                   </div>
                 </article>
                 <article>
                   <span><Activity size={16} aria-hidden="true" /></span>
                   <div>
                     <small>{isArabic ? "الخدمات النشطة" : "Active Services"}</small>
-                    <strong>{displayMetric(activeServices)}</strong>
+                    <strong>{displayMetric(runtimeMetrics.activeServices)}</strong>
                   </div>
                 </article>
                 <article>
                   <span><Clock3 size={16} aria-hidden="true" /></span>
                   <div>
                     <small>{isArabic ? "آخر مزامنة" : "Last Sync"}</small>
-                    <strong dir="ltr">{lastSync}</strong>
+                    <strong dir="ltr">{runtimeMetrics.lastSync}</strong>
                   </div>
                 </article>
               </section>
@@ -412,7 +496,11 @@ export default function AbuKhalifaExecutiveCard({
                             {isArabic ? action.descriptionAr : action.descriptionEn}
                           </small>
                         </span>
-                        <OpenIcon className="abu-khalifa-action__arrow" size={16} aria-hidden="true" />
+                        <OpenIcon
+                          className="abu-khalifa-action__arrow"
+                          size={16}
+                          aria-hidden="true"
+                        />
                       </button>
                     );
                   })}
