@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
-const SERVICE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "");
+const API_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "");
+const ADMIN_ACCESS_TOKEN = String(process.env.SUPABASE_ADMIN_ACCESS_TOKEN || "");
 
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error("P1 runtime health requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+if (!SUPABASE_URL || !API_KEY || !ADMIN_ACCESS_TOKEN) {
+  console.error(
+    "P1 runtime health requires SUPABASE_URL, an API key, and SUPABASE_ADMIN_ACCESS_TOKEN for a protected admin/support test account.",
+  );
   process.exit(2);
 }
 
 const headers = {
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
+  apikey: API_KEY,
+  Authorization: `Bearer ${ADMIN_ACCESS_TOKEN}`,
   "Content-Type": "application/json",
 };
 
@@ -33,10 +36,7 @@ async function rpc(name, body = {}) {
 async function edgeFunction(name) {
   const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "OPTIONS",
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-    },
+    headers,
     redirect: "manual",
   });
 
@@ -82,6 +82,7 @@ for (const name of edgeNames) {
 const report = {
   checkedAt: new Date().toISOString(),
   supabaseHost: new URL(SUPABASE_URL).host,
+  authenticatedRole: "admin_or_support_test_account",
   rpc: rpcResults,
   edgeFunctions: edgeResults,
   secretProof: {
