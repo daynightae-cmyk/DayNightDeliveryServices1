@@ -117,29 +117,114 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_REF" \
             --password "$SUPABASE_DB_PASSWORD"
 
-      - name: Capture migration state before deployment
+      - name: Capture legacy migration drift safely
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          supabase migration list --linked \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/migrations-before.txt
-          supabase db push --dry-run \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/db-push-dry-run.txt
+          evidence="artifacts/day-night-delivery/p1-runtime-evidence"
+          supabase migration list --linked | tee "$evidence/migrations-before.txt"
 
-      - name: Apply pending production migrations
+          # The production schema predates consistent CLI migration tracking. Never run
+          # --include-all against the complete repository because that could replay old SQL.
+          set +e
+          supabase db push --dry-run > "$evidence/full-repository-dry-run.txt" 2>&1
+          drift_status=$?
+          set -e
+          printf 'Full repository dry-run exit status: %s\n' "$drift_status" \
+            > "$evidence/legacy-history-drift.txt"
+          if [ "$drift_status" -eq 0 ]; then
+            echo 'No legacy history drift was reported.' >> "$evidence/legacy-history-drift.txt"
+          else
+            echo 'Legacy history drift detected; isolated release workdir required.' \
+              >> "$evidence/legacy-history-drift.txt"
+          fi
+
+      - name: Build isolated P1 migration release workdir
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          supabase db push \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/db-push.txt
-          supabase migration list --linked \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/migrations-after.txt
+          evidence="artifacts/day-night-delivery/p1-runtime-evidence"
+          workdir="$RUNNER_TEMP/day-night-p1-supabase"
+          rm -rf "$workdir"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+
+          supabase --workdir "$workdir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+
+          # Fetch only migrations already recorded by the production history table.
+          supabase --workdir "$workdir" migration fetch --linked
+          find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' \
+            | sort > "$evidence/isolated-remote-baseline-files.txt"
+
+          targets=(
+            20260730094500_admin_order_authoritative_validation.sql
+            20260730095500_finance_authoritative_reconciliation_health.sql
+            20260730100500_international_tracking_runtime_health.sql
+            20260730101500_admin_order_legacy_insert_guard.sql
+          )
+
+          for target in "${targets[@]}"; do
+            test -f "supabase/migrations/$target"
+            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+          done
+
+          printf '%s\n' "${targets[@]}" | sort > "$evidence/expected-p1-migrations.txt"
+          find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' \
+            | sort > "$evidence/isolated-release-files.txt"
+          comm -13 \
+            "$evidence/isolated-remote-baseline-files.txt" \
+            "$evidence/isolated-release-files.txt" \
+            > "$evidence/isolated-added-files.txt"
+          diff -u "$evidence/expected-p1-migrations.txt" "$evidence/isolated-added-files.txt"
+
+          echo "P1_SUPABASE_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo 'Isolated migration release contains exactly the four reviewed P1 migrations.'
+
+      - name: Validate isolated P1 migration plan
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="artifacts/day-night-delivery/p1-runtime-evidence"
+          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked \
+            | tee "$evidence/isolated-migrations-before.txt"
+          supabase --workdir "$P1_SUPABASE_WORKDIR" db push --dry-run \
+            | tee "$evidence/isolated-db-push-dry-run.txt"
+
+          for target in \
+            20260730094500_admin_order_authoritative_validation.sql \
+            20260730095500_finance_authoritative_reconciliation_health.sql \
+            20260730100500_international_tracking_runtime_health.sql \
+            20260730101500_admin_order_legacy_insert_guard.sql
+          do
+            if ! grep -Fq "$target" "$evidence/isolated-db-push-dry-run.txt"; then
+              echo "Expected migration missing from isolated dry-run: $target" >&2
+              exit 1
+            fi
+          done
+
+      - name: Apply isolated P1 production migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="artifacts/day-night-delivery/p1-runtime-evidence"
+          supabase --workdir "$P1_SUPABASE_WORKDIR" db push --yes \
+            | tee "$evidence/isolated-db-push.txt"
+          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked \
+            | tee "$evidence/migrations-after.txt"
 
       - name: Deploy required 17TRACK Edge Functions
         env:
