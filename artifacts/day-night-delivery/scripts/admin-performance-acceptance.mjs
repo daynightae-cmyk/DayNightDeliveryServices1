@@ -299,7 +299,7 @@ async function runProfile(profile, session, storageKey) {
           await commandMenu.click();
           const mobileLayer = page.locator('.dncc-mobile-layer');
           await mobileLayer.waitFor({ state: 'visible' });
-          await page.locator('.dncc-mobile-backdrop').click();
+          await page.locator('.dncc-mobile-close').click();
           await mobileLayer.waitFor({ state: 'hidden' });
           return;
         }
