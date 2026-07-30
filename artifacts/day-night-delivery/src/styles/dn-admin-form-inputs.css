@@ -1,0 +1,54 @@
+/* DAY NIGHT admin form ergonomics and general-manager identity. */
+
+.dncc-main input[type="number"]::-webkit-outer-spin-button,
+.dncc-main input[type="number"]::-webkit-inner-spin-button,
+.dn-admin-workspace-host input[type="number"]::-webkit-outer-spin-button,
+.dn-admin-workspace-host input[type="number"]::-webkit-inner-spin-button,
+.dn-employee-hr-embedded-root input[type="number"]::-webkit-outer-spin-button,
+.dn-employee-hr-embedded-root input[type="number"]::-webkit-inner-spin-button,
+.dn-admin-fullscreen input[type="number"]::-webkit-outer-spin-button,
+.dn-admin-fullscreen input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dncc-main input[type="number"],
+.dn-admin-workspace-host input[type="number"],
+.dn-employee-hr-embedded-root input[type="number"],
+.dn-admin-fullscreen input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.dncc-main input[data-dn-number-enhanced="true"],
+.dn-admin-workspace-host input[data-dn-number-enhanced="true"],
+.dn-employee-hr-embedded-root input[data-dn-number-enhanced="true"],
+.dn-admin-fullscreen input[data-dn-number-enhanced="true"] {
+  touch-action: manipulation;
+}
+
+.dncc-operator-avatar {
+  overflow: hidden;
+  padding: 0;
+  background: #ffffff;
+}
+
+.dncc-operator-avatar .dn-admin-manager-identity-image,
+.dn-admin-manager-identity-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: inherit;
+  background: #ffffff;
+}
+
+.dncc-brand .dn-admin-manager-identity-image {
+  object-fit: contain;
+  background: transparent;
+}
+
+[data-dn-manager-identity="true"] .dn-admin-manager-identity-image {
+  padding: 2px;
+}
