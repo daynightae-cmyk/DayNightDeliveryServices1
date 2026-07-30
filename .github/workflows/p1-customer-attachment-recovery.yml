@@ -1,6 +1,6 @@
 name: P1 Customer Attachment Recovery
 
-# Internal protected verification for the complaint attachment policy helper.
+# Dedicated protected verification for the complaint attachment policy helper.
 on:
   push:
     branches: [runtime/issue-266-evidence]
@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-production-runtime-evidence
+  group: p1-customer-attachment-recovery
   cancel-in-progress: false
 
 jobs:
