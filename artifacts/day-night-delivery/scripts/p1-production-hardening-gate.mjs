@@ -60,6 +60,23 @@ if (fs.existsSync(path.resolve(ROOT, "src/components/admin/AbuKhalifaExecutiveCa
 const executiveCard = read("src/components/admin/AbuKhalifaExecutiveCard.tsx");
 requireText(executiveCard, 'data-testid="abu-khalifa-executive-card"', "executive card DOM contract");
 requireText(executiveCard, 'data-testid="abu-khalifa-executive-launcher"', "executive launcher DOM contract");
+requireText(executiveCard, 'import { fetchAdminStats } from "../../lib/adminData"', "executive runtime source");
+requireText(executiveCard, "window.setInterval(requestRefresh, 60_000)", "executive metrics polling");
+requireText(
+  executiveCard,
+  'window.addEventListener("dn-international-shipment-updated", requestRefresh)',
+  "executive shipment refresh event",
+);
+requireText(
+  executiveCard,
+  'window.addEventListener("dn-admin-settings-change", requestRefresh)',
+  "executive settings refresh event",
+);
+requireText(executiveCard, "window.innerWidth > 1280", "desktop sidebar breakpoint");
+requireText(executiveCard, "window.innerWidth > 1100", "compact sidebar breakpoint");
+requireText(executiveCard, "resolvedSidebarWidth", "responsive executive flyout offset");
+forbidText(executiveCard, "new MutationObserver", "executive card mutation observer");
+forbidText(executiveCard, "document.querySelector", "executive card DOM lookup");
 
 const executiveCss = read("src/styles/abu-khalifa-executive-card.css");
 forbidText(executiveCss, "dn-abu-khalifa-executive-host", "injected executive host CSS");
