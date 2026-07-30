@@ -37,7 +37,6 @@ import {
   Loader2,
   FileMinus,
   RefreshCw,
-  Send,
   X,
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
@@ -57,7 +56,9 @@ import AdminNewMerchant from "./admin/AdminNewMerchant";
 import AdminNewOrder from "./admin/AdminNewOrder";
 import AdminLiveOperationsMap from "./admin/AdminLiveOperationsMap";
 import DriverTrackingPanel from "./admin/DriverTrackingPanel";
-import KhalifaGuidanceFeed from "./admin/KhalifaGuidanceFeed";
+import AbuKhalifaExecutiveCard, {
+  type AbuKhalifaAction,
+} from "./admin/AbuKhalifaExecutiveCard";
 import AdminPdfExportButton from "./admin/AdminPdfExportButton";
 import AdminControlSettings from "./admin/AdminControlSettings";
 import AdminOperationsLayer from "./admin/AdminOperationsLayer";
@@ -70,7 +71,6 @@ import AdminNotificationCenter, {
 } from "./admin/AdminNotificationCenter";
 import {
   AdminIconBadge,
-  AdminStateChip,
   type AdminIconName,
 } from "./admin/adminIconSystem";
 import {
@@ -85,9 +85,8 @@ import {
   buildAdminSectionStats,
   normalizeOrderStatus,
 } from "../lib/adminOrderLogic";
-import khalifaAssets from "./admin/khalifaAssets";
 import "../styles/dn-dashboard-map.css";
-import "../styles/dn-khalifa-final.css";
+import "../styles/abu-khalifa-executive-card.css";
 import "../styles/dn-admin-task2.css";
 import "../styles/dn-admin-task3.css";
 import "../styles/dn-admin-pdf.css";
@@ -404,10 +403,6 @@ const copy = {
   ar: {
     owner: "أبو خليفة",
     role: "مدير النظام",
-    helper: "خليفة",
-    helperRole: "مساعد العمليات الذكي",
-    helperText: "متصل بالبيانات الحية ويغيّر إرشاداته حسب القسم الحالي.",
-    ask: "اسألني أي شيء",
     language: "English",
     menu: "قائمة الإدارة",
     websiteNav: "روابط الموقع الأساسي",
@@ -426,7 +421,7 @@ const copy = {
     quickHelp: "مساعدة سريعة",
     noUpdates: "لا توجد تنبيهات عاجلة حالياً",
     noData: "البيانات الحية جاهزة داخل مستودع العمليات",
-    preparing: "خليفة يقرأ ملخص الطلبات ويقترح عليك الإجراء التالي.",
+    preparing: "بطاقة أبو خليفه تفتح إجراءات القيادة والإدارة مباشرة.",
     refresh: "تحديث البيانات",
     loading: "تحميل البيانات الحية...",
     lastSync: "آخر مزامنة",
@@ -458,10 +453,6 @@ const copy = {
   en: {
     owner: "Abu Khalifa",
     role: "System Manager",
-    helper: "Khalifa",
-    helperRole: "Smart Operations Assistant",
-    helperText: "Connected to live data and changes guidance by section.",
-    ask: "Ask me anything",
     language: "العربية",
     menu: "Admin Menu",
     websiteNav: "Main website links",
@@ -480,7 +471,7 @@ const copy = {
     quickHelp: "Quick Help",
     noUpdates: "No urgent alerts right now",
     noData: "Live data is ready inside the operations warehouse",
-    preparing: "Khalifa reads the order summary and suggests the next action.",
+    preparing: "The Abu Khalifa card opens leadership and administration actions directly.",
     refresh: "Refresh data",
     loading: "Loading live data...",
     lastSync: "Last sync",
@@ -643,118 +634,35 @@ function buildDashboardPdfPayload(
   };
 }
 
-function KhalifaPanel({
-  isArabic,
-  ui,
-  activeTitle,
-  active,
-  orders,
-  merchants,
-  financeSummary,
-  lastSyncAt,
-}: {
-  isArabic: boolean;
-  ui: typeof copy.ar;
-  activeTitle: string;
-  active: SectionId;
-  orders: any[];
-  merchants: Merchant[];
-  financeSummary: FinanceSummary | null;
-  lastSyncAt: Date | null;
-}) {
-  const [avatarNonce, setAvatarNonce] = useState(0);
+const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
 
-  useEffect(() => {
-    const handler = () => setAvatarNonce((value) => value + 1);
-    window.addEventListener("dn-admin-settings-change", handler);
+function openEmployeeWorkspace() {
+  const url = new URL(window.location.href);
+  url.pathname = "/admin";
+  url.search = "";
+  url.searchParams.set("hr", "employees");
+  window.history.replaceState(window.history.state, "", url);
+  window.dispatchEvent(
+    new PopStateEvent("popstate", { state: window.history.state }),
+  );
+  window.dispatchEvent(
+    new CustomEvent<string>(EMPLOYEE_PATH_EVENT, {
+      detail: "employee:directory",
+    }),
+  );
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
-    return () =>
-      window.removeEventListener("dn-admin-settings-change", handler);
-  }, []);
-
-  const metrics = useMemo(() => buildMetrics(orders), [orders]);
-  const rawAvatar = khalifaAssets.bot;
-  const avatar = rawAvatar.startsWith("data:")
-    ? rawAvatar
-    : `${rawAvatar}?v=${avatarNonce}`;
-
+function isOrderCreatedToday(order: any) {
+  const value = order?.created_at || order?.createdAt || order?.created;
+  if (!value) return false;
+  const created = new Date(value);
+  if (Number.isNaN(created.getTime())) return false;
+  const now = new Date();
   return (
-    <aside
-      className="dn-admin-left-ai"
-      aria-label={isArabic ? "لوحة خليفة" : "Khalifa panel"}
-    >
-      <div className="dn-admin-user-head">
-        <img src={avatar} alt={ui.helper} />
-        <div>
-          <strong>{ui.owner}</strong>
-          <span>{ui.role}</span>
-        </div>
-      </div>
-
-      <div className="dn-admin-khalifa-card">
-        <img src={avatar} alt={ui.helper} />
-        <div className="dn-khalifa-profile-title">
-          <AdminIconBadge
-            name="khalifa"
-            label={isArabic ? "مساعد العمليات خليفة" : "Khalifa operations assistant"}
-          />
-          <h2>{ui.helper}</h2>
-        </div>
-        <p>{ui.helperRole}</p>
-        <small>{ui.helperText}</small>
-
-        <AdminStateChip name="live-data" tone="success">
-          {ui.liveData}
-        </AdminStateChip>
-
-        <div className="mt-3 grid gap-2 text-xs font-black text-white/80">
-          <div className="dn-khalifa-status-row">
-            <span>
-              <AdminIconBadge name={iconForSection(active)} />
-              {isArabic ? "القسم الحالي" : "Current section"}
-            </span>
-            <b>{activeTitle}</b>
-          </div>
-          <div className="dn-khalifa-status-row">
-            <span>
-              <AdminIconBadge name="last-sync" />
-              {ui.lastSync}
-            </span>
-            <b>
-              {lastSyncAt
-                ? lastSyncAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE")
-                : "—"}
-            </b>
-          </div>
-          <div className="dn-khalifa-status-row">
-            <span>
-              <AdminIconBadge name="unassigned-orders" />
-              {isArabic ? "بدون مندوب" : "Unassigned"}
-            </span>
-            <b>{metrics.unassigned}</b>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            document.getElementById("dn-khalifa-question")?.focus()
-          }
-        >
-          <Send className="h-4 w-4" aria-hidden="true" />
-          {ui.ask}
-        </button>
-      </div>
-
-      <KhalifaGuidanceFeed
-        key={`${active}-${orders.length}-${merchants.length}`}
-        isArabic={isArabic}
-        orders={orders}
-        merchants={merchants}
-        financeSummary={financeSummary}
-        sectionTitle={activeTitle}
-      />
-    </aside>
+    created.getFullYear() === now.getFullYear() &&
+    created.getMonth() === now.getMonth() &&
+    created.getDate() === now.getDate()
   );
 }
 
@@ -923,6 +831,10 @@ export default function AdminPanelLuxury() {
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
   const metrics = useMemo(() => buildMetrics(orders), [orders]);
+  const todayOrders = useMemo(
+    () => orders.filter(isOrderCreatedToday).length,
+    [orders],
+  );
 
   const groupedMenu = useMemo(() => {
     return menu.reduce<Record<string, (typeof menu)[number][]>>((acc, item) => {
@@ -1058,6 +970,29 @@ export default function AdminPanelLuxury() {
 
     setActive(id);
     setMobileMenu(false);
+  }
+
+  function handleExecutiveAction(action: AbuKhalifaAction) {
+    switch (action) {
+      case "new-order":
+        setSection("new_order");
+        return;
+      case "orders":
+        setSection("all_orders");
+        return;
+      case "reports":
+        setSection("reports");
+        return;
+      case "messages":
+        setSection("support");
+        return;
+      case "employees":
+      case "payroll":
+        setActive("dashboard");
+        setMobileMenu(false);
+        openEmployeeWorkspace();
+        return;
+    }
   }
 
   function renderDashboardCenter() {
@@ -1583,16 +1518,29 @@ export default function AdminPanelLuxury() {
           </div>
 
           <div className="dn-admin-home-full">
-            <KhalifaPanel
-              isArabic={isArabic}
-              ui={ui}
-              active={active}
-              activeTitle={activeTitle}
-              orders={orders}
-              merchants={merchants}
-              financeSummary={financeSummary}
-              lastSyncAt={lastSyncAt}
-            />
+            <aside
+              className="dn-admin-left-ai dn-admin-left-ai--executive"
+              aria-label={
+                isArabic ? "بطاقة أبو خليفه التنفيذية" : "Abu Khalifa executive card"
+              }
+            >
+              <AbuKhalifaExecutiveCard
+                isArabic={isArabic}
+                isAvailable={!adminLoading && !adminError}
+                ordersToday={todayOrders}
+                activeServices={metrics.active}
+                lastSync={
+                  lastSyncAt
+                    ? lastSyncAt.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "—"
+                }
+                currentSection={activeTitle}
+                onNavigate={handleExecutiveAction}
+              />
+            </aside>
 
             <div className="dn-admin-workspace-host">{renderWorkspace()}</div>
           </div>

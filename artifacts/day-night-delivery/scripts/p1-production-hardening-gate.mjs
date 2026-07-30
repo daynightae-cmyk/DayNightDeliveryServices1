@@ -42,10 +42,45 @@ requireText(formHook, 'const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen"', "for
 forbidText(formHook, "observer.observe(document.body", "form document observer");
 forbidText(formHook, "characterData: true", "form character observer");
 
-const bridge = read("src/components/admin/AbuKhalifaExecutiveCardBridge.tsx");
-requireText(bridge, 'const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen"', "executive card admin scope");
-forbidText(bridge, "observer.observe(document.body", "executive card document observer");
-forbidText(bridge, "characterData: true", "executive card character observer");
+const adminPanel = read("src/components/AdminPanelLuxury.tsx");
+requireText(adminPanel, 'from "./admin/AbuKhalifaExecutiveCard"', "direct executive card import");
+requireSingleOccurrence(adminPanel, "<AbuKhalifaExecutiveCard", "direct executive card render count");
+requireText(adminPanel, "onNavigate={handleExecutiveAction}", "React-owned executive navigation");
+forbidText(adminPanel, "function KhalifaPanel(", "legacy Khalifa component");
+forbidText(adminPanel, "<KhalifaPanel", "legacy Khalifa render");
+forbidText(adminPanel, "مساعد العمليات الذكي", "legacy assistant identity");
+forbidText(adminPanel, "Smart Operations Assistant", "legacy assistant identity English");
+
+const enhancements = read("src/components/admin/AdminExperienceEnhancements.tsx");
+forbidText(enhancements, "AbuKhalifaExecutiveCardBridge", "executive bridge mount");
+if (fs.existsSync(path.resolve(ROOT, "src/components/admin/AbuKhalifaExecutiveCardBridge.tsx"))) {
+  throw new Error("executive bridge file must be deleted");
+}
+
+const executiveCard = read("src/components/admin/AbuKhalifaExecutiveCard.tsx");
+requireText(executiveCard, 'data-testid="abu-khalifa-executive-card"', "executive card DOM contract");
+requireText(executiveCard, 'data-testid="abu-khalifa-executive-launcher"', "executive launcher DOM contract");
+requireText(executiveCard, 'import { fetchAdminStats } from "../../lib/adminData"', "executive runtime source");
+requireText(executiveCard, "window.setInterval(requestRefresh, 60_000)", "executive metrics polling");
+requireText(
+  executiveCard,
+  'window.addEventListener("dn-international-shipment-updated", requestRefresh)',
+  "executive shipment refresh event",
+);
+requireText(
+  executiveCard,
+  'window.addEventListener("dn-admin-settings-change", requestRefresh)',
+  "executive settings refresh event",
+);
+requireText(executiveCard, "window.innerWidth > 1280", "desktop sidebar breakpoint");
+requireText(executiveCard, "window.innerWidth > 1100", "compact sidebar breakpoint");
+requireText(executiveCard, "resolvedSidebarWidth", "responsive executive flyout offset");
+forbidText(executiveCard, "new MutationObserver", "executive card mutation observer");
+forbidText(executiveCard, "document.querySelector", "executive card DOM lookup");
+
+const executiveCss = read("src/styles/abu-khalifa-executive-card.css");
+forbidText(executiveCss, "dn-abu-khalifa-executive-host", "injected executive host CSS");
+forbidText(executiveCss, "> :not(.dn-abu-khalifa-executive-host)", "legacy child hiding CSS");
 
 const inp = read("src/hooks/useAdminInteractionPerformanceBudget.ts");
 requireText(inp, "ADMIN_INP_BUDGET_MS = 200", "INP 200ms budget");
