@@ -205,11 +205,12 @@ export default function AbuKhalifaExecutiveCard({
   } as CSSProperties;
 
   return (
-    <div className="abu-khalifa-card-shell" dir={direction}>
+    <div className="abu-khalifa-card-shell" dir={direction} data-testid="abu-khalifa-executive-card">
       <button
         ref={launcherRef}
         type="button"
         className="abu-khalifa-launcher"
+        data-testid="abu-khalifa-executive-launcher"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         onClick={() => setIsOpen(true)}

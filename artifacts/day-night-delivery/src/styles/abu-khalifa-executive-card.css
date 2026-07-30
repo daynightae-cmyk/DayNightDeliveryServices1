@@ -23,11 +23,6 @@
   overflow: visible;
 }
 
-.dn-admin-left-ai.dn-admin-left-ai--executive > :not(.dn-abu-khalifa-executive-host) {
-  display: none !important;
-}
-
-.dn-abu-khalifa-executive-host,
 .abu-khalifa-card-shell {
   width: 100%;
   min-width: 0;
