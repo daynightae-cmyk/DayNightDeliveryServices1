@@ -1,0 +1,275 @@
+name: P1 Production Runtime Evidence
+
+on:
+  push:
+    branches:
+      - runtime/issue-266-evidence
+    paths:
+      - .github/workflows/p1-runtime-evidence.yml
+      - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
+      - artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs
+      - supabase/migrations/**
+      - supabase/functions/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-production-runtime-evidence
+  cancel-in-progress: false
+
+jobs:
+  production-evidence:
+    name: Finance, tracking, and customer production evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify protected production secrets
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY \
+            SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD \
+            RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD \
+            RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD \
+            RUNTIME_DRIVER_EMAIL RUNTIME_DRIVER_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected production secrets: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); const ref=u.hostname.split('.')[0]; if(!ref) process.exit(2); process.stdout.write(ref)")"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Production project reference derived from protected URL: ${project_ref:0:4}…${project_ref: -4}"
+
+      - name: Create evidence workspace
+        run: mkdir -p artifacts/day-night-delivery/p1-runtime-evidence
+
+      - name: Link production Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Capture migration state before deployment
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration list --linked \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/migrations-before.txt
+          supabase db push --dry-run \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/db-push-dry-run.txt
+
+      - name: Apply pending production migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db push \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/db-push.txt
+          supabase migration list --linked \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/migrations-after.txt
+
+      - name: Deploy required 17TRACK Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for function_name in \
+            register-track17-shipment \
+            sync-track17-shipment \
+            track17-admin
+          do
+            supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF"
+          done
+
+          for function_name in \
+            track17-webhook \
+            public-international-tracking
+          do
+            supabase functions deploy "$function_name" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --no-verify-jwt
+          done
+
+          supabase functions list --project-ref "$SUPABASE_PROJECT_REF" \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/functions.txt
+
+      - name: Verify TRACK17 secret presence without exposing values
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_list="$(supabase secrets list --project-ref "$SUPABASE_PROJECT_REF")"
+          if ! grep -q 'TRACK17_API_KEY' <<< "$secret_list"; then
+            echo 'TRACK17_API_KEY is missing from Supabase Edge Function Secrets.' >&2
+            exit 1
+          fi
+          printf 'TRACK17_API_KEY present: true\nVerified at: %s\n' \
+            "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            > artifacts/day-night-delivery/p1-runtime-evidence/track17-secret-proof.txt
+
+      - name: Authenticate protected admin test session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const email = String(process.env.RUNTIME_ADMIN_EMAIL || '');
+          const password = String(process.env.RUNTIME_ADMIN_PASSWORD || '');
+          const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.access_token) {
+            console.error(`Protected admin authentication failed with HTTP ${response.status}.`);
+            process.exit(1);
+          }
+          console.log(`::add-mask::${payload.access_token}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `SUPABASE_ADMIN_ACCESS_TOKEN=${payload.access_token}\n`);
+          console.log('Protected admin session acquired without exposing credentials.');
+          NODE
+
+      - name: Run static production acceptance gates
+        run: |
+          pnpm --dir artifacts/day-night-delivery run p1:gate
+          pnpm --dir artifacts/day-night-delivery run international-tracking:gate
+          pnpm --dir artifacts/day-night-delivery run customer-experience:test
+          pnpm --dir artifacts/day-night-delivery run customer-experience:gate
+
+      - name: Run protected P1 runtime health
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_ADMIN_ACCESS_TOKEN: ${{ env.SUPABASE_ADMIN_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run p1:runtime-health 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/p1-runtime-health.log
+
+      - name: Run protected Customer Experience lifecycle
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+          CUSTOMER_EXPERIENCE_E2E_KEEP_DATA: false
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/customer-experience-e2e.log
+
+      - name: Record manual provider-dashboard acceptance boundary
+        if: always()
+        shell: bash
+        run: |
+          cat > artifacts/day-night-delivery/p1-runtime-evidence/manual-provider-checks.md <<'EOF'
+          # Manual 17TRACK dashboard checks
+
+          The repository workflow can deploy functions, verify function presence, verify the
+          Supabase secret name, and run database/runtime health checks. It cannot impersonate
+          the external 17TRACK dashboard or fabricate provider-originated signed callbacks.
+
+          Remaining provider-controlled acceptance:
+          - Package Webhook URL targets `track17-webhook`.
+          - 17TRACK `Tracking updated` test returns HTTP 200.
+          - 17TRACK `Tracking stopped` test returns HTTP 200.
+
+          Do not close Issue #266 until those provider-dashboard results are attached.
+          EOF
+
+      - name: Upload sanitized runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-P1-Production-Runtime-Evidence
+          path: artifacts/day-night-delivery/p1-runtime-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish evidence summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## DAY NIGHT P1 production runtime evidence'
+            echo
+            echo "- Project ref: \`${SUPABASE_PROJECT_REF:0:4}…${SUPABASE_PROJECT_REF: -4}\`"
+            echo "- Checked at: \`$(date -u +'%Y-%m-%dT%H:%M:%SZ')\`"
+            echo '- Evidence artifact: `DAY-NIGHT-P1-Production-Runtime-Evidence`'
+            echo '- Secrets and raw provider payloads are not included.'
+            echo '- External 17TRACK dashboard callback tests remain a manual provider-controlled check.'
+          } >> "$GITHUB_STEP_SUMMARY"
