@@ -19,6 +19,10 @@ const checks = [
   ["src/lib/printableDocuments.ts", "const receiverAddress = localizeExportText"],
   ["src/lib/exportUtils.ts", "const receiverAddress = localizeExportText"],
   ["src/types.ts", "receiver_address_ar?: string"],
+  ["src/components/AdminPanel.tsx", "localizedOrderCity(order, language, \"receiver\")"],
+  ["src/components/AdminPanel.tsx", "localizedPackageType(order.package_type, language)"],
+  ["src/components/AdminPanel.tsx", "localizedPaymentMethod(order.payment_method, language)"],
+  ["src/components/AdminPanel.tsx", "localizedOrderStatus(order.status, language)"],
 ];
 
 for (const [path, marker] of checks) {
@@ -31,6 +35,9 @@ if (packageJson.scripts?.["export-language:gate"] !== "node scripts/export-langu
 }
 if (!String(packageJson.scripts?.["production:gate"] || "").includes("node scripts/export-language-policy-gate.mjs")) {
   throw new Error("package.json: production:gate does not enforce export localization");
+}
+if (packageJson.scripts?.["customer-experience:e2e"] !== "node scripts/customer-experience-runtime-e2e.mjs") {
+  throw new Error("package.json: customer-experience:e2e was removed");
 }
 
 const localization = read("src/lib/exportLocalization.ts");
