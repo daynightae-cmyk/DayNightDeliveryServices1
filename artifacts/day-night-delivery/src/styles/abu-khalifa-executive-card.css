@@ -1,0 +1,817 @@
+:root {
+  --ak-navy-950: #020b18;
+  --ak-navy-900: #031426;
+  --ak-navy-850: #061b33;
+  --ak-navy-800: #0a2545;
+  --ak-blue: #1478ff;
+  --ak-blue-bright: #2ca4ff;
+  --ak-sky: #72c8ff;
+  --ak-gold: #d4af37;
+  --ak-gold-bright: #f2cc55;
+  --ak-white: #f8fbff;
+  --ak-muted: #93a9c2;
+  --ak-border: rgba(136, 184, 229, 0.16);
+  --ak-success: #26d99a;
+}
+
+.executive-panel-open {
+  overflow: hidden;
+}
+
+.dn-admin-left-ai.dn-admin-left-ai--executive {
+  align-self: start;
+  overflow: visible;
+}
+
+.dn-admin-left-ai.dn-admin-left-ai--executive > :not(.dn-abu-khalifa-executive-host) {
+  display: none !important;
+}
+
+.dn-abu-khalifa-executive-host,
+.abu-khalifa-card-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.abu-khalifa-launcher {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 96px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  border-radius: 22px;
+  padding: 13px;
+  color: var(--ak-white);
+  text-align: start;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(44, 164, 255, 0.23), transparent 42%),
+    radial-gradient(circle at 95% 100%, rgba(212, 175, 55, 0.12), transparent 42%),
+    linear-gradient(145deg, rgba(11, 43, 78, 0.99), rgba(3, 20, 38, 0.995));
+  box-shadow:
+    0 24px 58px rgba(0, 8, 22, 0.42),
+    0 0 0 1px rgba(44, 164, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.abu-khalifa-launcher::after {
+  position: absolute;
+  right: 14px;
+  bottom: 0;
+  left: 14px;
+  height: 2px;
+  border-radius: 999px;
+  content: "";
+  background: linear-gradient(90deg, transparent, var(--ak-gold), var(--ak-blue-bright), transparent);
+  opacity: 0.75;
+}
+
+.abu-khalifa-launcher:hover {
+  transform: translateY(-2px);
+  border-color: rgba(242, 204, 85, 0.68);
+  box-shadow:
+    0 28px 68px rgba(0, 8, 22, 0.52),
+    0 0 34px rgba(20, 120, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.abu-khalifa-launcher:focus-visible,
+.abu-khalifa-icon-button:focus-visible,
+.abu-khalifa-action:focus-visible {
+  outline: 3px solid rgba(44, 164, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.abu-khalifa-launcher__shine {
+  position: absolute;
+  top: -64px;
+  inset-inline-start: 4%;
+  width: 150px;
+  height: 130px;
+  pointer-events: none;
+  transform: rotate(-14deg);
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.11), transparent);
+}
+
+.abu-khalifa-launcher__identity {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.abu-khalifa-launcher__avatar {
+  position: relative;
+  display: grid;
+  width: 66px;
+  height: 66px;
+  flex: 0 0 66px;
+  place-items: center;
+  border: 1px solid rgba(242, 204, 85, 0.58);
+  border-radius: 20px;
+  background: radial-gradient(circle, rgba(44, 164, 255, 0.22), rgba(3, 20, 38, 0.97) 72%);
+  box-shadow: 0 0 26px rgba(20, 120, 255, 0.2), inset 0 0 18px rgba(212, 175, 55, 0.1);
+}
+
+.abu-khalifa-launcher__avatar img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #fff;
+}
+
+.abu-khalifa-status-dot {
+  position: absolute;
+  inset-inline-end: -2px;
+  bottom: -1px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--ak-navy-900);
+  border-radius: 50%;
+}
+
+.abu-khalifa-status-dot.is-online {
+  background: var(--ak-success);
+  box-shadow: 0 0 13px rgba(38, 217, 154, 0.84);
+  animation: abu-khalifa-status-pulse 2.4s ease-in-out infinite;
+}
+
+.abu-khalifa-status-dot.is-offline {
+  background: #718198;
+}
+
+.abu-khalifa-launcher__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.abu-khalifa-launcher__copy strong {
+  overflow: hidden;
+  color: var(--ak-white);
+  font-size: 17px;
+  font-weight: 950;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abu-khalifa-launcher__copy small {
+  overflow: hidden;
+  color: var(--ak-gold-bright);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abu-khalifa-launcher__status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: #8debc9;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.abu-khalifa-launcher__open {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(113, 189, 255, 0.2);
+  border-radius: 12px;
+  color: var(--ak-gold-bright);
+  background: rgba(8, 35, 66, 0.88);
+}
+
+.abu-khalifa-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 99950;
+  pointer-events: none;
+}
+
+.abu-khalifa-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  pointer-events: auto;
+  background: rgba(0, 7, 18, 0.66);
+  backdrop-filter: blur(6px);
+  animation: abu-khalifa-backdrop-in 180ms ease-out both;
+}
+
+.abu-khalifa-flyout {
+  position: absolute;
+  top: 92px;
+  right: calc(var(--admin-sidebar-width, 288px) + 18px);
+  width: clamp(390px, 30vw, 468px);
+  max-height: calc(100dvh - 116px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  border-radius: 30px;
+  padding: 19px;
+  color: var(--ak-white);
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 14% 5%, rgba(44, 164, 255, 0.22), transparent 36%),
+    radial-gradient(circle at 85% 10%, rgba(212, 175, 55, 0.13), transparent 32%),
+    linear-gradient(150deg, rgba(8, 33, 61, 0.995), rgba(2, 13, 28, 0.998));
+  box-shadow:
+    0 46px 110px rgba(0, 5, 16, 0.76),
+    0 0 0 1px rgba(67, 157, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: abu-khalifa-flyout-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[dir="ltr"] .abu-khalifa-flyout {
+  right: auto;
+  left: calc(var(--admin-sidebar-width, 288px) + 18px);
+  animation-name: abu-khalifa-flyout-in-ltr;
+}
+
+.abu-khalifa-flyout::-webkit-scrollbar {
+  width: 6px;
+}
+
+.abu-khalifa-flyout::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(114, 200, 255, 0.28);
+}
+
+.abu-khalifa-flyout__ambient {
+  position: absolute;
+  top: -110px;
+  inset-inline-start: -80px;
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: rgba(20, 120, 255, 0.14);
+  filter: blur(58px);
+}
+
+.abu-khalifa-flyout__header,
+.abu-khalifa-profile,
+.abu-khalifa-leadership-copy,
+.abu-khalifa-current-section,
+.abu-khalifa-metrics,
+.abu-khalifa-actions,
+.abu-khalifa-flyout__footer {
+  position: relative;
+  z-index: 1;
+}
+
+.abu-khalifa-flyout__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 17px;
+}
+
+.abu-khalifa-flyout__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ak-gold-bright);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.abu-khalifa-icon-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--ak-border);
+  border-radius: 13px;
+  color: #cce4fb;
+  cursor: pointer;
+  background: rgba(7, 30, 56, 0.86);
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.abu-khalifa-icon-button:hover {
+  border-color: rgba(242, 204, 85, 0.46);
+  color: var(--ak-gold-bright);
+  background: rgba(12, 44, 78, 0.98);
+}
+
+.abu-khalifa-profile {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  border: 1px solid rgba(127, 188, 239, 0.17);
+  border-radius: 24px;
+  padding: 16px;
+  background: linear-gradient(130deg, rgba(14, 53, 92, 0.8), rgba(5, 25, 47, 0.7));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.abu-khalifa-profile::after {
+  position: absolute;
+  right: 16px;
+  bottom: 0;
+  left: 16px;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.62), transparent);
+}
+
+.abu-khalifa-profile__logo-wrap {
+  position: relative;
+  display: grid;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  place-items: center;
+}
+
+.abu-khalifa-profile__halo {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(44, 164, 255, 0.29), rgba(212, 175, 55, 0.12) 48%, transparent 72%);
+  filter: blur(8px);
+}
+
+.abu-khalifa-profile__logo {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 82px;
+  height: 82px;
+  border: 2px solid rgba(242, 204, 85, 0.72);
+  border-radius: 50%;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: 0 0 0 5px rgba(20, 120, 255, 0.11), 0 14px 32px rgba(0, 7, 22, 0.52), 0 0 28px rgba(212, 175, 55, 0.17);
+}
+
+.abu-khalifa-profile__crown {
+  position: absolute;
+  z-index: 2;
+  top: -1px;
+  inset-inline-end: 1px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(242, 204, 85, 0.76);
+  border-radius: 10px;
+  color: #07192d;
+  background: linear-gradient(145deg, #ffe789, var(--ak-gold));
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.26);
+}
+
+.abu-khalifa-profile__identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.abu-khalifa-profile__name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.abu-khalifa-profile__name-row h2 {
+  margin: 0;
+  color: var(--ak-white);
+  font-size: clamp(23px, 2vw, 30px);
+  font-weight: 950;
+  line-height: 1.12;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+}
+
+.abu-khalifa-profile__name-row p {
+  margin: 5px 0 0;
+  color: #9ec5e8;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.abu-khalifa-availability {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(38, 217, 154, 0.28);
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #8debc9;
+  font-size: 8px;
+  font-weight: 900;
+  background: rgba(11, 103, 79, 0.18);
+}
+
+.abu-khalifa-availability > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.abu-khalifa-availability.is-online > span {
+  background: var(--ak-success);
+  box-shadow: 0 0 10px rgba(38, 217, 154, 0.82);
+}
+
+.abu-khalifa-availability.is-offline {
+  border-color: rgba(138, 154, 175, 0.2);
+  color: #9aa9bc;
+  background: rgba(95, 111, 132, 0.1);
+}
+
+.abu-khalifa-availability.is-offline > span {
+  background: #78879b;
+}
+
+.abu-khalifa-profile__role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  color: var(--ak-gold-bright);
+}
+
+.abu-khalifa-profile__role strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.abu-khalifa-profile__role small {
+  color: #92b0ce;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.abu-khalifa-leadership-copy {
+  display: flex;
+  gap: 12px;
+  margin-top: 13px;
+  border: 1px solid rgba(44, 164, 255, 0.16);
+  border-radius: 19px;
+  padding: 14px;
+  background: rgba(4, 23, 44, 0.62);
+}
+
+.abu-khalifa-leadership-copy__icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  place-items: center;
+  border: 1px solid rgba(242, 204, 85, 0.34);
+  border-radius: 13px;
+  color: var(--ak-gold-bright);
+  background: rgba(212, 175, 55, 0.09);
+}
+
+.abu-khalifa-leadership-copy h3 {
+  margin: 0;
+  color: #edf7ff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.abu-khalifa-leadership-copy p {
+  margin: 5px 0 0;
+  color: var(--ak-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.75;
+}
+
+.abu-khalifa-current-section {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+  border: 1px solid rgba(44, 164, 255, 0.16);
+  border-radius: 14px;
+  padding: 9px 11px;
+  color: #83c8ff;
+  background: rgba(20, 120, 255, 0.07);
+}
+
+.abu-khalifa-current-section span {
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.abu-khalifa-current-section strong {
+  overflow: hidden;
+  color: #eef8ff;
+  font-size: 9px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abu-khalifa-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.abu-khalifa-metrics article {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(130, 185, 235, 0.15);
+  border-radius: 16px;
+  padding: 10px;
+  background: linear-gradient(145deg, rgba(13, 48, 83, 0.76), rgba(5, 25, 47, 0.72));
+}
+
+.abu-khalifa-metrics article > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--ak-blue-bright);
+  background: rgba(20, 120, 255, 0.12);
+}
+
+.abu-khalifa-metrics article div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.abu-khalifa-metrics small {
+  overflow: hidden;
+  color: #88a1bb;
+  font-size: 7px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abu-khalifa-metrics strong {
+  color: #f5fbff;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.abu-khalifa-actions {
+  margin-top: 16px;
+}
+
+.abu-khalifa-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.abu-khalifa-section-heading small {
+  color: var(--ak-gold-bright);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.abu-khalifa-section-heading h3 {
+  margin: 3px 0 0;
+  color: #edf7ff;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.abu-khalifa-section-heading > svg {
+  color: var(--ak-blue-bright);
+}
+
+.abu-khalifa-actions__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.abu-khalifa-action {
+  display: grid;
+  grid-template-columns: 39px minmax(0, 1fr) 16px;
+  min-height: 72px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(130, 185, 235, 0.16);
+  border-radius: 17px;
+  padding: 9px;
+  color: var(--ak-white);
+  text-align: start;
+  cursor: pointer;
+  background: linear-gradient(145deg, rgba(11, 43, 77, 0.9), rgba(4, 22, 42, 0.91));
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.abu-khalifa-action:hover {
+  transform: translateY(-2px);
+  border-color: rgba(44, 164, 255, 0.46);
+  background: linear-gradient(145deg, rgba(15, 59, 103, 0.98), rgba(6, 29, 54, 0.96));
+  box-shadow: 0 14px 28px rgba(0, 7, 22, 0.34), inset 3px 0 0 rgba(212, 175, 55, 0.8);
+}
+
+[dir="rtl"] .abu-khalifa-action:hover {
+  box-shadow: 0 14px 28px rgba(0, 7, 22, 0.34), inset -3px 0 0 rgba(212, 175, 55, 0.8);
+}
+
+.abu-khalifa-action__icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 1px solid rgba(212, 175, 55, 0.23);
+  border-radius: 12px;
+  color: var(--ak-gold-bright);
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.13), rgba(20, 120, 255, 0.09));
+}
+
+.abu-khalifa-action__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.abu-khalifa-action__copy strong,
+.abu-khalifa-action__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abu-khalifa-action__copy strong {
+  color: #eef8ff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.abu-khalifa-action__copy small {
+  color: #819bb5;
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.abu-khalifa-action__arrow {
+  color: #6785a4;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.abu-khalifa-action:hover .abu-khalifa-action__arrow {
+  color: var(--ak-gold-bright);
+  transform: translateX(-2px);
+}
+
+[dir="ltr"] .abu-khalifa-action:hover .abu-khalifa-action__arrow {
+  transform: translateX(2px);
+}
+
+.abu-khalifa-flyout__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  border-top: 1px solid rgba(134, 185, 228, 0.13);
+  padding-top: 13px;
+  color: #8da8c2;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.abu-khalifa-flyout__footer > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.abu-khalifa-secure-badge {
+  border: 1px solid rgba(38, 217, 154, 0.22);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #86e7c4;
+  background: rgba(38, 217, 154, 0.08);
+}
+
+@media (max-width: 1100px) {
+  .abu-khalifa-flyout {
+    top: 82px;
+    right: 18px;
+    width: min(440px, calc(100vw - 36px));
+    max-height: calc(100dvh - 100px);
+  }
+
+  [dir="ltr"] .abu-khalifa-flyout {
+    right: auto;
+    left: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .abu-khalifa-flyout {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-height: min(88dvh, 780px);
+    border-radius: 26px;
+    padding: 15px;
+    animation-name: abu-khalifa-sheet-in;
+  }
+
+  [dir="ltr"] .abu-khalifa-flyout {
+    right: 8px;
+    left: 8px;
+  }
+
+  .abu-khalifa-profile {
+    align-items: flex-start;
+  }
+
+  .abu-khalifa-profile__logo-wrap {
+    width: 76px;
+    height: 76px;
+    flex-basis: 76px;
+  }
+
+  .abu-khalifa-profile__logo {
+    width: 66px;
+    height: 66px;
+  }
+
+  .abu-khalifa-profile__name-row {
+    display: grid;
+  }
+
+  .abu-khalifa-availability {
+    width: max-content;
+  }
+
+  .abu-khalifa-metrics,
+  .abu-khalifa-actions__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes abu-khalifa-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(38, 217, 154, 0.54); }
+  50% { box-shadow: 0 0 0 7px rgba(38, 217, 154, 0); }
+}
+
+@keyframes abu-khalifa-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes abu-khalifa-flyout-in {
+  from { opacity: 0; transform: translateX(22px) scale(0.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes abu-khalifa-flyout-in-ltr {
+  from { opacity: 0; transform: translateX(-22px) scale(0.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes abu-khalifa-sheet-in {
+  from { opacity: 0; transform: translateY(32px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abu-khalifa-launcher,
+  .abu-khalifa-action,
+  .abu-khalifa-action__arrow,
+  .abu-khalifa-backdrop,
+  .abu-khalifa-flyout,
+  .abu-khalifa-status-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}

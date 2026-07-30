@@ -1,8 +1,14 @@
 import { useEffect } from "react";
-import { ADMIN_IDENTITY, adminIdentityName, adminIdentityRole } from "../config/adminIdentity";
+import {
+  ADMIN_IDENTITY,
+  adminIdentityName,
+  adminIdentityRole,
+} from "../config/adminIdentity";
 
 function setImage(image: HTMLImageElement, alt: string) {
-  if (image.getAttribute("src") !== ADMIN_IDENTITY.logoUrl) image.src = ADMIN_IDENTITY.logoUrl;
+  if (image.getAttribute("src") !== ADMIN_IDENTITY.logoUrl) {
+    image.src = ADMIN_IDENTITY.logoUrl;
+  }
   image.alt = alt;
   image.loading = "eager";
   image.decoding = "async";
@@ -10,7 +16,8 @@ function setImage(image: HTMLImageElement, alt: string) {
 }
 
 function managerCopy(element: Element) {
-  const value = element.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+  const value =
+    element.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
   return value.includes("مدير") || value.includes("manager");
 }
 
@@ -22,6 +29,14 @@ function replaceAvatar(container: Element, alt: string) {
     container.appendChild(image);
   }
   setImage(image, alt);
+}
+
+function synchronizeProfileCopy(profile: HTMLElement, name: string, role: string) {
+  const nameNode = profile.querySelector<HTMLElement>("strong");
+  const roleNode = profile.querySelector<HTMLElement>("span");
+  if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
+  if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
+  profile.dataset.dnManagerIdentity = "true";
 }
 
 function applyShellIdentity(isArabic: boolean) {
@@ -46,24 +61,25 @@ function applyShellIdentity(isArabic: boolean) {
     if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
   });
 
-  document.querySelectorAll<HTMLElement>(".dn-admin-user-head").forEach((profile) => {
-    const image = profile.querySelector<HTMLImageElement>("img");
-    const nameNode = profile.querySelector<HTMLElement>("strong");
-    const roleNode = profile.querySelector<HTMLElement>("span");
-    if (image) setImage(image, alt);
-    if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
-    if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
-    profile.dataset.dnManagerIdentity = "true";
-  });
+  document
+    .querySelectorAll<HTMLElement>(".dn-admin-user-head, .dn-admin-user-mini")
+    .forEach((profile) => {
+      const image = profile.querySelector<HTMLImageElement>("img");
+      if (image) setImage(image, alt);
+      synchronizeProfileCopy(profile, name, role);
+    });
 
-  document.querySelectorAll<HTMLElement>("[data-admin-manager-profile]").forEach((profile) => {
-    const avatar = profile.querySelector<HTMLElement>("[data-admin-manager-avatar]");
-    if (avatar) replaceAvatar(avatar, alt);
-    const nameNode = profile.querySelector<HTMLElement>("[data-admin-manager-name]");
-    const roleNode = profile.querySelector<HTMLElement>("[data-admin-manager-role]");
-    if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
-    if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
-  });
+  document
+    .querySelectorAll<HTMLElement>("[data-admin-manager-profile]")
+    .forEach((profile) => {
+      const avatar = profile.querySelector<HTMLElement>("[data-admin-manager-avatar]");
+      if (avatar) replaceAvatar(avatar, alt);
+      const nameNode = profile.querySelector<HTMLElement>("[data-admin-manager-name]");
+      const roleNode = profile.querySelector<HTMLElement>("[data-admin-manager-role]");
+      if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
+      if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
+      profile.dataset.dnManagerIdentity = "true";
+    });
 }
 
 function applyManagerEmployeeCards(isArabic: boolean) {
@@ -81,8 +97,8 @@ function applyManagerEmployeeCards(isArabic: boolean) {
     const heading = card.querySelector<HTMLElement>("h3");
     if (heading && heading.textContent !== name) heading.textContent = name;
 
-    const avatar = Array.from(card.querySelectorAll<HTMLElement>("span")).find((span) =>
-      span.className.includes("h-14") && span.className.includes("w-14"),
+    const avatar = Array.from(card.querySelectorAll<HTMLElement>("span")).find(
+      (span) => span.className.includes("h-14") && span.className.includes("w-14"),
     );
     if (avatar) replaceAvatar(avatar, alt);
     card.dataset.dnManagerIdentity = "true";
@@ -95,8 +111,8 @@ function applyManagerEmployeeCards(isArabic: boolean) {
     const heading = header.querySelector<HTMLElement>("h2");
     if (heading && heading.textContent !== name) heading.textContent = name;
 
-    const avatar = Array.from(header.querySelectorAll<HTMLElement>("span")).find((span) =>
-      span.className.includes("h-16") && span.className.includes("w-16"),
+    const avatar = Array.from(header.querySelectorAll<HTMLElement>("span")).find(
+      (span) => span.className.includes("h-16") && span.className.includes("w-16"),
     );
     if (avatar) replaceAvatar(avatar, alt);
     header.dataset.dnManagerIdentity = "true";
@@ -118,7 +134,11 @@ export function useAdminManagerIdentity(enabled: boolean, isArabic: boolean) {
 
     apply();
     const observer = new MutationObserver(apply);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
 
     return () => {
       cancelAnimationFrame(frame);
