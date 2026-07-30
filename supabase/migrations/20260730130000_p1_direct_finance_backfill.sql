@@ -245,7 +245,7 @@ select
   now()
 from public.orders o
 cross join lateral (
-  select public.dn_safe_uuid(coalesce(
+  select public.admin_safe_uuid(coalesce(
     nullif(to_jsonb(o)->>'assigned_driver_id', ''),
     nullif(to_jsonb(o)->>'driver_id', '')
   )) as raw_driver_id
