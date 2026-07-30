@@ -1,9 +1,8 @@
-name: Runtime Full Arabic Addresses
+name: Generate Runtime Full Arabic Addresses
 
 on:
   push:
-    branches:
-      - fix/runtime-full-arabic-addresses
+    branches: [main]
     paths:
       - .github/workflows/runtime-full-arabic-addresses.yml
       - artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
@@ -11,28 +10,46 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
-  group: runtime-full-arabic-addresses
+  group: generate-runtime-full-arabic-addresses
   cancel-in-progress: false
 
 jobs:
-  apply-validate-publish:
+  generate-validate-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
+    env:
+      SOURCE_BRANCH: fix/runtime-full-arabic-addresses-source-v1
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout source branch
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
-          ref: fix/runtime-full-arabic-addresses
+          ref: main
           fetch-depth: 0
 
+      - name: Stop when source branch already exists
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Validated source branch already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup pnpm
+        if: steps.source.outputs.exists != 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
       - name: Setup Node.js
+        if: steps.source.outputs.exists != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -40,40 +57,47 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply complete runtime Arabic address policy
-        id: patch
+        if: steps.source.outputs.exists != 'true'
         shell: bash
         run: |
           set -euo pipefail
+          git switch -c "$SOURCE_BRANCH"
           python artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
           git rm artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
           git rm .github/workflows/runtime-full-arabic-addresses.yml
 
       - name: Install dependencies
+        if: steps.source.outputs.exists != 'true'
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: pnpm install --frozen-lockfile
 
       - name: Validate TypeScript
+        if: steps.source.outputs.exists != 'true'
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: pnpm exec tsc --noEmit
 
       - name: Validate complete Arabic address policy
+        if: steps.source.outputs.exists != 'true'
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: node scripts/export-language-policy-gate.mjs
 
       - name: Run complete production gate
+        if: steps.source.outputs.exists != 'true'
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: pnpm production:gate
 
       - name: Build production application
+        if: steps.source.outputs.exists != 'true'
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: pnpm build
 
       - name: Remove build-generated asset changes
+        if: steps.source.outputs.exists != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +120,8 @@ jobs:
             fi
           done
 
-      - name: Commit validated source changes
+      - name: Publish validated source branch and PR
+        if: steps.source.outputs.exists != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -106,7 +131,36 @@ jobs:
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
           git commit -m "fix(i18n): localize complete addresses across every surface"
-          git push origin HEAD:fix/runtime-full-arabic-addresses
+          git push origin "$SOURCE_BRANCH"
+
+          cat > "$RUNNER_TEMP/runtime-full-arabic-addresses.md" <<'EOF'
+          ## الهدف
+
+          جعل لغة النظام هي المصدر الحاكم للعناوين في كل الواجهات، وليس في ملفات التصدير فقط.
+
+          ## التنفيذ
+
+          - عرض العنوان العربي الكامل: المدينة، المنطقة، الشارع، المبنى، الفيلا/الشقة، الطابق والمعلم.
+          - استخدام الحقول العربية المحفوظة أولاً، وتعريب كل مكونات العنوان الإنجليزية القديمة عند غيابها.
+          - تطبيق السياسة على الويب ولوحة الإدارة والتاجر والمندوب والعميل والتتبع والخرائط ورسائل واتساب.
+          - تطبيقها على أغلفة Android وiOS للتاجر والمندوب لأنها تستخدم نفس Runtime الموحّد.
+          - إعادة النص الأصلي دون تغيير عند اختيار الإنجليزية.
+          - إضافة Runtime Bridge مركزي وGate دائم يمنع رجوع العنوان الإنجليزي في الوضع العربي.
+
+          ## الفحص قبل النشر
+
+          - TypeScript `--noEmit`
+          - Full Arabic address policy gate
+          - Complete production gate
+          - Production build
+          EOF
+
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$SOURCE_BRANCH" \
+            --title "Arabic UI: localize complete addresses across web and apps" \
+            --body-file "$RUNNER_TEMP/runtime-full-arabic-addresses.md"
 
       - name: Publish validation summary
         if: always()
@@ -116,7 +170,6 @@ jobs:
             echo "## Complete Arabic address runtime"
             echo
             echo "- Full city, area, street, building, villa/apartment, floor and landmark policy."
-            echo "- Applied to public web, admin, customer, merchant and driver surfaces."
-            echo "- Applied to Android/iOS role shells through the shared native React runtime."
-            echo "- TypeScript, policy gate, production gate and production build must all pass before publication."
+            echo "- Public web, admin, customer, merchant, driver and native mobile role shells."
+            echo "- TypeScript, policy gate, production gate and build are mandatory before the source PR is published."
           } >> "$GITHUB_STEP_SUMMARY"
