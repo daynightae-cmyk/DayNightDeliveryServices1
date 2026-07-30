@@ -3,10 +3,10 @@
    The medium-desktop executive rail is fixed in a reserved side lane so it
    cannot be pushed outside the viewport by the command deck or dashboard height. */
 /* Verified geometry contract: no transform may displace the rail from its physical edge. */
-/* Vercel preview retried after the platform build-rate cooldown. */
+/* Phase 4 render-budget release marker: phase4-20260730-5. */
 
 :root {
-  --dn-admin-inp-acceptance-version: phase4-20260730-4;
+  --dn-admin-inp-acceptance-version: phase4-20260730-5;
 }
 
 html:has(.dn-admin-fullscreen),
