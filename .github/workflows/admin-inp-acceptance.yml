@@ -1,4 +1,5 @@
 name: Phase 4 Admin INP Acceptance
+# Final production rerun after c300255 was promoted to daynightae.com.
 
 on:
   push:
