@@ -1,0 +1,53 @@
+name: Apply P1 UUID Compatibility Patch
+
+on:
+  push:
+    branches: [runtime/issue-266-evidence]
+    paths: [.github/workflows/p1-apply-uuid-compat.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: runtime/issue-266-evidence
+          fetch-depth: 0
+
+      - name: Apply verified UUID compatibility replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          migration = Path('supabase/migrations/20260730130000_p1_direct_finance_backfill.sql')
+          text = migration.read_text(encoding='utf-8')
+          old = 'public.dn_safe_uuid('
+          new = 'public.admin_safe_uuid('
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one dn_safe_uuid call, found {count}')
+          migration.write_text(text.replace(old, new), encoding='utf-8')
+          Path('.github/workflows/p1-apply-uuid-compat.yml').unlink(missing_ok=True)
+          PY
+
+          grep -F 'public.admin_safe_uuid(' \
+            supabase/migrations/20260730130000_p1_direct_finance_backfill.sql
+          if grep -Fq 'dn_safe_uuid' supabase/migrations/20260730130000_p1_direct_finance_backfill.sql; then
+            echo 'Legacy UUID helper remains in direct backfill.' >&2
+            exit 1
+          fi
+
+      - name: Commit clean UUID compatibility patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'daynightae-cmyk'
+          git config user.email 'daynightae-cmyk@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(finance): use live UUID compatibility helper'
+          git push origin HEAD:runtime/issue-266-evidence
