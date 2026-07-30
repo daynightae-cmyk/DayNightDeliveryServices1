@@ -1,6 +1,7 @@
 -- DAY NIGHT DELIVERY SERVICES
 -- Prevent incomplete/default-filled admin orders from becoming operational rows.
--- Applies to RPC and direct inserts because the guard is attached to public.orders.
+-- The trigger protects RPC and direct inserts. The preflight RPC records invalid
+-- input before the write transaction so validation evidence is not rolled back.
 
 begin;
 
@@ -8,7 +9,7 @@ create table if not exists public.admin_order_validation_audit (
   id uuid primary key default gen_random_uuid(),
   order_id text,
   source_channel text not null default 'admin_panel',
-  validation_stage text not null check (validation_stage in ('draft_warning', 'blocked_final_order')),
+  validation_stage text not null check (validation_stage in ('preflight', 'draft_warning')),
   invalid_fields text[] not null default '{}',
   payload jsonb not null default '{}'::jsonb,
   created_by uuid default auth.uid(),
@@ -40,17 +41,11 @@ as $$
 declare
   v_invalid text[] := '{}';
   v_scope text := lower(btrim(coalesce(p_payload->>'shipping_scope', 'local')));
-  v_status text := lower(replace(replace(btrim(coalesce(p_payload->>'status', 'pending')), '-', '_'), ' ', '_'));
   v_sender_name text := btrim(coalesce(p_payload->>'sender_name', p_payload->>'merchant_name', ''));
   v_receiver_city text := btrim(coalesce(p_payload->>'receiver_city', ''));
   v_destination text := btrim(coalesce(p_payload->>'destination_country', ''));
   v_weight numeric := nullif(p_payload->>'weight', '')::numeric;
 begin
-  if v_status = 'draft' then
-    -- Drafts may be incomplete, but placeholders are still recorded by the trigger.
-    null;
-  end if;
-
   if v_sender_name = '' or lower(v_sender_name) in ('day night merchant', 'unknown', 'n/a') then
     v_invalid := array_append(v_invalid, 'sender_name');
   end if;
@@ -102,6 +97,56 @@ exception
 end;
 $$;
 
+create or replace function public.admin_validate_order_payload(
+  p_order jsonb,
+  p_stage text default 'preflight'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_invalid text[] := public.dn_admin_order_invalid_fields(coalesce(p_order, '{}'::jsonb));
+  v_status text := lower(replace(replace(btrim(coalesce(p_order->>'status', 'pending')), '-', '_'), ' ', '_'));
+  v_stage text := case when v_status = 'draft' then 'draft_warning' else 'preflight' end;
+begin
+  if not exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and lower(coalesce(p.role::text, '')) in ('admin', 'support')
+  ) then
+    raise exception using errcode = '42501', message = 'admin_order_validation_not_authorized';
+  end if;
+
+  if coalesce(array_length(v_invalid, 1), 0) > 0 then
+    insert into public.admin_order_validation_audit(
+      order_id,
+      source_channel,
+      validation_stage,
+      invalid_fields,
+      payload,
+      created_by
+    ) values (
+      coalesce(p_order->>'id', p_order->>'invoice_number', p_order->>'tracking_number'),
+      lower(btrim(coalesce(p_order->>'source_channel', 'admin_panel'))),
+      case when lower(btrim(coalesce(p_stage, ''))) = 'draft_warning' then 'draft_warning' else v_stage end,
+      v_invalid,
+      coalesce(p_order, '{}'::jsonb) - 'customer_email' - 'email',
+      auth.uid()
+    );
+  end if;
+
+  return jsonb_build_object(
+    'ok', coalesce(array_length(v_invalid, 1), 0) = 0,
+    'invalid_fields', to_jsonb(v_invalid),
+    'status', v_status,
+    'checked_at', now()
+  );
+end;
+$$;
+
 create or replace function public.dn_guard_admin_order_required_fields()
 returns trigger
 language plpgsql
@@ -113,36 +158,13 @@ declare
   v_source text := lower(btrim(coalesce(v_payload->>'source_channel', '')));
   v_status text := lower(replace(replace(btrim(coalesce(v_payload->>'status', 'pending')), '-', '_'), ' ', '_'));
   v_invalid text[];
-  v_stage text;
 begin
-  if v_source <> 'admin_panel' then
+  if v_source <> 'admin_panel' or v_status = 'draft' then
     return new;
   end if;
 
   v_invalid := public.dn_admin_order_invalid_fields(v_payload);
-  if coalesce(array_length(v_invalid, 1), 0) = 0 then
-    return new;
-  end if;
-
-  v_stage := case when v_status = 'draft' then 'draft_warning' else 'blocked_final_order' end;
-
-  insert into public.admin_order_validation_audit(
-    order_id,
-    source_channel,
-    validation_stage,
-    invalid_fields,
-    payload,
-    created_by
-  ) values (
-    coalesce(v_payload->>'id', v_payload->>'invoice_number', v_payload->>'tracking_number'),
-    v_source,
-    v_stage,
-    v_invalid,
-    v_payload - 'customer_email' - 'email',
-    auth.uid()
-  );
-
-  if v_status <> 'draft' then
+  if coalesce(array_length(v_invalid, 1), 0) > 0 then
     raise exception using
       errcode = '23514',
       message = 'admin_order_validation_failed',
@@ -170,6 +192,7 @@ as $$
     'ok',
       to_regclass('public.orders') is not null
       and to_regclass('public.admin_order_validation_audit') is not null
+      and to_regprocedure('public.admin_validate_order_payload(jsonb,text)') is not null
       and exists (
         select 1
         from pg_trigger
@@ -178,16 +201,17 @@ as $$
       ),
     'orders_table', to_regclass('public.orders') is not null,
     'audit_table', to_regclass('public.admin_order_validation_audit') is not null,
+    'preflight_rpc', to_regprocedure('public.admin_validate_order_payload(jsonb,text)') is not null,
     'guard_trigger', exists (
       select 1
       from pg_trigger
       where tgname = 'dn_guard_admin_order_required_fields'
         and not tgisinternal
     ),
-    'blocked_last_24h', (
+    'preflight_failures_last_24h', (
       select count(*)
       from public.admin_order_validation_audit
-      where validation_stage = 'blocked_final_order'
+      where validation_stage = 'preflight'
         and created_at >= now() - interval '24 hours'
     ),
     'draft_warnings_last_24h', (
@@ -200,6 +224,7 @@ as $$
   );
 $$;
 
+grant execute on function public.admin_validate_order_payload(jsonb, text) to authenticated;
 grant execute on function public.admin_order_validation_health() to authenticated;
 
 commit;
