@@ -14,6 +14,7 @@ import type { Merchant, Order, OrderStatusHistoryItem } from "../types";
 import { subscribeToNewOrdersForAdmin, subscribeToOrderStatusChanges, type AppNotification } from "../lib/notifications";
 import { exportOrderPDF, exportOrderTXT, type ExportLanguage, type OrderPDFData } from "../lib/exportUtils";
 import { downloadInvoicePdf, invoiceNumberForOrder } from "../lib/invoice";
+import { localizedOrderCity, localizedOrderStatus, localizedPackageType, localizedPaymentMethod } from "../lib/exportLocalization";
 import { calculateAdminOrderPrice, createAdminOrder, createMerchant, fetchMerchants, type AdminOrderInput, type MerchantInput } from "../lib/adminData";
 import { useAppContext } from "../lib/AppContext";
 import {
@@ -301,7 +302,23 @@ function buildCsv(orders: Order[], language: ExportLanguage) {
     "Invoice Number", "Tracking Code", "Coupon", "Merchant", "Created At", "Sender Name", "Sender Phone", "Receiver Name", "Receiver Phone", "Receiver City", "Package Type", "Order Count", "Payment Method", "Delivery Fee AED", "COD Amount AED", "Status", "Notes"
   ];
   const rows = orders.map((order) => [
-    invoiceCode(order), trackingCode(order), order.coupon_number, order.merchant_name, dateText(order.created_at, language), order.sender_name, order.sender_phone, order.receiver_name, order.receiver_phone, order.receiver_city, order.package_type, order.order_count || order.pieces || 1, order.payment_method, Number(order.delivery_price || order.price || 0).toFixed(2), Number(order.cod_amount || 0).toFixed(2), order.status, order.notes || "",
+    invoiceCode(order),
+    trackingCode(order),
+    order.coupon_number,
+    order.merchant_name,
+    dateText(order.created_at, language),
+    order.sender_name,
+    order.sender_phone,
+    order.receiver_name,
+    order.receiver_phone,
+    localizedOrderCity(order, language, "receiver"),
+    localizedPackageType(order.package_type, language),
+    order.order_count || order.pieces || 1,
+    localizedPaymentMethod(order.payment_method, language),
+    Number(order.delivery_price || order.price || 0).toFixed(2),
+    Number(order.cod_amount || 0).toFixed(2),
+    localizedOrderStatus(order.status, language),
+    order.notes || "",
   ].map(csvCell).join(","));
   return `\uFEFF${headers.map(csvCell).join(",")}\n${rows.join("\n")}`;
 }
