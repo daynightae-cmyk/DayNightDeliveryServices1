@@ -137,6 +137,26 @@ for (const contract of [
 forbidText(runtimeRepair, "delete from public.track17_api_logs", "provider audit log deletion");
 forbidText(runtimeRepair, "truncate", "runtime reconciliation destructive SQL");
 
+const directFinanceBackfill = readRepo("supabase/migrations/20260730130000_p1_direct_finance_backfill.sql");
+for (const contract of [
+  "p1_finance_backfill_incomplete",
+  "order_financial_settlements",
+  "cod_collections",
+  "merchant_statement_entries",
+  "driver_statement_entries",
+  "v_missing_settlements",
+  "v_missing_cod",
+  "v_missing_merchants",
+  "v_missing_drivers",
+]) requireText(directFinanceBackfill, contract, "direct authoritative finance backfill");
+forbidText(directFinanceBackfill, "delete from", "direct finance backfill destructive delete");
+forbidText(directFinanceBackfill, "truncate", "direct finance backfill destructive truncate");
+
+const customerRuntimeE2E = read("scripts/customer-experience-runtime-e2e.mjs");
+requireText(customerRuntimeE2E, 'admin.rpc("admin_dispatch_order_runtime"', "stable Customer Experience dispatch RPC");
+requireText(customerRuntimeE2E, "p_payload", "stable Customer Experience dispatch payload");
+forbidText(customerRuntimeE2E, 'admin.rpc("admin_dispatch_order",', "overloaded Customer Experience dispatch RPC");
+
 const whatsapp = read("src/services/whatsappMessageService.ts");
 requireText(whatsapp, '"generated" | "opened" | "copied" | "failed"', "WhatsApp proof states");
 forbidText(whatsapp, 'OutboundMessageStatus = "delivered"', "unproven WhatsApp delivery state");
