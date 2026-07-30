@@ -2,8 +2,7 @@ name: P1 Production Runtime Evidence
 
 on:
   push:
-    branches:
-      - runtime/issue-266-evidence
+    branches: [runtime/issue-266-evidence]
     paths:
       - .github/workflows/p1-runtime-evidence.yml
       - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
@@ -11,8 +10,7 @@ on:
       - supabase/migrations/**
       - supabase/functions/**
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
       - .github/workflows/p1-runtime-evidence.yml
       - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
@@ -98,10 +96,10 @@ jobs:
             printf 'Missing protected production secrets: %s\n' "${missing[*]}" >&2
             exit 2
           fi
-
-          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); const ref=u.hostname.split('.')[0]; if(!ref) process.exit(2); process.stdout.write(ref)")"
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          test -n "$project_ref"
           echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
-          echo "Production project reference derived from protected URL: ${project_ref:0:4}…${project_ref: -4}"
+          echo "Production project: ${project_ref:0:4}…${project_ref: -4}"
 
       - name: Create evidence workspace
         run: mkdir -p artifacts/day-night-delivery/p1-runtime-evidence
@@ -110,43 +108,35 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
-          supabase link \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --password "$SUPABASE_DB_PASSWORD"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Capture legacy migration drift safely
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           evidence="artifacts/day-night-delivery/p1-runtime-evidence"
-          supabase migration list --linked | tee "$evidence/migrations-before.txt"
-
-          # The production schema predates consistent CLI migration tracking. Never run
-          # --include-all against the complete repository because that could replay old SQL.
+          supabase migration list --linked 2>&1 | tee "$evidence/migrations-before.txt"
           set +e
           supabase db push --dry-run > "$evidence/full-repository-dry-run.txt" 2>&1
-          drift_status=$?
+          status=$?
           set -e
-          printf 'Full repository dry-run exit status: %s\n' "$drift_status" \
-            > "$evidence/legacy-history-drift.txt"
-          if [ "$drift_status" -eq 0 ]; then
-            echo 'No legacy history drift was reported.' >> "$evidence/legacy-history-drift.txt"
-          else
-            echo 'Legacy history drift detected; isolated release workdir required.' \
-              >> "$evidence/legacy-history-drift.txt"
-          fi
+          {
+            echo "Full repository dry-run exit status: $status"
+            if [ "$status" -eq 0 ]; then
+              echo 'No legacy history drift reported.'
+            else
+              echo 'Legacy history drift detected; full --include-all deployment is forbidden.'
+            fi
+          } > "$evidence/legacy-history-drift.txt"
 
-      - name: Build isolated P1 migration release workdir
+      - name: Build idempotent isolated P1 migration release
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           evidence="artifacts/day-night-delivery/p1-runtime-evidence"
@@ -154,15 +144,15 @@ jobs:
           rm -rf "$workdir"
           mkdir -p "$workdir/supabase/migrations"
           cp supabase/config.toml "$workdir/supabase/config.toml"
-
           supabase --workdir "$workdir" link \
             --project-ref "$SUPABASE_PROJECT_REF" \
             --password "$SUPABASE_DB_PASSWORD"
-
-          # Fetch only migrations already recorded by the production history table.
           supabase --workdir "$workdir" migration fetch --linked
+
           find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' \
             | sort > "$evidence/isolated-remote-baseline-files.txt"
+          : > "$evidence/pending-p1-migrations.txt"
+          : > "$evidence/p1-migration-state.txt"
 
           targets=(
             20260730094500_admin_order_authoritative_validation.sql
@@ -173,96 +163,90 @@ jobs:
 
           for target in "${targets[@]}"; do
             test -f "supabase/migrations/$target"
-            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+            if grep -Fxq "$target" "$evidence/isolated-remote-baseline-files.txt"; then
+              echo "$target: already_recorded" | tee -a "$evidence/p1-migration-state.txt"
+            else
+              cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+              echo "$target" >> "$evidence/pending-p1-migrations.txt"
+              echo "$target: pending" | tee -a "$evidence/p1-migration-state.txt"
+            fi
           done
 
-          printf '%s\n' "${targets[@]}" | sort > "$evidence/expected-p1-migrations.txt"
-          find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' \
-            | sort > "$evidence/isolated-release-files.txt"
-          comm -13 \
-            "$evidence/isolated-remote-baseline-files.txt" \
-            "$evidence/isolated-release-files.txt" \
-            > "$evidence/isolated-added-files.txt"
-          diff -u "$evidence/expected-p1-migrations.txt" "$evidence/isolated-added-files.txt"
-
+          pending_count="$(wc -l < "$evidence/pending-p1-migrations.txt" | tr -d ' ')"
+          echo "P1_PENDING_COUNT=$pending_count" >> "$GITHUB_ENV"
           echo "P1_SUPABASE_WORKDIR=$workdir" >> "$GITHUB_ENV"
-          echo 'Isolated migration release contains exactly the four reviewed P1 migrations.'
+          echo "Pending reviewed migrations: $pending_count"
 
       - name: Validate isolated P1 migration plan
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           evidence="artifacts/day-night-delivery/p1-runtime-evidence"
-          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked \
+          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/isolated-migrations-before.txt"
+          if [ "$P1_PENDING_COUNT" -eq 0 ]; then
+            echo 'All four reviewed P1 migrations are already recorded in production.' \
+              | tee "$evidence/isolated-db-push-dry-run.txt"
+            exit 0
+          fi
           supabase --workdir "$P1_SUPABASE_WORKDIR" db push --dry-run 2>&1 \
             | tee "$evidence/isolated-db-push-dry-run.txt"
-
-          for target in \
-            20260730094500_admin_order_authoritative_validation.sql \
-            20260730095500_finance_authoritative_reconciliation_health.sql \
-            20260730100500_international_tracking_runtime_health.sql \
-            20260730101500_admin_order_legacy_insert_guard.sql
-          do
-            if ! grep -Fq "$target" "$evidence/isolated-db-push-dry-run.txt"; then
-              echo "Expected migration missing from isolated dry-run: $target" >&2
+          while IFS= read -r target; do
+            grep -Fq "$target" "$evidence/isolated-db-push-dry-run.txt" || {
+              echo "Expected pending migration missing from dry-run: $target" >&2
               exit 1
-            fi
-          done
+            }
+          done < "$evidence/pending-p1-migrations.txt"
 
-      - name: Apply isolated P1 production migrations
+      - name: Apply pending isolated P1 production migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           evidence="artifacts/day-night-delivery/p1-runtime-evidence"
-          supabase --workdir "$P1_SUPABASE_WORKDIR" db push --yes \
-            | tee "$evidence/isolated-db-push.txt"
-          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked \
+          if [ "$P1_PENDING_COUNT" -gt 0 ]; then
+            supabase --workdir "$P1_SUPABASE_WORKDIR" db push --yes 2>&1 \
+              | tee "$evidence/isolated-db-push.txt"
+          else
+            echo 'No P1 database write required.' | tee "$evidence/isolated-db-push.txt"
+          fi
+          supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/migrations-after.txt"
+          for version in 20260730094500 20260730095500 20260730100500 20260730101500; do
+            grep -Fq "$version" "$evidence/migrations-after.txt" || {
+              echo "Required production migration version missing: $version" >&2
+              exit 1
+            }
+          done
 
       - name: Deploy required 17TRACK Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        shell: bash
         run: |
           set -euo pipefail
-          for function_name in \
-            register-track17-shipment \
-            sync-track17-shipment \
-            track17-admin
-          do
+          for function_name in register-track17-shipment sync-track17-shipment track17-admin; do
             supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF"
           done
-
-          for function_name in \
-            track17-webhook \
-            public-international-tracking
-          do
+          for function_name in track17-webhook public-international-tracking; do
             supabase functions deploy "$function_name" \
-              --project-ref "$SUPABASE_PROJECT_REF" \
-              --no-verify-jwt
+              --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
           done
-
-          supabase functions list --project-ref "$SUPABASE_PROJECT_REF" \
+          supabase functions list --project-ref "$SUPABASE_PROJECT_REF" 2>&1 \
             | tee artifacts/day-night-delivery/p1-runtime-evidence/functions.txt
 
       - name: Verify TRACK17 secret presence without exposing values
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        shell: bash
         run: |
           set -euo pipefail
           secret_list="$(supabase secrets list --project-ref "$SUPABASE_PROJECT_REF")"
-          if ! grep -q 'TRACK17_API_KEY' <<< "$secret_list"; then
+          grep -q 'TRACK17_API_KEY' <<< "$secret_list" || {
             echo 'TRACK17_API_KEY is missing from Supabase Edge Function Secrets.' >&2
             exit 1
-          fi
+          }
           printf 'TRACK17_API_KEY present: true\nVerified at: %s\n' \
             "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             > artifacts/day-night-delivery/p1-runtime-evidence/track17-secret-proof.txt
@@ -273,20 +257,19 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
           RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-
           const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
           const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
-          const email = String(process.env.RUNTIME_ADMIN_EMAIL || '');
-          const password = String(process.env.RUNTIME_ADMIN_PASSWORD || '');
           const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: { apikey: key, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({
+              email: process.env.RUNTIME_ADMIN_EMAIL,
+              password: process.env.RUNTIME_ADMIN_PASSWORD,
+            }),
           });
           const payload = await response.json().catch(() => ({}));
           if (!response.ok || !payload.access_token) {
@@ -302,7 +285,6 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        shell: bash
         run: |
           set -o pipefail
           pnpm --dir artifacts/day-night-delivery run p1:runtime-health 2>&1 \
@@ -320,7 +302,6 @@ jobs:
           RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
           RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
           CUSTOMER_EXPERIENCE_E2E_KEEP_DATA: false
-        shell: bash
         run: |
           set -o pipefail
           pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
@@ -328,15 +309,10 @@ jobs:
 
       - name: Record manual provider-dashboard acceptance boundary
         if: always()
-        shell: bash
         run: |
           mkdir -p artifacts/day-night-delivery/p1-runtime-evidence
           cat > artifacts/day-night-delivery/p1-runtime-evidence/manual-provider-checks.md <<'EOF'
           # Manual 17TRACK dashboard checks
-
-          The repository workflow can deploy functions, verify function presence, verify the
-          Supabase secret name, and run database/runtime health checks. It cannot impersonate
-          the external 17TRACK dashboard or fabricate provider-originated signed callbacks.
 
           Remaining provider-controlled acceptance:
           - Package Webhook URL targets `track17-webhook`.
@@ -357,7 +333,6 @@ jobs:
 
       - name: Publish evidence summary
         if: always()
-        shell: bash
         run: |
           {
             echo '## DAY NIGHT P1 production runtime evidence'
@@ -365,10 +340,10 @@ jobs:
             if [ -n "${SUPABASE_PROJECT_REF:-}" ]; then
               echo "- Project ref: \`${SUPABASE_PROJECT_REF:0:4}…${SUPABASE_PROJECT_REF: -4}\`"
             else
-              echo '- Project ref: unavailable because protected-secret verification did not complete.'
+              echo '- Project ref: unavailable.'
             fi
             echo "- Checked at: \`$(date -u +'%Y-%m-%dT%H:%M:%SZ')\`"
             echo '- Evidence artifact: `DAY-NIGHT-P1-Production-Runtime-Evidence`'
             echo '- Secrets and raw provider payloads are not included.'
-            echo '- External 17TRACK dashboard callback tests remain a manual provider-controlled check.'
+            echo '- External 17TRACK dashboard callback tests remain manual.'
           } >> "$GITHUB_STEP_SUMMARY"
