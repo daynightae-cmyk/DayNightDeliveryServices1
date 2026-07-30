@@ -12,6 +12,7 @@ import AdminSectionWorkspaceComplete from "./AdminSectionWorkspaceComplete";
 
 const PENDING_SCOPE_KEY = "dn-admin-pending-merchant-order-scope";
 const SCOPE_TTL_MS = 60_000;
+const ORDER_PAGE_SIZE = 20;
 
 const ORDER_SECTIONS = new Set([
   "all_orders",
@@ -112,7 +113,6 @@ function installMerchantOrderScopeCapture() {
       const isOpenMerchantOrders =
         buttonText.includes("فتح طلباته") ||
         buttonText.includes("open orders");
-
       if (!isOpenMerchantOrders) return;
 
       const detailsRoot = button.closest(".space-y-4") as HTMLElement | null;
@@ -131,7 +131,6 @@ function installMerchantOrderScopeCapture() {
         merchantName,
         capturedAt: Date.now(),
       };
-
       try {
         window.sessionStorage.setItem(PENDING_SCOPE_KEY, JSON.stringify(payload));
       } catch {
@@ -151,15 +150,12 @@ function consumePendingScope(): MerchantScopeHint | null {
     const raw = window.sessionStorage.getItem(PENDING_SCOPE_KEY);
     window.sessionStorage.removeItem(PENDING_SCOPE_KEY);
     if (!raw) return null;
-
     const parsed = JSON.parse(raw) as Partial<MerchantScopeHint>;
     const capturedAt = Number(parsed.capturedAt || 0);
     if (!capturedAt || Date.now() - capturedAt > SCOPE_TTL_MS) return null;
-
     const merchantCode = clean(parsed.merchantCode);
     const merchantName = clean(parsed.merchantName);
     if (!merchantCode && !merchantName) return null;
-
     return { merchantCode, merchantName, capturedAt };
   } catch {
     return null;
@@ -171,13 +167,13 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
   const [merchantFilterId, setMerchantFilterId] = useState("");
   const [bulkQuery, setBulkQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [orderPage, setOrderPage] = useState(0);
 
   useLayoutEffect(() => {
     if (props.id !== "all_orders") {
       setScopeHint(null);
       return;
     }
-
     setScopeHint(consumePendingScope());
   }, [props.id]);
 
@@ -185,6 +181,7 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     setMerchantFilterId("");
     setBulkQuery("");
     setSelectedOrderIds([]);
+    setOrderPage(0);
   }, [props.id]);
 
   const resolution = useMemo(() => {
@@ -264,6 +261,19 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     [filteredOrders, props.id],
   );
 
+  const showBulkConsole = ORDER_SECTIONS.has(props.id);
+  const shouldPageWorkspace = showBulkConsole && props.id !== "external";
+  const pageCount = Math.max(1, Math.ceil(visibleSectionOrders.length / ORDER_PAGE_SIZE));
+  const safePage = Math.min(orderPage, pageCount - 1);
+  const pagedSectionOrders = useMemo(
+    () => visibleSectionOrders.slice(safePage * ORDER_PAGE_SIZE, (safePage + 1) * ORDER_PAGE_SIZE),
+    [safePage, visibleSectionOrders],
+  );
+
+  useEffect(() => {
+    if (orderPage !== safePage) setOrderPage(safePage);
+  }, [orderPage, safePage]);
+
   useEffect(() => {
     const allowed = new Set(visibleSectionOrders.map(orderId).filter(Boolean));
     setSelectedOrderIds((current) => {
@@ -281,7 +291,7 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
   }, [selectedOrderIds, visibleSectionOrders]);
 
   const workspaceOrders = filteredOrders;
-  const showBulkConsole = ORDER_SECTIONS.has(props.id);
+  const renderedWorkspaceOrders = shouldPageWorkspace ? pagedSectionOrders : workspaceOrders;
 
   return (
     <>
@@ -302,9 +312,7 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
                     {resolution.merchant.code}
                   </small>
                 )}
-                <span className="mx-2 text-white/55">
-                  ({resolution.orders.length})
-                </span>
+                <span className="mx-2 text-white/55">({resolution.orders.length})</span>
               </>
             ) : (
               <span className="text-rose-200">
@@ -317,7 +325,10 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
 
           <button
             type="button"
-            onClick={() => setScopeHint(null)}
+            onClick={() => {
+              setScopeHint(null);
+              setOrderPage(0);
+            }}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-black text-white transition hover:border-brand-gold/40 hover:text-brand-gold"
           >
             {props.isArabic ? "عرض كافة الطلبات" : "Show all orders"}
@@ -338,25 +349,44 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
             onMerchantChange={(merchantId) => {
               setMerchantFilterId(merchantId);
               setSelectedOrderIds([]);
+              setOrderPage(0);
             }}
             onQueryChange={(query) => {
               setBulkQuery(query);
               setSelectedOrderIds([]);
+              setOrderPage(0);
             }}
             onSelectionChange={setSelectedOrderIds}
           />
         </div>
       )}
 
+      {shouldPageWorkspace && visibleSectionOrders.length > 0 && (
+        <div className="dn-admin-order-pagination" dir={props.isArabic ? "rtl" : "ltr"}>
+          <span>
+            {props.isArabic ? "عرض" : "Showing"} {safePage * ORDER_PAGE_SIZE + 1}–{Math.min((safePage + 1) * ORDER_PAGE_SIZE, visibleSectionOrders.length)} / {visibleSectionOrders.length}
+          </span>
+          <div>
+            <button type="button" disabled={safePage === 0} onClick={() => setOrderPage((value) => Math.max(0, value - 1))}>
+              {props.isArabic ? "السابق" : "Previous"}
+            </button>
+            <strong>{safePage + 1} / {pageCount}</strong>
+            <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setOrderPage((value) => Math.min(pageCount - 1, value + 1))}>
+              {props.isArabic ? "التالي" : "Next"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {props.id === "external" ? (
         <AdminInternationalOrdersWorkspace
           isArabic={props.isArabic}
-          orders={workspaceOrders}
+          orders={renderedWorkspaceOrders}
           merchants={props.merchants}
           onRefresh={props.onRefresh}
         />
       ) : (
-        <AdminSectionWorkspaceComplete {...props} orders={workspaceOrders} />
+        <AdminSectionWorkspaceComplete {...props} orders={renderedWorkspaceOrders} />
       )}
     </>
   );

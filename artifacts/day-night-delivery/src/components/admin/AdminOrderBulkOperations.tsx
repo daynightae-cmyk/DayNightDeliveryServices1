@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CheckSquare2, FileDown, ListChecks, Printer, Search, Square, Store, UserRound, X } from "lucide-react";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import { normalizeOrderStatus } from "../../lib/adminOrderLogic";
@@ -19,6 +19,7 @@ type Props = {
   onSelectionChange: (ids: string[]) => void;
 };
 
+const SELECTOR_PAGE_SIZE = 30;
 const clean = (value: unknown) => String(value ?? "").trim();
 const orderId = (order: Order) => clean(order.id || order.tracking_number || order.invoice_number || order.coupon_number);
 const reference = (order: Order) => clean(order.tracking_number || order.invoice_number || order.coupon_number || order.id) || "—";
@@ -86,12 +87,20 @@ function printOrders(orders: Order[], isArabic: boolean, sectionId: AdminSection
 }
 
 export default function AdminOrderBulkOperations({ sectionId, isArabic, orders, merchants, merchantId, query, selectedIds, onMerchantChange, onQueryChange, onSelectionChange }: Props) {
+  const [selectorPage, setSelectorPage] = useState(0);
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedOrders = useMemo(() => orders.filter((order) => selected.has(orderId(order))), [orders, selected]);
-  const selectedPayload = useMemo(() => makePayload(selectedOrders.length ? selectedOrders : orders, isArabic, sectionId, selectedOrders.length > 0), [isArabic, orders, sectionId, selectedOrders]);
   const allPayload = useMemo(() => makePayload(orders, isArabic, sectionId, false), [isArabic, orders, sectionId]);
+  const selectedPayload = useMemo(
+    () => selectedOrders.length ? makePayload(selectedOrders, isArabic, sectionId, true) : allPayload,
+    [allPayload, isArabic, sectionId, selectedOrders],
+  );
   const printRows = selectedOrders.length ? selectedOrders : orders;
   const personal = sectionId === "personal_orders";
+  const selectorPageCount = Math.max(1, Math.ceil(orders.length / SELECTOR_PAGE_SIZE));
+  const selectorSafePage = Math.min(selectorPage, selectorPageCount - 1);
+  const selectorStart = selectorSafePage * SELECTOR_PAGE_SIZE;
+  const selectorRows = orders.slice(selectorStart, selectorStart + SELECTOR_PAGE_SIZE);
 
   function toggle(order: Order) {
     const id = orderId(order);
@@ -122,8 +131,30 @@ export default function AdminOrderBulkOperations({ sectionId, isArabic, orders, 
       </div>
 
       <details className="dn-admin-bulk-selector" open>
-        <summary><FileDown className="inline h-4 w-4" /> {isArabic ? "اختيار الطلبات بالاسم ورقم التتبع — مفتوح دائمًا" : "Choose orders by name and tracking — always visible"}</summary>
-        <div className="dn-admin-bulk-selector-list">{orders.slice(0, 300).map((order) => { const id = orderId(order); const checked = selected.has(id); return <button type="button" className={`dn-admin-bulk-order-option ${checked ? "is-selected" : ""}`} key={id} onClick={() => toggle(order)} aria-pressed={checked}>{checked ? <CheckSquare2 className="h-5 w-5" /> : <Square className="h-5 w-5" />}<span><strong dir="ltr">{reference(order)}</strong><small>{clean(order.merchant_name || order.sender_name) || "—"} · {clean(order.receiver_name || order.customer_name) || "—"}</small></span><em>{statusLabel(order.status, isArabic)}</em></button>; })}{!orders.length && <p>{isArabic ? "لا توجد طلبات مطابقة للفلاتر الحالية." : "No orders match the current filters."}</p>}</div>
+        <summary><FileDown className="inline h-4 w-4" /> {isArabic ? "اختيار الطلبات بالاسم ورقم التتبع" : "Choose orders by name and tracking"}</summary>
+        <div className="dn-admin-bulk-selector-list">
+          {selectorRows.map((order) => {
+            const id = orderId(order);
+            const checked = selected.has(id);
+            return (
+              <button type="button" className={`dn-admin-bulk-order-option ${checked ? "is-selected" : ""}`} key={id} onClick={() => toggle(order)} aria-pressed={checked}>
+                {checked ? <CheckSquare2 className="h-5 w-5" /> : <Square className="h-5 w-5" />}
+                <span><strong dir="ltr">{reference(order)}</strong><small>{clean(order.merchant_name || order.sender_name) || "—"} · {clean(order.receiver_name || order.customer_name) || "—"}</small></span>
+                <em>{statusLabel(order.status, isArabic)}</em>
+              </button>
+            );
+          })}
+          {!orders.length && <p>{isArabic ? "لا توجد طلبات مطابقة للفلاتر الحالية." : "No orders match the current filters."}</p>}
+        </div>
+        {selectorPageCount > 1 && (
+          <div className="dn-admin-order-pagination">
+            <span>{isArabic ? "صفحة" : "Page"} {selectorSafePage + 1} / {selectorPageCount}</span>
+            <div>
+              <button type="button" disabled={selectorSafePage === 0} onClick={() => setSelectorPage((value) => Math.max(0, value - 1))}>{isArabic ? "السابق" : "Previous"}</button>
+              <button type="button" disabled={selectorSafePage >= selectorPageCount - 1} onClick={() => setSelectorPage((value) => Math.min(selectorPageCount - 1, value + 1))}>{isArabic ? "التالي" : "Next"}</button>
+            </div>
+          </div>
+        )}
       </details>
     </section>
   );
