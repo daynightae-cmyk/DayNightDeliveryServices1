@@ -1,5 +1,5 @@
 name: Phase 4 Admin INP Acceptance
-# Final production rerun after c300255 was promoted to daynightae.com.
+# Render-budget acceptance requires the phase4-20260730-5 production marker.
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
           grep -Fq 'dn-admin-inp-sample' artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
           grep -Fq '.dn-admin-fullscreen' artifacts/day-night-delivery/src/hooks/useAdminFormKeyboardNavigation.ts
           ! grep -Eq 'observe\(document\.(body|documentElement)' artifacts/day-night-delivery/src/hooks/useAdminManagerIdentity.ts
-          grep -Fq 'phase4-20260730-4' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
+          grep -Fq 'phase4-20260730-5' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
           grep -Fq 'dn-admin-inp-acceptance.css' artifacts/day-night-delivery/src/main.tsx
           grep -Fq 'admin-performance-geometry-diagnostic.mjs' .github/workflows/admin-inp-acceptance.yml
           grep -Fq 'admin-performance-issue-report.mjs' .github/workflows/admin-inp-acceptance.yml
@@ -84,7 +84,7 @@ jobs:
     env:
       ADMIN_PERFORMANCE_BASE_URL: https://daynightae.com
       ADMIN_PERFORMANCE_OUTPUT_DIR: artifacts/day-night-delivery/admin-performance-evidence
-      ADMIN_PERFORMANCE_DEPLOYMENT_MARKER: phase4-20260730-4
+      ADMIN_PERFORMANCE_DEPLOYMENT_MARKER: phase4-20260730-5
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
