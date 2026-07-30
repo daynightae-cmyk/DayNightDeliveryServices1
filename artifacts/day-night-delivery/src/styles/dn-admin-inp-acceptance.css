@@ -1,0 +1,102 @@
+/* DAY NIGHT Phase 4 admin interaction-acceptance layout.
+   The executive launcher is a required core admin action and must stay visible
+   at the 1366×768 desktop target and on the mobile drawer layout. */
+
+html body:has(.dn-admin-fullscreen)
+  .dn-admin-fullscreen
+  .dn-admin-left-ai.dn-admin-left-ai--executive {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  align-self: start !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+}
+
+html body:has(.dn-admin-fullscreen)
+  .dn-admin-fullscreen
+  .dn-admin-left-ai--executive
+  .abu-khalifa-card-shell {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+html body:has(.dn-admin-fullscreen)
+  .dn-admin-fullscreen
+  .dn-admin-left-ai--executive
+  .abu-khalifa-launcher {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+@media (min-width: 1025px) and (max-width: 1450px) {
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .dn-admin-home-full {
+    grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher {
+    min-height: 84px !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher__avatar {
+    width: 54px !important;
+    height: 54px !important;
+    flex-basis: 54px !important;
+    border-radius: 16px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher__avatar img {
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher__copy strong {
+    font-size: 14px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher__open {
+    width: 32px !important;
+    height: 32px !important;
+    flex-basis: 32px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .dn-admin-left-ai.dn-admin-left-ai--executive {
+    order: 2 !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .abu-khalifa-launcher {
+    min-height: 76px !important;
+  }
+}
