@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { ADMIN_IDENTITY, adminIdentityName, adminIdentityRole } from "../config/adminIdentity";
 
 function setImage(image: HTMLImageElement, alt: string) {
-  if (image.src !== ADMIN_IDENTITY.logoUrl) image.src = ADMIN_IDENTITY.logoUrl;
+  if (image.getAttribute("src") !== ADMIN_IDENTITY.logoUrl) image.src = ADMIN_IDENTITY.logoUrl;
   image.alt = alt;
   image.loading = "eager";
   image.decoding = "async";
@@ -29,7 +29,11 @@ function applyShellIdentity(isArabic: boolean) {
   const role = adminIdentityRole(isArabic);
   const alt = `${name} — ${role}`;
 
-  document.querySelectorAll<HTMLImageElement>(".dncc-brand img").forEach((image) => setImage(image, alt));
+  document
+    .querySelectorAll<HTMLImageElement>(
+      ".dncc-brand img, .dn-admin-fullscreen [class*='brand'] img, .dn-admin-fullscreen [class*='logo'] img",
+    )
+    .forEach((image) => setImage(image, alt));
 
   document.querySelectorAll<HTMLElement>(".dncc-operator").forEach((operator) => {
     const avatar = operator.querySelector<HTMLElement>(".dncc-operator-avatar");
@@ -38,6 +42,25 @@ function applyShellIdentity(isArabic: boolean) {
     const copy = operator.querySelector<HTMLElement>(":scope > div");
     const nameNode = copy?.querySelector<HTMLElement>("strong");
     const roleNode = copy?.querySelector<HTMLElement>("span");
+    if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
+    if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
+  });
+
+  document.querySelectorAll<HTMLElement>(".dn-admin-user-head").forEach((profile) => {
+    const image = profile.querySelector<HTMLImageElement>("img");
+    const nameNode = profile.querySelector<HTMLElement>("strong");
+    const roleNode = profile.querySelector<HTMLElement>("span");
+    if (image) setImage(image, alt);
+    if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
+    if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
+    profile.dataset.dnManagerIdentity = "true";
+  });
+
+  document.querySelectorAll<HTMLElement>("[data-admin-manager-profile]").forEach((profile) => {
+    const avatar = profile.querySelector<HTMLElement>("[data-admin-manager-avatar]");
+    if (avatar) replaceAvatar(avatar, alt);
+    const nameNode = profile.querySelector<HTMLElement>("[data-admin-manager-name]");
+    const roleNode = profile.querySelector<HTMLElement>("[data-admin-manager-role]");
     if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
     if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
   });
