@@ -1,6 +1,7 @@
 import type { Order } from "../types";
 import companyMeta from "../data/companyMeta";
 import { supabase } from "../supabase";
+import { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedOrderRoute, localizedOrderStatus, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "./exportLocalization";
 
 function safeText(value?: unknown) {
   const text = String(value ?? "").trim();
@@ -45,28 +46,30 @@ export function buildInvoiceData(order: Order, lang: "en" | "ar" = "en") {
     customer: {
       senderName: safeText(order.sender_name),
       senderPhone: safeText(order.sender_phone),
-      senderCity: safeText(order.sender_city),
-      senderAddress: safeText(order.sender_address),
+      senderCity: localizedOrderCity(order, lang, "sender"),
+      senderAddress: localizedOrderAddress(order, lang, "sender"),
       receiverName: safeText(order.receiver_name),
       receiverPhone: safeText(order.receiver_phone),
-      receiverCity: safeText(order.receiver_city),
-      receiverAddress: safeText(order.receiver_address),
+      receiverCity: localizedOrderCity(order, lang, "receiver"),
+      receiverAddress: localizedOrderAddress(order, lang, "receiver"),
       customerName: safeText(order.customer_name || order.sender_name),
       customerPhone: safeText(order.customer_phone || order.sender_phone || order.receiver_phone),
       customerEmail: safeText(order.customer_email || order.sender_email || order.receiver_email)
     },
     shipment: {
       trackingCode: trackingReference(order),
-      packageType: safeText(order.package_type),
-      description: safeText(order.package_description || order.package_type || order.notes),
+      packageType: localizedPackageType(order.package_type, lang),
+      description: order.package_description
+        ? localizeExportText(order.package_description, lang)
+        : localizedPackageType(order.package_type || "shipment", lang),
       weight: order.weight ?? "—",
       pieces: order.pieces ?? 1,
-      serviceType: safeText(order.service_type || "Standard"),
-      fromCity: safeText(order.sender_city),
-      toCity: safeText(order.receiver_city),
-      route: `${safeText(order.sender_city)} → ${safeText(order.receiver_city)}`,
-      status: safeText(order.status),
-      paymentMethod: safeText(order.payment_method),
+      serviceType: localizedServiceType(order.service_type || "standard", lang),
+      fromCity: localizedOrderCity(order, lang, "sender"),
+      toCity: localizedOrderCity(order, lang, "receiver"),
+      route: localizedOrderRoute(order, lang),
+      status: localizedOrderStatus(order.status, lang),
+      paymentMethod: localizedPaymentMethod(order.payment_method, lang),
       codAmount: order.cod_amount ?? null,
       notes: safeText(order.notes)
     },

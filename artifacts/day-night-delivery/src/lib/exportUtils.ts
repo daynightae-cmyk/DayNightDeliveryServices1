@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import companyMeta from "../data/companyMeta";
 import { orderInvoiceNumber, printOrderDocument } from "./printableDocuments";
+import { localizeExportText, localizedPackageType, localizedPaymentMethod } from "./exportLocalization";
 
 export type ExportLanguage = "ar" | "en";
 
@@ -188,6 +189,12 @@ export function exportOrderPDF(data: OrderPDFData, type: "invoice" | "summary" |
 export function exportOrderTXT(data: OrderPDFData, language: ExportLanguage = getExportLanguage()) {
   const invoiceNo = orderInvoiceNumber(data);
   const isArabic = language === "ar";
+  const senderCity = localizeExportText(data.senderCity, language);
+  const senderAddress = localizeExportText(data.senderAddress, language);
+  const receiverCity = localizeExportText(data.receiverCity, language);
+  const receiverAddress = localizeExportText(data.receiverAddress, language);
+  const packageType = localizedPackageType(data.packageType, language);
+  const paymentMethod = localizedPaymentMethod(data.paymentMethod, language);
   const lines = isArabic ? [
     "DAY NIGHT DELIVERY SERVICES",
     "داي نايت لخدمات التوصيل والشحن",
@@ -195,11 +202,11 @@ export function exportOrderTXT(data: OrderPDFData, language: ExportLanguage = ge
     `رقم التتبع: ${data.trackingCode}`,
     `التاريخ: ${data.createdAt || today(language)}`,
     `المرسل: ${data.senderName} | ${data.senderPhone}`,
-    `عنوان المرسل: ${data.senderCity} - ${data.senderAddress}`,
+    `عنوان المرسل: ${senderCity} - ${senderAddress}`,
     `المستلم: ${data.receiverName} | ${data.receiverPhone}`,
-    `عنوان المستلم: ${data.receiverCity} - ${data.receiverAddress}`,
-    `الشحنة: ${data.packageType}`,
-    `الدفع: ${data.paymentMethod}`,
+    `عنوان المستلم: ${receiverCity} - ${receiverAddress}`,
+    `الشحنة: ${packageType}`,
+    `الدفع: ${paymentMethod}`,
     `رسوم التوصيل: ${Number(data.deliveryFee || 0).toFixed(2)} AED`,
     data.codAmount ? `مبلغ COD: ${data.codAmount} AED` : "",
     `ملاحظات: ${data.notes || "—"}`,
@@ -210,9 +217,9 @@ export function exportOrderTXT(data: OrderPDFData, language: ExportLanguage = ge
     `Tracking Number: ${data.trackingCode}`,
     `Date: ${data.createdAt || today(language)}`,
     `Sender: ${data.senderName} | ${data.senderPhone}`,
-    `Sender Address: ${data.senderCity} - ${data.senderAddress}`,
+    `Sender Address: ${senderCity} - ${senderAddress}`,
     `Receiver: ${data.receiverName} | ${data.receiverPhone}`,
-    `Receiver Address: ${data.receiverCity} - ${data.receiverAddress}`,
+    `Receiver Address: ${receiverCity} - ${receiverAddress}`,
     `Package: ${data.packageType}`,
     `Payment: ${data.paymentMethod}`,
     `Delivery Fee: ${Number(data.deliveryFee || 0).toFixed(2)} AED`,
