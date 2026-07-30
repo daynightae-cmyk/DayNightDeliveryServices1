@@ -1,6 +1,7 @@
 import { useAppContext } from "../../lib/AppContext";
 import { useAdminFormKeyboardNavigation } from "../../hooks/useAdminFormKeyboardNavigation";
 import { useAdminManagerIdentity } from "../../hooks/useAdminManagerIdentity";
+import AbuKhalifaExecutiveCardBridge from "./AbuKhalifaExecutiveCardBridge";
 import "../../styles/dn-admin-form-inputs.css";
 
 /**
@@ -14,5 +15,5 @@ export default function AdminExperienceEnhancements() {
   useAdminFormKeyboardNavigation(true);
   useAdminManagerIdentity(true, isArabic);
 
-  return null;
+  return <AbuKhalifaExecutiveCardBridge />;
 }
