@@ -11,6 +11,7 @@ import { installAlAinLocationOptions } from "./data/installAlAinLocation";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
 import AdminDeferredMerchantAccounting from "./components/admin/AdminDeferredMerchantAccounting";
+import AdminExperienceEnhancements from "./components/admin/AdminExperienceEnhancements";
 import NativeRoleErrorBoundary from "./components/native/NativeRoleErrorBoundary";
 import WhatsAppRuntimeGuard from "./components/WhatsAppRuntimeGuard";
 import AdminCustomerExperienceLauncher from "./components/admin/AdminCustomerExperienceLauncher";
@@ -54,7 +55,7 @@ function installGlobalRuntimeHandlers() {
   window.addEventListener("unhandledrejection", (event) => reportError(event.reason, "unhandled_rejection"));
 }
 function rootElement() { const root = document.getElementById("root"); if (!root) throw new Error("DAY NIGHT root element is missing"); return root; }
-function mountPublicApplication() { createRoot(rootElement()).render(<StrictMode><AppProvider><App /><WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge /><AdminDeferredMerchantAccounting /><ProductionExperience /></AppProvider></StrictMode>); }
+function mountPublicApplication() { createRoot(rootElement()).render(<StrictMode><AppProvider><App /><AdminExperienceEnhancements /><WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge /><AdminDeferredMerchantAccounting /><ProductionExperience /></AppProvider></StrictMode>); }
 async function mountNativeRoleApplication(role: NativeRole) { const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot"); createRoot(rootElement()).render(<StrictMode><BrowserRouter><NativeRoleErrorBoundary role={role}><AppProvider><NativeRoleRoot role={role} /><WhatsAppRuntimeGuard />{role === "merchant" && <MerchantFeedbackSummaryLauncher />}{role === "merchant" && <MerchantInternationalTrackingLauncher />}</AppProvider></NativeRoleErrorBoundary></BrowserRouter></StrictMode>); }
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
