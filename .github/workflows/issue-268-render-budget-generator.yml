@@ -1,4 +1,5 @@
 name: Issue 268 render-budget generator
+# Trigger after the generator workflow is present on main.
 
 on:
   push:
