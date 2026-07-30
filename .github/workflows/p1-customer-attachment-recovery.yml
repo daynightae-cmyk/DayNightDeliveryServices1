@@ -1,5 +1,6 @@
 name: P1 Customer Attachment Recovery
 
+# Internal protected verification for the complaint attachment policy helper.
 on:
   push:
     branches: [runtime/issue-266-evidence]
