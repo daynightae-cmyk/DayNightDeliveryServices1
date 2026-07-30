@@ -2,6 +2,10 @@
    The executive launcher is a required core admin action and must stay visible
    at the 1366×768 desktop target and on the mobile drawer layout. */
 
+:root {
+  --dn-admin-inp-acceptance-version: phase4-20260730-1;
+}
+
 html body:has(.dn-admin-fullscreen)
   .dn-admin-fullscreen
   .dn-admin-left-ai.dn-admin-left-ai--executive {
