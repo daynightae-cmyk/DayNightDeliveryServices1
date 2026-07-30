@@ -4,7 +4,7 @@
    cannot be pushed outside the viewport by the command deck or dashboard height. */
 
 :root {
-  --dn-admin-inp-acceptance-version: phase4-20260730-3;
+  --dn-admin-inp-acceptance-version: phase4-20260730-4;
 }
 
 html:has(.dn-admin-fullscreen),
@@ -128,6 +128,10 @@ html body:has(.dn-admin-fullscreen)
     max-height: calc(100dvh - 196px) !important;
     margin: 0 !important;
     overflow: visible !important;
+    transform: none !important;
+    translate: none !important;
+    transition: none !important;
+    animation: none !important;
   }
 
   html body:has(.dn-admin-fullscreen)
@@ -214,6 +218,8 @@ html body:has(.dn-admin-fullscreen)
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
+    transform: none !important;
+    translate: none !important;
   }
 
   html body:has(.dn-admin-fullscreen)
