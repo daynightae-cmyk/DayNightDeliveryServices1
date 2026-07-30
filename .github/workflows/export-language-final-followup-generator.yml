@@ -1,4 +1,5 @@
 name: Export language final follow-up generator
+# Trigger after the reviewed workflow exists on main.
 
 on:
   push:
