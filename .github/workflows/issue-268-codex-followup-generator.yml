@@ -1,0 +1,126 @@
+name: Issue 268 Codex follow-up generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/issue-268-codex-followup-generator.yml
+      - artifacts/day-night-delivery/scripts/issue-268-codex-followup.py
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: issue-268-codex-followup-generator
+  cancel-in-progress: false
+
+jobs:
+  generate-reviewed-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_BRANCH: fix/issue-268-preserve-order-aggregates
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Stop when source branch already exists
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Source branch already exists; no duplicate generation required."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.branch.outputs.exists != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        if: steps.branch.outputs.exists != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
+
+      - name: Apply fail-closed review fixes
+        if: steps.branch.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -c "$SOURCE_BRANCH"
+          python artifacts/day-night-delivery/scripts/issue-268-codex-followup.py
+          git rm artifacts/day-night-delivery/scripts/issue-268-codex-followup.py
+          git rm .github/workflows/issue-268-codex-followup-generator.yml
+
+      - name: Validate TypeScript, guardrails, and production build
+        if: steps.branch.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
+          node scripts/personal-orders-admin-gate.mjs
+          pnpm build
+
+      - name: Publish source branch and pull request
+        if: steps.branch.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(phase4): preserve aggregates across paged order rendering"
+          git push origin "$SOURCE_BRANCH"
+
+          cat > "$RUNNER_TEMP/issue-268-followup.md" <<'EOF'
+          ## Why
+
+          Follow-up to the two valid Codex review findings on merged PR #289.
+
+          ## Fixes
+
+          - keeps the full filtered order set for KPIs, financial aggregates, internal global search, and the hero PDF;
+          - passes a separate 20-row page only to the heavy table renderer;
+          - synchronizes the bulk selector's backing page after merchant/query filtering;
+          - adds static guardrails so both contracts cannot regress;
+          - removes this one-time generator and patch script.
+
+          ## Validation before branch publication
+
+          - TypeScript `--noEmit`;
+          - personal-orders/admin production gate;
+          - production build.
+
+          Refs #268 and follows #289.
+          EOF
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SOURCE_BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$SOURCE_BRANCH" \
+              --title "Phase 4: preserve order aggregates with paged rendering" \
+              --body-file "$RUNNER_TEMP/issue-268-followup.md"
+          else
+            echo "Pull request #$existing already exists."
+          fi
