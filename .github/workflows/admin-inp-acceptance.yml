@@ -29,6 +29,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: phase-4-admin-inp-${{ github.ref }}
@@ -62,6 +63,7 @@ jobs:
           ! grep -Eq 'observe\(document\.(body|documentElement)' artifacts/day-night-delivery/src/hooks/useAdminManagerIdentity.ts
           grep -Fq 'phase4-20260730-1' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
           grep -Fq 'dn-admin-inp-acceptance.css' artifacts/day-night-delivery/src/main.tsx
+          grep -Fq 'issues: write' .github/workflows/admin-inp-acceptance.yml
 
   production-profile:
     name: Production desktop and Android INP evidence
@@ -143,3 +145,29 @@ jobs:
           else
             echo 'Admin performance summary was not produced.' >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Report protected acceptance to Issue 268
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/issue-268-performance-report.md"
+          {
+            echo '## Phase 4 production Chrome acceptance run'
+            echo
+            echo "- Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Protected Chrome stage: **${PERFORMANCE_OUTCOME:-not-run}**"
+            echo '- Evidence artifact: `DAY-NIGHT-Admin-INP-Acceptance` (30-day retention)'
+            echo '- Secrets, authentication sessions, customer PII, and raw production payloads are excluded.'
+            echo
+            if [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md ]; then
+              cat artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md
+            else
+              echo 'The structured performance summary was not produced; inspect the linked workflow before retrying.'
+            fi
+          } > "$report"
+          gh issue comment 268 --repo "$GITHUB_REPOSITORY" --body-file "$report"
