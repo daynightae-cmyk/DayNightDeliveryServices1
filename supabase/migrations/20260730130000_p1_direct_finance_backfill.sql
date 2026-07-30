@@ -156,7 +156,7 @@ select
   0,
   coalesce(o.delivered_at, o.updated_at, o.created_at, now())::date,
   'collected',
-  'cod',
+  'cash',
   'Authoritative COD collection reconciled from delivered-order snapshot',
   null,
   now(),
