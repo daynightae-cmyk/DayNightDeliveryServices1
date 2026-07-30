@@ -13,13 +13,15 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse(req, { ok: false, code: "method_not_allowed" }, 405);
 
   const supabase = getSupabaseAdmin();
+  let shipmentId = "";
   let trackingNumber = "";
   const started = Date.now();
 
   try {
     await requireAdmin(req);
     const body = await readJson<Record<string, unknown>>(req);
-    const shipmentId = String(body.shipment_id || "").trim();
+    shipmentId = String(body.shipment_id || "").trim();
+    const force = body.force === true;
     if (!shipmentId) throw new Error("shipment_id_required");
 
     const { data: shipment, error: shipmentError } = await supabase
@@ -32,7 +34,7 @@ Deno.serve(async (req) => {
     trackingNumber = shipment.tracking_number;
 
     const lastSync = shipment.last_synced_at ? Date.parse(shipment.last_synced_at) : 0;
-    if (Number.isFinite(lastSync) && Date.now() - lastSync < TRACK17_SYNC_COOLDOWN_MS) {
+    if (!force && Number.isFinite(lastSync) && Date.now() - lastSync < TRACK17_SYNC_COOLDOWN_MS) {
       const retryAfterSeconds = Math.ceil((TRACK17_SYNC_COOLDOWN_MS - (Date.now() - lastSync)) / 1000);
       return jsonResponse(req, {
         ok: false,
@@ -80,11 +82,13 @@ Deno.serve(async (req) => {
       shipment: updatedShipment || shipment,
       status_changed: persistence.statusChanged,
       events_received: parsed.events.length,
+      forced: force,
     });
   } catch (error) {
     const message = errorMessage(error);
     await supabase.from("track17_api_logs").insert({
       operation: "gettrackinfo",
+      shipment_id: shipmentId || null,
       tracking_number: trackingNumber || null,
       provider_response_code: error instanceof Track17RequestError ? error.providerCode : null,
       error_code: message.split(":")[0],
