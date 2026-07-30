@@ -482,3 +482,5 @@ jobs:
             echo '- Secrets and raw provider payloads are not included.'
             echo '- External 17TRACK dashboard callback tests remain manual.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+# Final clean verification trigger: 2026-07-30T11:18:12Z
