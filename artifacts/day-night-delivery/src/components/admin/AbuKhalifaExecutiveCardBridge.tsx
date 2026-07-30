@@ -8,6 +8,8 @@ import AbuKhalifaExecutiveCard, {
 import "../../styles/abu-khalifa-executive-card.css";
 
 const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
+const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen";
+const EXECUTIVE_PANEL_SELECTOR = ".dn-admin-left-ai";
 const EMPTY_STATS: AdminStats = {
   pending: 0,
   in_transit: 0,
@@ -28,11 +30,11 @@ const ACTION_LABELS: Partial<Record<AbuKhalifaAction, string[]>> = {
 };
 
 function isAdminRoute() {
-  return typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  return typeof window !== "undefined" && /^\/admin(?:\/|$)/i.test(window.location.pathname);
 }
 
-function ensureHost() {
-  const panel = document.querySelector<HTMLElement>(".dn-admin-left-ai");
+function ensureHost(root: ParentNode) {
+  const panel = root.querySelector<HTMLElement>(EXECUTIVE_PANEL_SELECTOR);
   if (!panel) return null;
 
   panel.classList.add("dn-admin-left-ai--executive");
@@ -79,16 +81,16 @@ function openEmployeeWorkspace() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function currentSectionLabel() {
+function currentSectionLabel(root: ParentNode = document) {
   return (
-    document.querySelector<HTMLElement>(".dn-admin-current-section strong")?.textContent
+    root.querySelector<HTMLElement>(".dn-admin-current-section strong")?.textContent
       ?.replace(/\s+/g, " ")
       .trim() || ""
   );
 }
 
-function sidebarWidth() {
-  const sidebar = document.querySelector<HTMLElement>(".dn-admin-sidebar-full");
+function sidebarWidth(root: ParentNode = document) {
+  const sidebar = root.querySelector<HTMLElement>(".dn-admin-sidebar-full");
   const width = sidebar?.getBoundingClientRect().width || 288;
   return Math.max(240, Math.round(width));
 }
@@ -119,37 +121,80 @@ export default function AbuKhalifaExecutiveCardBridge() {
   useEffect(() => {
     if (!isAdminRoute()) return;
 
+    const applicationRoot = document.getElementById("root");
+    if (!applicationRoot) return;
+
+    let adminRoot: HTMLElement | null = null;
+    let shellObserver: MutationObserver | null = null;
+    let bootstrapObserver: MutationObserver | null = null;
+    let resizeObserver: ResizeObserver | null = null;
     let frame = 0;
+
     const sync = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const nextHost = ensureHost();
+        adminRoot = document.querySelector<HTMLElement>(ADMIN_ROOT_SELECTOR);
+        if (!adminRoot) return;
+        const nextHost = ensureHost(adminRoot);
         setHost((current) => (current === nextHost ? current : nextHost));
-        const nextSection = currentSectionLabel();
+        const nextSection = currentSectionLabel(adminRoot);
         setSection((current) => (current === nextSection ? current : nextSection));
-        const nextWidth = sidebarWidth();
+        const nextWidth = sidebarWidth(adminRoot);
         setMeasuredSidebarWidth((current) => (current === nextWidth ? current : nextWidth));
       });
     };
 
-    sync();
-    void refreshMetrics();
+    const connectAdminRoot = () => {
+      const nextRoot = document.querySelector<HTMLElement>(ADMIN_ROOT_SELECTOR);
+      if (!nextRoot || nextRoot === adminRoot) return Boolean(nextRoot);
+      adminRoot = nextRoot;
+      sync();
 
-    const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    window.addEventListener("resize", sync);
+      shellObserver?.disconnect();
+      shellObserver = new MutationObserver((mutations) => {
+        if (mutations.some((mutation) => mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) sync();
+      });
+      shellObserver.observe(adminRoot, { childList: true, subtree: true });
+
+      resizeObserver?.disconnect();
+      resizeObserver = new ResizeObserver(sync);
+      const sidebar = adminRoot.querySelector<HTMLElement>(".dn-admin-sidebar-full");
+      if (sidebar) resizeObserver.observe(sidebar);
+      return true;
+    };
+
+    if (!connectAdminRoot()) {
+      bootstrapObserver = new MutationObserver(() => {
+        if (connectAdminRoot()) bootstrapObserver?.disconnect();
+      });
+      bootstrapObserver.observe(applicationRoot, { childList: true, subtree: true });
+    }
+
+    const handleAdminClick = (event: Event) => {
+      if (!(event.target instanceof Element)) return;
+      if (event.target.closest(".dn-admin-side-nav button")) sync();
+    };
+
+    void refreshMetrics();
+    applicationRoot.addEventListener("click", handleAdminClick, true);
+    window.addEventListener("resize", sync, { passive: true });
+    window.addEventListener("popstate", sync);
     window.addEventListener("dn-international-shipment-updated", refreshMetrics);
     window.addEventListener("dn-admin-settings-change", refreshMetrics);
     const timer = window.setInterval(() => void refreshMetrics(), 60_000);
 
     return () => {
       cancelAnimationFrame(frame);
-      observer.disconnect();
+      bootstrapObserver?.disconnect();
+      shellObserver?.disconnect();
+      resizeObserver?.disconnect();
+      applicationRoot.removeEventListener("click", handleAdminClick, true);
       window.removeEventListener("resize", sync);
+      window.removeEventListener("popstate", sync);
       window.removeEventListener("dn-international-shipment-updated", refreshMetrics);
       window.removeEventListener("dn-admin-settings-change", refreshMetrics);
       window.clearInterval(timer);
-      const panel = document.querySelector<HTMLElement>(".dn-admin-left-ai");
+      const panel = adminRoot?.querySelector<HTMLElement>(EXECUTIVE_PANEL_SELECTOR);
       panel?.classList.remove("dn-admin-left-ai--executive");
       panel?.querySelector<HTMLElement>(":scope > .dn-abu-khalifa-executive-host")?.remove();
     };

@@ -5,10 +5,11 @@ import {
   adminIdentityRole,
 } from "../config/adminIdentity";
 
+const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen";
+export const ADMIN_IDENTITY_REFRESH_EVENT = "dn-admin-identity-refresh";
+
 function setImage(image: HTMLImageElement, alt: string) {
-  if (image.getAttribute("src") !== ADMIN_IDENTITY.logoUrl) {
-    image.src = ADMIN_IDENTITY.logoUrl;
-  }
+  if (image.getAttribute("src") !== ADMIN_IDENTITY.logoUrl) image.src = ADMIN_IDENTITY.logoUrl;
   image.alt = alt;
   image.loading = "eager";
   image.decoding = "async";
@@ -16,8 +17,7 @@ function setImage(image: HTMLImageElement, alt: string) {
 }
 
 function managerCopy(element: Element) {
-  const value =
-    element.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+  const value = element.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
   return value.includes("مدير") || value.includes("manager");
 }
 
@@ -39,21 +39,18 @@ function synchronizeProfileCopy(profile: HTMLElement, name: string, role: string
   profile.dataset.dnManagerIdentity = "true";
 }
 
-function applyShellIdentity(isArabic: boolean) {
+function applyShellIdentity(root: HTMLElement, isArabic: boolean) {
   const name = adminIdentityName(isArabic);
   const role = adminIdentityRole(isArabic);
   const alt = `${name} — ${role}`;
 
-  document
-    .querySelectorAll<HTMLImageElement>(
-      ".dncc-brand img, .dn-admin-fullscreen [class*='brand'] img, .dn-admin-fullscreen [class*='logo'] img",
-    )
+  root
+    .querySelectorAll<HTMLImageElement>(".dncc-brand img, [class*='brand'] img, [class*='logo'] img")
     .forEach((image) => setImage(image, alt));
 
-  document.querySelectorAll<HTMLElement>(".dncc-operator").forEach((operator) => {
+  root.querySelectorAll<HTMLElement>(".dncc-operator").forEach((operator) => {
     const avatar = operator.querySelector<HTMLElement>(".dncc-operator-avatar");
     if (avatar) replaceAvatar(avatar, alt);
-
     const copy = operator.querySelector<HTMLElement>(":scope > div");
     const nameNode = copy?.querySelector<HTMLElement>("strong");
     const roleNode = copy?.querySelector<HTMLElement>("span");
@@ -61,42 +58,36 @@ function applyShellIdentity(isArabic: boolean) {
     if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
   });
 
-  document
-    .querySelectorAll<HTMLElement>(".dn-admin-user-head, .dn-admin-user-mini")
-    .forEach((profile) => {
-      const image = profile.querySelector<HTMLImageElement>("img");
-      if (image) setImage(image, alt);
-      synchronizeProfileCopy(profile, name, role);
-    });
+  root.querySelectorAll<HTMLElement>(".dn-admin-user-head, .dn-admin-user-mini").forEach((profile) => {
+    const image = profile.querySelector<HTMLImageElement>("img");
+    if (image) setImage(image, alt);
+    synchronizeProfileCopy(profile, name, role);
+  });
 
-  document
-    .querySelectorAll<HTMLElement>("[data-admin-manager-profile]")
-    .forEach((profile) => {
-      const avatar = profile.querySelector<HTMLElement>("[data-admin-manager-avatar]");
-      if (avatar) replaceAvatar(avatar, alt);
-      const nameNode = profile.querySelector<HTMLElement>("[data-admin-manager-name]");
-      const roleNode = profile.querySelector<HTMLElement>("[data-admin-manager-role]");
-      if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
-      if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
-      profile.dataset.dnManagerIdentity = "true";
-    });
+  root.querySelectorAll<HTMLElement>("[data-admin-manager-profile]").forEach((profile) => {
+    const avatar = profile.querySelector<HTMLElement>("[data-admin-manager-avatar]");
+    if (avatar) replaceAvatar(avatar, alt);
+    const nameNode = profile.querySelector<HTMLElement>("[data-admin-manager-name]");
+    const roleNode = profile.querySelector<HTMLElement>("[data-admin-manager-role]");
+    if (nameNode && nameNode.textContent !== name) nameNode.textContent = name;
+    if (roleNode && roleNode.textContent !== role) roleNode.textContent = role;
+    profile.dataset.dnManagerIdentity = "true";
+  });
 }
 
-function applyManagerEmployeeCards(isArabic: boolean) {
-  const root = document.querySelector<HTMLElement>(".dn-employee-hr-embedded-root");
-  if (!root) return;
+function applyManagerEmployeeCards(root: HTMLElement, isArabic: boolean) {
+  const employeeRoot = root.querySelector<HTMLElement>(".dn-employee-hr-embedded-root");
+  if (!employeeRoot) return;
 
   const name = adminIdentityName(isArabic);
   const role = adminIdentityRole(isArabic);
   const alt = `${name} — ${role}`;
 
-  root.querySelectorAll<HTMLElement>("article").forEach((card) => {
+  employeeRoot.querySelectorAll<HTMLElement>("article").forEach((card) => {
     const roleLine = Array.from(card.querySelectorAll("p")).find(managerCopy);
     if (!roleLine) return;
-
     const heading = card.querySelector<HTMLElement>("h3");
     if (heading && heading.textContent !== name) heading.textContent = name;
-
     const avatar = Array.from(card.querySelectorAll<HTMLElement>("span")).find(
       (span) => span.className.includes("h-14") && span.className.includes("w-14"),
     );
@@ -104,13 +95,11 @@ function applyManagerEmployeeCards(isArabic: boolean) {
     card.dataset.dnManagerIdentity = "true";
   });
 
-  root.querySelectorAll<HTMLElement>("header").forEach((header) => {
+  employeeRoot.querySelectorAll<HTMLElement>("header").forEach((header) => {
     const roleLine = Array.from(header.querySelectorAll("p")).find(managerCopy);
     if (!roleLine) return;
-
     const heading = header.querySelector<HTMLElement>("h2");
     if (heading && heading.textContent !== name) heading.textContent = name;
-
     const avatar = Array.from(header.querySelectorAll<HTMLElement>("span")).find(
       (span) => span.className.includes("h-16") && span.className.includes("w-16"),
     );
@@ -119,30 +108,24 @@ function applyManagerEmployeeCards(isArabic: boolean) {
   });
 }
 
+/**
+ * Transitional compatibility hook for legacy admin surfaces.
+ * New admin identity must be supplied through React props/components.
+ * No MutationObserver is installed; callers explicitly request refreshes.
+ */
 export function useAdminManagerIdentity(enabled: boolean, isArabic: boolean) {
   useEffect(() => {
     if (!enabled) return;
 
-    let frame = 0;
     const apply = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        applyShellIdentity(isArabic);
-        applyManagerEmployeeCards(isArabic);
-      });
+      const root = document.querySelector<HTMLElement>(ADMIN_ROOT_SELECTOR);
+      if (!root) return;
+      applyShellIdentity(root, isArabic);
+      applyManagerEmployeeCards(root, isArabic);
     };
 
     apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
+    window.addEventListener(ADMIN_IDENTITY_REFRESH_EVENT, apply);
+    return () => window.removeEventListener(ADMIN_IDENTITY_REFRESH_EVENT, apply);
   }, [enabled, isArabic]);
 }

@@ -1,19 +1,17 @@
-import { useAppContext } from "../../lib/AppContext";
 import { useAdminFormKeyboardNavigation } from "../../hooks/useAdminFormKeyboardNavigation";
-import { useAdminManagerIdentity } from "../../hooks/useAdminManagerIdentity";
+import { useAdminInteractionPerformanceBudget } from "../../hooks/useAdminInteractionPerformanceBudget";
 import AbuKhalifaExecutiveCardBridge from "./AbuKhalifaExecutiveCardBridge";
 import "../../styles/dn-admin-form-inputs.css";
 
 /**
- * Installs administration-only interaction and identity enhancements without
- * coupling them to one form or one dashboard section.
+ * Administration-only interaction enhancements.
+ *
+ * Identity is rendered by React components. This component intentionally does
+ * not scan or rewrite document.body, which keeps public routes and unrelated
+ * portal screens outside the admin performance budget.
  */
 export default function AdminExperienceEnhancements() {
-  const { language } = useAppContext();
-  const isArabic = language === "ar";
-
   useAdminFormKeyboardNavigation(true);
-  useAdminManagerIdentity(true, isArabic);
-
+  useAdminInteractionPerformanceBudget(true);
   return <AbuKhalifaExecutiveCardBridge />;
 }
