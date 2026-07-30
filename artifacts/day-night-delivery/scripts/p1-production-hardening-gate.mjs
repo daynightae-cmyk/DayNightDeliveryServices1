@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..");
+const REPO = path.resolve(ROOT, "../..");
+
+function read(relativePath) {
+  return fs.readFileSync(path.resolve(ROOT, relativePath), "utf8");
+}
+
+function readRepo(relativePath) {
+  return fs.readFileSync(path.resolve(REPO, relativePath), "utf8");
+}
+
+function requireText(source, expected, label) {
+  if (!source.includes(expected)) throw new Error(`${label}: missing ${expected}`);
+}
+
+function forbidText(source, forbidden, label) {
+  if (source.includes(forbidden)) throw new Error(`${label}: forbidden ${forbidden}`);
+}
+
+const main = read("src/main.tsx");
+requireText(main, "adminRoute && <AdminExperienceEnhancements />", "admin-only enhancements");
+forbidText(main, "<AdminExperienceEnhancements />", "unconditional admin enhancement mount");
+
+const identityHook = read("src/hooks/useAdminManagerIdentity.ts");
+forbidText(identityHook, "new MutationObserver", "manager identity observer");
+forbidText(identityHook, "document.body", "manager identity document scan");
+
+const formHook = read("src/hooks/useAdminFormKeyboardNavigation.ts");
+requireText(formHook, 'const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen"', "form admin scope");
+forbidText(formHook, "observer.observe(document.body", "form document observer");
+forbidText(formHook, "characterData: true", "form character observer");
+
+const bridge = read("src/components/admin/AbuKhalifaExecutiveCardBridge.tsx");
+requireText(bridge, 'const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen"', "executive card admin scope");
+forbidText(bridge, "observer.observe(document.body", "executive card document observer");
+forbidText(bridge, "characterData: true", "executive card character observer");
+
+const inp = read("src/hooks/useAdminInteractionPerformanceBudget.ts");
+requireText(inp, "ADMIN_INP_BUDGET_MS = 200", "INP 200ms budget");
+requireText(inp, 'observer.observe({ type: "event"', "INP browser event timing");
+
+const orderValidation = readRepo("supabase/migrations/20260730094500_admin_order_authoritative_validation.sql");
+for (const contract of [
+  "admin_validate_order_payload",
+  "dn_guard_admin_order_required_fields",
+  "admin_order_validation_health",
+  "admin_order_validation_failed",
+]) requireText(orderValidation, contract, "admin order authority");
+
+const financeHealth = readRepo("supabase/migrations/20260730095500_finance_authoritative_reconciliation_health.sql");
+for (const contract of [
+  "admin_finance_reconciliation_health",
+  "admin_assert_authoritative_finance",
+  "missing_settlement_rows",
+  "missing_cod_rows",
+  "missing_merchant_statement_rows",
+  "missing_driver_statement_rows",
+  "variance_zero",
+  "authoritative_finance_required",
+]) requireText(financeHealth, contract, "finance authority");
+
+const internationalHealth = readRepo("supabase/migrations/20260730100500_international_tracking_runtime_health.sql");
+for (const contract of [
+  "international_tracking_runtime_health",
+  "register-track17-shipment",
+  "sync-track17-shipment",
+  "track17-webhook",
+  "TRACK17_API_KEY",
+  "quota_fresh",
+]) requireText(internationalHealth, contract, "international runtime health");
+
+const whatsapp = read("src/services/whatsappMessageService.ts");
+requireText(whatsapp, '"generated" | "opened" | "copied" | "failed"', "WhatsApp proof states");
+forbidText(whatsapp, 'OutboundMessageStatus = "delivered"', "unproven WhatsApp delivery state");
+
+const whatsappSql = readRepo("supabase/migrations/20260723140000_smart_whatsapp_feedback_complaints.sql");
+requireText(whatsappSql, "status in ('generated','opened','copied','failed')", "WhatsApp database proof states");
+forbidText(whatsappSql, "status in ('generated','opened','copied','delivered'", "unproven WhatsApp database delivery state");
+
+const driverLocation = read("src/hooks/useDriverLocation.ts");
+requireText(driverLocation, "order controls remain available", "GPS non-blocking presence");
+requireText(driverLocation, 'permissionRef.current === "denied"', "GPS retry suppression");
+requireText(driverLocation, "يمكنك متابعة الطلب وتسجيل التسليم", "GPS Arabic guidance");
+
+console.log("P1 PRODUCTION HARDENING GATE: PASS");
