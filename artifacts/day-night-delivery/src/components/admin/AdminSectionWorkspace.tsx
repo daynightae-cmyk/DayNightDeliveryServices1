@@ -290,7 +290,8 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
     return visibleSectionOrders.filter((order) => selected.has(orderId(order)));
   }, [selectedOrderIds, visibleSectionOrders]);
 
-  const workspaceOrders = shouldPageWorkspace ? pagedSectionOrders : filteredOrders;
+  const workspaceOrders = filteredOrders;
+  const renderedWorkspaceOrders = shouldPageWorkspace ? pagedSectionOrders : workspaceOrders;
 
   return (
     <>
@@ -380,12 +381,12 @@ export default function AdminSectionWorkspace(props: WorkspaceProps) {
       {props.id === "external" ? (
         <AdminInternationalOrdersWorkspace
           isArabic={props.isArabic}
-          orders={workspaceOrders}
+          orders={renderedWorkspaceOrders}
           merchants={props.merchants}
           onRefresh={props.onRefresh}
         />
       ) : (
-        <AdminSectionWorkspaceComplete {...props} orders={workspaceOrders} />
+        <AdminSectionWorkspaceComplete {...props} orders={renderedWorkspaceOrders} />
       )}
     </>
   );
