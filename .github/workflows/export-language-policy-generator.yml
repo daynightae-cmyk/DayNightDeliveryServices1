@@ -62,30 +62,45 @@ jobs:
           cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
 
       - name: Apply export language policy
+        id: patch
         if: steps.branch.outputs.exists != 'true'
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          git switch -c "$SOURCE_BRANCH"
-          python artifacts/day-night-delivery/scripts/apply-export-language-policy.py
-          git rm artifacts/day-night-delivery/scripts/apply-export-language-policy.py
-          git rm artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
-          git rm .github/workflows/export-language-policy-generator.yml
+          set +e
+          {
+            git switch -c "$SOURCE_BRANCH"
+            python artifacts/day-night-delivery/scripts/apply-export-language-policy.py
+            git rm artifacts/day-night-delivery/scripts/apply-export-language-policy.py
+            git rm artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
+            git rm .github/workflows/export-language-policy-generator.yml
+          } > "$RUNNER_TEMP/export-patch.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/export-patch.log"
+          exit "$status"
 
       - name: Validate TypeScript, export policy, guardrails, and production build
-        if: steps.branch.outputs.exists != 'true'
+        id: validate
+        if: steps.branch.outputs.exists != 'true' && steps.patch.outcome == 'success'
+        continue-on-error: true
         working-directory: artifacts/day-night-delivery
         shell: bash
         run: |
-          set -euo pipefail
-          pnpm install --frozen-lockfile
-          pnpm exec tsc --noEmit
-          node scripts/export-language-policy-gate.mjs
-          node scripts/personal-orders-admin-gate.mjs
-          pnpm build
+          set +e
+          {
+            pnpm install --frozen-lockfile
+            pnpm exec tsc --noEmit
+            node scripts/export-language-policy-gate.mjs
+            node scripts/personal-orders-admin-gate.mjs
+            pnpm build
+          } > "$RUNNER_TEMP/export-validate.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/export-validate.log"
+          exit "$status"
 
       - name: Publish source branch and pull request
-        if: steps.branch.outputs.exists != 'true'
+        id: publish
+        if: steps.branch.outputs.exists != 'true' && steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -129,3 +144,35 @@ jobs:
           else
             echo "Pull request #$existing already exists."
           fi
+
+      - name: Report sanitized generator outcome
+        if: always() && steps.branch.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_tail="$(tail -n 30 "$RUNNER_TEMP/export-patch.log" 2>/dev/null || true)"
+          validate_tail="$(tail -n 30 "$RUNNER_TEMP/export-validate.log" 2>/dev/null || true)"
+          cat > "$RUNNER_TEMP/export-generator-report.md" <<EOF
+          ## Export language generator outcome
+
+          - Patch: \`${{ steps.patch.outcome }}\`
+          - Validation/build: \`${{ steps.validate.outcome }}\`
+          - Publish: \`${{ steps.publish.outcome }}\`
+          - Run: \`${{ github.run_id }}\`
+
+          ### Patch tail
+          \`\`\`text
+          $patch_tail
+          \`\`\`
+
+          ### Validation tail
+          \`\`\`text
+          $validate_tail
+          \`\`\`
+          EOF
+          gh pr comment 292 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/export-generator-report.md"
+
+      - name: Fail closed when generation did not pass
+        if: steps.branch.outputs.exists != 'true' && (steps.patch.outcome != 'success' || steps.validate.outcome != 'success' || steps.publish.outcome != 'success')
+        shell: bash
+        run: exit 1
