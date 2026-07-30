@@ -7,7 +7,7 @@ const ADMIN_FORM_SCOPE = [
   ".dn-admin-fullscreen",
 ].join(",");
 
-const NAVIGABLE_INPUT_TYPES = new Set([
+const ARROW_NAV_SOURCE_TYPES = new Set([
   "text",
   "number",
   "email",
@@ -17,22 +17,44 @@ const NAVIGABLE_INPUT_TYPES = new Set([
   "url",
 ]);
 
+const EXCLUDED_TARGET_TYPES = new Set([
+  "button",
+  "submit",
+  "reset",
+  "checkbox",
+  "radio",
+  "file",
+  "range",
+  "color",
+  "hidden",
+  "image",
+]);
+
+type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
 function inputType(input: HTMLInputElement) {
   return (input.getAttribute("type") || "text").toLowerCase();
 }
 
-function isVisible(input: HTMLInputElement) {
-  if (input.hidden || input.disabled || input.readOnly) return false;
-  if (input.closest("[hidden], [aria-hidden='true']")) return false;
-  const style = window.getComputedStyle(input);
-  return style.display !== "none" && style.visibility !== "hidden" && input.getClientRects().length > 0;
+function isVisible(control: FormControl) {
+  if (control.hidden || control.disabled) return false;
+  if (control instanceof HTMLInputElement && control.readOnly) return false;
+  if (control instanceof HTMLTextAreaElement && control.readOnly) return false;
+  if (control.closest("[hidden], [aria-hidden='true']")) return false;
+  const style = window.getComputedStyle(control);
+  return style.display !== "none" && style.visibility !== "hidden" && control.getClientRects().length > 0;
 }
 
-function isNavigableInput(input: HTMLInputElement) {
-  if (!input.closest(ADMIN_FORM_SCOPE)) return false;
-  if (input.matches("[data-dn-arrow-nav='off']")) return false;
-  if (input.closest("[role='combobox'], [data-radix-popper-content-wrapper]")) return false;
-  return NAVIGABLE_INPUT_TYPES.has(inputType(input)) && isVisible(input);
+function isNavigationTarget(control: FormControl) {
+  if (!control.closest(ADMIN_FORM_SCOPE)) return false;
+  if (control.matches("[data-dn-arrow-nav='off']")) return false;
+  if (control.closest("[role='combobox'], [data-radix-popper-content-wrapper]")) return false;
+  if (control instanceof HTMLInputElement && EXCLUDED_TARGET_TYPES.has(inputType(control))) return false;
+  return isVisible(control);
+}
+
+function isArrowNavigationSource(input: HTMLInputElement) {
+  return ARROW_NAV_SOURCE_TYPES.has(inputType(input)) && isNavigationTarget(input);
 }
 
 function navigationScope(input: HTMLInputElement) {
@@ -41,28 +63,30 @@ function navigationScope(input: HTMLInputElement) {
   );
 }
 
-function availableInputs(input: HTMLInputElement) {
+function availableControls(input: HTMLInputElement) {
   const scope = navigationScope(input);
   if (!scope) return [];
-  return Array.from(scope.querySelectorAll<HTMLInputElement>("input")).filter(isNavigableInput);
+  return Array.from(scope.querySelectorAll<FormControl>("input, select, textarea")).filter(isNavigationTarget);
 }
 
-function focusRelativeInput(input: HTMLInputElement, direction: -1 | 1) {
-  const inputs = availableInputs(input);
-  const currentIndex = inputs.indexOf(input);
+function focusRelativeControl(input: HTMLInputElement, direction: -1 | 1) {
+  const controls = availableControls(input);
+  const currentIndex = controls.indexOf(input);
   if (currentIndex < 0) return;
 
   const nextIndex = currentIndex + direction;
-  if (nextIndex < 0 || nextIndex >= inputs.length) return;
+  if (nextIndex < 0 || nextIndex >= controls.length) return;
 
-  const next = inputs[nextIndex];
+  const next = controls[nextIndex];
   next.focus({ preventScroll: true });
   next.scrollIntoView({ block: "nearest", inline: "nearest" });
 
-  try {
-    next.select();
-  } catch {
-    // Some input types do not support selection. Focusing is sufficient.
+  if (next instanceof HTMLInputElement && ARROW_NAV_SOURCE_TYPES.has(inputType(next))) {
+    try {
+      next.select();
+    } catch {
+      // Focusing is sufficient for inputs that do not support selection.
+    }
   }
 }
 
@@ -107,10 +131,10 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
       if (!(event.target instanceof HTMLInputElement)) return;
 
       const input = event.target;
-      if (!isNavigableInput(input)) return;
+      if (!isArrowNavigationSource(input)) return;
 
       event.preventDefault();
-      focusRelativeInput(input, event.key === "ArrowDown" ? 1 : -1);
+      focusRelativeControl(input, event.key === "ArrowDown" ? 1 : -1);
     };
 
     const handleWheel = (event: WheelEvent) => {
