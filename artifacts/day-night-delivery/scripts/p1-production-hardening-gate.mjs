@@ -24,9 +24,14 @@ function forbidText(source, forbidden, label) {
   if (source.includes(forbidden)) throw new Error(`${label}: forbidden ${forbidden}`);
 }
 
+function requireSingleOccurrence(source, expected, label) {
+  const count = source.split(expected).length - 1;
+  if (count !== 1) throw new Error(`${label}: expected one occurrence, found ${count}`);
+}
+
 const main = read("src/main.tsx");
 requireText(main, "adminRoute && <AdminExperienceEnhancements />", "admin-only enhancements");
-forbidText(main, "<AdminExperienceEnhancements />", "unconditional admin enhancement mount");
+requireSingleOccurrence(main, "<AdminExperienceEnhancements />", "admin enhancement mount count");
 
 const identityHook = read("src/hooks/useAdminManagerIdentity.ts");
 forbidText(identityHook, "new MutationObserver", "manager identity observer");
