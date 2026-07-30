@@ -1,11 +1,25 @@
 name: Phase 4 Admin INP Acceptance
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/admin-inp-acceptance.yml
+      - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
+      - artifacts/day-night-delivery/src/main.tsx
+      - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
+      - artifacts/day-night-delivery/src/components/admin/**
+      - artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
+      - artifacts/day-night-delivery/src/hooks/useAdminFormKeyboardNavigation.ts
+      - artifacts/day-night-delivery/src/styles/dn-admin-**
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/admin-inp-acceptance.yml
       - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
+      - artifacts/day-night-delivery/src/main.tsx
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
       - artifacts/day-night-delivery/src/components/admin/**
       - artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
@@ -34,8 +48,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate acceptance script
-        run: node --check artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - name: Validate acceptance scripts
+        run: |
+          node --check artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+          node --check artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
 
       - name: Verify static admin performance guardrails
         run: |
@@ -44,17 +60,20 @@ jobs:
           grep -Fq 'dn-admin-inp-sample' artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
           grep -Fq '.dn-admin-fullscreen' artifacts/day-night-delivery/src/hooks/useAdminFormKeyboardNavigation.ts
           ! grep -Eq 'observe\(document\.(body|documentElement)' artifacts/day-night-delivery/src/hooks/useAdminManagerIdentity.ts
+          grep -Fq 'phase4-20260730-1' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
+          grep -Fq 'dn-admin-inp-acceptance.css' artifacts/day-night-delivery/src/main.tsx
 
   production-profile:
     name: Production desktop and Android INP evidence
     needs: validate-harness
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: production-runtime-tests
     env:
       ADMIN_PERFORMANCE_BASE_URL: https://daynightae.com
       ADMIN_PERFORMANCE_OUTPUT_DIR: artifacts/day-night-delivery/admin-performance-evidence
+      ADMIN_PERFORMANCE_DEPLOYMENT_MARKER: phase4-20260730-1
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
@@ -81,6 +100,9 @@ jobs:
             printf 'Missing protected performance inputs: %s\n' "${missing[*]}" >&2
             exit 2
           fi
+
+      - name: Wait for verified Vercel production release
+        run: node artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
 
       - name: Install isolated Playwright runtime
         shell: bash
