@@ -49,7 +49,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -308,10 +308,16 @@ jobs:
             return { response, payload };
           }
 
-          const finance = await post('/rest/v1/rpc/admin_reconcile_authoritative_finance', {});
-          fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance.payload, null, 2));
-          if (!finance.response.ok || finance.payload?.ok !== true) {
-            console.error(`Finance reconciliation failed with HTTP ${finance.response.status}.`);
+          let finance = null;
+          for (let attempt = 1; attempt <= 12; attempt += 1) {
+            finance = await post('/rest/v1/rpc/admin_reconcile_authoritative_finance', {});
+            if (finance.response.status !== 404) break;
+            console.log(`PostgREST schema cache has not exposed the reconciliation RPC yet; retry ${attempt}/12.`);
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+          fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance?.payload || {}, null, 2));
+          if (!finance || !finance.response.ok || finance.payload?.ok !== true) {
+            console.error(`Finance reconciliation failed with HTTP ${finance?.response?.status || 0}.`);
             process.exit(1);
           }
 
