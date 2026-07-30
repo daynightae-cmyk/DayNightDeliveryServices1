@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/admin-inp-acceptance.yml
       - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
       - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
       - artifacts/day-night-delivery/src/main.tsx
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
@@ -18,6 +19,7 @@ on:
     paths:
       - .github/workflows/admin-inp-acceptance.yml
       - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
       - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
       - artifacts/day-night-delivery/src/main.tsx
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
@@ -52,6 +54,7 @@ jobs:
       - name: Validate acceptance scripts
         run: |
           node --check artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+          node --check artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
           node --check artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
 
       - name: Verify static admin performance guardrails
@@ -63,6 +66,7 @@ jobs:
           ! grep -Eq 'observe\(document\.(body|documentElement)' artifacts/day-night-delivery/src/hooks/useAdminManagerIdentity.ts
           grep -Fq 'phase4-20260730-3' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
           grep -Fq 'dn-admin-inp-acceptance.css' artifacts/day-night-delivery/src/main.tsx
+          grep -Fq 'admin-performance-geometry-diagnostic.mjs' .github/workflows/admin-inp-acceptance.yml
           grep -Fq 'issues: write' .github/workflows/admin-inp-acceptance.yml
 
   production-profile:
@@ -118,12 +122,20 @@ jobs:
           npx playwright install --with-deps chromium
           echo "PLAYWRIGHT_RUNNER_DIR=$runner" >> "$GITHUB_ENV"
 
+      - name: Capture protected admin geometry
+        id: geometry
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/day-night-delivery/admin-performance-evidence
+          node artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs 2>&1 \
+            | tee artifacts/day-night-delivery/admin-performance-evidence/geometry.log
+
       - name: Record production admin Chrome traces
         id: performance
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p artifacts/day-night-delivery/admin-performance-evidence
           node artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs 2>&1 \
             | tee artifacts/day-night-delivery/admin-performance-evidence/workflow.log
 
@@ -145,11 +157,16 @@ jobs:
           else
             echo 'Admin performance summary was not produced.' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-geometry.json ]; then
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo 'Geometry diagnostic was captured in the protected artifact.' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Report protected acceptance to Issue 268
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          GEOMETRY_OUTCOME: ${{ steps.geometry.outcome }}
           PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
         shell: bash
         run: |
@@ -160,14 +177,31 @@ jobs:
             echo
             echo "- Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Protected geometry stage: **${GEOMETRY_OUTCOME:-not-run}**"
             echo "- Protected Chrome stage: **${PERFORMANCE_OUTCOME:-not-run}**"
             echo '- Evidence artifact: `DAY-NIGHT-Admin-INP-Acceptance` (30-day retention)'
             echo '- Secrets, authentication sessions, customer PII, and raw production payloads are excluded.'
             echo
             if [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md ]; then
               cat artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md
+            elif [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-geometry.json ]; then
+              node --input-type=module <<'NODE'
+              import fs from 'node:fs';
+              const payload = JSON.parse(fs.readFileSync('artifacts/day-night-delivery/admin-performance-evidence/admin-performance-geometry.json', 'utf8'));
+              const before = payload.beforeScrollIntoView || {};
+              const after = payload.afterScrollIntoView || {};
+              const item = before.ancestors?.[0] || {};
+              const itemAfter = after.ancestors?.[0] || {};
+              console.log('### Geometry diagnostic');
+              console.log(`- Viewport: \`${before.viewport?.innerWidth || 0}×${before.viewport?.innerHeight || 0}\``);
+              console.log(`- Before rect: \`${JSON.stringify(item.rect || {})}\``);
+              console.log(`- After scroll rect: \`${JSON.stringify(itemAfter.rect || {})}\``);
+              console.log(`- Before intersection: \`${JSON.stringify(before.insideViewport || {})}\``);
+              console.log(`- After intersection: \`${JSON.stringify(after.insideViewport || {})}\``);
+              console.log('- Full ancestor geometry and redacted screenshot are stored in the protected artifact.');
+              NODE
             else
-              echo 'The structured performance summary was not produced; inspect the linked workflow before retrying.'
+              echo 'Neither a structured performance summary nor geometry diagnostic was produced; inspect the linked workflow.'
             fi
           } > "$report"
           gh issue comment 268 --repo "$GITHUB_REPOSITORY" --body-file "$report"
