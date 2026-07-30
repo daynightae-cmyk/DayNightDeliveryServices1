@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: issue-268-render-budget-generator
@@ -36,28 +37,101 @@ jobs:
           cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
 
       - name: Apply exact source patch
-        run: python .github/scripts/issue_268_render_budget.py
+        id: patch
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python .github/scripts/issue_268_render_budget.py 2>&1 | tee "$RUNNER_TEMP/issue-268-generator.log"
 
       - name: Validate generated source
+        id: validate
+        if: ${{ steps.patch.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
         run: |
-          grep -Fq 'ORDER_PAGE_SIZE = 20' artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceComplete.tsx
-          grep -Fq 'selectorOpen &&' artifacts/day-night-delivery/src/components/admin/AdminOrderBulkOperations.tsx
-          grep -Fq 'Phase 4 render-budget optimization' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
-          test ! -e .github/scripts/issue_268_render_budget.py
-          test ! -e .github/workflows/issue-268-render-budget-generator.yml
+          set -o pipefail
+          {
+            grep -Fq 'ORDER_PAGE_SIZE = 20' artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceComplete.tsx
+            grep -Fq 'selectorOpen &&' artifacts/day-night-delivery/src/components/admin/AdminOrderBulkOperations.tsx
+            grep -Fq 'Phase 4 render-budget optimization' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
+            test ! -e .github/scripts/issue_268_render_budget.py
+            test ! -e .github/workflows/issue-268-render-budget-generator.yml
+          } 2>&1 | tee -a "$RUNNER_TEMP/issue-268-generator.log"
 
       - name: Install and build
+        id: build
+        if: ${{ steps.patch.outcome == 'success' && steps.validate.outcome == 'success' }}
+        continue-on-error: true
         working-directory: artifacts/day-night-delivery
+        shell: bash
         run: |
-          pnpm install --frozen-lockfile
-          pnpm exec tsc --noEmit
-          pnpm run build
+          set -o pipefail
+          {
+            pnpm install --frozen-lockfile
+            pnpm exec tsc --noEmit
+            pnpm run build
+          } 2>&1 | tee -a "$RUNNER_TEMP/issue-268-generator.log"
 
       - name: Publish reviewed source branch
+        id: publish
+        if: ${{ steps.patch.outcome == 'success' && steps.validate.outcome == 'success' && steps.build.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
         run: |
-          git config user.name 'daynightae-cmyk'
-          git config user.email 'daynightae-cmyk@users.noreply.github.com'
-          git switch -c perf/issue-268-render-budget-applied
-          git add -A
-          git commit -m 'fix(perf): bound admin order rendering and mobile effects'
-          git push --force origin perf/issue-268-render-budget-applied
+          set -o pipefail
+          {
+            git config user.name 'daynightae-cmyk'
+            git config user.email 'daynightae-cmyk@users.noreply.github.com'
+            git switch -C perf/issue-268-render-budget-applied
+            git add -A
+            git commit -m 'fix(perf): bound admin order rendering and mobile effects'
+            git push --force origin perf/issue-268-render-budget-applied
+          } 2>&1 | tee -a "$RUNNER_TEMP/issue-268-generator.log"
+
+      - name: Report generator result to Issue 268
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PATCH_OUTCOME: ${{ steps.patch.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/issue-268-generator.log"
+          report="$RUNNER_TEMP/issue-268-generator-report.md"
+          {
+            echo '## Phase 4 render-budget generator'
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Patch: **${PATCH_OUTCOME:-skipped}**"
+            echo "- Validation: **${VALIDATE_OUTCOME:-skipped}**"
+            echo "- TypeScript / build: **${BUILD_OUTCOME:-skipped}**"
+            echo "- Source branch publish: **${PUBLISH_OUTCOME:-skipped}**"
+            echo
+            echo '### Sanitized log tail'
+            echo '```text'
+            if [ -f "$log" ]; then
+              tail -80 "$log" \
+                | sed -E 's/(ghp_|github_pat_|sbp_)[A-Za-z0-9_\-]+/[redacted-token]/g' \
+                | sed -E 's/(password|token|secret)=([^[:space:]]+)/\1=[redacted]/Ig'
+            else
+              echo 'No generator log was produced.'
+            fi
+            echo '```'
+          } > "$report"
+          gh issue comment 268 --repo "$GITHUB_REPOSITORY" --body-file "$report"
+
+      - name: Enforce generator outcome
+        if: always()
+        env:
+          PATCH_OUTCOME: ${{ steps.patch.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        run: |
+          test "$PATCH_OUTCOME" = success
+          test "$VALIDATE_OUTCOME" = success
+          test "$BUILD_OUTCOME" = success
+          test "$PUBLISH_OUTCOME" = success
