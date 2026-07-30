@@ -1,0 +1,130 @@
+name: Export language policy generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/export-language-policy-generator.yml
+      - artifacts/day-night-delivery/scripts/apply-export-language-policy.py
+      - artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: export-language-policy-generator
+  cancel-in-progress: false
+
+jobs:
+  generate-language-aware-exports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_BRANCH: fix/export-language-aware-statements
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Stop when source branch already exists
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Source branch already exists; no duplicate generation required."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.branch.outputs.exists != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        if: steps.branch.outputs.exists != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
+
+      - name: Apply export language policy
+        if: steps.branch.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -c "$SOURCE_BRANCH"
+          python artifacts/day-night-delivery/scripts/apply-export-language-policy.py
+          git rm artifacts/day-night-delivery/scripts/apply-export-language-policy.py
+          git rm artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
+          git rm .github/workflows/export-language-policy-generator.yml
+
+      - name: Validate TypeScript, export policy, guardrails, and production build
+        if: steps.branch.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
+          node scripts/export-language-policy-gate.mjs
+          node scripts/personal-orders-admin-gate.mjs
+          pnpm build
+
+      - name: Publish source branch and pull request
+        if: steps.branch.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(exports): follow dashboard language across all statements"
+          git push origin "$SOURCE_BRANCH"
+
+          cat > "$RUNNER_TEMP/export-language-policy.md" <<'EOF'
+          ## Objective
+
+          Make the selected dashboard language authoritative for every exported document.
+
+          ## Changes
+
+          - Arabic dashboards produce Arabic delivery addresses, cities, areas, routes, statuses, payment methods, service types, and package types.
+          - Explicit Arabic database fields take priority when available.
+          - Historical English UAE addresses are localized through a central UAE/GCC location dictionary with a deterministic Arabic fallback.
+          - The policy applies to merchant statements PDF/CSV, driver/admin/international reports, bulk PDF/CSV/print, customer invoices, merchant-portal invoices, and TXT/HTML printable documents.
+          - English dashboards preserve English output.
+          - Adds a permanent static export-language gate.
+          - Removes the accidental empty `.tmp` placeholder through this reviewed PR.
+
+          ## Validation before publication
+
+          - TypeScript `--noEmit`
+          - export language policy gate
+          - existing admin production gate
+          - production build
+          EOF
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SOURCE_BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$SOURCE_BRANCH" \
+              --title "Exports: follow dashboard language in every statement" \
+              --body-file "$RUNNER_TEMP/export-language-policy.md"
+          else
+            echo "Pull request #$existing already exists."
+          fi
