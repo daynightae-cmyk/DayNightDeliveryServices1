@@ -1,0 +1,133 @@
+name: P1 Customer Attachment Recovery
+
+on:
+  push:
+    branches: [runtime/issue-266-evidence]
+    paths:
+      - .github/workflows/p1-customer-attachment-recovery.yml
+      - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/p1-customer-attachment-recovery.yml
+      - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-production-runtime-evidence
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Apply attachment permission repair and verify CX
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply isolated storage permission migration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          workdir="$RUNNER_TEMP/p1-customer-attachment"
+          mkdir -p "$workdir/supabase/migrations" artifacts/day-night-delivery/p1-runtime-evidence
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+          supabase --workdir "$workdir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+          migration=20260730135000_anon_storage_policy_helper_grant.sql
+          if ! find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' | grep -Fxq "$migration"; then
+            cp "supabase/migrations/$migration" "$workdir/supabase/migrations/$migration"
+          fi
+          supabase --workdir "$workdir" db push --dry-run 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-dry-run.log
+          supabase --workdir "$workdir" db push --yes 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-push.log
+          supabase --workdir "$workdir" migration list --linked 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
+          grep -Fq '20260730135000' artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
+
+      - name: Authenticate protected admin test session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: process.env.RUNTIME_ADMIN_EMAIL, password: process.env.RUNTIME_ADMIN_PASSWORD }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.access_token) throw new Error(`admin_auth_http_${response.status}`);
+          console.log(`::add-mask::${payload.access_token}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `SUPABASE_ADMIN_ACCESS_TOKEN=${payload.access_token}\n`);
+          NODE
+
+      - name: Run P1 runtime health
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run p1:runtime-health 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-p1-health.log
+
+      - name: Run Customer Experience lifecycle
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+          CUSTOMER_EXPERIENCE_E2E_KEEP_DATA: false
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-customer-e2e.log
+
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-P1-Customer-Attachment-Recovery
+          path: artifacts/day-night-delivery/p1-runtime-evidence/
+          if-no-files-found: error
+          retention-days: 30
