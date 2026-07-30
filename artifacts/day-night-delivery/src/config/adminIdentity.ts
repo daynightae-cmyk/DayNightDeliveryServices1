@@ -1,7 +1,7 @@
 export const ADMIN_IDENTITY = {
-  logoUrl: "https://i.postimg.cc/FHF9HQxq/cropped-circle-image-(1).png",
-  nameAr: "منصور علي",
-  nameEn: "Mansour Ali",
+  logoUrl: "https://i.postimg.cc/DZNg8Fsc/cropped-circle-image-(2).png",
+  nameAr: "بو خليفة",
+  nameEn: "Abu Khalifa",
   roleAr: "المدير العام",
   roleEn: "General Manager",
 } as const;
