@@ -1,5 +1,5 @@
-name: Export language policy generator v2
-# Generate a clean source branch from the latest main without committing build-generated assets.
+name: Export language policy generator v3
+# Unconditional one-time generation on a unique source branch.
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: export-language-policy-generator-v2
+  group: export-language-policy-generator-v3
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SOURCE_BRANCH: fix/export-language-aware-statements-v2
+      SOURCE_BRANCH: fix/export-language-aware-statements-v3
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout latest main
@@ -33,25 +33,12 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Stop when clean source branch already exists
-        id: branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup pnpm
-        if: steps.branch.outputs.exists != 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
       - name: Setup Node.js
-        if: steps.branch.outputs.exists != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -60,7 +47,6 @@ jobs:
 
       - name: Apply export language policy on latest main
         id: patch
-        if: steps.branch.outputs.exists != 'true'
         continue-on-error: true
         shell: bash
         run: |
@@ -89,14 +75,14 @@ jobs:
             git rm artifacts/day-night-delivery/scripts/apply-export-language-policy.py
             git rm artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
             git rm .github/workflows/export-language-policy-generator.yml
-          } > "$RUNNER_TEMP/export-patch-v2.log" 2>&1
+          } > "$RUNNER_TEMP/export-patch-v3.log" 2>&1
           status=$?
-          cat "$RUNNER_TEMP/export-patch-v2.log"
+          cat "$RUNNER_TEMP/export-patch-v3.log"
           exit "$status"
 
       - name: Validate TypeScript, export policy, production gates, and build
         id: validate
-        if: steps.branch.outputs.exists != 'true' && steps.patch.outcome == 'success'
+        if: steps.patch.outcome == 'success'
         continue-on-error: true
         working-directory: artifacts/day-night-delivery
         shell: bash
@@ -108,14 +94,14 @@ jobs:
             node scripts/export-language-policy-gate.mjs
             node scripts/personal-orders-admin-gate.mjs
             pnpm build
-          } > "$RUNNER_TEMP/export-validate-v2.log" 2>&1
+          } > "$RUNNER_TEMP/export-validate-v3.log" 2>&1
           status=$?
-          cat "$RUNNER_TEMP/export-validate-v2.log"
+          cat "$RUNNER_TEMP/export-validate-v3.log"
           exit "$status"
 
       - name: Commit only reviewed source files and publish branch
         id: publish
-        if: steps.branch.outputs.exists != 'true' && steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
+        if: steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -128,20 +114,20 @@ jobs:
           git commit -m "fix(exports): follow dashboard language across all statements"
           git push origin "$SOURCE_BRANCH"
 
-      - name: Report sanitized v2 generator outcome
-        if: always() && steps.branch.outputs.exists != 'true'
+      - name: Report sanitized v3 generator outcome
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          patch_tail="$(tail -n 30 "$RUNNER_TEMP/export-patch-v2.log" 2>/dev/null || true)"
-          validate_tail="$(tail -n 30 "$RUNNER_TEMP/export-validate-v2.log" 2>/dev/null || true)"
-          cat > "$RUNNER_TEMP/export-generator-v2-report.md" <<EOF
-          ## Export language generator v2 outcome
+          patch_tail="$(tail -n 30 "$RUNNER_TEMP/export-patch-v3.log" 2>/dev/null || true)"
+          validate_tail="$(tail -n 30 "$RUNNER_TEMP/export-validate-v3.log" 2>/dev/null || true)"
+          cat > "$RUNNER_TEMP/export-generator-v3-report.md" <<EOF
+          ## Export language generator v3 outcome
 
-          - Patch: `${{ steps.patch.outcome }}`
-          - Validation/build: `${{ steps.validate.outcome }}`
-          - Branch publish: `${{ steps.publish.outcome }}`
-          - Run: `${{ github.run_id }}`
+          - Patch: ${{ steps.patch.outcome }}
+          - Validation/build: ${{ steps.validate.outcome }}
+          - Branch publish: ${{ steps.publish.outcome }}
+          - Run: ${{ github.run_id }}
 
           ### Patch tail
           ```text
@@ -153,9 +139,9 @@ jobs:
           $validate_tail
           ```
           EOF
-          gh pr comment 292 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/export-generator-v2-report.md"
+          gh pr comment 292 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/export-generator-v3-report.md"
 
-      - name: Fail closed when clean generation did not pass
-        if: steps.branch.outputs.exists != 'true' && (steps.patch.outcome != 'success' || steps.validate.outcome != 'success' || steps.publish.outcome != 'success')
+      - name: Fail closed when generation did not pass
+        if: steps.patch.outcome != 'success' || steps.validate.outcome != 'success' || steps.publish.outcome != 'success'
         shell: bash
         run: exit 1
