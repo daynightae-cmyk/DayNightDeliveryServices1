@@ -1,5 +1,5 @@
 name: Export language policy generator
-# Trigger after the workflow is present on main.
+# One-time trigger after fixing the nested pnpm lockfile path.
 
 on:
   push:
@@ -8,8 +8,6 @@ on:
       - .github/workflows/export-language-policy-generator.yml
       - artifacts/day-night-delivery/scripts/apply-export-language-policy.py
       - artifacts/day-night-delivery/scripts/export-localization-template.ts.txt
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -59,7 +57,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
 
       - name: Apply export language policy
         id: patch
@@ -155,20 +153,20 @@ jobs:
           cat > "$RUNNER_TEMP/export-generator-report.md" <<EOF
           ## Export language generator outcome
 
-          - Patch: \`${{ steps.patch.outcome }}\`
-          - Validation/build: \`${{ steps.validate.outcome }}\`
-          - Publish: \`${{ steps.publish.outcome }}\`
-          - Run: \`${{ github.run_id }}\`
+          - Patch: `${{ steps.patch.outcome }}`
+          - Validation/build: `${{ steps.validate.outcome }}`
+          - Publish: `${{ steps.publish.outcome }}`
+          - Run: `${{ github.run_id }}`
 
           ### Patch tail
-          \`\`\`text
+          ```text
           $patch_tail
-          \`\`\`
+          ```
 
           ### Validation tail
-          \`\`\`text
+          ```text
           $validate_tail
-          \`\`\`
+          ```
           EOF
           gh pr comment 292 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/export-generator-report.md"
 
