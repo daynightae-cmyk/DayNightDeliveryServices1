@@ -126,7 +126,6 @@ insert into public.cod_collections (
   order_id,
   tracking_number,
   merchant_id,
-  driver_id,
   cod_amount,
   collected_amount,
   reconciled_amount,
@@ -147,10 +146,6 @@ select
     o.id::text
   ),
   o.merchant_id,
-  public.dn_safe_uuid(coalesce(
-    nullif(to_jsonb(o)->>'assigned_driver_id', ''),
-    nullif(to_jsonb(o)->>'driver_id', '')
-  )),
   greatest(coalesce(o.customer_total, 0), 0),
   greatest(coalesce(nullif(o.collected_amount, 0), o.customer_total, 0), 0),
   0,
@@ -230,10 +225,7 @@ insert into public.driver_statement_entries (
   updated_at
 )
 select
-  public.dn_safe_uuid(coalesce(
-    nullif(to_jsonb(o)->>'assigned_driver_id', ''),
-    nullif(to_jsonb(o)->>'driver_id', '')
-  )),
+  resolved_driver.id,
   o.id,
   coalesce(
     nullif(to_jsonb(o)->>'tracking_number', ''),
@@ -252,12 +244,22 @@ select
   now(),
   now()
 from public.orders o
-where lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
-    in ('delivered', 'completed', 'complete')
-  and public.dn_safe_uuid(coalesce(
+cross join lateral (
+  select public.dn_safe_uuid(coalesce(
     nullif(to_jsonb(o)->>'assigned_driver_id', ''),
     nullif(to_jsonb(o)->>'driver_id', '')
-  )) is not null
+  )) as raw_driver_id
+) raw_driver
+join lateral (
+  select dp.id
+  from public.driver_profiles dp
+  where dp.id = raw_driver.raw_driver_id
+     or dp.user_id = raw_driver.raw_driver_id
+  order by case when dp.id = raw_driver.raw_driver_id then 0 else 1 end
+  limit 1
+) resolved_driver on true
+where lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
+    in ('delivered', 'completed', 'complete')
   and not exists (
     select 1 from public.driver_statement_entries d where d.order_id = o.id
   )
@@ -305,10 +307,10 @@ begin
   from public.orders o
   where lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
       in ('delivered', 'completed', 'complete')
-    and public.dn_safe_uuid(coalesce(
+    and coalesce(
       nullif(to_jsonb(o)->>'assigned_driver_id', ''),
       nullif(to_jsonb(o)->>'driver_id', '')
-    )) is not null
+    ) is not null
     and not exists (
       select 1 from public.driver_statement_entries d where d.order_id = o.id
     );
