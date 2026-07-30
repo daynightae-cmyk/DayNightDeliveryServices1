@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 
+const ADMIN_ROOT_SELECTOR = ".dn-admin-fullscreen";
 const ADMIN_FORM_SCOPE = [
   ".dncc-main",
   ".dn-admin-workspace-host",
   ".dn-employee-hr-embedded-root",
-  ".dn-admin-fullscreen",
+  ADMIN_ROOT_SELECTOR,
 ].join(",");
 
 const ARROW_NAV_SOURCE_TYPES = new Set([
@@ -100,8 +101,9 @@ function nearestScrollable(element: HTMLElement) {
   return null;
 }
 
-function applyNumericInputMode(root: ParentNode = document) {
-  root.querySelectorAll<HTMLInputElement>(`${ADMIN_FORM_SCOPE} input[type='number']`).forEach((input) => {
+function applyNumericInputMode(root: ParentNode) {
+  root.querySelectorAll<HTMLInputElement>("input[type='number']").forEach((input) => {
+    if (!input.closest(ADMIN_FORM_SCOPE)) return;
     const step = input.getAttribute("step");
     const integerOnly = step === "1" || input.dataset.integer === "true";
     input.inputMode = integerOnly ? "numeric" : "decimal";
@@ -113,16 +115,9 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
 
-    applyNumericInputMode();
-
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLElement) applyNumericInputMode(node);
-        });
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    let adminRoot: HTMLElement | null = null;
+    let adminObserver: MutationObserver | null = null;
+    let bootstrapObserver: MutationObserver | null = null;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -151,13 +146,49 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown, true);
-    document.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+    const connectToAdminRoot = () => {
+      const nextRoot = document.querySelector<HTMLElement>(ADMIN_ROOT_SELECTOR);
+      if (!nextRoot || nextRoot === adminRoot) return Boolean(nextRoot);
+
+      if (adminRoot) {
+        adminRoot.removeEventListener("keydown", handleKeyDown, true);
+        adminRoot.removeEventListener("wheel", handleWheel, true);
+      }
+      adminObserver?.disconnect();
+
+      adminRoot = nextRoot;
+      applyNumericInputMode(adminRoot);
+      adminRoot.addEventListener("keydown", handleKeyDown, true);
+      adminRoot.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+
+      adminObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLElement) applyNumericInputMode(node);
+          });
+        }
+      });
+      adminObserver.observe(adminRoot, { childList: true, subtree: true });
+      return true;
+    };
+
+    if (!connectToAdminRoot()) {
+      const applicationRoot = document.getElementById("root");
+      if (applicationRoot) {
+        bootstrapObserver = new MutationObserver(() => {
+          if (connectToAdminRoot()) bootstrapObserver?.disconnect();
+        });
+        bootstrapObserver.observe(applicationRoot, { childList: true, subtree: true });
+      }
+    }
 
     return () => {
-      observer.disconnect();
-      document.removeEventListener("keydown", handleKeyDown, true);
-      document.removeEventListener("wheel", handleWheel, true);
+      bootstrapObserver?.disconnect();
+      adminObserver?.disconnect();
+      if (adminRoot) {
+        adminRoot.removeEventListener("keydown", handleKeyDown, true);
+        adminRoot.removeEventListener("wheel", handleWheel, true);
+      }
     };
   }, [enabled]);
 }
