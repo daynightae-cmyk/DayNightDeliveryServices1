@@ -12,7 +12,6 @@ const ARROW_NAV_SOURCE_TYPES = new Set([
   "number",
   "email",
   "tel",
-  "search",
   "password",
   "url",
 ]);
@@ -48,7 +47,7 @@ function isVisible(control: FormControl) {
 function isNavigationTarget(control: FormControl) {
   if (!control.closest(ADMIN_FORM_SCOPE)) return false;
   if (control.matches("[data-dn-arrow-nav='off']")) return false;
-  if (control.closest("[role='combobox'], [data-radix-popper-content-wrapper]")) return false;
+  if (control.closest(".dncc-search, [role='search'], [role='combobox'], [data-radix-popper-content-wrapper]")) return false;
   if (control instanceof HTMLInputElement && EXCLUDED_TARGET_TYPES.has(inputType(control))) return false;
   return isVisible(control);
 }
