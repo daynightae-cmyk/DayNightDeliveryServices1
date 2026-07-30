@@ -10,6 +10,15 @@ on:
       - artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs
       - supabase/migrations/**
       - supabase/functions/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/p1-runtime-evidence.yml
+      - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
+      - artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs
+      - supabase/migrations/**
+      - supabase/functions/**
   workflow_dispatch:
 
 permissions:
@@ -22,6 +31,7 @@ concurrency:
 jobs:
   production-evidence:
     name: Finance, tracking, and customer production evidence
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: production-runtime-tests
@@ -50,6 +60,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Run static production acceptance gates
+        run: |
+          pnpm --dir artifacts/day-night-delivery run p1:gate
+          pnpm --dir artifacts/day-night-delivery run international-tracking:gate
+          pnpm --dir artifacts/day-night-delivery run customer-experience:test
+          pnpm --dir artifacts/day-night-delivery run customer-experience:gate
 
       - name: Verify protected production secrets
         env:
@@ -196,18 +213,10 @@ jobs:
           console.log('Protected admin session acquired without exposing credentials.');
           NODE
 
-      - name: Run static production acceptance gates
-        run: |
-          pnpm --dir artifacts/day-night-delivery run p1:gate
-          pnpm --dir artifacts/day-night-delivery run international-tracking:gate
-          pnpm --dir artifacts/day-night-delivery run customer-experience:test
-          pnpm --dir artifacts/day-night-delivery run customer-experience:gate
-
       - name: Run protected P1 runtime health
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          SUPABASE_ADMIN_ACCESS_TOKEN: ${{ env.SUPABASE_ADMIN_ACCESS_TOKEN }}
         shell: bash
         run: |
           set -o pipefail
@@ -236,6 +245,7 @@ jobs:
         if: always()
         shell: bash
         run: |
+          mkdir -p artifacts/day-night-delivery/p1-runtime-evidence
           cat > artifacts/day-night-delivery/p1-runtime-evidence/manual-provider-checks.md <<'EOF'
           # Manual 17TRACK dashboard checks
 
@@ -267,7 +277,11 @@ jobs:
           {
             echo '## DAY NIGHT P1 production runtime evidence'
             echo
-            echo "- Project ref: \`${SUPABASE_PROJECT_REF:0:4}…${SUPABASE_PROJECT_REF: -4}\`"
+            if [ -n "${SUPABASE_PROJECT_REF:-}" ]; then
+              echo "- Project ref: \`${SUPABASE_PROJECT_REF:0:4}…${SUPABASE_PROJECT_REF: -4}\`"
+            else
+              echo '- Project ref: unavailable because protected-secret verification did not complete.'
+            fi
             echo "- Checked at: \`$(date -u +'%Y-%m-%dT%H:%M:%SZ')\`"
             echo '- Evidence artifact: `DAY-NIGHT-P1-Production-Runtime-Evidence`'
             echo '- Secrets and raw provider payloads are not included.'
