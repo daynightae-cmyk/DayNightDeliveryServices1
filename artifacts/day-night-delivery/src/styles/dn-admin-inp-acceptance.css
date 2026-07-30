@@ -230,3 +230,92 @@ html body:has(.dn-admin-fullscreen)
     min-height: 76px !important;
   }
 }
+
+/* Phase 4 render-budget optimization. */
+.dn-admin-fullscreen .dn-section-table-card,
+.dn-admin-fullscreen .dn-admin-bulk-console,
+.dn-admin-fullscreen .dn-section-panels > article,
+.dn-admin-fullscreen .dn-section-kpis > article {
+  contain: layout paint style;
+}
+
+.dn-admin-fullscreen .dn-section-table-wrap tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 132px;
+}
+
+.dn-admin-order-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 175, 55, 0.24);
+  border-radius: 14px;
+  background: rgba(4, 20, 42, 0.72);
+  color: #f7fbff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dn-admin-order-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dn-admin-order-pagination button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-weight: 800;
+}
+
+.dn-admin-order-pagination button:not(:disabled) {
+  cursor: pointer;
+}
+
+.dn-admin-order-pagination button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .dn-admin-fullscreen .dncc-mobile-layer,
+  .dn-admin-fullscreen .dncc-mobile-backdrop,
+  .dn-admin-fullscreen .dncc-mobile-drawer,
+  .dn-admin-fullscreen .abu-khalifa-flyout,
+  .dn-admin-fullscreen .abu-khalifa-launcher,
+  .dn-admin-fullscreen .dn-section-workspace,
+  .dn-admin-fullscreen .dn-section-table-card,
+  .dn-admin-fullscreen .dn-admin-bulk-console,
+  .dn-admin-fullscreen .dn-section-panels > article,
+  .dn-admin-fullscreen .dn-section-kpis > article {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    filter: none !important;
+  }
+
+  .dn-admin-fullscreen .dncc-mobile-drawer,
+  .dn-admin-fullscreen .abu-khalifa-flyout,
+  .dn-admin-fullscreen .dn-section-workspace,
+  .dn-admin-fullscreen .dn-section-table-card,
+  .dn-admin-fullscreen .dn-admin-bulk-console {
+    transition-duration: 80ms !important;
+    animation-duration: 120ms !important;
+    box-shadow: none !important;
+  }
+
+  .dn-admin-order-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dn-admin-order-pagination > div {
+    justify-content: space-between;
+  }
+}
