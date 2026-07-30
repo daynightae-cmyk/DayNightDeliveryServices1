@@ -1,9 +1,10 @@
 /* DAY NIGHT Phase 4 admin interaction-acceptance layout.
    Core administration controls must remain reachable at 1366×768 and on mobile.
-   This file also prevents the full-screen shell from trapping content below the fold. */
+   The medium-desktop executive rail is fixed in a reserved side lane so it
+   cannot be pushed outside the viewport by the command deck or dashboard height. */
 
 :root {
-  --dn-admin-inp-acceptance-version: phase4-20260730-2;
+  --dn-admin-inp-acceptance-version: phase4-20260730-3;
 }
 
 html:has(.dn-admin-fullscreen),
@@ -96,8 +97,59 @@ html body:has(.dn-admin-fullscreen)
   html body:has(.dn-admin-fullscreen)
     .dn-admin-fullscreen
     .dn-admin-home-full {
-    grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) !important;
-    gap: 14px !important;
+    display: block !important;
+    grid-template-columns: none !important;
+    grid-template-areas: none !important;
+    gap: 0 !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen[dir="rtl"]
+    .dn-admin-home-full {
+    padding-left: 264px !important;
+    padding-right: 0 !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen[dir="ltr"]
+    .dn-admin-home-full {
+    padding-right: 264px !important;
+    padding-left: 0 !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .dn-admin-left-ai.dn-admin-left-ai--executive {
+    position: fixed !important;
+    top: 180px !important;
+    z-index: 60 !important;
+    width: 240px !important;
+    max-width: 240px !important;
+    max-height: calc(100dvh - 196px) !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen[dir="rtl"]
+    .dn-admin-left-ai.dn-admin-left-ai--executive {
+    right: auto !important;
+    left: 16px !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen[dir="ltr"]
+    .dn-admin-left-ai.dn-admin-left-ai--executive {
+    right: 16px !important;
+    left: auto !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
+    .dn-admin-workspace-host {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
 
   html body:has(.dn-admin-fullscreen)
@@ -150,10 +202,18 @@ html body:has(.dn-admin-fullscreen)
 
   html body:has(.dn-admin-fullscreen)
     .dn-admin-fullscreen
+    .dn-admin-home-full {
+    padding: 0 !important;
+  }
+
+  html body:has(.dn-admin-fullscreen)
+    .dn-admin-fullscreen
     .dn-admin-left-ai.dn-admin-left-ai--executive {
+    position: static !important;
     order: 2 !important;
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
   }
 
   html body:has(.dn-admin-fullscreen)
