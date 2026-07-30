@@ -1,0 +1,175 @@
+name: Admin Order Financial Save Hotfix
+
+on:
+  push:
+    branches: [fix/admin-order-financial-save-20260731]
+    paths:
+      - .github/workflows/admin-order-financial-save-hotfix.yml
+      - supabase/migrations/20260731023000_admin_order_financial_save_repair.sql
+      - supabase/migrations/20260731023100_admin_order_legacy_validation_delta.sql
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/admin-order-financial-save-hotfix.yml
+      - supabase/migrations/20260731023000_admin_order_financial_save_repair.sql
+      - supabase/migrations/20260731023100_admin_order_legacy_validation_delta.sql
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-order-financial-save-production-hotfix
+  cancel-in-progress: false
+
+jobs:
+  deploy-and-verify:
+    name: Deploy and verify production financial editing
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify protected production configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          test -n "$project_ref"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Production project resolved safely."
+
+      - name: Build isolated reviewed migration release
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/day-night-admin-order-hotfix"
+          rm -rf "$workdir"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+          supabase --workdir "$workdir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+
+          targets=(
+            20260731023000_admin_order_financial_save_repair.sql
+            20260731023100_admin_order_legacy_validation_delta.sql
+          )
+          pending=0
+          for target in "${targets[@]}"; do
+            test -f "supabase/migrations/$target"
+            if find "$workdir/supabase/migrations" -maxdepth 1 -type f -name "${target%%_*}_*.sql" | grep -q .; then
+              echo "$target already recorded in production."
+            else
+              cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+              pending=$((pending + 1))
+            fi
+          done
+
+          echo "HOTFIX_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "HOTFIX_PENDING=$pending" >> "$GITHUB_ENV"
+          echo "Pending reviewed hotfix migrations: $pending"
+
+      - name: Validate and apply production migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$HOTFIX_PENDING" -gt 0 ]; then
+            supabase --workdir "$HOTFIX_WORKDIR" db push --dry-run
+            supabase --workdir "$HOTFIX_WORKDIR" db push --yes
+          else
+            echo "No database write required; both migrations are already recorded."
+          fi
+          supabase --workdir "$HOTFIX_WORKDIR" migration list --linked | tee /tmp/hotfix-migrations.txt
+          grep -Fq '20260731023000' /tmp/hotfix-migrations.txt
+          grep -Fq '20260731023100' /tmp/hotfix-migrations.txt
+
+      - name: Authenticate production admin session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: process.env.RUNTIME_ADMIN_EMAIL,
+              password: process.env.RUNTIME_ADMIN_PASSWORD,
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.access_token) {
+            throw new Error(`admin_auth_failed_http_${response.status}`);
+          }
+          console.log(`::add-mask::${payload.access_token}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `HOTFIX_ADMIN_TOKEN=${payload.access_token}\n`);
+          NODE
+
+      - name: Verify production health RPCs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const token = String(process.env.HOTFIX_ADMIN_TOKEN || '');
+          const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+          for (const rpc of ['admin_order_financial_save_health', 'admin_order_legacy_validation_health']) {
+            const response = await fetch(`${url}/rest/v1/rpc/${rpc}`, { method: 'POST', headers, body: '{}' });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload?.ok !== true) {
+              console.error(rpc, response.status, payload);
+              process.exit(1);
+            }
+            console.log(`${rpc}: OK`);
+          }
+          NODE
+
+      - name: Publish hotfix result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Admin order financial save hotfix'
+            echo
+            echo '- Manual zero remains an explicit marker and resolves to a 25 AED merchant debit.'
+            echo '- Positive manual delivery prices persist exactly.'
+            echo '- Historical rows can be financially edited without unrelated legacy-field rejection.'
+            echo '- Delivered/posted orders remain protected by the audited correction path.'
+            echo "- Checked at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
