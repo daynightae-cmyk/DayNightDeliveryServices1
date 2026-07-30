@@ -51,6 +51,16 @@ jobs:
           cp supabase/migrations/20260730130000_p1_direct_finance_backfill.sql "$workdir/supabase/migrations/"
           echo "P1_DEBUG_WORKDIR=$workdir" >> "$GITHUB_ENV"
 
+      - name: Dump live public schema for constraint inspection
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --workdir "$P1_DEBUG_WORKDIR" db dump --linked --schema public \
+            --file artifacts/day-night-delivery/p1-runtime-evidence/live-public-schema.sql
+
       - name: Execute isolated migration with debug diagnostics
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -61,11 +71,11 @@ jobs:
           supabase --workdir "$P1_DEBUG_WORKDIR" db push --yes --debug 2>&1 \
             | tee artifacts/day-night-delivery/p1-runtime-evidence/migration-debug.log
 
-      - name: Upload sanitized diagnostic log
+      - name: Upload sanitized diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DAY-NIGHT-P1-Migration-Debug
-          path: artifacts/day-night-delivery/p1-runtime-evidence/migration-debug.log
+          path: artifacts/day-night-delivery/p1-runtime-evidence/
           if-no-files-found: warn
           retention-days: 1
