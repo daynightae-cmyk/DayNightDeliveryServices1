@@ -121,15 +121,60 @@ function localizedPart(record: FlexibleOrder, language: ExportDocumentLanguage, 
 }
 export function localizedOrderCity(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
   const record = order as FlexibleOrder;
-  return localizedPart(record, language,
-    side === "receiver" ? ["receiver_city_ar", "delivery_city_ar", "receiver_emirate_ar", "delivery_emirate_ar", "destination_country_ar"] : ["sender_city_ar", "pickup_city_ar", "sender_emirate_ar", "pickup_emirate_ar"],
-    side === "receiver" ? ["receiver_city", "delivery_city", "receiver_emirate", "delivery_emirate", "destination_country"] : ["sender_city", "pickup_city", "sender_emirate", "pickup_emirate"]);
+  const cityArabicKeys = side === "receiver"
+    ? ["receiver_city_ar", "delivery_city_ar"]
+    : ["sender_city_ar", "pickup_city_ar"];
+  const cityFallbackKeys = side === "receiver"
+    ? ["receiver_city", "delivery_city"]
+    : ["sender_city", "pickup_city"];
+  const broaderArabicKeys = side === "receiver"
+    ? ["receiver_emirate_ar", "delivery_emirate_ar", "destination_country_ar"]
+    : ["sender_emirate_ar", "pickup_emirate_ar"];
+  const broaderFallbackKeys = side === "receiver"
+    ? ["receiver_emirate", "delivery_emirate", "destination_country"]
+    : ["sender_emirate", "pickup_emirate"];
+
+  if (language === "ar") {
+    const explicitArabicCity = explicitText(record, cityArabicKeys);
+    if (explicitArabicCity) return explicitArabicCity;
+  }
+  const city = explicitText(record, cityFallbackKeys);
+  if (city) return localizeExportText(city, language);
+  if (language === "ar") {
+    const explicitArabicBroaderLocation = explicitText(record, broaderArabicKeys);
+    if (explicitArabicBroaderLocation) return explicitArabicBroaderLocation;
+  }
+  return localizeExportText(explicitText(record, broaderFallbackKeys), language);
 }
+function combineAddressParts(parts: string[]) {
+  const combined: string[] = [];
+  for (const rawPart of parts) {
+    const part = clean(rawPart);
+    if (!part || part === EMPTY) continue;
+    const normalized = part.replace(/\s+/g, " ").trim();
+    if (combined.some((existing) => existing === normalized || existing.includes(normalized) || normalized.includes(existing))) continue;
+    combined.push(normalized);
+  }
+  return combined.join("، ") || EMPTY;
+}
+
 export function localizedOrderAddress(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
   const record = order as FlexibleOrder;
-  return localizedPart(record, language,
-    side === "receiver" ? ["receiver_address_ar", "delivery_address_ar", "receiver_area_ar", "delivery_area_ar", "receiver_landmark_ar", "delivery_landmark_ar"] : ["sender_address_ar", "pickup_address_ar", "sender_area_ar", "pickup_area_ar", "sender_landmark_ar", "pickup_landmark_ar"],
-    side === "receiver" ? ["receiver_address", "delivery_address", "receiver_area", "delivery_area", "receiver_landmark", "delivery_landmark"] : ["sender_address", "pickup_address", "sender_area", "pickup_area", "sender_landmark", "pickup_landmark"]);
+  const fullArabicKeys = side === "receiver"
+    ? ["receiver_address_ar", "delivery_address_ar"]
+    : ["sender_address_ar", "pickup_address_ar"];
+  const partialArabicKeys = side === "receiver"
+    ? ["receiver_area_ar", "delivery_area_ar", "receiver_landmark_ar", "delivery_landmark_ar"]
+    : ["sender_area_ar", "pickup_area_ar", "sender_landmark_ar", "pickup_landmark_ar"];
+  const fallbackKeys = side === "receiver"
+    ? ["receiver_address", "delivery_address", "receiver_area", "delivery_area", "receiver_landmark", "delivery_landmark"]
+    : ["sender_address", "pickup_address", "sender_area", "pickup_area", "sender_landmark", "pickup_landmark"];
+  const fallback = localizeExportText(explicitText(record, fallbackKeys), language);
+  if (language !== "ar") return fallback;
+
+  const fullArabic = explicitText(record, fullArabicKeys);
+  const partialArabic = partialArabicKeys.map((key) => clean(record[key])).filter(Boolean);
+  return combineAddressParts([fullArabic || fallback, ...partialArabic]);
 }
 export function localizedOrderDestination(order: Order, language: ExportDocumentLanguage) {
   const city = localizedOrderCity(order, language, "receiver");
@@ -142,19 +187,19 @@ export function localizedOrderRoute(order: Order, language: ExportDocumentLangua
   return `${localizedOrderCity(order, language, "sender")} → ${localizedOrderCity(order, language, "receiver")}`;
 }
 export function localizedOrderStatus(value: unknown, language: ExportDocumentLanguage) {
-  if (language !== "ar") return clean(value).replace(/_/g, " ") || EMPTY;
+  if (language !== "ar") return clean(value) || EMPTY;
   const key = normalizeKey(value); return STATUS_AR[key] || localizeExportText(clean(value).replace(/_/g, " "), language);
 }
 export function localizedPaymentMethod(value: unknown, language: ExportDocumentLanguage) {
-  if (language !== "ar") return clean(value).replace(/_/g, " ") || EMPTY;
+  if (language !== "ar") return clean(value) || EMPTY;
   const key = normalizeKey(value); return PAYMENT_AR[key] || localizeExportText(clean(value).replace(/_/g, " "), language);
 }
 export function localizedServiceType(value: unknown, language: ExportDocumentLanguage) {
-  if (language !== "ar") return clean(value).replace(/_/g, " ") || EMPTY;
+  if (language !== "ar") return clean(value) || EMPTY;
   const key = normalizeKey(value); return SERVICE_AR[key] || localizeExportText(clean(value).replace(/_/g, " "), language);
 }
 export function localizedPackageType(value: unknown, language: ExportDocumentLanguage) {
-  if (language !== "ar") return clean(value).replace(/_/g, " ") || EMPTY;
+  if (language !== "ar") return clean(value) || EMPTY;
   const key = normalizeKey(value); return PACKAGE_AR[key] || localizeExportText(clean(value).replace(/_/g, " "), language);
 }
 export function localizeExportField(key: string, label: string, value: unknown, language: ExportDocumentLanguage) {

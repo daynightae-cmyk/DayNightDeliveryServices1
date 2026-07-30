@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { localizeExportText, localizedOrderStatus } from "./exportLocalization";
 
 export type MerchantStatementLanguage = "ar" | "en";
 
@@ -194,9 +195,18 @@ function normalizeStatementRow(row: MerchantStatementRow): MerchantStatementRow 
 }
 
 function normalizedPayload(payload: MerchantStatementPayload): MerchantStatementPayload {
-  const rows = payload.rows.map(normalizeStatementRow);
+  const rows = payload.rows.map(normalizeStatementRow).map((row) => ({
+    ...row,
+    destination: localizeExportText(row.destination, payload.language),
+    status: row.status ? localizedOrderStatus(row.status, payload.language) : row.status,
+  }));
   return {
     ...payload,
+    merchant: {
+      ...payload.merchant,
+      location: payload.merchant.location ? localizeExportText(payload.merchant.location, payload.language) : payload.merchant.location,
+      address: payload.merchant.address ? localizeExportText(payload.merchant.address, payload.language) : payload.merchant.address,
+    },
     rows,
     totals: {
       orders: rows.length,

@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { localizeExportField } from "./exportLocalization";
 
 export type AdminPdfLanguage = "ar" | "en";
 export type AdminPdfColumn = { key: string; label: string };
@@ -31,6 +32,10 @@ function html(value: unknown) {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function localizedCell(payload: AdminPdfPayload, column: AdminPdfColumn, value: unknown) {
+  return localizeExportField(column.key, column.label, value, payload.language);
 }
 
 function visibleColumns(payload: AdminPdfPayload) {
@@ -114,7 +119,7 @@ function buildReportHtml(payload: AdminPdfPayload) {
     <p class="subtitle">${isArabic ? "ملف إداري صادر من لوحة تحكم DAY NIGHT" : "Administrative file from DAY NIGHT Admin Dashboard"}</p>
     ${showFilters ? `<section class="filters"><b>${isArabic ? "الفلاتر / البحث" : "Filters / Search"}</b><br />${html(payload.filters || (isArabic ? "بدون فلاتر" : "No filters"))}</section>` : ""}
     ${showSummary && totals.length ? `<section class="totals">${totals.map(([key, value]) => `<article class="total-card"><b>${html(key)}</b><span>${html(value)}</span></article>`).join("")}</section>` : ""}
-    ${rows.length ? `<table><thead><tr>${columns.map((column) => `<th>${html(column.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${columns.map((column) => `<td>${html(row[column.key])}</td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="empty">${isArabic ? "لا توجد بيانات في هذا التقرير." : "No data in this report."}</div>`}
+    ${rows.length ? `<table><thead><tr>${columns.map((column) => `<th>${html(column.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${columns.map((column) => `<td>${html(localizedCell(payload, column, row[column.key]))}</td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="empty">${isArabic ? "لا توجد بيانات في هذا التقرير." : "No data in this report."}</div>`}
     <footer><span>${isArabic ? "تم إنشاء الملف تلقائياً من نظام DAY NIGHT التشغيلي." : "Generated automatically from the DAY NIGHT operations system."}</span><span>DAY NIGHT</span></footer>
   </main>
 </body>
@@ -129,7 +134,7 @@ function csvValue(value: unknown) {
 export function buildAdminCsv(payload: AdminPdfPayload) {
   const columns = visibleColumns(payload);
   const header = columns.map((column) => csvValue(column.label)).join(",");
-  const rows = safeRows(payload).map((row) => columns.map((column) => csvValue(row[column.key])).join(","));
+  const rows = safeRows(payload).map((row) => columns.map((column) => csvValue(localizedCell(payload, column, row[column.key]))).join(","));
   const csv = `\uFEFF${[header, ...rows].join("\r\n")}`;
   downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeFileStem(payload)}.csv`);
 }
@@ -279,7 +284,7 @@ function drawPdfPage(payload: AdminPdfPayload, rows: Record<string, unknown>[], 
         const x = margin + index * columnWidth;
         ctx.strokeStyle = "#e2e8f0";
         ctx.strokeRect(x, y, columnWidth, rowHeight);
-        const value = row[column.key];
+        const value = localizedCell(payload, column, row[column.key]);
         const isLtr = ltrPattern.test(column.key);
         const align: CanvasTextAlign = isLtr ? "left" : "center";
         const textX = isLtr ? x + 7 : x + columnWidth / 2;

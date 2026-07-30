@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { Merchant, Order } from "../../types";
 import type { MerchantStatementPayload } from "../../lib/merchantStatementExport";
+import { localizeExportText, localizedOrderDestination } from "../../lib/exportLocalization";
 import MerchantStatementExportButton from "./MerchantStatementExportButton";
 
 type Props = {
@@ -134,10 +135,8 @@ function merchantSettlement(value: unknown, isArabic: boolean) {
     : `Due to merchant ${money(parsed, false)}`;
 }
 
-function routeText(order: Order) {
-  return [order.receiver_city || order.destination_country, order.receiver_address]
-    .filter(Boolean)
-    .join("، ") || "—";
+function routeText(order: Order, isArabic: boolean) {
+  return localizedOrderDestination(order, isArabic ? "ar" : "en");
 }
 
 function MerchantMetric({
@@ -284,8 +283,8 @@ export default function AdminMerchantStatementsCenter({
         code: merchant?.merchant_code,
         phone: merchant?.phone,
         email: merchant?.email,
-        location: [merchant?.emirate, merchant?.city].filter(Boolean).join("، "),
-        address: merchant?.address || merchant?.pickup_address,
+        location: localizeExportText([merchant?.emirate, merchant?.city].filter(Boolean).join("، "), isArabic ? "ar" : "en"),
+        address: localizeExportText(merchant?.address || merchant?.pickup_address, isArabic ? "ar" : "en"),
       },
       rows: exportOrders.map((order, index) => ({
         index: index + 1,
@@ -293,7 +292,7 @@ export default function AdminMerchantStatementsCenter({
         coupon: clean(order.coupon_number) || "—",
         customer: order.receiver_name || order.customer_name || "—",
         phone: order.receiver_phone || order.customer_phone || "—",
-        destination: routeText(order),
+        destination: routeText(order, isArabic),
         date: clean(order.delivery_date || order.created_at).slice(0, 10) || "—",
         customerTotal: customerValue(order),
         deliveryFee: deliveryValue(order),
