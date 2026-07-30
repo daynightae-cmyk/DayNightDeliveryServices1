@@ -1,0 +1,122 @@
+name: Runtime Full Arabic Addresses
+
+on:
+  push:
+    branches:
+      - fix/runtime-full-arabic-addresses
+    paths:
+      - .github/workflows/runtime-full-arabic-addresses.yml
+      - artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-full-arabic-addresses
+  cancel-in-progress: false
+
+jobs:
+  apply-validate-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/runtime-full-arabic-addresses
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply complete runtime Arabic address policy
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+          git rm artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+          git rm .github/workflows/runtime-full-arabic-addresses.yml
+
+      - name: Install dependencies
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate TypeScript
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm exec tsc --noEmit
+
+      - name: Validate complete Arabic address policy
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: node scripts/export-language-policy-gate.mjs
+
+      - name: Run complete production gate
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm production:gate
+
+      - name: Build production application
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm build
+
+      - name: Remove build-generated asset changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated=(
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-dashboard-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-map.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/intro-gateway.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/khalifa-card-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/loading-command-center.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-extra-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/logo-glass.png
+            artifacts/day-night-delivery/public/assets/daynight/merchant-statement-logo.png
+          )
+          for path in "${generated[@]}"; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git restore --source=HEAD --staged --worktree -- "$path"
+            else
+              rm -f -- "$path"
+            fi
+          done
+
+      - name: Commit validated source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git commit -m "fix(i18n): localize complete addresses across every surface"
+          git push origin HEAD:fix/runtime-full-arabic-addresses
+
+      - name: Publish validation summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Complete Arabic address runtime"
+            echo
+            echo "- Full city, area, street, building, villa/apartment, floor and landmark policy."
+            echo "- Applied to public web, admin, customer, merchant and driver surfaces."
+            echo "- Applied to Android/iOS role shells through the shared native React runtime."
+            echo "- TypeScript, policy gate, production gate and production build must all pass before publication."
+          } >> "$GITHUB_STEP_SUMMARY"
