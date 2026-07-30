@@ -7,6 +7,7 @@ on:
       - .github/workflows/p1-runtime-evidence.yml
       - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
       - artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs
+      - artifacts/day-night-delivery/scripts/p1-production-hardening-gate.mjs
       - supabase/migrations/**
       - supabase/functions/**
   pull_request:
@@ -15,6 +16,7 @@ on:
       - .github/workflows/p1-runtime-evidence.yml
       - artifacts/day-night-delivery/scripts/p1-runtime-health.mjs
       - artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs
+      - artifacts/day-night-delivery/scripts/p1-production-hardening-gate.mjs
       - supabase/migrations/**
       - supabase/functions/**
   workflow_dispatch:
@@ -159,6 +161,7 @@ jobs:
             20260730095500_finance_authoritative_reconciliation_health.sql
             20260730100500_international_tracking_runtime_health.sql
             20260730101500_admin_order_legacy_insert_guard.sql
+            20260730114000_p1_runtime_reconciliation_repair.sql
           )
 
           for target in "${targets[@]}"; do
@@ -187,7 +190,7 @@ jobs:
           supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/isolated-migrations-before.txt"
           if [ "$P1_PENDING_COUNT" -eq 0 ]; then
-            echo 'All four reviewed P1 migrations are already recorded in production.' \
+            echo 'All reviewed P1 migrations are already recorded in production.' \
               | tee "$evidence/isolated-db-push-dry-run.txt"
             exit 0
           fi
@@ -215,7 +218,7 @@ jobs:
           fi
           supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/migrations-after.txt"
-          for version in 20260730094500 20260730095500 20260730100500 20260730101500; do
+          for version in 20260730094500 20260730095500 20260730100500 20260730101500 20260730114000; do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2
               exit 1
@@ -252,6 +255,7 @@ jobs:
             > artifacts/day-night-delivery/p1-runtime-evidence/track17-secret-proof.txt
 
       - name: Authenticate protected admin test session
+        id: admin_auth
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -281,7 +285,61 @@ jobs:
           console.log('Protected admin session acquired without exposing credentials.');
           NODE
 
+      - name: Reconcile finance and refresh 17TRACK quota
+        id: runtime_repair
+        if: ${{ steps.admin_auth.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root = 'artifacts/day-night-delivery/p1-runtime-evidence';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const token = String(process.env.SUPABASE_ADMIN_ACCESS_TOKEN || '');
+          const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+          async function post(path, body) {
+            const response = await fetch(`${url}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+            const payload = await response.json().catch(() => ({}));
+            return { response, payload };
+          }
+
+          const finance = await post('/rest/v1/rpc/admin_reconcile_authoritative_finance', {});
+          fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance.payload, null, 2));
+          if (!finance.response.ok || finance.payload?.ok !== true) {
+            console.error(`Finance reconciliation failed with HTTP ${finance.response.status}.`);
+            process.exit(1);
+          }
+
+          const quota = await post('/functions/v1/track17-admin', { action: 'quota', force: true });
+          const quotaProof = {
+            ok: quota.payload?.ok === true,
+            cached: quota.payload?.cached === true,
+            quota: quota.payload?.quota ? {
+              total: quota.payload.quota.quota_total,
+              used: quota.payload.quota.quota_used,
+              remain: quota.payload.quota.quota_remain,
+              today_used: quota.payload.quota.today_used,
+              max_track_daily: quota.payload.quota.max_track_daily,
+              checked_at: quota.payload.quota.checked_at,
+            } : null,
+          };
+          fs.writeFileSync(`${root}/track17-quota-proof.json`, JSON.stringify(quotaProof, null, 2));
+          if (!quota.response.ok || quota.payload?.ok !== true) {
+            console.error(`17TRACK quota refresh failed with HTTP ${quota.response.status}.`);
+            process.exit(1);
+          }
+          console.log('Finance reconciliation and 17TRACK quota refresh completed.');
+          NODE
+
       - name: Run protected P1 runtime health
+        id: runtime_health
+        if: ${{ steps.admin_auth.outcome == 'success' }}
+        continue-on-error: true
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -291,6 +349,9 @@ jobs:
             | tee artifacts/day-night-delivery/p1-runtime-evidence/p1-runtime-health.log
 
       - name: Run protected Customer Experience lifecycle
+        id: customer_e2e
+        if: ${{ always() && steps.admin_auth.outcome == 'success' }}
+        continue-on-error: true
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -306,6 +367,25 @@ jobs:
           set -o pipefail
           pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
             | tee artifacts/day-night-delivery/p1-runtime-evidence/customer-experience-e2e.log
+
+      - name: Enforce protected runtime acceptance
+        if: always()
+        run: |
+          set -euo pipefail
+          failed=0
+          for result in \
+            "admin_auth=${{ steps.admin_auth.outcome }}" \
+            "runtime_repair=${{ steps.runtime_repair.outcome }}" \
+            "runtime_health=${{ steps.runtime_health.outcome }}" \
+            "customer_e2e=${{ steps.customer_e2e.outcome }}"
+          do
+            echo "$result"
+            if [[ "$result" != *=success ]]; then failed=1; fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo 'One or more protected runtime acceptance stages failed.' >&2
+            exit 1
+          fi
 
       - name: Record manual provider-dashboard acceptance boundary
         if: always()
