@@ -2,6 +2,7 @@
    Core administration controls must remain reachable at 1366×768 and on mobile.
    The medium-desktop executive rail is fixed in a reserved side lane so it
    cannot be pushed outside the viewport by the command deck or dashboard height. */
+/* Verified geometry contract: no transform may displace the rail from its physical edge. */
 
 :root {
   --dn-admin-inp-acceptance-version: phase4-20260730-4;
