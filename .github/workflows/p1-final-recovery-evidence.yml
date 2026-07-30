@@ -1,0 +1,205 @@
+name: P1 Final Runtime Recovery Evidence
+
+on:
+  push:
+    branches: [runtime/issue-266-evidence]
+    paths:
+      - .github/workflows/p1-final-recovery-evidence.yml
+      - supabase/migrations/20260730133000_track17_recovery_health.sql
+      - supabase/migrations/20260730134000_driver_out_for_delivery_alias.sql
+      - supabase/functions/sync-track17-shipment/index.ts
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/p1-final-recovery-evidence.yml
+      - supabase/migrations/20260730133000_track17_recovery_health.sql
+      - supabase/migrations/20260730134000_driver_out_for_delivery_alias.sql
+      - supabase/functions/sync-track17-shipment/index.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-production-runtime-evidence
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Deploy runtime recovery and verify production
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify protected inputs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD RUNTIME_DRIVER_EMAIL RUNTIME_DRIVER_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          mkdir -p artifacts/day-night-delivery/p1-runtime-evidence
+
+      - name: Build isolated recovery migration workdir
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/p1-final-recovery"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+          supabase --workdir "$workdir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+          for migration in \
+            20260730133000_track17_recovery_health.sql \
+            20260730134000_driver_out_for_delivery_alias.sql
+          do
+            if ! find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' | grep -Fxq "$migration"; then
+              cp "supabase/migrations/$migration" "$workdir/supabase/migrations/$migration"
+            fi
+          done
+          echo "P1_RECOVERY_WORKDIR=$workdir" >> "$GITHUB_ENV"
+
+      - name: Dry-run and apply reviewed recovery migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --workdir "$P1_RECOVERY_WORKDIR" db push --dry-run 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/recovery-dry-run.log
+          supabase --workdir "$P1_RECOVERY_WORKDIR" db push --yes 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/recovery-push.log
+          supabase --workdir "$P1_RECOVERY_WORKDIR" migration list --linked 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/recovery-migrations-after.log
+          grep -Fq '20260730133000' artifacts/day-night-delivery/p1-runtime-evidence/recovery-migrations-after.log
+          grep -Fq '20260730134000' artifacts/day-night-delivery/p1-runtime-evidence/recovery-migrations-after.log
+
+      - name: Deploy corrected tracking sync function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy sync-track17-shipment --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Authenticate admin and recover active tracking
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root = 'artifacts/day-night-delivery/p1-runtime-evidence';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const authResponse = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: process.env.RUNTIME_ADMIN_EMAIL, password: process.env.RUNTIME_ADMIN_PASSWORD }),
+          });
+          const auth = await authResponse.json().catch(() => ({}));
+          if (!authResponse.ok || !auth.access_token) throw new Error(`admin_auth_http_${authResponse.status}`);
+          console.log(`::add-mask::${auth.access_token}`);
+          const headers = { apikey: key, Authorization: `Bearer ${auth.access_token}`, 'Content-Type': 'application/json' };
+          async function post(path, body) {
+            const response = await fetch(`${url}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+            const payload = await response.json().catch(() => ({}));
+            return { response, payload };
+          }
+          const quota = await post('/functions/v1/track17-admin', { action: 'quota', force: true });
+          if (!quota.response.ok || quota.payload?.ok !== true) throw new Error(`quota_http_${quota.response.status}`);
+          const listing = await post('/functions/v1/track17-admin', { action: 'list', limit: 100 });
+          if (!listing.response.ok || listing.payload?.ok !== true) throw new Error(`list_http_${listing.response.status}`);
+          const active = (Array.isArray(listing.payload.shipments) ? listing.payload.shipments : [])
+            .filter((shipment) => !['delivered', 'expired'].includes(String(shipment?.normalized_status || '').toLowerCase()))
+            .filter((shipment) => !shipment?.tracking_stopped_at);
+          const results = [];
+          for (const shipment of active) {
+            const sync = await post('/functions/v1/sync-track17-shipment', { shipment_id: shipment.id, force: true });
+            results.push({ ok: sync.payload?.ok === true, status: sync.response.status, code: sync.payload?.code || null });
+          }
+          const proof = {
+            active_shipments: active.length,
+            successful_syncs: results.filter((item) => item.ok).length,
+            failed_syncs: results.filter((item) => !item.ok).length,
+            results,
+          };
+          fs.writeFileSync(`${root}/track17-recovery-sync.json`, JSON.stringify(proof, null, 2));
+          if (proof.failed_syncs) throw new Error(`recovery_sync_failures_${proof.failed_syncs}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `SUPABASE_ADMIN_ACCESS_TOKEN=${auth.access_token}\n`);
+          NODE
+
+      - name: Run protected P1 runtime health
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run p1:runtime-health 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/final-p1-runtime-health.log
+
+      - name: Run protected Customer Experience lifecycle
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+          RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+          CUSTOMER_EXPERIENCE_E2E_KEEP_DATA: false
+        run: |
+          set -o pipefail
+          pnpm --dir artifacts/day-night-delivery run customer-experience:e2e 2>&1 \
+            | tee artifacts/day-night-delivery/p1-runtime-evidence/final-customer-experience-e2e.log
+
+      - name: Upload sanitized final recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-P1-Final-Recovery-Evidence
+          path: artifacts/day-night-delivery/p1-runtime-evidence/
+          if-no-files-found: error
+          retention-days: 30
