@@ -13,15 +13,73 @@ def write(path: str, content: str) -> None:
     target.write_text(content, encoding="utf-8")
 
 
-def replace_once(path: str, old: str, new: str) -> None:
-    content = read(path)
+def replace_text_once(content: str, old: str, new: str, label: str) -> str:
     count = content.count(old)
     if count != 1:
-        raise SystemExit(f"{path}: expected one occurrence, found {count}: {old[:120]!r}")
-    write(path, content.replace(old, new, 1))
+        raise SystemExit(f"{label}: expected one occurrence, found {count}: {old[:120]!r}")
+    return content.replace(old, new, 1)
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    content = read(path)
+    write(path, replace_text_once(content, old, new, path))
 
 
 template = read("scripts/export-localization-template.ts.txt")
+template = replace_text_once(
+    template,
+    '''export function localizedOrderAddress(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
+  const record = order as FlexibleOrder;
+  return localizedPart(record, language,
+    side === "receiver" ? ["receiver_address_ar", "delivery_address_ar", "receiver_area_ar", "delivery_area_ar", "receiver_landmark_ar", "delivery_landmark_ar"] : ["sender_address_ar", "pickup_address_ar", "sender_area_ar", "pickup_area_ar", "sender_landmark_ar", "pickup_landmark_ar"],
+    side === "receiver" ? ["receiver_address", "delivery_address", "receiver_area", "delivery_area", "receiver_landmark", "delivery_landmark"] : ["sender_address", "pickup_address", "sender_area", "pickup_area", "sender_landmark", "pickup_landmark"]);
+}''',
+    '''function combineAddressParts(parts: string[]) {
+  const combined: string[] = [];
+  for (const rawPart of parts) {
+    const part = clean(rawPart);
+    if (!part || part === EMPTY) continue;
+    const normalized = part.replace(/\\s+/g, " ").trim();
+    if (combined.some((existing) => existing === normalized || existing.includes(normalized) || normalized.includes(existing))) continue;
+    combined.push(normalized);
+  }
+  return combined.join("، ") || EMPTY;
+}
+
+export function localizedOrderAddress(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
+  const record = order as FlexibleOrder;
+  const fullArabicKeys = side === "receiver"
+    ? ["receiver_address_ar", "delivery_address_ar"]
+    : ["sender_address_ar", "pickup_address_ar"];
+  const partialArabicKeys = side === "receiver"
+    ? ["receiver_area_ar", "delivery_area_ar", "receiver_landmark_ar", "delivery_landmark_ar"]
+    : ["sender_area_ar", "pickup_area_ar", "sender_landmark_ar", "pickup_landmark_ar"];
+  const fallbackKeys = side === "receiver"
+    ? ["receiver_address", "delivery_address", "receiver_area", "delivery_area", "receiver_landmark", "delivery_landmark"]
+    : ["sender_address", "pickup_address", "sender_area", "pickup_area", "sender_landmark", "pickup_landmark"];
+  const fallback = localizeExportText(explicitText(record, fallbackKeys), language);
+  if (language !== "ar") return fallback;
+
+  const fullArabic = explicitText(record, fullArabicKeys);
+  const partialArabic = partialArabicKeys.map((key) => clean(record[key])).filter(Boolean);
+  return combineAddressParts([fullArabic || fallback, ...partialArabic]);
+}''',
+    "export localization template address contract",
+)
+for function_name in (
+    "localizedOrderStatus",
+    "localizedPaymentMethod",
+    "localizedServiceType",
+    "localizedPackageType",
+):
+    template = replace_text_once(
+        template,
+        f'''export function {function_name}(value: unknown, language: ExportDocumentLanguage) {{
+  if (language !== "ar") return clean(value).replace(/_/g, " ") || EMPTY;''',
+        f'''export function {function_name}(value: unknown, language: ExportDocumentLanguage) {{
+  if (language !== "ar") return clean(value) || EMPTY;''',
+        f"{function_name} English preservation contract",
+    )
 write("src/lib/exportLocalization.ts", template)
 
 # Remove the accidental zero-impact placeholder through the reviewed source PR.
@@ -53,10 +111,11 @@ replace_once("src/components/admin/AdminOrderBulkOperations.tsx", 'import type {
 replace_once("src/components/admin/AdminOrderBulkOperations.tsx", '      route: `${clean(order.sender_city) || "—"} → ${clean(order.receiver_city || order.destination_country) || "—"}`,', '      route: localizedOrderRoute(order, isArabic ? "ar" : "en"),')
 replace_once("src/components/admin/AdminOrderBulkOperations.tsx", '${escapeHtml(order.sender_city || "—")} → ${escapeHtml(order.receiver_city || order.destination_country || "—")}', '${escapeHtml(localizedOrderRoute(order, isArabic ? "ar" : "en"))}')
 
-replace_once("src/lib/invoice.ts", 'import { supabase } from "../supabase";\n', 'import { supabase } from "../supabase";\nimport { localizedOrderAddress, localizedOrderCity, localizedOrderRoute, localizedOrderStatus, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "./exportLocalization";\n')
+replace_once("src/lib/invoice.ts", 'import { supabase } from "../supabase";\n', 'import { supabase } from "../supabase";\nimport { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedOrderRoute, localizedOrderStatus, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "./exportLocalization";\n')
 replace_once("src/lib/invoice.ts", '      senderCity: safeText(order.sender_city),\n      senderAddress: safeText(order.sender_address),', '      senderCity: localizedOrderCity(order, lang, "sender"),\n      senderAddress: localizedOrderAddress(order, lang, "sender"),')
 replace_once("src/lib/invoice.ts", '      receiverCity: safeText(order.receiver_city),\n      receiverAddress: safeText(order.receiver_address),', '      receiverCity: localizedOrderCity(order, lang, "receiver"),\n      receiverAddress: localizedOrderAddress(order, lang, "receiver"),')
 replace_once("src/lib/invoice.ts", '      packageType: safeText(order.package_type),', '      packageType: localizedPackageType(order.package_type, lang),')
+replace_once("src/lib/invoice.ts", '      description: safeText(order.package_description || order.package_type || order.notes),', '      description: order.package_description\n        ? localizeExportText(order.package_description, lang)\n        : localizedPackageType(order.package_type || "shipment", lang),')
 replace_once("src/lib/invoice.ts", '      serviceType: safeText(order.service_type || "Standard"),\n      fromCity: safeText(order.sender_city),\n      toCity: safeText(order.receiver_city),\n      route: `${safeText(order.sender_city)} → ${safeText(order.receiver_city)}`,\n      status: safeText(order.status),\n      paymentMethod: safeText(order.payment_method),', '      serviceType: localizedServiceType(order.service_type || "standard", lang),\n      fromCity: localizedOrderCity(order, lang, "sender"),\n      toCity: localizedOrderCity(order, lang, "receiver"),\n      route: localizedOrderRoute(order, lang),\n      status: localizedOrderStatus(order.status, lang),\n      paymentMethod: localizedPaymentMethod(order.payment_method, lang),')
 
 replace_once("src/lib/printableDocuments.ts", 'import type { ExportLanguage, OrderPDFData } from "./exportUtils";\n', 'import type { ExportLanguage, OrderPDFData } from "./exportUtils";\nimport { localizeExportText, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "./exportLocalization";\n')
@@ -81,6 +140,28 @@ for old, new in [
 ]:
     replace_once("src/lib/exportUtils.ts", old, new)
 
-write("scripts/export-language-policy-gate.mjs", '''import fs from "node:fs";\nconst read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");\nconst checks = [\n  ["src/lib/exportLocalization.ts", "localizedOrderDestination"],\n  ["src/lib/adminPdfExport.ts", "localizedCell(payload, column"],\n  ["src/lib/adminPdfExport.ts", "csvValue(localizedCell"],\n  ["src/lib/merchantStatementExport.ts", "destination: localizeExportText"],\n  ["src/components/admin/AdminMerchantStatementsCenter.tsx", "localizedOrderDestination(order"],\n  ["src/components/admin/AdminOrderBulkOperations.tsx", "localizedOrderRoute(order"],\n  ["src/lib/invoice.ts", "localizedOrderAddress(order, lang"],\n  ["src/lib/printableDocuments.ts", "const receiverAddress = localizeExportText"],\n  ["src/lib/exportUtils.ts", "const receiverAddress = localizeExportText"],\n  ["src/types.ts", "receiver_address_ar?: string"],\n];\nfor (const [path, marker] of checks) { if (!read(path).includes(marker)) throw new Error(`${path}: missing ${marker}`); }\nconsole.log("Export language policy gate passed.");\n''')
+write("scripts/export-language-policy-gate.mjs", '''import fs from "node:fs";
+const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const checks = [
+  ["src/lib/exportLocalization.ts", "localizedOrderDestination"],
+  ["src/lib/exportLocalization.ts", "const partialArabic = partialArabicKeys.map"],
+  ["src/lib/exportLocalization.ts", "return combineAddressParts([fullArabic || fallback, ...partialArabic])"],
+  ["src/lib/adminPdfExport.ts", "localizedCell(payload, column"],
+  ["src/lib/adminPdfExport.ts", "csvValue(localizedCell"],
+  ["src/lib/merchantStatementExport.ts", "destination: localizeExportText"],
+  ["src/components/admin/AdminMerchantStatementsCenter.tsx", "localizedOrderDestination(order"],
+  ["src/components/admin/AdminOrderBulkOperations.tsx", "localizedOrderRoute(order"],
+  ["src/lib/invoice.ts", "localizedOrderAddress(order, lang"],
+  ["src/lib/invoice.ts", "localizeExportText(order.package_description, lang)"],
+  ["src/lib/printableDocuments.ts", "const receiverAddress = localizeExportText"],
+  ["src/lib/exportUtils.ts", "const receiverAddress = localizeExportText"],
+  ["src/types.ts", "receiver_address_ar?: string"],
+];
+for (const [path, marker] of checks) { if (!read(path).includes(marker)) throw new Error(`${path}: missing ${marker}`); }
+const localization = read("src/lib/exportLocalization.ts");
+const englishPreservationCount = (localization.match(/if \(language !== "ar"\) return clean\(value\) \|\| EMPTY;/g) || []).length;
+if (englishPreservationCount !== 4) throw new Error(`Expected 4 English enum preservation guards, found ${englishPreservationCount}`);
+console.log("Export language policy gate passed.");
+''')
 
 print("Export language policy patch applied.")
