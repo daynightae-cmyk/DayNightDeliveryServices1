@@ -124,6 +124,77 @@ for (const contract of [
   "quota_fresh",
 ]) requireText(internationalHealth, contract, "international runtime health");
 
+const runtimeRepair = readRepo("supabase/migrations/20260730114000_p1_runtime_reconciliation_repair.sql");
+for (const contract of [
+  "admin_reconcile_authoritative_finance",
+  "order_financial_settlements",
+  "cod_collections",
+  "merchant_statement_entries",
+  "driver_statement_entries",
+  "api_unresolved_errors_last_24h",
+  "Historical failures are retained",
+]) requireText(runtimeRepair, contract, "P1 runtime reconciliation repair");
+forbidText(runtimeRepair, "delete from public.track17_api_logs", "provider audit log deletion");
+forbidText(runtimeRepair, "truncate", "runtime reconciliation destructive SQL");
+
+const directFinanceBackfill = readRepo("supabase/migrations/20260730130000_p1_direct_finance_backfill.sql");
+for (const contract of [
+  "p1_finance_backfill_incomplete",
+  "order_financial_settlements",
+  "cod_collections",
+  "merchant_statement_entries",
+  "driver_statement_entries",
+  "admin_safe_numeric",
+  "admin_safe_uuid",
+  "v_missing_settlements",
+  "v_missing_cod",
+  "v_missing_merchants",
+  "v_missing_drivers",
+]) requireText(directFinanceBackfill, contract, "direct authoritative finance backfill");
+forbidText(directFinanceBackfill, "delete from", "direct finance backfill destructive delete");
+forbidText(directFinanceBackfill, "truncate", "direct finance backfill destructive truncate");
+
+const track17RecoveryHealth = readRepo("supabase/migrations/20260730133000_track17_recovery_health.sql");
+for (const contract of [
+  "api_unresolved_errors_by_operation",
+  "succeeded.tracking_number = failed.tracking_number",
+  "shipment.last_synced_at",
+  "shipment.last_webhook_at",
+  "provider audit history",
+]) requireText(track17RecoveryHealth, contract, "17TRACK recovery health");
+forbidText(track17RecoveryHealth, "delete from public.track17_api_logs", "17TRACK audit history deletion");
+
+const driverStatusAlias = readRepo("supabase/migrations/20260730134000_driver_out_for_delivery_alias.sql");
+requireText(driverStatusAlias, "out_for_delivery", "driver status compatibility alias");
+requireText(driverStatusAlias, "in_transit", "canonical driver transit status");
+forbidText(driverStatusAlias, "alter type", "driver status enum expansion");
+
+const attachmentGrant = readRepo("supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql");
+requireText(attachmentGrant, "grant execute on function public.is_driver() to authenticated, service_role, anon", "safe storage helper grant");
+
+const attachmentFolderFix = readRepo("supabase/migrations/20260730136000_complaint_attachment_folder_depth_fix.sql");
+requireText(attachmentFolderFix, "array_length(storage.foldername(name), 1) >= 2", "complaint attachment folder depth");
+requireText(attachmentFolderFix, "dn_ce_can_upload_complaint_attachment", "complaint attachment authorization helper");
+requireText(attachmentFolderFix, "created_at > now() - interval '30 minutes'", "complaint attachment upload window");
+
+const notificationCompat = readRepo("supabase/migrations/20260730137000_customer_experience_notification_schema_compat.sql");
+for (const contract of [
+  "dn_ce_notify_admins",
+  "user_id,title,body,message,type,metadata,data",
+  "admin', 'support', 'owner', 'super_admin",
+  "notifications_schema_missing_body_and_message",
+]) requireText(notificationCompat, contract, "Customer Experience notification compatibility");
+
+const syncTrack17 = readRepo("supabase/functions/sync-track17-shipment/index.ts");
+requireText(syncTrack17, "const force = body.force === true", "admin recovery sync force contract");
+requireText(syncTrack17, "shipment_id: shipmentId || null", "failed sync shipment identity");
+requireText(syncTrack17, "forced: force", "recovery sync response proof");
+
+const customerRuntimeE2E = read("scripts/customer-experience-runtime-e2e.mjs");
+requireText(customerRuntimeE2E, 'admin.rpc("admin_dispatch_order_runtime"', "stable Customer Experience dispatch RPC");
+requireText(customerRuntimeE2E, "p_payload", "stable Customer Experience dispatch payload");
+forbidText(customerRuntimeE2E, 'admin.rpc("admin_dispatch_order",', "overloaded Customer Experience dispatch RPC");
+
 const whatsapp = read("src/services/whatsappMessageService.ts");
 requireText(whatsapp, '"generated" | "opened" | "copied" | "failed"', "WhatsApp proof states");
 forbidText(whatsapp, 'OutboundMessageStatus = "delivered"', "unproven WhatsApp delivery state");
