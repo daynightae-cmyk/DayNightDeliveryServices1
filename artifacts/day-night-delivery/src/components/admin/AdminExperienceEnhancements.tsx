@@ -1,4 +1,5 @@
 import { useAdminFormKeyboardNavigation } from "../../hooks/useAdminFormKeyboardNavigation";
+import { useAdminInteractionPerformanceBudget } from "../../hooks/useAdminInteractionPerformanceBudget";
 import AbuKhalifaExecutiveCardBridge from "./AbuKhalifaExecutiveCardBridge";
 import "../../styles/dn-admin-form-inputs.css";
 
@@ -11,5 +12,6 @@ import "../../styles/dn-admin-form-inputs.css";
  */
 export default function AdminExperienceEnhancements() {
   useAdminFormKeyboardNavigation(true);
+  useAdminInteractionPerformanceBudget(true);
   return <AbuKhalifaExecutiveCardBridge />;
 }
