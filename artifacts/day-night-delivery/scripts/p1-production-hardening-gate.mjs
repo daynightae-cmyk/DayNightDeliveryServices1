@@ -59,6 +59,14 @@ for (const contract of [
   "admin_order_validation_failed",
 ]) requireText(orderValidation, contract, "admin order authority");
 
+const legacyOrderGuard = readRepo("supabase/migrations/20260730101500_admin_order_legacy_insert_guard.sql");
+for (const contract of [
+  "v_admin_actor",
+  "source_channel",
+  "admin_order_validation_failed",
+  "legacy direct inserts",
+]) requireText(legacyOrderGuard, contract, "legacy admin order guard");
+
 const financeHealth = readRepo("supabase/migrations/20260730095500_finance_authoritative_reconciliation_health.sql");
 for (const contract of [
   "admin_finance_reconciliation_health",
