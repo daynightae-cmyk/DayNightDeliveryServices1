@@ -1,0 +1,123 @@
+name: Phase 4 Admin INP Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/admin-inp-acceptance.yml
+      - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+      - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
+      - artifacts/day-night-delivery/src/components/admin/**
+      - artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
+      - artifacts/day-night-delivery/src/hooks/useAdminFormKeyboardNavigation.ts
+      - artifacts/day-night-delivery/src/styles/dn-admin-**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-4-admin-inp-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-harness:
+    name: Validate Chrome acceptance harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate acceptance script
+        run: node --check artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
+
+      - name: Verify static admin performance guardrails
+        run: |
+          set -euo pipefail
+          grep -Fq 'ADMIN_INP_BUDGET_MS = 200' artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
+          grep -Fq 'dn-admin-inp-sample' artifacts/day-night-delivery/src/hooks/useAdminInteractionPerformanceBudget.ts
+          grep -Fq '.dn-admin-fullscreen' artifacts/day-night-delivery/src/hooks/useAdminFormKeyboardNavigation.ts
+          ! grep -Eq 'observe\(document\.(body|documentElement)' artifacts/day-night-delivery/src/hooks/useAdminManagerIdentity.ts
+
+  production-profile:
+    name: Production desktop and Android INP evidence
+    needs: validate-harness
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-runtime-tests
+    env:
+      ADMIN_PERFORMANCE_BASE_URL: https://daynightae.com
+      ADMIN_PERFORMANCE_OUTPUT_DIR: artifacts/day-night-delivery/admin-performance-evidence
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify protected acceptance inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected performance inputs: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+
+      - name: Install isolated Playwright runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="$RUNNER_TEMP/day-night-playwright"
+          mkdir -p "$runner"
+          cd "$runner"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_RUNNER_DIR=$runner" >> "$GITHUB_ENV"
+
+      - name: Record production admin Chrome traces
+        id: performance
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/day-night-delivery/admin-performance-evidence
+          node artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs 2>&1 \
+            | tee artifacts/day-night-delivery/admin-performance-evidence/workflow.log
+
+      - name: Upload sanitized performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Admin-INP-Acceptance
+          path: artifacts/day-night-delivery/admin-performance-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish acceptance summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md ]; then
+            cat artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Admin performance summary was not produced.' >> "$GITHUB_STEP_SUMMARY"
+          fi
