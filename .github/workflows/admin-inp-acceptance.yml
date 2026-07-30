@@ -7,6 +7,7 @@ on:
       - .github/workflows/admin-inp-acceptance.yml
       - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
       - artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
+      - artifacts/day-night-delivery/scripts/admin-performance-issue-report.mjs
       - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
       - artifacts/day-night-delivery/src/main.tsx
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
@@ -20,6 +21,7 @@ on:
       - .github/workflows/admin-inp-acceptance.yml
       - artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
       - artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
+      - artifacts/day-night-delivery/scripts/admin-performance-issue-report.mjs
       - artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
       - artifacts/day-night-delivery/src/main.tsx
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
@@ -55,6 +57,7 @@ jobs:
         run: |
           node --check artifacts/day-night-delivery/scripts/admin-performance-acceptance.mjs
           node --check artifacts/day-night-delivery/scripts/admin-performance-geometry-diagnostic.mjs
+          node --check artifacts/day-night-delivery/scripts/admin-performance-issue-report.mjs
           node --check artifacts/day-night-delivery/scripts/wait-for-admin-performance-deployment.mjs
 
       - name: Verify static admin performance guardrails
@@ -67,6 +70,7 @@ jobs:
           grep -Fq 'phase4-20260730-3' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
           grep -Fq 'dn-admin-inp-acceptance.css' artifacts/day-night-delivery/src/main.tsx
           grep -Fq 'admin-performance-geometry-diagnostic.mjs' .github/workflows/admin-inp-acceptance.yml
+          grep -Fq 'admin-performance-issue-report.mjs' .github/workflows/admin-inp-acceptance.yml
           grep -Fq 'issues: write' .github/workflows/admin-inp-acceptance.yml
 
   production-profile:
@@ -168,40 +172,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GEOMETRY_OUTCOME: ${{ steps.geometry.outcome }}
           PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
+          ADMIN_PERFORMANCE_ISSUE_REPORT: ${{ runner.temp }}/issue-268-performance-report.md
         shell: bash
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/issue-268-performance-report.md"
-          {
-            echo '## Phase 4 production Chrome acceptance run'
-            echo
-            echo "- Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Protected geometry stage: **${GEOMETRY_OUTCOME:-not-run}**"
-            echo "- Protected Chrome stage: **${PERFORMANCE_OUTCOME:-not-run}**"
-            echo '- Evidence artifact: `DAY-NIGHT-Admin-INP-Acceptance` (30-day retention)'
-            echo '- Secrets, authentication sessions, customer PII, and raw production payloads are excluded.'
-            echo
-            if [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md ]; then
-              cat artifacts/day-night-delivery/admin-performance-evidence/admin-performance-summary.md
-            elif [ -f artifacts/day-night-delivery/admin-performance-evidence/admin-performance-geometry.json ]; then
-              node --input-type=module <<'NODE'
-              import fs from 'node:fs';
-              const payload = JSON.parse(fs.readFileSync('artifacts/day-night-delivery/admin-performance-evidence/admin-performance-geometry.json', 'utf8'));
-              const before = payload.beforeScrollIntoView || {};
-              const after = payload.afterScrollIntoView || {};
-              const item = before.ancestors?.[0] || {};
-              const itemAfter = after.ancestors?.[0] || {};
-              console.log('### Geometry diagnostic');
-              console.log(`- Viewport: \`${before.viewport?.innerWidth || 0}×${before.viewport?.innerHeight || 0}\``);
-              console.log(`- Before rect: \`${JSON.stringify(item.rect || {})}\``);
-              console.log(`- After scroll rect: \`${JSON.stringify(itemAfter.rect || {})}\``);
-              console.log(`- Before intersection: \`${JSON.stringify(before.insideViewport || {})}\``);
-              console.log(`- After intersection: \`${JSON.stringify(after.insideViewport || {})}\``);
-              console.log('- Full ancestor geometry and redacted screenshot are stored in the protected artifact.');
-              NODE
-            else
-              echo 'Neither a structured performance summary nor geometry diagnostic was produced; inspect the linked workflow.'
-            fi
-          } > "$report"
-          gh issue comment 268 --repo "$GITHUB_REPOSITORY" --body-file "$report"
+          node artifacts/day-night-delivery/scripts/admin-performance-issue-report.mjs
+          gh issue comment 268 \
+            --repo "$GITHUB_REPOSITORY" \
+            --body-file "$ADMIN_PERFORMANCE_ISSUE_REPORT"
