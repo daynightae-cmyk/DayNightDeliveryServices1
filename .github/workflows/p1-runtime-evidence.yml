@@ -162,6 +162,7 @@ jobs:
             20260730100500_international_tracking_runtime_health.sql
             20260730101500_admin_order_legacy_insert_guard.sql
             20260730114000_p1_runtime_reconciliation_repair.sql
+            20260730130000_p1_direct_finance_backfill.sql
           )
 
           for target in "${targets[@]}"; do
@@ -218,7 +219,7 @@ jobs:
           fi
           supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/migrations-after.txt"
-          for version in 20260730094500 20260730095500 20260730100500 20260730101500 20260730114000; do
+          for version in 20260730094500 20260730095500 20260730100500 20260730101500 20260730114000 20260730130000; do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2
               exit 1
@@ -285,7 +286,7 @@ jobs:
           console.log('Protected admin session acquired without exposing credentials.');
           NODE
 
-      - name: Reconcile finance and refresh 17TRACK quota
+      - name: Verify finance authority and refresh 17TRACK quota
         id: runtime_repair
         if: ${{ steps.admin_auth.outcome == 'success' }}
         continue-on-error: true
@@ -308,16 +309,10 @@ jobs:
             return { response, payload };
           }
 
-          let finance = null;
-          for (let attempt = 1; attempt <= 12; attempt += 1) {
-            finance = await post('/rest/v1/rpc/admin_reconcile_authoritative_finance', {});
-            if (finance.response.status !== 404) break;
-            console.log(`PostgREST schema cache has not exposed the reconciliation RPC yet; retry ${attempt}/12.`);
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-          }
-          fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance?.payload || {}, null, 2));
-          if (!finance || !finance.response.ok || finance.payload?.ok !== true) {
-            console.error(`Finance reconciliation failed with HTTP ${finance?.response?.status || 0}.`);
+          const finance = await post('/rest/v1/rpc/admin_finance_reconciliation_health', {});
+          fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance.payload, null, 2));
+          if (!finance.response.ok || finance.payload?.ok !== true) {
+            console.error(`Finance authority verification failed with HTTP ${finance.response.status}.`);
             process.exit(1);
           }
 
@@ -339,7 +334,7 @@ jobs:
             console.error(`17TRACK quota refresh failed with HTTP ${quota.response.status}.`);
             process.exit(1);
           }
-          console.log('Finance reconciliation and 17TRACK quota refresh completed.');
+          console.log('Finance authority verified and 17TRACK quota refreshed.');
           NODE
 
       - name: Run protected P1 runtime health
