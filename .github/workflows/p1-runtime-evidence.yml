@@ -198,7 +198,7 @@ jobs:
           evidence="artifacts/day-night-delivery/p1-runtime-evidence"
           supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked \
             | tee "$evidence/isolated-migrations-before.txt"
-          supabase --workdir "$P1_SUPABASE_WORKDIR" db push --dry-run \
+          supabase --workdir "$P1_SUPABASE_WORKDIR" db push --dry-run 2>&1 \
             | tee "$evidence/isolated-db-push-dry-run.txt"
 
           for target in \
