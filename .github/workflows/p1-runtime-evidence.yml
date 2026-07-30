@@ -163,6 +163,11 @@ jobs:
             20260730101500_admin_order_legacy_insert_guard.sql
             20260730114000_p1_runtime_reconciliation_repair.sql
             20260730130000_p1_direct_finance_backfill.sql
+            20260730133000_track17_recovery_health.sql
+            20260730134000_driver_out_for_delivery_alias.sql
+            20260730135000_anon_storage_policy_helper_grant.sql
+            20260730136000_complaint_attachment_folder_depth_fix.sql
+            20260730137000_customer_experience_notification_schema_compat.sql
           )
 
           for target in "${targets[@]}"; do
@@ -219,7 +224,11 @@ jobs:
           fi
           supabase --workdir "$P1_SUPABASE_WORKDIR" migration list --linked 2>&1 \
             | tee "$evidence/migrations-after.txt"
-          for version in 20260730094500 20260730095500 20260730100500 20260730101500 20260730114000 20260730130000; do
+          for version in \
+            20260730094500 20260730095500 20260730100500 20260730101500 \
+            20260730114000 20260730130000 20260730133000 20260730134000 \
+            20260730135000 20260730136000 20260730137000
+          do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2
               exit 1
@@ -286,9 +295,8 @@ jobs:
           console.log('Protected admin session acquired without exposing credentials.');
           NODE
 
-      - name: Verify finance authority and refresh 17TRACK quota
+      - name: Verify finance authority and recover 17TRACK runtime
         id: runtime_repair
-        if: ${{ steps.admin_auth.outcome == 'success' }}
         continue-on-error: true
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -301,10 +309,18 @@ jobs:
           const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
           const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
           const token = String(process.env.SUPABASE_ADMIN_ACCESS_TOKEN || '');
-          const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+          const headers = {
+            apikey: key,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          };
 
           async function post(path, body) {
-            const response = await fetch(`${url}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+            const response = await fetch(`${url}${path}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+            });
             const payload = await response.json().catch(() => ({}));
             return { response, payload };
           }
@@ -312,8 +328,7 @@ jobs:
           const finance = await post('/rest/v1/rpc/admin_finance_reconciliation_health', {});
           fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance.payload, null, 2));
           if (!finance.response.ok || finance.payload?.ok !== true) {
-            console.error(`Finance authority verification failed with HTTP ${finance.response.status}.`);
-            process.exit(1);
+            throw new Error(`finance_authority_http_${finance.response.status}`);
           }
 
           const quota = await post('/functions/v1/track17-admin', { action: 'quota', force: true });
@@ -331,15 +346,49 @@ jobs:
           };
           fs.writeFileSync(`${root}/track17-quota-proof.json`, JSON.stringify(quotaProof, null, 2));
           if (!quota.response.ok || quota.payload?.ok !== true) {
-            console.error(`17TRACK quota refresh failed with HTTP ${quota.response.status}.`);
-            process.exit(1);
+            throw new Error(`track17_quota_http_${quota.response.status}`);
           }
-          console.log('Finance authority verified and 17TRACK quota refreshed.');
+
+          const listing = await post('/functions/v1/track17-admin', { action: 'list', limit: 100 });
+          if (!listing.response.ok || listing.payload?.ok !== true) {
+            throw new Error(`track17_list_http_${listing.response.status}`);
+          }
+
+          const activeShipments = (Array.isArray(listing.payload?.shipments) ? listing.payload.shipments : [])
+            .filter((shipment) => !['delivered', 'expired'].includes(
+              String(shipment?.normalized_status || '').toLowerCase(),
+            ))
+            .filter((shipment) => !shipment?.tracking_stopped_at);
+
+          const recovery = [];
+          for (const shipment of activeShipments) {
+            const synced = await post('/functions/v1/sync-track17-shipment', {
+              shipment_id: shipment.id,
+              force: true,
+            });
+            recovery.push({
+              ok: synced.payload?.ok === true,
+              status: synced.response.status,
+              code: synced.payload?.code || null,
+            });
+          }
+
+          const recoveryProof = {
+            active_shipments: activeShipments.length,
+            successful_syncs: recovery.filter((item) => item.ok).length,
+            failed_syncs: recovery.filter((item) => !item.ok).length,
+            results: recovery,
+          };
+          fs.writeFileSync(`${root}/track17-recovery-sync.json`, JSON.stringify(recoveryProof, null, 2));
+          if (recoveryProof.failed_syncs > 0) {
+            throw new Error(`track17_recovery_failures_${recoveryProof.failed_syncs}`);
+          }
+
+          console.log('Finance authority verified; 17TRACK quota and active shipments refreshed.');
           NODE
 
       - name: Run protected P1 runtime health
         id: runtime_health
-        if: ${{ steps.admin_auth.outcome == 'success' }}
         continue-on-error: true
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -351,7 +400,6 @@ jobs:
 
       - name: Run protected Customer Experience lifecycle
         id: customer_e2e
-        if: ${{ always() && steps.admin_auth.outcome == 'success' }}
         continue-on-error: true
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -371,17 +419,23 @@ jobs:
 
       - name: Enforce protected runtime acceptance
         if: always()
+        env:
+          ADMIN_AUTH_OUTCOME: ${{ steps.admin_auth.outcome }}
+          RUNTIME_REPAIR_OUTCOME: ${{ steps.runtime_repair.outcome }}
+          RUNTIME_HEALTH_OUTCOME: ${{ steps.runtime_health.outcome }}
+          CUSTOMER_E2E_OUTCOME: ${{ steps.customer_e2e.outcome }}
         run: |
           set -euo pipefail
           failed=0
-          for result in \
-            "admin_auth=${{ steps.admin_auth.outcome }}" \
-            "runtime_repair=${{ steps.runtime_repair.outcome }}" \
-            "runtime_health=${{ steps.runtime_health.outcome }}" \
-            "customer_e2e=${{ steps.customer_e2e.outcome }}"
+          for name in \
+            ADMIN_AUTH_OUTCOME \
+            RUNTIME_REPAIR_OUTCOME \
+            RUNTIME_HEALTH_OUTCOME \
+            CUSTOMER_E2E_OUTCOME
           do
-            echo "$result"
-            if [[ "$result" != *=success ]]; then failed=1; fi
+            value="${!name:-missing}"
+            echo "$name=$value"
+            if [ "$value" != "success" ]; then failed=1; fi
           done
           if [ "$failed" -ne 0 ]; then
             echo 'One or more protected runtime acceptance stages failed.' >&2
