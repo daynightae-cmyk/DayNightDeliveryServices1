@@ -124,6 +124,19 @@ for (const contract of [
   "quota_fresh",
 ]) requireText(internationalHealth, contract, "international runtime health");
 
+const runtimeRepair = readRepo("supabase/migrations/20260730114000_p1_runtime_reconciliation_repair.sql");
+for (const contract of [
+  "admin_reconcile_authoritative_finance",
+  "order_financial_settlements",
+  "cod_collections",
+  "merchant_statement_entries",
+  "driver_statement_entries",
+  "api_unresolved_errors_last_24h",
+  "Historical failures are retained",
+]) requireText(runtimeRepair, contract, "P1 runtime reconciliation repair");
+forbidText(runtimeRepair, "delete from public.track17_api_logs", "provider audit log deletion");
+forbidText(runtimeRepair, "truncate", "runtime reconciliation destructive SQL");
+
 const whatsapp = read("src/services/whatsappMessageService.ts");
 requireText(whatsapp, '"generated" | "opened" | "copied" | "failed"', "WhatsApp proof states");
 forbidText(whatsapp, 'OutboundMessageStatus = "delivered"', "unproven WhatsApp delivery state");
