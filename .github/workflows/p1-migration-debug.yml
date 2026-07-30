@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
           workdir="$RUNNER_TEMP/p1-migration-debug"
-          mkdir -p "$workdir/supabase/migrations" artifacts/day-night-delivery/p1-runtime-evidence
+          mkdir -p "$workdir/supabase/migrations" "$GITHUB_WORKSPACE/artifacts/day-night-delivery/p1-runtime-evidence"
           cp supabase/config.toml "$workdir/supabase/config.toml"
           supabase --workdir "$workdir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$workdir" migration fetch --linked
@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           supabase --workdir "$P1_DEBUG_WORKDIR" db dump --linked --schema public \
-            --file artifacts/day-night-delivery/p1-runtime-evidence/live-public-schema.sql
+            --file "$GITHUB_WORKSPACE/artifacts/day-night-delivery/p1-runtime-evidence/live-public-schema.sql"
 
       - name: Execute isolated migration with debug diagnostics
         env:
@@ -69,7 +69,7 @@ jobs:
         run: |
           set -o pipefail
           supabase --workdir "$P1_DEBUG_WORKDIR" db push --yes --debug 2>&1 \
-            | tee artifacts/day-night-delivery/p1-runtime-evidence/migration-debug.log
+            | tee "$GITHUB_WORKSPACE/artifacts/day-night-delivery/p1-runtime-evidence/migration-debug.log"
 
       - name: Upload sanitized diagnostic evidence
         if: always()
