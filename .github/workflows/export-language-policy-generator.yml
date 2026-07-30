@@ -1,4 +1,5 @@
 name: Export language policy generator
+# Trigger after the workflow is present on main.
 
 on:
   push:
