@@ -35,6 +35,15 @@ begin
 
   v_invalid := public.dn_admin_order_invalid_fields(v_payload);
   if coalesce(array_length(v_invalid, 1), 0) > 0 then
+    -- PostgreSQL LOG survives as operational evidence even though the blocked
+    -- transaction itself is rolled back. Never include customer PII here.
+    raise log 'DAY_NIGHT_ADMIN_ORDER_BLOCKED actor=% source=% status=% invalid_fields=% reference=%',
+      coalesce(auth.uid()::text, 'unknown'),
+      coalesce(v_source, 'legacy_direct_insert'),
+      v_status,
+      array_to_string(v_invalid, ','),
+      coalesce(v_payload->>'invoice_number', v_payload->>'tracking_number', v_payload->>'id', 'unassigned');
+
     raise exception using
       errcode = '23514',
       message = 'admin_order_validation_failed',
