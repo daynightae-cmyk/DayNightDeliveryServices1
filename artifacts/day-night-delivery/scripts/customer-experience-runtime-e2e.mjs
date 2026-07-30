@@ -60,7 +60,11 @@ function pass(name, details = {}) {
   console.log(`PASS: ${name}`);
 }
 function fail(name, cause, details = {}) {
-  const message = cause instanceof Error ? cause.message : String(cause || "unknown_error");
+  const message = cause instanceof Error
+    ? cause.message
+    : cause && typeof cause === "object"
+      ? JSON.stringify(cause)
+      : String(cause || "unknown_error");
   report.push({ name, status: "FAIL", error: message, ...details });
   throw new Error(`${name}: ${message}`);
 }
@@ -153,12 +157,14 @@ try {
   if (!created.orderId || !trackingNumber) fail("Merchant creates temporary real order", new Error("order_identity_missing"), { order });
   pass("Merchant creates temporary real order", { orderId: created.orderId, trackingNumber });
 
-  const { data: dispatchResult, error: dispatchError } = await admin.rpc("admin_dispatch_order", {
-    p_order_id: created.orderId,
-    p_driver_id: driverId,
-    p_action: "assign",
-    p_note: `Customer Experience E2E assignment ${runId}`,
-    p_force: false,
+  const { data: dispatchResult, error: dispatchError } = await admin.rpc("admin_dispatch_order_runtime", {
+    p_payload: {
+      order_id: created.orderId,
+      driver_id: driverId,
+      action: "assign",
+      note: `Customer Experience E2E assignment ${runId}`,
+      force: false,
+    },
   });
   if (dispatchError || !record(Array.isArray(dispatchResult) ? dispatchResult[0] : dispatchResult).ok) {
     fail("Admin assigns real driver", dispatchError || new Error("dispatch_not_ok"), { dispatchResult });
