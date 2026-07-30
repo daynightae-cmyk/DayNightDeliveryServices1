@@ -7,11 +7,13 @@ on:
     paths:
       - .github/workflows/p1-customer-attachment-recovery.yml
       - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
+      - supabase/migrations/20260730136000_complaint_attachment_folder_depth_fix.sql
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/p1-customer-attachment-recovery.yml
       - supabase/migrations/20260730135000_anon_storage_policy_helper_grant.sql
+      - supabase/migrations/20260730136000_complaint_attachment_folder_depth_fix.sql
   workflow_dispatch:
 
 permissions:
@@ -48,7 +50,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Apply isolated storage permission migration
+      - name: Apply isolated storage permission migrations
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -62,10 +64,14 @@ jobs:
           cp supabase/config.toml "$workdir/supabase/config.toml"
           supabase --workdir "$workdir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$workdir" migration fetch --linked
-          migration=20260730135000_anon_storage_policy_helper_grant.sql
-          if ! find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' | grep -Fxq "$migration"; then
-            cp "supabase/migrations/$migration" "$workdir/supabase/migrations/$migration"
-          fi
+          for migration in \
+            20260730135000_anon_storage_policy_helper_grant.sql \
+            20260730136000_complaint_attachment_folder_depth_fix.sql
+          do
+            if ! find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' | grep -Fxq "$migration"; then
+              cp "supabase/migrations/$migration" "$workdir/supabase/migrations/$migration"
+            fi
+          done
           supabase --workdir "$workdir" db push --dry-run 2>&1 \
             | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-dry-run.log
           supabase --workdir "$workdir" db push --yes 2>&1 \
@@ -73,6 +79,7 @@ jobs:
           supabase --workdir "$workdir" migration list --linked 2>&1 \
             | tee artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
           grep -Fq '20260730135000' artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
+          grep -Fq '20260730136000' artifacts/day-night-delivery/p1-runtime-evidence/attachment-recovery-migrations.log
 
       - name: Authenticate protected admin test session
         env:
