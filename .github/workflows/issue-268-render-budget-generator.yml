@@ -1,0 +1,62 @@
+name: Issue 268 render-budget generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/issue-268-render-budget-generator.yml
+      - .github/scripts/issue_268_render_budget.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-268-render-budget-generator
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: artifacts/day-night-delivery/pnpm-lock.yaml
+
+      - name: Apply exact source patch
+        run: python .github/scripts/issue_268_render_budget.py
+
+      - name: Validate generated source
+        run: |
+          grep -Fq 'ORDER_PAGE_SIZE = 20' artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceComplete.tsx
+          grep -Fq 'selectorOpen &&' artifacts/day-night-delivery/src/components/admin/AdminOrderBulkOperations.tsx
+          grep -Fq 'Phase 4 render-budget optimization' artifacts/day-night-delivery/src/styles/dn-admin-inp-acceptance.css
+          test ! -e .github/scripts/issue_268_render_budget.py
+          test ! -e .github/workflows/issue-268-render-budget-generator.yml
+
+      - name: Install and build
+        working-directory: artifacts/day-night-delivery
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
+          pnpm run build
+
+      - name: Publish reviewed source branch
+        run: |
+          git config user.name 'daynightae-cmyk'
+          git config user.email 'daynightae-cmyk@users.noreply.github.com'
+          git switch -c perf/issue-268-render-budget-applied
+          git add -A
+          git commit -m 'fix(perf): bound admin order rendering and mobile effects'
+          git push --force origin perf/issue-268-render-budget-applied
