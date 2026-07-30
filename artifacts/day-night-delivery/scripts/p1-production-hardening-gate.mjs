@@ -160,7 +160,7 @@ for (const contract of [
   "succeeded.tracking_number = failed.tracking_number",
   "shipment.last_synced_at",
   "shipment.last_webhook_at",
-  "Historical failures",
+  "provider audit history",
 ]) requireText(track17RecoveryHealth, contract, "17TRACK recovery health");
 forbidText(track17RecoveryHealth, "delete from public.track17_api_logs", "17TRACK audit history deletion");
 
