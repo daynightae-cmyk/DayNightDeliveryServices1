@@ -50,16 +50,16 @@ function initSession({ storageKey, session }) {
   localStorage.setItem(storageKey, JSON.stringify(session));
 }
 
-function safeClassName(element) {
-  if (!element) return null;
-  return String(element.className || '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 8)
-    .join(' ');
-}
-
 function captureGeometry(selector) {
+  const safeClassName = (candidate) => {
+    if (!candidate) return null;
+    return String(candidate.className || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 8)
+      .join(' ');
+  };
+
   const element = document.querySelector(selector);
   if (!element) return { found: false, selector };
 
