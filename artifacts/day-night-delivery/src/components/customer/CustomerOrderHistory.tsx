@@ -3,6 +3,7 @@ import { Archive, CalendarCheck, Mail, MessageCircle, PackageCheck, RefreshCw, T
 import { Link } from "react-router-dom";
 import type { Order } from "../../types";
 import { sendDeliveryConfirmationEmail } from "../../lib/deliveryConfirmationEmail";
+import { localizedOrderDestination, localizedOrderRoute, localizedPackageType } from "../../lib/exportLocalization";
 import OrderChatDialog from "../shared/OrderChatDialog";
 
 const FINAL_STATUSES = new Set(["delivered", "cancelled", "canceled", "returned", "failed", "delivery_failed"]);
@@ -61,6 +62,9 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const language = isArabic ? "ar" : "en";
+  const route = localizedOrderRoute(order, language);
+  const destination = localizedOrderDestination(order, language);
 
   async function sendEmail() {
     setSending(true);
@@ -82,11 +86,10 @@ function OrderCard({ order, isArabic, historical }: { order: Order; isArabic: bo
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <p className="break-all font-mono text-sm font-black text-brand-gold" dir="ltr">{tracking}</p>
-          <p className="mt-1 text-xs font-bold text-white/75">
-            {String(row.sender_city || "—")} → {String(row.receiver_city || "—")}
-          </p>
+          <p className="mt-1 text-xs font-bold text-white/75">{route}</p>
+          <p className="mt-1 text-[11px] text-white/55">{destination}</p>
           <p className="mt-1 text-[11px] text-white/45">
-            {String(row.package_type || (isArabic ? "شحنة" : "Shipment"))} · {Number(row.pieces || 1)} {isArabic ? "قطعة" : "pcs"} · {Number(row.weight || 1)} kg
+            {localizedPackageType(row.package_type || "shipment", language)} · {Number(row.pieces || 1)} {isArabic ? "قطعة" : "pcs"} · {Number(row.weight || 1)} kg
           </p>
         </div>
 

@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import type { DriverOrder } from "../../types/driver";
+import type { Order } from "../../types";
+import { localizedOrderAddress, localizedOrderCity } from "../../lib/exportLocalization";
 import {
   copyPreparedWhatsApp,
   createFeedbackLinkForOrder,
@@ -115,6 +117,11 @@ export default function DriverCustomerCommunication({ order, isArabic, busy = fa
   const shipmentAmount = useMemo(() => amountDue(order), [order]);
   const trackingUrl = useMemo(() => getTrackingUrl(reference), [reference]);
   const recordedPaymentMode = useMemo(() => normalizePaymentMode(order.payment_method), [order.payment_method]);
+  const language = isArabic ? "ar" : "en";
+  const localizedOrder = order as unknown as Order;
+  const localizedCustomerCity = localizedOrderCity(localizedOrder, language, "receiver");
+  const localizedPickupAddress = localizedOrderAddress(localizedOrder, language, "sender");
+  const localizedDeliveryAddress = localizedOrderAddress(localizedOrder, language, "receiver");
 
   const [prepared, setPrepared] = useState<PreparedWhatsAppMessage | null>(null);
   const [draft, setDraft] = useState("");
@@ -174,7 +181,7 @@ export default function DriverCustomerCommunication({ order, isArabic, busy = fa
         trackingNumber: reference,
         customerName: order.receiver_name || order.customer_name,
         customerPhone: phone,
-        customerCity: order.receiver_city,
+        customerCity: localizedCustomerCity,
         merchantId: order.merchant_id,
         merchantName: order.merchant_name,
         driverId: order.assigned_driver_id || order.driver_id || undefined,
@@ -182,8 +189,8 @@ export default function DriverCustomerCommunication({ order, isArabic, busy = fa
         driverPhone: order.driver_phone,
         amountDue: shipmentAmount,
         paymentMethod: effectivePaymentMode === "online" ? "bank_transfer" : "cash",
-        pickupAddress: [order.sender_city, order.sender_address].filter(Boolean).join("، "),
-        deliveryAddress: [order.receiver_city, order.receiver_address].filter(Boolean).join("، "),
+        pickupAddress: localizedPickupAddress,
+        deliveryAddress: localizedDeliveryAddress,
         trackingUrl,
         feedbackUrl,
         orderStatus: isDeliveryAction ? "delivered" : order.status,
