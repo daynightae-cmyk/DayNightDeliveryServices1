@@ -31,6 +31,7 @@ fs.writeFileSync(temporaryModule, transpiled.outputText, "utf8");
 try {
   const {
     areEquivalentLocations,
+    extractDestinationAreaFromAddress,
     formatDestinationLocation,
     inferDestinationEmirate,
   } = await import(`${pathToFileURL(temporaryModule).href}?v=${Date.now()}`);
@@ -60,8 +61,20 @@ try {
   assert.equal(areEquivalentLocations("Abu-Dhabi", "ابوظبي"), true);
   assert.equal(inferDestinationEmirate("Al Ain", "ar"), "أبوظبي");
   assert.equal(inferDestinationEmirate("Al Barsha", "en"), "Dubai");
+  assert.equal(
+    extractDestinationAreaFromAddress(
+      "Al Shahama - Street 7 - Abu Dhabi",
+      "Abu Dhabi",
+      "Abu Dhabi",
+    ),
+    "Al Shahama",
+  );
+  assert.equal(
+    extractDestinationAreaFromAddress("الشامخة، شارع 7، أبوظبي", "أبوظبي", "أبوظبي"),
+    "الشامخة",
+  );
 
-  console.log(`PASS destination location formatter (${cases.length + 4} assertions)`);
+  console.log(`PASS destination location formatter (${cases.length + 6} assertions)`);
 } finally {
   fs.rmSync(temporaryModule, { force: true });
 }
