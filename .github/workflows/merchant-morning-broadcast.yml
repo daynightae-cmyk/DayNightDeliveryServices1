@@ -1,0 +1,252 @@
+name: Merchant Morning WhatsApp Broadcast
+
+on:
+  push:
+    branches:
+      - feature/merchant-morning-broadcast
+      - main
+    paths:
+      - .github/workflows/merchant-morning-broadcast.yml
+      - artifacts/day-night-delivery/src/components/admin/AdminMessageControlCenter.tsx
+      - artifacts/day-night-delivery/src/components/admin/AdminMessagePresentationSettings.tsx
+      - artifacts/day-night-delivery/src/components/admin/AdminMerchantMorningBroadcast.tsx
+      - artifacts/day-night-delivery/src/services/merchantMorningBroadcastService.ts
+      - artifacts/day-night-delivery/scripts/merchant-morning-broadcast-gate.mjs
+      - supabase/config.toml
+      - supabase/functions/merchant-morning-broadcast/**
+      - supabase/migrations/20260731162000_merchant_morning_whatsapp_broadcast.sql
+      - docs/MERCHANT-MORNING-WHATSAPP-BROADCAST.md
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/merchant-morning-broadcast.yml
+      - artifacts/day-night-delivery/src/components/admin/AdminMessageControlCenter.tsx
+      - artifacts/day-night-delivery/src/components/admin/AdminMessagePresentationSettings.tsx
+      - artifacts/day-night-delivery/src/components/admin/AdminMerchantMorningBroadcast.tsx
+      - artifacts/day-night-delivery/src/services/merchantMorningBroadcastService.ts
+      - artifacts/day-night-delivery/scripts/merchant-morning-broadcast-gate.mjs
+      - supabase/config.toml
+      - supabase/functions/merchant-morning-broadcast/**
+      - supabase/migrations/20260731162000_merchant_morning_whatsapp_broadcast.sql
+      - docs/MERCHANT-MORNING-WHATSAPP-BROADCAST.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merchant-morning-whatsapp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Typecheck, build, and security gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run merchant broadcast production gate
+        run: node artifacts/day-night-delivery/scripts/merchant-morning-broadcast-gate.mjs
+
+      - name: Typecheck application
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - name: Build production application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+  deploy-production:
+    name: Deploy protected Supabase runtime
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify protected production configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in \
+            VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY \
+            SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD \
+            RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD
+          do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          test -n "$project_ref"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Production project resolved safely."
+
+      - name: Build isolated migration release
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/day-night-merchant-broadcast"
+          rm -rf "$workdir"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+          supabase --workdir "$workdir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+
+          target="20260731162000_merchant_morning_whatsapp_broadcast.sql"
+          test -f "supabase/migrations/$target"
+          if find "$workdir/supabase/migrations" -maxdepth 1 -type f -name '20260731162000_*.sql' | grep -q .; then
+            pending=0
+            echo "$target already recorded in production."
+          else
+            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+            pending=1
+          fi
+          echo "MERCHANT_BROADCAST_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "MERCHANT_BROADCAST_PENDING=$pending" >> "$GITHUB_ENV"
+
+      - name: Validate and apply reviewed migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$MERCHANT_BROADCAST_PENDING" -gt 0 ]; then
+            supabase --workdir "$MERCHANT_BROADCAST_WORKDIR" db push --dry-run
+            supabase --workdir "$MERCHANT_BROADCAST_WORKDIR" db push --yes
+          else
+            echo "No database write required."
+          fi
+          supabase --workdir "$MERCHANT_BROADCAST_WORKDIR" migration list --linked \
+            | tee /tmp/merchant-broadcast-migrations.txt
+          grep -Fq '20260731162000' /tmp/merchant-broadcast-migrations.txt
+
+      - name: Deploy merchant broadcast Edge Function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy merchant-morning-broadcast \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --no-verify-jwt
+
+      - name: Authenticate protected admin test session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: process.env.RUNTIME_ADMIN_EMAIL,
+              password: process.env.RUNTIME_ADMIN_PASSWORD,
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.access_token) {
+            throw new Error(`admin_auth_failed_http_${response.status}`);
+          }
+          console.log(`::add-mask::${payload.access_token}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `MERCHANT_BROADCAST_ADMIN_TOKEN=${payload.access_token}\n`);
+          NODE
+
+      - name: Verify production database and function health
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const token = String(process.env.MERCHANT_BROADCAST_ADMIN_TOKEN || '');
+          const headers = {
+            apikey: key,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          };
+
+          const database = await fetch(`${url}/rest/v1/rpc/merchant_morning_broadcast_health`, {
+            method: 'POST', headers, body: '{}',
+          });
+          const databasePayload = await database.json().catch(() => ({}));
+          if (!database.ok || databasePayload?.ok !== true) {
+            console.error('Database health failed', database.status, databasePayload);
+            process.exit(1);
+          }
+
+          const runtime = await fetch(`${url}/functions/v1/merchant-morning-broadcast`, {
+            method: 'POST', headers, body: JSON.stringify({ action: 'preview', locale: 'ar' }),
+          });
+          const runtimePayload = await runtime.json().catch(() => ({}));
+          if (!runtime.ok || runtimePayload?.ok !== true || runtimePayload?.function_ready !== true) {
+            console.error('Function health failed', runtime.status, runtimePayload);
+            process.exit(1);
+          }
+
+          console.log(`Eligible merchants: ${runtimePayload.eligible_merchants ?? 0}`);
+          console.log(`WhatsApp Cloud configured: ${runtimePayload.cloud_configured === true}`);
+          if (runtimePayload.cloud_configured !== true) {
+            console.log('Automatic sending remains disabled until the documented Meta secrets are configured.');
+          }
+          NODE
+
+      - name: Publish deployment summary
+        if: always()
+        run: |
+          {
+            echo '## Merchant morning WhatsApp broadcast'
+            echo
+            echo '- Dynamic production merchant audience deployed.'
+            echo '- Campaign and recipient audit ledger deployed.'
+            echo '- Protected Edge Function deployed without sending any test broadcast.'
+            echo '- Official automatic sending activates only when Meta configuration is complete.'
+            echo "- Checked at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
