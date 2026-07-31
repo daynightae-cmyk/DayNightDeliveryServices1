@@ -95,6 +95,33 @@ export function areEquivalentLocations(left: unknown, right: unknown) {
   return normalizeLocationIdentity(leftRaw) === normalizeLocationIdentity(rightRaw);
 }
 
+export function extractDestinationAreaFromAddress(
+  address: unknown,
+  emirate: unknown,
+  city: unknown,
+) {
+  const rawAddress = clean(address);
+  if (!rawAddress) return "";
+
+  const parts = rawAddress
+    .split(/\s+(?:—|–|-|→|←)\s+|[,،|\n]+/)
+    .map(clean)
+    .filter(Boolean);
+  if (!parts.length) return "";
+
+  const candidates = parts.filter(
+    (part) => !areEquivalentLocations(part, emirate) && !areEquivalentLocations(part, city),
+  );
+  const knownArea = candidates.find((part) => Boolean(inferDestinationEmirate(part, "en")));
+  if (knownArea) return knownArea;
+
+  const terminal = parts[parts.length - 1];
+  const structuredAddress =
+    parts.length > 1 &&
+    (areEquivalentLocations(terminal, emirate) || areEquivalentLocations(terminal, city));
+  return structuredAddress ? candidates[0] || "" : "";
+}
+
 export function formatDestinationLocation(
   emirate: unknown,
   area: unknown,
