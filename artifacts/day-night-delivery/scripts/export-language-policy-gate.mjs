@@ -82,6 +82,7 @@ const screenshotFixtures = [
   ["Al Ain: Al Khalidiyah Al Ain - Al Ain", "العين: الخالدية العين - العين"],
   ["Abu Dhabi, Al Zahiyah - Abu Dhabi", "أبوظبي، الزاهية - أبوظبي"],
   ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],
+  ["Dubai, Deira, Villa 12, Street 5, Building 8, Floor 2, Near Al Zahiyah", "دبي، ديرة، فيلا 12، شارع 5، مبنى 8، الطابق 2، بالقرب من الزاهية"],
 ];
 
 for (const [input, expected] of screenshotFixtures) {

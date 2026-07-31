@@ -20,6 +20,7 @@ import AdminEmployeeLauncher from "./components/admin/AdminEmployeeLauncher";
 import MerchantFeedbackSummaryLauncher from "./components/merchant/MerchantFeedbackSummaryLauncher";
 import InternationalTrackingEntryLauncher from "./components/InternationalTrackingEntryLauncher";
 import MerchantInternationalTrackingLauncher from "./components/merchant/MerchantInternationalTrackingLauncher";
+import ArabicAddressRuntimeBridge from "./components/ArabicAddressRuntimeBridge";
 import "./index.css";
 import "./styles/dn-premium.css";
 import "./styles/dn-ui-fixes.css";
@@ -57,12 +58,12 @@ function installGlobalRuntimeHandlers() {
   window.addEventListener("unhandledrejection", (event) => reportError(event.reason, "unhandled_rejection"));
 }
 function rootElement() { const root = document.getElementById("root"); if (!root) throw new Error("DAY NIGHT root element is missing"); return root; }
-function mountPublicApplication() { const adminRoute = isAdminPath(); createRoot(rootElement()).render(<StrictMode><AppProvider><App />{adminRoute && <AdminExperienceEnhancements />}<WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge />{adminRoute && <AdminDeferredMerchantAccounting />}<ProductionExperience /></AppProvider></StrictMode>); }
-async function mountNativeRoleApplication(role: NativeRole) { const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot"); createRoot(rootElement()).render(<StrictMode><BrowserRouter><NativeRoleErrorBoundary role={role}><AppProvider><NativeRoleRoot role={role} /><WhatsAppRuntimeGuard />{role === "merchant" && <MerchantFeedbackSummaryLauncher />}{role === "merchant" && <MerchantInternationalTrackingLauncher />}</AppProvider></NativeRoleErrorBoundary></BrowserRouter></StrictMode>); }
+function mountPublicApplication() { const adminRoute = isAdminPath(); createRoot(rootElement()).render(<StrictMode><AppProvider><ArabicAddressRuntimeBridge /><App />{adminRoute && <AdminExperienceEnhancements />}<WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge />{adminRoute && <AdminDeferredMerchantAccounting />}<ProductionExperience /></AppProvider></StrictMode>); }
+async function mountNativeRoleApplication(role: NativeRole) { const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot"); createRoot(rootElement()).render(<StrictMode><BrowserRouter><NativeRoleErrorBoundary role={role}><AppProvider><ArabicAddressRuntimeBridge /><NativeRoleRoot role={role} /><WhatsAppRuntimeGuard />{role === "merchant" && <MerchantFeedbackSummaryLauncher />}{role === "merchant" && <MerchantInternationalTrackingLauncher />}</AppProvider></NativeRoleErrorBoundary></BrowserRouter></StrictMode>); }
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
-  if (/^\/international-tracking\/?$/i.test(pathname)) { const { default: InternationalTrackingPage } = await import("./components/InternationalTrackingPage"); createRoot(rootElement()).render(<StrictMode><AppProvider><InternationalTrackingPage /><WhatsAppRuntimeGuard /></AppProvider></StrictMode>); return true; }
-  if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) { const ratingModule = await import("./components/MultiPartyRatingPage").catch(() => import("./components/FeedbackPage")); const RatingPage = ratingModule.default; createRoot(rootElement()).render(<StrictMode><AppProvider><RatingPage /><WhatsAppRuntimeGuard /></AppProvider></StrictMode>); return true; }
+  if (/^\/international-tracking\/?$/i.test(pathname)) { const { default: InternationalTrackingPage } = await import("./components/InternationalTrackingPage"); createRoot(rootElement()).render(<StrictMode><AppProvider><ArabicAddressRuntimeBridge /><InternationalTrackingPage /><WhatsAppRuntimeGuard /></AppProvider></StrictMode>); return true; }
+  if (/^\/(?:feedback|rate)\/[^/]+\/?$/i.test(pathname)) { const ratingModule = await import("./components/MultiPartyRatingPage").catch(() => import("./components/FeedbackPage")); const RatingPage = ratingModule.default; createRoot(rootElement()).render(<StrictMode><AppProvider><ArabicAddressRuntimeBridge /><RatingPage /><WhatsAppRuntimeGuard /></AppProvider></StrictMode>); return true; }
   return false;
 }
 async function bootstrapApplication() {

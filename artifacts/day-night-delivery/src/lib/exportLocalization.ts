@@ -111,6 +111,13 @@ export function localizeExportText(value: unknown, language: ExportDocumentLangu
   text = text.replace(/[A-Za-z]+(?:['’-][A-Za-z]+)*/g, transliterateLatinWord);
   return text.replace(/\s*,\s*/g, "، ").replace(/\s*:\s*/g, ": ").replace(/\s+-\s+/g, " - ").replace(/\s{2,}/g, " ").trim() || EMPTY;
 }
+
+export function isLikelyLocationText(value: unknown) {
+  const text = clean(value).toLowerCase();
+  if (!text || !/[a-z]/i.test(text)) return false;
+  if ([...ARABIC_PHRASES, ...ARABIC_TERMS].some(([latin]) => text.includes(latin))) return true;
+  return /(?:\b(?:address|location|route|pickup|drop[ -]?off|delivery|destination|city|area|emirate|district|street|road|building|tower|villa|apartment|flat|floor|office|shop|warehouse|block|sector|zone|landmark|near|opposite|behind|mall|hotel|school|hospital|mosque|airport|port)\b)/i.test(text);
+}
 function explicitText(record: FlexibleOrder, keys: string[]) {
   for (const key of keys) { const value = clean(record[key]); if (value) return value; }
   return "";
@@ -160,21 +167,40 @@ function combineAddressParts(parts: string[]) {
 
 export function localizedOrderAddress(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
   const record = order as FlexibleOrder;
-  const fullArabicKeys = side === "receiver"
-    ? ["receiver_address_ar", "delivery_address_ar"]
-    : ["sender_address_ar", "pickup_address_ar"];
-  const partialArabicKeys = side === "receiver"
-    ? ["receiver_area_ar", "delivery_area_ar", "receiver_landmark_ar", "delivery_landmark_ar"]
-    : ["sender_area_ar", "pickup_area_ar", "sender_landmark_ar", "pickup_landmark_ar"];
+  const arabicKeys = side === "receiver"
+    ? [
+        "receiver_address_ar", "delivery_address_ar", "receiver_area_ar", "delivery_area_ar",
+        "receiver_street_ar", "delivery_street_ar", "receiver_building_ar", "delivery_building_ar",
+        "receiver_villa_ar", "delivery_villa_ar", "receiver_apartment_ar", "delivery_apartment_ar",
+        "receiver_floor_ar", "delivery_floor_ar", "receiver_landmark_ar", "delivery_landmark_ar",
+      ]
+    : [
+        "sender_address_ar", "pickup_address_ar", "sender_area_ar", "pickup_area_ar",
+        "sender_street_ar", "pickup_street_ar", "sender_building_ar", "pickup_building_ar",
+        "sender_villa_ar", "pickup_villa_ar", "sender_apartment_ar", "pickup_apartment_ar",
+        "sender_floor_ar", "pickup_floor_ar", "sender_landmark_ar", "pickup_landmark_ar",
+      ];
   const fallbackKeys = side === "receiver"
-    ? ["receiver_address", "delivery_address", "receiver_area", "delivery_area", "receiver_landmark", "delivery_landmark"]
-    : ["sender_address", "pickup_address", "sender_area", "pickup_area", "sender_landmark", "pickup_landmark"];
-  const fallback = localizeExportText(explicitText(record, fallbackKeys), language);
-  if (language !== "ar") return fallback;
-
-  const fullArabic = explicitText(record, fullArabicKeys);
-  const partialArabic = partialArabicKeys.map((key) => clean(record[key])).filter(Boolean);
-  return combineAddressParts([fullArabic || fallback, ...partialArabic]);
+    ? [
+        "receiver_address", "delivery_address", "receiver_area", "delivery_area",
+        "receiver_street", "delivery_street", "receiver_building", "delivery_building",
+        "receiver_villa", "delivery_villa", "receiver_apartment", "delivery_apartment",
+        "receiver_floor", "delivery_floor", "receiver_landmark", "delivery_landmark",
+      ]
+    : [
+        "sender_address", "pickup_address", "sender_area", "pickup_area",
+        "sender_street", "pickup_street", "sender_building", "pickup_building",
+        "sender_villa", "pickup_villa", "sender_apartment", "pickup_apartment",
+        "sender_floor", "pickup_floor", "sender_landmark", "pickup_landmark",
+      ];
+  const arabicParts = language === "ar"
+    ? arabicKeys.map((key) => clean(record[key])).filter(Boolean)
+    : [];
+  const fallbackParts = fallbackKeys
+    .map((key) => clean(record[key]))
+    .filter(Boolean)
+    .map((part) => localizeExportText(part, language));
+  return combineAddressParts([...arabicParts, ...fallbackParts]);
 }
 export function localizedOrderDestination(order: Order, language: ExportDocumentLanguage) {
   const city = localizedOrderCity(order, language, "receiver");
