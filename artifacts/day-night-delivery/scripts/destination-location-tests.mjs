@@ -1,3 +1,4 @@
+// Executes the exact TypeScript formatter source under the repository's Node 20 CI runtime.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
