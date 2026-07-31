@@ -66,40 +66,35 @@ replace_regex_once(
     r'''export function localizedOrderAddress\(order: Order, language: ExportDocumentLanguage, side: "sender" \| "receiver" = "receiver"\) \{[\s\S]*?\n\}\nexport function localizedOrderDestination''',
     '''export function localizedOrderAddress(order: Order, language: ExportDocumentLanguage, side: "sender" | "receiver" = "receiver") {
   const record = order as FlexibleOrder;
-  const arabicKeys = side === "receiver"
+  const addressComponents: Array<[string[], string[]]> = side === "receiver"
     ? [
-        "receiver_address_ar", "delivery_address_ar", "receiver_area_ar", "delivery_area_ar",
-        "receiver_street_ar", "delivery_street_ar", "receiver_building_ar", "delivery_building_ar",
-        "receiver_villa_ar", "delivery_villa_ar", "receiver_apartment_ar", "delivery_apartment_ar",
-        "receiver_floor_ar", "delivery_floor_ar", "receiver_landmark_ar", "delivery_landmark_ar",
+        [["receiver_address_ar", "delivery_address_ar"], ["receiver_address", "delivery_address"]],
+        [["receiver_area_ar", "delivery_area_ar"], ["receiver_area", "delivery_area"]],
+        [["receiver_street_ar", "delivery_street_ar"], ["receiver_street", "delivery_street"]],
+        [["receiver_building_ar", "delivery_building_ar"], ["receiver_building", "delivery_building"]],
+        [["receiver_villa_ar", "delivery_villa_ar"], ["receiver_villa", "delivery_villa"]],
+        [["receiver_apartment_ar", "delivery_apartment_ar"], ["receiver_apartment", "delivery_apartment"]],
+        [["receiver_floor_ar", "delivery_floor_ar"], ["receiver_floor", "delivery_floor"]],
+        [["receiver_landmark_ar", "delivery_landmark_ar"], ["receiver_landmark", "delivery_landmark"]],
       ]
     : [
-        "sender_address_ar", "pickup_address_ar", "sender_area_ar", "pickup_area_ar",
-        "sender_street_ar", "pickup_street_ar", "sender_building_ar", "pickup_building_ar",
-        "sender_villa_ar", "pickup_villa_ar", "sender_apartment_ar", "pickup_apartment_ar",
-        "sender_floor_ar", "pickup_floor_ar", "sender_landmark_ar", "pickup_landmark_ar",
+        [["sender_address_ar", "pickup_address_ar"], ["sender_address", "pickup_address"]],
+        [["sender_area_ar", "pickup_area_ar"], ["sender_area", "pickup_area"]],
+        [["sender_street_ar", "pickup_street_ar"], ["sender_street", "pickup_street"]],
+        [["sender_building_ar", "pickup_building_ar"], ["sender_building", "pickup_building"]],
+        [["sender_villa_ar", "pickup_villa_ar"], ["sender_villa", "pickup_villa"]],
+        [["sender_apartment_ar", "pickup_apartment_ar"], ["sender_apartment", "pickup_apartment"]],
+        [["sender_floor_ar", "pickup_floor_ar"], ["sender_floor", "pickup_floor"]],
+        [["sender_landmark_ar", "pickup_landmark_ar"], ["sender_landmark", "pickup_landmark"]],
       ];
-  const fallbackKeys = side === "receiver"
-    ? [
-        "receiver_address", "delivery_address", "receiver_area", "delivery_area",
-        "receiver_street", "delivery_street", "receiver_building", "delivery_building",
-        "receiver_villa", "delivery_villa", "receiver_apartment", "delivery_apartment",
-        "receiver_floor", "delivery_floor", "receiver_landmark", "delivery_landmark",
-      ]
-    : [
-        "sender_address", "pickup_address", "sender_area", "pickup_area",
-        "sender_street", "pickup_street", "sender_building", "pickup_building",
-        "sender_villa", "pickup_villa", "sender_apartment", "pickup_apartment",
-        "sender_floor", "pickup_floor", "sender_landmark", "pickup_landmark",
-      ];
-  const arabicParts = language === "ar"
-    ? arabicKeys.map((key) => clean(record[key])).filter(Boolean)
-    : [];
-  const fallbackParts = fallbackKeys
-    .map((key) => clean(record[key]))
-    .filter(Boolean)
-    .map((part) => localizeExportText(part, language));
-  return combineAddressParts([...arabicParts, ...fallbackParts]);
+  const parts = addressComponents.map(([arabicKeys, fallbackKeys]) => {
+    if (language === "ar") {
+      const explicitArabic = explicitText(record, arabicKeys);
+      if (explicitArabic) return explicitArabic;
+    }
+    return localizeExportText(explicitText(record, fallbackKeys), language);
+  });
+  return combineAddressParts(parts);
 }
 export function localizedOrderDestination''',
 )
@@ -115,6 +110,7 @@ const LOCATION_CONTEXT = /(?:address|location|route|pickup|drop[ -]?off|delivery
 const BLOCKED_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "SELECT", "OPTION", "CODE", "PRE"]);
 const originals = new WeakMap<Text, string>();
 const tracked = new Set<Text>();
+const localizedWrites = new WeakSet<Text>();
 
 function elementContext(element: Element | null) {
   let current = element;
@@ -154,11 +150,26 @@ function shouldLocalize(node: Text) {
 
 function processText(node: Text) {
   const current = node.nodeValue || "";
-  if (!shouldLocalize(node)) return;
-  const original = originals.get(node) || current;
-  if (!originals.has(node)) originals.set(node, original);
+  if (localizedWrites.has(node)) {
+    localizedWrites.delete(node);
+    tracked.add(node);
+    return;
+  }
+
+  const saved = originals.get(node);
+  const savedLocalized = saved === undefined ? "" : localizeExportText(saved, "ar");
+  if (!shouldLocalize(node)) {
+    if (saved !== undefined && current !== savedLocalized) originals.set(node, current);
+    return;
+  }
+
+  const original = saved !== undefined && current === savedLocalized ? saved : current;
+  originals.set(node, original);
   const localized = localizeExportText(original, "ar");
-  if (localized !== current) node.nodeValue = localized;
+  if (localized !== current) {
+    localizedWrites.add(node);
+    node.nodeValue = localized;
+  }
   tracked.add(node);
 }
 
@@ -440,12 +451,12 @@ replace_once(
 replace_once(
     "src/components/tracking/TrackingMap.tsx",
     '        {pickupPos && <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{getString(activeOrder, ["sender_address", "pickup_address"]) || (isArabic ? pickupLabel.labelAr : pickupLabel.labelEn)}</p></div></Popup></Marker>}',
-    '        {pickupPos && <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{activeOrder ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "sender") : (isArabic ? pickupLabel.labelAr : pickupLabel.labelEn)}</p></div></Popup></Marker>}',
+    '        {pickupPos && <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{activeOrder && localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "sender") !== "—" ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "sender") : (isArabic ? pickupLabel.labelAr : pickupLabel.labelEn)}</p></div></Popup></Marker>}',
 )
 replace_once(
     "src/components/tracking/TrackingMap.tsx",
     '        {destinationPos && <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{getString(activeOrder, ["receiver_address", "delivery_address"]) || (isArabic ? destinationLabel.labelAr : destinationLabel.labelEn)}</p></div></Popup></Marker>}',
-    '        {destinationPos && <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{activeOrder ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "receiver") : (isArabic ? destinationLabel.labelAr : destinationLabel.labelEn)}</p></div></Popup></Marker>}',
+    '        {destinationPos && <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{activeOrder && localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "receiver") !== "—" ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "receiver") : (isArabic ? destinationLabel.labelAr : destinationLabel.labelEn)}</p></div></Popup></Marker>}',
 )
 
 # 7) Admin order tables/details: full localized destination, not emirate-only routes.
@@ -491,16 +502,56 @@ replace_once(
 
 # 8) Permanent fail-closed gate for full addresses and all runtime mounts.
 gate = read("scripts/export-language-policy-gate.mjs")
-gate = gate.replace(
-    '  ["src/types.ts", "receiver_address_ar?: string"],\n];',
-    '  ["src/types.ts", "receiver_address_ar?: string"],\n  ["src/lib/exportLocalization.ts", "receiver_building"],\n  ["src/lib/exportLocalization.ts", "export function isLikelyLocationText"],\n  ["src/components/ArabicAddressRuntimeBridge.tsx", "MutationObserver"],\n  ["src/main.tsx", "<ArabicAddressRuntimeBridge />"],\n  ["src/components/driver/DriverOrderCard.tsx", "localizedOrderAddress"],\n  ["src/components/driver/DriverCustomerCommunication.tsx", "localizedDeliveryAddress"],\n  ["src/components/merchant/MerchantPortalCommandCenter.tsx", "localizedOrderAddress(order, language"],\n  ["src/components/Tracking.tsx", "عنوان التسليم الكامل"],\n  ["src/components/admin/AdminSectionWorkspaceComplete.tsx", "localizedOrderDestination"],\n];',
+for obsolete in (
+    '  ["src/lib/exportLocalization.ts", "const partialArabic = partialArabicKeys.map"],
+',
+    '  ["src/lib/exportLocalization.ts", "return combineAddressParts([fullArabic || fallback, ...partialArabic])"],
+',
+):
+    gate = gate.replace(obsolete, "")
+
+gate = replace_text_once(
+    gate,
+    '  ["src/components/AdminPanel.tsx", "localizedOrderStatus(order.status, language)"],
+];',
+    '  ["src/components/AdminPanel.tsx", "localizedOrderStatus(order.status, language)"],
+'
+    '  ["src/lib/exportLocalization.ts", "const addressComponents: Array<[string[], string[]]>"],
+'
+    '  ["src/lib/exportLocalization.ts", "receiver_building"],
+'
+    '  ["src/lib/exportLocalization.ts", "export function isLikelyLocationText"],
+'
+    '  ["src/components/ArabicAddressRuntimeBridge.tsx", "localizedWrites"],
+'
+    '  ["src/components/ArabicAddressRuntimeBridge.tsx", "MutationObserver"],
+'
+    '  ["src/main.tsx", "<ArabicAddressRuntimeBridge />"],
+'
+    '  ["src/components/driver/DriverOrderCard.tsx", "localizedOrderAddress"],
+'
+    '  ["src/components/driver/DriverCustomerCommunication.tsx", "localizedDeliveryAddress"],
+'
+    '  ["src/components/merchant/MerchantPortalCommandCenter.tsx", "localizedOrderAddress(order, language"],
+'
+    '  ["src/components/Tracking.tsx", "عنوان التسليم الكامل"],
+'
+    '  ["src/components/admin/AdminSectionWorkspaceComplete.tsx", "localizedOrderDestination"],
+'
+    '];',
+    "export language gate checks tail",
 )
-gate = gate.replace(
-    '  ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],\n];',
-    '  ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],\n  ["Dubai, Deira, Villa 12, Street 5, Building 8, Floor 2, Near Al Zahiyah", "دبي، ديرة، فيلا 12، شارع 5، مبنى 8، الطابق 2، بالقرب من الزاهية"],\n];',
+gate = replace_text_once(
+    gate,
+    '  ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],
+];',
+    '  ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],
+'
+    '  ["Dubai, Deira, Villa 12, Street 5, Building 8, Floor 2, Near Al Zahiyah", "دبي، ديرة، فيلا 12، شارع 5، مبنى 8، الطابق 2، بالقرب من الزاهية"],
+'
+    '];',
+    "complete address fixture",
 )
-if gate == read("scripts/export-language-policy-gate.mjs"):
-    raise SystemExit("export-language-policy-gate.mjs: no changes applied")
 write("scripts/export-language-policy-gate.mjs", gate)
 
 print("Runtime full Arabic address patch applied.")
