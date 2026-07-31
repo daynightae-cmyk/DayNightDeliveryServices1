@@ -1,5 +1,5 @@
 import type { Order } from "../types";
-import { areEquivalentLocations, formatDestinationLocation, inferDestinationEmirate } from "./destinationLocation";
+import { areEquivalentLocations, extractDestinationAreaFromAddress, formatDestinationLocation, inferDestinationEmirate } from "./destinationLocation";
 
 export type ExportDocumentLanguage = "ar" | "en";
 type FlexibleOrder = Order & Record<string, unknown>;
@@ -250,6 +250,14 @@ export function localizedOrderDestinationArea(order: Order, language: ExportDocu
     ["receiver_city", "delivery_city"],
   );
   const emirate = localizedOrderDestinationEmirate(order, language);
+  const address = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_address_ar", "delivery_address_ar"],
+    ["receiver_address", "delivery_address"],
+  );
+  const addressArea = extractDestinationAreaFromAddress(address, emirate, city);
+  if (addressArea) return language === "ar" ? localizeExportText(addressArea, language) : addressArea;
   return city && !areEquivalentLocations(city, emirate) ? city : "";
 }
 
