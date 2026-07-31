@@ -1,0 +1,175 @@
+name: Generate Runtime Full Arabic Addresses
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/runtime-full-arabic-addresses.yml
+      - artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: generate-runtime-full-arabic-addresses
+  cancel-in-progress: false
+
+jobs:
+  generate-validate-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SOURCE_BRANCH: fix/runtime-full-arabic-addresses-source-v1
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Stop when source branch already exists
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Validated source branch already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.source.outputs.exists != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        if: steps.source.outputs.exists != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply complete runtime Arabic address policy
+        if: steps.source.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -c "$SOURCE_BRANCH"
+          python artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+          git rm artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+          git rm .github/workflows/runtime-full-arabic-addresses.yml
+
+      - name: Install dependencies
+        if: steps.source.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate TypeScript
+        if: steps.source.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm exec tsc --noEmit
+
+      - name: Validate complete Arabic address policy
+        if: steps.source.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: node scripts/export-language-policy-gate.mjs
+
+      - name: Run complete production gate
+        if: steps.source.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm production:gate
+
+      - name: Build production application
+        if: steps.source.outputs.exists != 'true'
+        working-directory: artifacts/day-night-delivery
+        shell: bash
+        run: pnpm build
+
+      - name: Remove build-generated asset changes
+        if: steps.source.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated=(
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-dashboard-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-map.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/intro-gateway.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/khalifa-card-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/loading-command-center.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-extra-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-reference.png
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/logo-glass.png
+            artifacts/day-night-delivery/public/assets/daynight/merchant-statement-logo.png
+          )
+          for path in "${generated[@]}"; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git restore --source=HEAD --staged --worktree -- "$path"
+            else
+              rm -f -- "$path"
+            fi
+          done
+
+      - name: Publish validated source branch and PR
+        if: steps.source.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git commit -m "fix(i18n): localize complete addresses across every surface"
+          git push origin "$SOURCE_BRANCH"
+
+          cat > "$RUNNER_TEMP/runtime-full-arabic-addresses.md" <<'EOF'
+          ## الهدف
+
+          جعل لغة النظام هي المصدر الحاكم للعناوين في كل الواجهات، وليس في ملفات التصدير فقط.
+
+          ## التنفيذ
+
+          - عرض العنوان العربي الكامل: المدينة، المنطقة، الشارع، المبنى، الفيلا/الشقة، الطابق والمعلم.
+          - استخدام الحقول العربية المحفوظة أولاً، وتعريب كل مكونات العنوان الإنجليزية القديمة عند غيابها.
+          - تطبيق السياسة على الويب ولوحة الإدارة والتاجر والمندوب والعميل والتتبع والخرائط ورسائل واتساب.
+          - تطبيقها على أغلفة Android وiOS للتاجر والمندوب لأنها تستخدم نفس Runtime الموحّد.
+          - إعادة النص الأصلي دون تغيير عند اختيار الإنجليزية.
+          - إضافة Runtime Bridge مركزي وGate دائم يمنع رجوع العنوان الإنجليزي في الوضع العربي.
+
+          ## الفحص قبل النشر
+
+          - TypeScript `--noEmit`
+          - Full Arabic address policy gate
+          - Complete production gate
+          - Production build
+          EOF
+
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$SOURCE_BRANCH" \
+            --title "Arabic UI: localize complete addresses across web and apps" \
+            --body-file "$RUNNER_TEMP/runtime-full-arabic-addresses.md"
+
+      - name: Publish validation summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Complete Arabic address runtime"
+            echo
+            echo "- Full city, area, street, building, villa/apartment, floor and landmark policy."
+            echo "- Public web, admin, customer, merchant, driver and native mobile role shells."
+            echo "- TypeScript, policy gate, production gate and build are mandatory before the source PR is published."
+          } >> "$GITHUB_STEP_SUMMARY"
