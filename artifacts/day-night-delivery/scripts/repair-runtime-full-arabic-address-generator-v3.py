@@ -7,6 +7,13 @@ content = TARGET.read_text(encoding="utf-8")
 
 replacement = r'''# 8) Permanent fail-closed gate for full addresses and all runtime mounts.
 gate = read("scripts/export-language-policy-gate.mjs")
+
+def replace_gate_once(content: str, old: str, new: str, label: str) -> str:
+    count = content.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected one occurrence, found {count}")
+    return content.replace(old, new, 1)
+
 for obsolete in (
     """  ["src/lib/exportLocalization.ts", "const partialArabic = partialArabicKeys.map"],
 """,
@@ -15,7 +22,7 @@ for obsolete in (
 ):
     gate = gate.replace(obsolete, "")
 
-gate = replace_text_once(
+gate = replace_gate_once(
     gate,
     """  ["src/components/AdminPanel.tsx", "localizedOrderStatus(order.status, language)"],
 ];""",
@@ -34,7 +41,7 @@ gate = replace_text_once(
 ];""",
     "export language gate checks tail",
 )
-gate = replace_text_once(
+gate = replace_gate_once(
     gate,
     """  ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],
 ];""",
@@ -53,4 +60,4 @@ if count != 1:
     raise SystemExit(f"generator gate repair: expected one occurrence, found {count}")
 
 TARGET.write_text(updated, encoding="utf-8")
-print("Runtime full Arabic address generator V3 syntax repaired.")
+print("Runtime full Arabic address generator V4 helper repaired.")
