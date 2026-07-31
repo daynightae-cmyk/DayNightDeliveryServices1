@@ -6,6 +6,7 @@ import { Crosshair, Flag, Layers, Loader2, Navigation, Radio, Route, X } from "l
 import { defaultLocations } from "../../data/defaultLocations";
 import { translations } from "../../data/translations";
 import { useAppContext } from "../../lib/AppContext";
+import { localizedOrderAddress } from "../../lib/exportLocalization";
 import {
   fetchRealDrivingRoute,
   geocodeUaeAddress,
@@ -422,7 +423,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
             <Polyline positions={routePoints} pathOptions={{ color: "#1A73E8", weight: navigationMode ? 7 : 6, opacity: 1, lineCap: "round", lineJoin: "round" }} />
           </>
         )}
-        {pickupPos && <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{getString(activeOrder, ["sender_address", "pickup_address"]) || (isArabic ? pickupLabel.labelAr : pickupLabel.labelEn)}</p></div></Popup></Marker>}
+        {pickupPos && <Marker position={pickupPos} icon={pickupIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-blue uppercase">{t.pickupPoint}</p><p>{activeOrder && localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "sender") !== "—" ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "sender") : (isArabic ? pickupLabel.labelAr : pickupLabel.labelEn)}</p></div></Popup></Marker>}
         {displayDriverPos && (
           <DayNightVehicleMarker
             position={displayDriverPos}
@@ -435,7 +436,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
             <Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-[#1A73E8]">DAY NIGHT GPS</p><p>{isArabic ? "هذا السهم يتحرك من GPS الحقيقي ويُحاذى مع مسار الطريق عند دقة مناسبة." : "This arrow moves from real GPS and snaps to the road route only within a safe accuracy threshold."}</p></div></Popup>
           </DayNightVehicleMarker>
         )}
-        {destinationPos && <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{getString(activeOrder, ["receiver_address", "delivery_address"]) || (isArabic ? destinationLabel.labelAr : destinationLabel.labelEn)}</p></div></Popup></Marker>}
+        {destinationPos && <Marker position={destinationPos} icon={destinationIcon}><Popup><div className={`text-xs font-bold ${isArabic ? "text-right" : "text-left"}`}><p className="text-brand-gold uppercase"><Flag className="mr-1 inline h-3 w-3" />{t.destinationPoint}</p><p>{activeOrder && localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "receiver") !== "—" ? localizedOrderAddress(activeOrder, isArabic ? "ar" : "en", "receiver") : (isArabic ? destinationLabel.labelAr : destinationLabel.labelEn)}</p></div></Popup></Marker>}
       </MapContainer>
     </div>
   );

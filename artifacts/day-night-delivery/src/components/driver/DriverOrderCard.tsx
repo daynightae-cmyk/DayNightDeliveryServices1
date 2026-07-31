@@ -15,6 +15,8 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import type { DriverOrder, DriverStatusAction } from "../../types/driver";
+import type { Order } from "../../types";
+import { localizedOrderAddress, localizedOrderRoute, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "../../lib/exportLocalization";
 import DriverCustomerCommunication from "./DriverCustomerCommunication";
 
 type Props = {
@@ -69,8 +71,11 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
   const [selectedAction, setSelectedAction] = useState<DriverStatusAction | null>(null);
   const [copied, setCopied] = useState(false);
   const phone = cleanPhone(order.receiver_phone || order.customer_phone);
-  const pickupAddress = [order.sender_city, order.sender_address].filter(Boolean).join("، ");
-  const deliveryAddress = [order.receiver_city, order.receiver_address].filter(Boolean).join("، ");
+  const language = isArabic ? "ar" : "en";
+  const localizedOrder = order as unknown as Order;
+  const pickupAddress = localizedOrderAddress(localizedOrder, language, "sender");
+  const deliveryAddress = localizedOrderAddress(localizedOrder, language, "receiver");
+  const routeLabel = localizedOrderRoute(localizedOrder, language);
   const reference = order.tracking_number || order.tracking_code || order.invoice_number || order.id;
   const availableActions = nextActions(order.status);
   const rawStatus = String(order.status || "assigned").toLowerCase();
@@ -119,7 +124,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
           </button>
           {copied && <em className="dn-driver-copy-confirm">{isArabic ? "تم النسخ" : "Copied"}</em>}
           <h3>{order.receiver_name || order.customer_name || (isArabic ? "عميل بدون اسم" : "Unnamed customer")}</h3>
-          <p>{order.sender_city || "—"} <Route /> {order.receiver_city || "—"}</p>
+          <p>{routeLabel}</p>
         </div>
         <div className="dn-driver-order-badges">
           {order.priority && <span className={`dn-driver-priority is-${String(order.priority).toLowerCase()}`}>{order.priority}</span>}
@@ -153,7 +158,7 @@ export default function DriverOrderCard({ order, isArabic, busy, navigationActiv
         <span><Banknote /> COD: {Number(order.cod_amount || 0).toFixed(2)} AED</span>
         <span><Clock3 /> {new Date(order.created_at).toLocaleString(isArabic ? "ar-AE" : "en-AE")}</span>
         <span><PackageCheck /> {order.pieces || 1} {isArabic ? "قطعة" : "pcs"} · {Number(order.weight || 0).toFixed(1)}kg</span>
-        <span><ShieldCheck /> {order.service_type || "standard"} · {order.payment_method || "—"}</span>
+        <span><ShieldCheck /> {localizedServiceType(order.service_type || "standard", language)} · {localizedPaymentMethod(order.payment_method, language)} · {localizedPackageType(order.package_type || "shipment", language)}</span>
       </div>
 
       {(order.notes || order.package_description) && (

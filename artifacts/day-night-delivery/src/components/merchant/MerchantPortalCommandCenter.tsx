@@ -8,6 +8,7 @@ import type { Merchant, Order, OrderStatusHistoryItem } from "../../types";
 import TrackingMap from "../tracking/TrackingMap";
 import { exportOrderPDF } from "../../lib/exportUtils";
 import { buildAdminCsv, buildAdminPdf } from "../../lib/adminPdfExport";
+import { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "../../lib/exportLocalization";
 import {
   MerchantPortalShell,
   MerchantSectionRenderer,
@@ -267,7 +268,8 @@ function mapNotification(row: Record<string, unknown>): MerchantNotificationView
   };
 }
 
-function mapOrder(order: OrderRecord): MerchantOrderViewModel {
+function mapOrder(order: OrderRecord, isArabic: boolean): MerchantOrderViewModel {
+  const language = isArabic ? "ar" : "en";
   return {
     id: order.id,
     trackingNumber: reference(order),
@@ -279,23 +281,23 @@ function mapOrder(order: OrderRecord): MerchantOrderViewModel {
     recipientPhone: clean(order.receiver_phone || order.customer_phone),
     recipientAlternatePhone: clean(order.receiver_alt_phone),
     recipientEmail: clean(order.receiver_email),
-    deliveryEmirate: clean(order.receiver_emirate || order.delivery_emirate),
-    deliveryCity: clean(order.receiver_city),
-    deliveryArea: clean(order.receiver_area || order.delivery_area),
-    deliveryAddress: clean(order.receiver_address),
-    deliveryLandmark: clean(order.receiver_landmark),
-    pickupBranch: clean(order.pickup_branch || order.branch_name),
-    pickupAddress: clean(order.sender_address),
+    deliveryEmirate: localizeExportText(order.receiver_emirate || order.delivery_emirate, language),
+    deliveryCity: localizedOrderCity(order, language, "receiver"),
+    deliveryArea: localizeExportText(order.receiver_area || order.delivery_area, language),
+    deliveryAddress: localizedOrderAddress(order, language, "receiver"),
+    deliveryLandmark: localizeExportText(order.receiver_landmark || order.delivery_landmark, language),
+    pickupBranch: localizeExportText(order.pickup_branch || order.branch_name, language),
+    pickupAddress: localizedOrderAddress(order, language, "sender"),
     senderName: clean(order.sender_name),
     senderPhone: clean(order.sender_phone),
-    serviceType: clean(order.service_type),
-    packageType: clean(order.package_type),
+    serviceType: localizedServiceType(order.service_type, language),
+    packageType: localizedPackageType(order.package_type, language),
     packageDescription: clean(order.package_description),
     pieces: numberOrNull(order.pieces) ?? undefined,
     weight: numberOrNull(order.weight) ?? undefined,
     fragile: Boolean(order.fragile),
     sensitive: Boolean(order.temperature_sensitive || order.sensitive),
-    paymentMethod: clean(order.payment_method),
+    paymentMethod: localizedPaymentMethod(order.payment_method, language),
     codAmount: codAmount(order),
     collectedAmount: collectedAmount(order),
     deliveryFee: numberOrNull(order.delivery_fee ?? order.delivery_price),
@@ -378,9 +380,9 @@ export default function MerchantPortalCommandCenter() {
   async function sendOtp(){if(!supabase||!phone.trim())return;setAuthBusy(true);const {error}=await supabase.auth.signInWithOtp({phone:phone.trim()});setAuthNotice(error?"":isArabic?"تم إرسال الرمز.":"Verification code sent.");if(error)setAuthError(errorMessage(error,isArabic));setAuthBusy(false)}
   async function verifyOtp(){if(!supabase||!phone.trim()||!otp.trim())return;setAuthBusy(true);const {error}=await supabase.auth.verifyOtp({phone:phone.trim(),token:otp.trim(),type:"sms"});if(error)setAuthError(errorMessage(error,isArabic));setAuthBusy(false)}
 
-  const merchant=merchantRows[0] ? mapMerchant(merchantRows[0]) : null; const orders=useMemo(()=>rawOrders.map(mapOrder),[rawOrders]);
+  const merchant=merchantRows[0] ? mapMerchant(merchantRows[0]) : null; const orders=useMemo(()=>rawOrders.map((order)=>mapOrder(order,isArabic)),[rawOrders,isArabic]);
   const selectedRaw=rawOrders.find(order=>order.id===selectedOrderId)||rawOrders.find(order=>ACTIVE.has(statusOf(order.status)))||rawOrders[0]||null;
-  const selectedOrder=selectedRaw?mapOrder(selectedRaw):null;
+  const selectedOrder=selectedRaw?mapOrder(selectedRaw,isArabic):null;
   const navigate:MerchantNavigate=(target,payload)=>{setSection(target);if(target==="order_details")setSelectedOrderId((payload as MerchantNavigationPayloadMap["order_details"]).orderId);if(target==="tracking"){const p=payload as MerchantNavigationPayloadMap["tracking"];const found=rawOrders.find(o=>o.id===p?.orderId||reference(o)===p?.trackingNumber);if(found)setSelectedOrderId(found.id)}};
 
   const codTransactions=useMemo<MerchantCodTransactionViewModel[]>(()=>{const live=arrayFrom<Record<string,unknown>>(business.cod_collections);return live.length?live.map(row=>({id:clean(row.id),trackingNumber:clean(row.tracking_number),recipientName:clean(row.recipient_name)||orders.find(order=>order.id===clean(row.order_id))?.recipientName||"—",codAmount:numberOrNull(row.cod_amount),collectedAmount:numberOrNull(row.collected_amount),status:statusOf(row.status),collectedAt:clean(row.collection_date),settlementId:clean(row.settlement_id)||null,note:clean(row.notes)||null,currency:"AED"})):orders.filter(o=>(o.codAmount||0)>0).map(o=>({id:o.id,trackingNumber:o.trackingNumber,recipientName:o.recipientName,codAmount:o.codAmount||0,collectedAmount:o.collectedAmount||0,status:o.status,collectedAt:o.updatedAt,settlementId:null,note:o.notes,currency:"AED"}))},[business.cod_collections,orders]);

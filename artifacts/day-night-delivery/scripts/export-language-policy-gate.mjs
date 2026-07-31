@@ -5,8 +5,6 @@ const checks = [
   ["src/lib/exportLocalization.ts", "localizedOrderDestination"],
   ["src/lib/exportLocalization.ts", "const cityFallbackKeys = side === \"receiver\""],
   ["src/lib/exportLocalization.ts", "const broaderArabicKeys = side === \"receiver\""],
-  ["src/lib/exportLocalization.ts", "const partialArabic = partialArabicKeys.map"],
-  ["src/lib/exportLocalization.ts", "return combineAddressParts([fullArabic || fallback, ...partialArabic])"],
   ["src/lib/exportLocalization.ts", "[...ARABIC_PHRASES].sort"],
   ["src/lib/exportLocalization.ts", "/(address|destination|route|city|area|emirate|location|عنوان|وجهة|مسار|مدينة|منطقة|إمارة)/i"],
   ["src/lib/adminPdfExport.ts", "localizedCell(payload, column"],
@@ -23,6 +21,17 @@ const checks = [
   ["src/components/AdminPanel.tsx", "localizedPackageType(order.package_type, language)"],
   ["src/components/AdminPanel.tsx", "localizedPaymentMethod(order.payment_method, language)"],
   ["src/components/AdminPanel.tsx", "localizedOrderStatus(order.status, language)"],
+  ["src/lib/exportLocalization.ts", "const addressComponents: Array<[string[], string[]]>"],
+  ["src/lib/exportLocalization.ts", "receiver_building"],
+  ["src/lib/exportLocalization.ts", "export function isLikelyLocationText"],
+  ["src/components/ArabicAddressRuntimeBridge.tsx", "localizedWrites"],
+  ["src/components/ArabicAddressRuntimeBridge.tsx", "MutationObserver"],
+  ["src/main.tsx", "<ArabicAddressRuntimeBridge />"],
+  ["src/components/driver/DriverOrderCard.tsx", "localizedOrderAddress"],
+  ["src/components/driver/DriverCustomerCommunication.tsx", "localizedDeliveryAddress"],
+  ["src/components/merchant/MerchantPortalCommandCenter.tsx", "localizedOrderAddress(order, language"],
+  ["src/components/Tracking.tsx", "عنوان التسليم الكامل"],
+  ["src/components/admin/AdminSectionWorkspaceComplete.tsx", "localizedOrderDestination"],
 ];
 
 for (const [path, marker] of checks) {
@@ -82,6 +91,7 @@ const screenshotFixtures = [
   ["Al Ain: Al Khalidiyah Al Ain - Al Ain", "العين: الخالدية العين - العين"],
   ["Abu Dhabi, Al Zahiyah - Abu Dhabi", "أبوظبي، الزاهية - أبوظبي"],
   ["Sharjah, Al Nud - Sharjah", "الشارقة، النود - الشارقة"],
+  ["Dubai, Deira, Villa 12, Street 5, Building 8, Floor 2, Near Al Zahiyah", "دبي، ديرة، فيلا 12، شارع 5، مبنى 8، الطابق 2، بالقرب من الزاهية"],
 ];
 
 for (const [input, expected] of screenshotFixtures) {

@@ -17,6 +17,7 @@ import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import { cleanAdminText, matchesAdminSection, normalizeAdminKey, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 import { financialsFromOrder } from "../../lib/orderFinancials";
+import { localizedOrderCity, localizedOrderDestination } from "../../lib/exportLocalization";
 import { updateExistingOrderStatus } from "../../supabaseAdminOps";
 import type { Merchant, Order } from "../../types";
 import AdminDriverAssignmentModal from "./AdminDriverAssignmentModal";
@@ -101,8 +102,8 @@ const money = (value: unknown, isArabic: boolean) =>
 const tracking = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
-const route = (order: Order) =>
-  `${order.sender_city || "—"} → ${order.receiver_city || order.destination_country || "—"}`;
+const route = (order: Order, isArabic: boolean) =>
+  `${localizedOrderCity(order, isArabic ? "ar" : "en", "sender")} → ${localizedOrderDestination(order, isArabic ? "ar" : "en")}`;
 
 const canonicalStatus = (value: unknown) =>
   normalizeOrderStatus(value as string | Order | null | undefined);
@@ -560,7 +561,7 @@ export default function AdminSectionWorkspaceComplete({
                         <span dir="ltr">{order.receiver_phone || "—"}</span>
                       </small>
                     </td>
-                    <td>{route(order)}</td>
+                    <td>{route(order, isArabic)}</td>
                     <td>
                       <FinancialCell order={order} isArabic={isArabic} />
                     </td>

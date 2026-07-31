@@ -32,6 +32,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabase";
 import { driverErrorMessage, setDriverPresence, updateDriverOrderStatus } from "../../lib/driverData";
 import type { DriverOrder, DriverProfile, DriverShiftStatus, ProfileRole } from "../../types/driver";
+import type { Order } from "../../types";
+import { localizedOrderAddress, localizedOrderCity, localizedOrderDestination, localizedOrderRoute } from "../../lib/exportLocalization";
 import { useDriverOrders } from "../../hooks/useDriverOrders";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import localAssets, { withRemoteFallback } from "../../data/localAssets";
@@ -253,6 +255,8 @@ export default function DriverDashboard({
     : "—";
   const currentWeight = Number(currentOrder?.weight);
   const currentPieces = Number(currentOrder?.pieces);
+  const displayLanguage = isArabic ? "ar" : "en";
+  const localizeDriverOrder = (value: DriverOrder) => value as unknown as Order;
   return (
     <section className="dn-driver-shell dn-driver-shell-v3 dn-driver-exact-shell" dir={isArabic ? "rtl" : "ltr"}>
       <aside className="dn-driver-rail-v3 dn-driver-exact-rail" aria-label={isArabic ? "تنقل لوحة المندوب" : "Driver navigation"}>
@@ -372,8 +376,8 @@ export default function DriverDashboard({
                     return (
                       <button key={order.id} type="button" className={currentOrder?.id === order.id ? "is-selected" : ""} onClick={() => setSelectedOrderId(order.id)}>
                         <span className="dn-driver-exact-job-number">#{reference}</span>
-                        <span className="dn-driver-exact-job-tags"><em>{statusLabel(order.status, isArabic)}</em><em>{order.receiver_city || (isArabic ? "الإمارات" : "UAE")}</em></span>
-                        <span className="dn-driver-exact-job-route"><b>{order.sender_city || "—"}</b><i>→</i><b>{order.receiver_city || "—"}</b></span>
+                        <span className="dn-driver-exact-job-tags"><em>{statusLabel(order.status, isArabic)}</em><em>{localizedOrderCity(localizeDriverOrder(order), displayLanguage, "receiver")}</em></span>
+                        <span className="dn-driver-exact-job-route"><b>{localizedOrderRoute(localizeDriverOrder(order), displayLanguage)}</b></span>
                         <span className="dn-driver-exact-job-progress" aria-label={`${progress + 1}/5`}>
                           {[0, 1, 2, 3, 4].map((step) => <i key={step} className={step <= progress ? "is-complete" : ""} />)}
                         </span>
@@ -406,7 +410,7 @@ export default function DriverDashboard({
 
               <article className="dn-driver-exact-map">
                 <header>
-                  <div><small>{isArabic ? "الخريطة المباشرة" : "Live map"}</small><h2>{currentOrder ? `${currentOrder.sender_city || "—"} → ${currentOrder.receiver_city || "—"}` : (isArabic ? "موقع المندوب الحالي" : "Current driver location")}</h2></div>
+                  <div><small>{isArabic ? "الخريطة المباشرة" : "Live map"}</small><h2>{currentOrder ? localizedOrderRoute(localizeDriverOrder(currentOrder), displayLanguage) : (isArabic ? "موقع المندوب الحالي" : "Current driver location")}</h2></div>
                   <span className={gps.permission === "granted" && shiftStarted ? "is-live" : ""}><Wifi />{gps.permission === "granted" && shiftStarted ? (isArabic ? "مباشر" : "Live") : (isArabic ? "غير متصل" : "Offline")}</span>
                 </header>
                 <div className="dn-driver-exact-map-canvas"><TrackingMap order={currentOrder || null} /></div>
@@ -417,7 +421,7 @@ export default function DriverDashboard({
                     <a href={`tel:${driver.phone || profile.phone || ADMIN_PHONE}`} aria-label={isArabic ? "اتصال بالمندوب" : "Call driver"}><Phone /></a>
                   </section>
                   <section>
-                    <div><small>{isArabic ? "عنوان التسليم" : "Delivery address"}</small><strong>{currentOrder ? [currentOrder.receiver_city, currentOrder.receiver_address].filter(Boolean).join("، ") || "—" : (isArabic ? "بانتظار مهمة" : "Waiting for assignment")}</strong><span><Clock3 />{isArabic ? "آخر مزامنة" : "Last sync"}: {lastSyncLabel}</span></div>
+                    <div><small>{isArabic ? "عنوان التسليم" : "Delivery address"}</small><strong>{currentOrder ? localizedOrderDestination(localizeDriverOrder(currentOrder), displayLanguage) : (isArabic ? "بانتظار مهمة" : "Waiting for assignment")}</strong><span><Clock3 />{isArabic ? "آخر مزامنة" : "Last sync"}: {lastSyncLabel}</span></div>
                     {currentOrder ? <button type="button" className="dn-driver-map-navigation-button" onClick={() => void startInAppNavigation(currentOrder)} aria-label={isArabic ? "فتح الملاحة الداخلية" : "Open in-app navigation"}><Navigation /></button> : <span className="is-disabled"><Navigation /></span>}
                   </section>
                 </footer>
