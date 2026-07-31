@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: generate-runtime-full-arabic-addresses
@@ -57,47 +58,43 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply complete runtime Arabic address policy
+        id: patch
         if: steps.source.outputs.exists != 'true'
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          git switch -c "$SOURCE_BRANCH"
-          python artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
-          git rm artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
-          git rm .github/workflows/runtime-full-arabic-addresses.yml
+          set +e
+          {
+            git switch -c "$SOURCE_BRANCH"
+            python artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+            git rm artifacts/day-night-delivery/scripts/apply-runtime-full-arabic-addresses.py
+            git rm .github/workflows/runtime-full-arabic-addresses.yml
+          } > "$RUNNER_TEMP/runtime-address-patch.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/runtime-address-patch.log"
+          exit "$status"
 
-      - name: Install dependencies
-        if: steps.source.outputs.exists != 'true'
+      - name: Validate TypeScript, policy, production gates and build
+        id: validate
+        if: steps.source.outputs.exists != 'true' && steps.patch.outcome == 'success'
+        continue-on-error: true
         working-directory: artifacts/day-night-delivery
         shell: bash
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate TypeScript
-        if: steps.source.outputs.exists != 'true'
-        working-directory: artifacts/day-night-delivery
-        shell: bash
-        run: pnpm exec tsc --noEmit
-
-      - name: Validate complete Arabic address policy
-        if: steps.source.outputs.exists != 'true'
-        working-directory: artifacts/day-night-delivery
-        shell: bash
-        run: node scripts/export-language-policy-gate.mjs
-
-      - name: Run complete production gate
-        if: steps.source.outputs.exists != 'true'
-        working-directory: artifacts/day-night-delivery
-        shell: bash
-        run: pnpm production:gate
-
-      - name: Build production application
-        if: steps.source.outputs.exists != 'true'
-        working-directory: artifacts/day-night-delivery
-        shell: bash
-        run: pnpm build
+        run: |
+          set +e
+          {
+            pnpm install --frozen-lockfile
+            pnpm exec tsc --noEmit
+            node scripts/export-language-policy-gate.mjs
+            pnpm production:gate
+            pnpm build
+          } > "$RUNNER_TEMP/runtime-address-validate.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/runtime-address-validate.log"
+          exit "$status"
 
       - name: Remove build-generated asset changes
-        if: steps.source.outputs.exists != 'true'
+        if: steps.source.outputs.exists != 'true' && steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -121,7 +118,8 @@ jobs:
           done
 
       - name: Publish validated source branch and PR
-        if: steps.source.outputs.exists != 'true'
+        id: publish
+        if: steps.source.outputs.exists != 'true' && steps.patch.outcome == 'success' && steps.validate.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -162,14 +160,34 @@ jobs:
             --title "Arabic UI: localize complete addresses across web and apps" \
             --body-file "$RUNNER_TEMP/runtime-full-arabic-addresses.md"
 
-      - name: Publish validation summary
-        if: always()
+      - name: Report sanitized generator outcome
+        if: always() && steps.source.outputs.exists != 'true'
         shell: bash
         run: |
-          {
-            echo "## Complete Arabic address runtime"
-            echo
-            echo "- Full city, area, street, building, villa/apartment, floor and landmark policy."
-            echo "- Public web, admin, customer, merchant, driver and native mobile role shells."
-            echo "- TypeScript, policy gate, production gate and build are mandatory before the source PR is published."
-          } >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          patch_tail="$(tail -n 40 "$RUNNER_TEMP/runtime-address-patch.log" 2>/dev/null || true)"
+          validate_tail="$(tail -n 60 "$RUNNER_TEMP/runtime-address-validate.log" 2>/dev/null || true)"
+          cat > "$RUNNER_TEMP/runtime-address-report.md" <<EOF
+          ## Runtime full Arabic address generator
+
+          - Patch: `${{ steps.patch.outcome }}`
+          - Validation/build: `${{ steps.validate.outcome }}`
+          - Publish: `${{ steps.publish.outcome }}`
+          - Run: `${{ github.run_id }}`
+
+          ### Patch tail
+          ```text
+          $patch_tail
+          ```
+
+          ### Validation tail
+          ```text
+          $validate_tail
+          ```
+          EOF
+          gh pr comment 307 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/runtime-address-report.md"
+
+      - name: Fail closed when generation did not pass
+        if: steps.source.outputs.exists != 'true' && (steps.patch.outcome != 'success' || steps.validate.outcome != 'success' || steps.publish.outcome != 'success')
+        shell: bash
+        run: exit 1
