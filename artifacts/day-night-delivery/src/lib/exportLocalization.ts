@@ -1,4 +1,5 @@
 import type { Order } from "../types";
+import { areEquivalentLocations, formatDestinationLocation, inferDestinationEmirate } from "./destinationLocation";
 
 export type ExportDocumentLanguage = "ar" | "en";
 type FlexibleOrder = Order & Record<string, unknown>;
@@ -197,15 +198,78 @@ export function localizedOrderAddress(order: Order, language: ExportDocumentLang
   });
   return combineAddressParts(parts);
 }
-export function localizedOrderDestination(order: Order, language: ExportDocumentLanguage) {
-  const city = localizedOrderCity(order, language, "receiver");
-  const address = localizedOrderAddress(order, language, "receiver");
-  if (city === EMPTY) return address;
-  if (address === EMPTY || address === city) return city;
-  return `${city}${language === "ar" ? "، " : ", "}${address}`;
+function optionalLocalizedPart(
+  record: FlexibleOrder,
+  language: ExportDocumentLanguage,
+  arabicKeys: string[],
+  fallbackKeys: string[],
+) {
+  const value = localizedPart(record, language, arabicKeys, fallbackKeys);
+  return value === EMPTY ? "" : value;
 }
+
+export function localizedOrderDestinationEmirate(order: Order, language: ExportDocumentLanguage) {
+  const record = order as FlexibleOrder;
+  const explicitEmirate = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_emirate_ar", "delivery_emirate_ar"],
+    ["receiver_emirate", "delivery_emirate"],
+  );
+  if (explicitEmirate) return explicitEmirate;
+
+  const explicitArea = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_area_ar", "delivery_area_ar"],
+    ["receiver_area", "delivery_area"],
+  );
+  const city = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_city_ar", "delivery_city_ar"],
+    ["receiver_city", "delivery_city"],
+  );
+  return inferDestinationEmirate(explicitArea || city, language) || city;
+}
+
+export function localizedOrderDestinationArea(order: Order, language: ExportDocumentLanguage) {
+  const record = order as FlexibleOrder;
+  const explicitArea = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_area_ar", "delivery_area_ar"],
+    ["receiver_area", "delivery_area"],
+  );
+  if (explicitArea) return explicitArea;
+
+  const city = optionalLocalizedPart(
+    record,
+    language,
+    ["receiver_city_ar", "delivery_city_ar"],
+    ["receiver_city", "delivery_city"],
+  );
+  const emirate = localizedOrderDestinationEmirate(order, language);
+  return city && !areEquivalentLocations(city, emirate) ? city : "";
+}
+
+export function localizedOrderDestination(order: Order, language: ExportDocumentLanguage) {
+  const emirate = localizedOrderDestinationEmirate(order, language);
+  const area = localizedOrderDestinationArea(order, language);
+  const localizedEmirate = language === "ar" && emirate ? localizeExportText(emirate, language) : emirate;
+  const localizedArea = language === "ar" && area ? localizeExportText(area, language) : area;
+  return formatDestinationLocation(localizedEmirate, localizedArea, language);
+}
+
+export function localizedOrderDestinationTooltip(order: Order, language: ExportDocumentLanguage) {
+  const destination = localizedOrderDestination(order, language);
+  const address = localizedOrderAddress(order, language, "receiver");
+  if (address === EMPTY || address === destination) return destination;
+  return combineAddressParts([destination, address]);
+}
+
 export function localizedOrderRoute(order: Order, language: ExportDocumentLanguage) {
-  return `${localizedOrderCity(order, language, "sender")} → ${localizedOrderCity(order, language, "receiver")}`;
+  return localizedOrderDestination(order, language);
 }
 export function localizedOrderStatus(value: unknown, language: ExportDocumentLanguage) {
   if (language !== "ar") return clean(value) || EMPTY;

@@ -17,7 +17,7 @@ import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import { cleanAdminText, matchesAdminSection, normalizeAdminKey, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 import { financialsFromOrder } from "../../lib/orderFinancials";
-import { localizedOrderCity, localizedOrderDestination } from "../../lib/exportLocalization";
+import { localizedOrderDestination, localizedOrderDestinationTooltip } from "../../lib/exportLocalization";
 import { updateExistingOrderStatus } from "../../supabaseAdminOps";
 import type { Merchant, Order } from "../../types";
 import AdminDriverAssignmentModal from "./AdminDriverAssignmentModal";
@@ -103,7 +103,10 @@ const tracking = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
 const route = (order: Order, isArabic: boolean) =>
-  `${localizedOrderCity(order, isArabic ? "ar" : "en", "sender")} → ${localizedOrderDestination(order, isArabic ? "ar" : "en")}`;
+  localizedOrderDestination(order, isArabic ? "ar" : "en");
+
+const routeTooltip = (order: Order, isArabic: boolean) =>
+  localizedOrderDestinationTooltip(order, isArabic ? "ar" : "en");
 
 const canonicalStatus = (value: unknown) =>
   normalizeOrderStatus(value as string | Order | null | undefined);
@@ -561,7 +564,15 @@ export default function AdminSectionWorkspaceComplete({
                         <span dir="ltr">{order.receiver_phone || "—"}</span>
                       </small>
                     </td>
-                    <td>{route(order, isArabic)}</td>
+                    <td>
+                      <span
+                        className="block max-w-[260px] truncate whitespace-nowrap font-semibold text-white/85"
+                        title={routeTooltip(order, isArabic)}
+                        dir={isArabic ? "rtl" : "ltr"}
+                      >
+                        {route(order, isArabic)}
+                      </span>
+                    </td>
                     <td>
                       <FinancialCell order={order} isArabic={isArabic} />
                     </td>

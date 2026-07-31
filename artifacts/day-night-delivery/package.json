@@ -25,7 +25,7 @@
     "international-tracking:gate": "node scripts/international-tracking-production-gate.mjs && node scripts/international-tracking-visual-gate.mjs",
     "p1:gate": "node scripts/p1-production-hardening-gate.mjs",
     "p1:runtime-health": "node scripts/p1-runtime-health.mjs",
-    "production:gate": "node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs && node scripts/coupon-camera-production-gate.mjs && node scripts/admin-final-closure-gate.mjs && node scripts/merchant-final-closure-gate.mjs && node scripts/runtime-live-feature-gate.mjs && node scripts/production-core-rescue-gate.mjs && node scripts/operations-order-control-gate.mjs && node scripts/order-financial-matrix-gate.mjs && node scripts/biometric-security-gate.mjs && node scripts/driver-chat-payroll-production-gate.mjs && node scripts/employee-hr-payroll-production-gate.mjs && node scripts/merchant-statement-order-edit-gate.mjs && node scripts/export-language-policy-gate.mjs && node scripts/customer-experience-tests.mjs && node scripts/customer-experience-production-gate.mjs && node scripts/customer-experience-sql-docker-gate.mjs && node scripts/multi-party-ratings-production-gate.mjs && node scripts/delivered-financial-adjustment-gate.mjs && node scripts/personal-orders-admin-gate.mjs && node scripts/driver-bank-payment-center-gate.mjs && node scripts/real-driver-navigation-gate.mjs && node scripts/international-tracking-production-gate.mjs && node scripts/international-tracking-visual-gate.mjs && node scripts/p1-production-hardening-gate.mjs",
+    "production:gate": "node --experimental-strip-types scripts/destination-location-tests.ts && node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs && node scripts/coupon-camera-production-gate.mjs && node scripts/admin-final-closure-gate.mjs && node scripts/merchant-final-closure-gate.mjs && node scripts/runtime-live-feature-gate.mjs && node scripts/production-core-rescue-gate.mjs && node scripts/operations-order-control-gate.mjs && node scripts/order-financial-matrix-gate.mjs && node scripts/biometric-security-gate.mjs && node scripts/driver-chat-payroll-production-gate.mjs && node scripts/employee-hr-payroll-production-gate.mjs && node scripts/merchant-statement-order-edit-gate.mjs && node scripts/export-language-policy-gate.mjs && node scripts/customer-experience-tests.mjs && node scripts/customer-experience-production-gate.mjs && node scripts/customer-experience-sql-docker-gate.mjs && node scripts/multi-party-ratings-production-gate.mjs && node scripts/delivered-financial-adjustment-gate.mjs && node scripts/personal-orders-admin-gate.mjs && node scripts/driver-bank-payment-center-gate.mjs && node scripts/real-driver-navigation-gate.mjs && node scripts/international-tracking-production-gate.mjs && node scripts/international-tracking-visual-gate.mjs && node scripts/p1-production-hardening-gate.mjs",
     "admin:closure": "node scripts/admin-final-closure-gate.mjs",
     "build:spa": "node scripts/install-local-assets.mjs --strict && node scripts/build-vite.mjs",
     "merchant:closure": "node scripts/merchant-final-closure-gate.mjs",
@@ -33,7 +33,8 @@
     "core:gate": "node scripts/production-core-rescue-gate.mjs",
     "operations:gate": "node scripts/operations-order-control-gate.mjs",
     "personal-orders:gate": "node scripts/personal-orders-admin-gate.mjs",
-    "runtime:e2e": "node scripts/runtime-delivery-e2e.mjs"
+    "runtime:e2e": "node scripts/runtime-delivery-e2e.mjs",
+    "destination-location:test": "node --experimental-strip-types scripts/destination-location-tests.ts"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
