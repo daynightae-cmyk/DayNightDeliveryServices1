@@ -1,0 +1,45 @@
+name: Destination Location Cleanup
+
+on:
+  push:
+    branches:
+      - fix/destination-location-display
+    paths:
+      - .github/workflows/destination-location-cleanup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-generated-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/destination-location-display
+          fetch-depth: 0
+
+      - name: Remove build-generated assets and cleanup workflow
+        run: |
+          rm -f \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-dashboard-reference.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/admin-map.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/intro-gateway.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/khalifa-card-reference.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/loading-command-center.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-extra-reference.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/login-reference.png \
+            artifacts/day-night-delivery/public/assets/daynight/admin-auth-v3/logo-glass.png \
+            artifacts/day-night-delivery/public/assets/daynight/merchant-statement-logo.png \
+            .github/workflows/destination-location-cleanup.yml
+
+      - name: Commit clean source branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "chore: remove build-generated destination artifacts"
+          git push origin HEAD:fix/destination-location-display
