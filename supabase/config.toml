@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.public-international-tracking]
 verify_jwt = false
+
+[functions.merchant-morning-broadcast]
+verify_jwt = false
