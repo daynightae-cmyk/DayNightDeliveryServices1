@@ -123,29 +123,30 @@ export async function loadMerchantMorningAudience(): Promise<MerchantMorningAudi
   const client = requireSupabase();
   const preferredColumns =
     "id,merchant_code,trade_name,owner_name,phone,email,status,created_at,whatsapp_broadcast_enabled,whatsapp_broadcast_language";
-  let result = await client
+  const preferredResult = await client
     .from("merchants")
     .select(preferredColumns)
     .order("created_at", { ascending: false })
     .limit(2000);
 
-  if (result.error) {
-    const detail = clean(result.error.message).toLowerCase();
-    const compatibilityError =
-      detail.includes("whatsapp_broadcast_enabled") ||
-      detail.includes("whatsapp_broadcast_language") ||
-      detail.includes("schema cache");
-    if (!compatibilityError) throw result.error;
-
-    result = await client
-      .from("merchants")
-      .select("id,merchant_code,trade_name,owner_name,phone,email,status,created_at")
-      .order("created_at", { ascending: false })
-      .limit(2000);
+  if (!preferredResult.error) {
+    return classify((preferredResult.data || []) as Record<string, unknown>[]);
   }
 
-  if (result.error) throw result.error;
-  return classify((result.data || []) as Record<string, unknown>[]);
+  const detail = clean(preferredResult.error.message).toLowerCase();
+  const compatibilityError =
+    detail.includes("whatsapp_broadcast_enabled") ||
+    detail.includes("whatsapp_broadcast_language") ||
+    detail.includes("schema cache");
+  if (!compatibilityError) throw preferredResult.error;
+
+  const fallbackResult = await client
+    .from("merchants")
+    .select("id,merchant_code,trade_name,owner_name,phone,email,status,created_at")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (fallbackResult.error) throw fallbackResult.error;
+  return classify((fallbackResult.data || []) as Record<string, unknown>[]);
 }
 
 export function subscribeMerchantMorningAudience(onChange: () => void) {
@@ -195,6 +196,20 @@ async function functionRequest<T>(body: Record<string, unknown>): Promise<T> {
   } catch {
     // Keep the stable public error code below.
   }
+
+  // Supabase reports non-2xx function responses as an invocation error. A 207
+  // campaign result is still a valid audited response and must be shown to the
+  // operator with exact sent/failed/skipped counts instead of a generic failure.
+  if (
+    details &&
+    Number.isFinite(Number(details.total)) &&
+    Number.isFinite(Number(details.sent)) &&
+    Number.isFinite(Number(details.failed)) &&
+    Number.isFinite(Number(details.skipped))
+  ) {
+    return details as T;
+  }
+
   const wrapped = new Error(code) as Error & { code?: string; details?: Record<string, unknown> | null };
   wrapped.code = code;
   wrapped.details = details;
