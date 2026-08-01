@@ -80,7 +80,6 @@ $$;
 create or replace function public.dn_resolve_portal_merchant_uuid(p_merchant_id uuid)
 returns uuid
 language plpgsql
-stable
 security definer
 set search_path = public, auth, pg_temp
 as $$
@@ -92,6 +91,12 @@ begin
   if p_merchant_id is null then
     raise exception using errcode = '23502', message = 'merchant_required';
   end if;
+
+  -- Keep merchant activity and every effective portal-link row stable until the
+  -- surrounding order transaction commits.  SHARE conflicts with the
+  -- ROW EXCLUSIVE lock required by inserts/updates/deletes on these tables.
+  lock table public.merchants in share mode;
+  lock table public.merchant_user_links in share mode;
 
   select * into v_selected
   from public.merchants m
@@ -163,7 +168,6 @@ $$;
 create or replace function public.admin_resolve_order_merchant(p_merchant_id uuid)
 returns jsonb
 language plpgsql
-stable
 security definer
 set search_path = public, auth, pg_temp
 as $$
@@ -1713,6 +1717,8 @@ begin
   -- Freeze order writes for the short reconciliation transaction so the before/after
   -- integrity proof cannot race a newly created or edited order.
   lock table public.orders in share row exclusive mode;
+  lock table public.merchants in share mode;
+  lock table public.merchant_user_links in share mode;
   foreach v_table in array array[
     'cod_collections',
     'merchant_statement_entries',

@@ -22,6 +22,7 @@ const migration = read(
   "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql",
   repoRoot,
 );
+const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 
 assert.match(resolver, /resolveCanonicalMerchantForOrder/);
 assert.match(resolver, /admin_resolve_order_merchant/);
@@ -73,6 +74,8 @@ for (const token of [
 ]) assert.ok(migration.toLowerCase().includes(token.toLowerCase()), `migration contains ${token}`);
 
 assert.match(migration, /lock table public\.orders in share row exclusive mode/i);
+assert.match(migration, /lock table public\.merchants in share mode/i);
+assert.match(migration, /lock table public\.merchant_user_links in share mode/i);
 assert.match(migration, /perform set_config\('daynight\.order_merchant_reconciliation', 'backfill', true\)/i);
 assert.match(migration, /old\.coupon_number|coupon_number is distinct from/i);
 assert.match(migration, /old\.status|status is distinct from/i);
@@ -83,5 +86,8 @@ assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/g
 assert.doesNotMatch(migration, /\bon delete cascade\b/i);
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
 assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || []).length, "balanced SQL parentheses");
+assert.match(productionAudit, /order:\s*["']id\.asc["']/);
+assert.match(productionAudit, /٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹/);
+assert.match(productionAudit, /\[\^\\p\{L\}\\p\{N\}\]/);
 
 console.log("PASS global order/merchant ownership, visibility and integrity gate");

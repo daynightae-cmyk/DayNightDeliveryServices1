@@ -7,7 +7,11 @@ if (new URL(root).hostname.split(".")[0] !== "ngdwybpgacauorygoedi") {
 
 const headers = { apikey: key, Authorization: `Bearer ${key}` };
 const clean = (value) => String(value ?? "").trim();
-const identity = (value) => clean(value).toLocaleLowerCase().replace(/[\s_-]+/g, "") || null;
+const localizedDigitMap = new Map([..."٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹"].map((digit, index) => [digit, String(index % 10)]));
+const identity = (value) => clean(value)
+  .replace(/[٠-٩۰-۹]/g, (digit) => localizedDigitMap.get(digit) || digit)
+  .toLocaleLowerCase()
+  .replace(/[^\p{L}\p{N}]+/gu, "") || null;
 const normalizedEmail = (value) => clean(value).toLocaleLowerCase() || null;
 const phone = (value) => clean(value).replace(/\D/g, "") || null;
 const inactive = (value) => ["deleted", "archived", "blocked", "suspended"].includes(clean(value || "active").toLowerCase());
@@ -17,7 +21,8 @@ async function allRows(table, select = "*", optional = false) {
   const rows = [];
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
-    const response = await fetch(`${root}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
+    const query = new URLSearchParams({ select, order: "id.asc" });
+    const response = await fetch(`${root}/rest/v1/${table}?${query}`, {
       headers: { ...headers, Range: `${from}-${from + pageSize - 1}`, Prefer: "count=exact" },
     });
     const payload = await response.json().catch(() => null);
