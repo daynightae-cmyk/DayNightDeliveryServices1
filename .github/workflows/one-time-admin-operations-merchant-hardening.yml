@@ -1,4 +1,4 @@
-name: One-time Admin Operations Merchant Hardening
+name: One-time Order Creation Merchant Hardening
 
 on:
   push:
@@ -15,14 +15,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply deterministic source patch
+      - name: Apply deterministic source patches
         run: |
           node .github/scripts/apply-admin-operations-merchant-hardening.mjs
+          node .github/scripts/apply-financial-merchant-hardening.mjs
           python - <<'PY'
           from pathlib import Path
           p = Path('artifacts/day-night-delivery/src/lib/adminOperationsData.ts')
-          s = p.read_text()
-          s = s.replace(
+          s = p.read_text().replace(
               'import { resolveOrderMerchant } from "./orderFinancialOperations";',
               'import { resolveOrderMerchant } from "./merchantOrderOwnership";',
           )
@@ -32,11 +32,14 @@ jobs:
       - name: Commit final source
         run: |
           if git diff --quiet; then
-            echo 'Admin operations hardening already applied.'
+            echo 'Order creation ownership hardening already applied.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add artifacts/day-night-delivery/src/lib/adminOperationsData.ts
-          git commit -m 'fix(orders): harden admin operations merchant ownership path'
+          git add \
+            artifacts/day-night-delivery/src/lib/adminOperationsData.ts \
+            artifacts/day-night-delivery/src/lib/adminData.ts \
+            artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts
+          git commit -m 'fix(orders): harden all admin merchant ownership creation paths'
           git push origin HEAD:${GITHUB_REF_NAME}
