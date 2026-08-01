@@ -39,6 +39,12 @@ export type CouponConflict = {
 export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;
 
 const clean = (value: unknown) => String(value ?? "").trim();
+const normalizeCouponForComparison = (value: unknown) =>
+  clean(value)
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/\s+/g, "")
+    .toLowerCase();
 const numberValue = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -400,8 +406,13 @@ export async function updateFinancialOpsOrder(
   if (!merchant?.id) throw operationError(null, "merchant_required");
 
   const excludeOrderId = clean(input.order.id) || null;
-  const existingConflict = await findCouponConflict(input.coupon_number, excludeOrderId);
-  if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
+  const couponChanged =
+    normalizeCouponForComparison(input.coupon_number) !==
+    normalizeCouponForComparison(input.order.coupon_number);
+  if (couponChanged) {
+    const existingConflict = await findCouponConflict(input.coupon_number, excludeOrderId);
+    if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
+  }
 
   const financials = calculateFinancialOpsOrder(input);
   const corePatch = buildCorePatch(input, merchant, financials);
@@ -419,8 +430,10 @@ export async function updateFinancialOpsOrder(
     },
   });
   if (error) {
-    const conflict = await recoverCouponConflict(input.coupon_number, excludeOrderId);
-    if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
+    if (couponChanged) {
+      const conflict = await recoverCouponConflict(input.coupon_number, excludeOrderId);
+      if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
+    }
     throw operationError(
       error,
       "Could not update the financial order. Delivered settlements are locked and require an audited adjustment.",

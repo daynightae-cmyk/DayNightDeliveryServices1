@@ -77,8 +77,23 @@ assert.match(
 );
 assert.match(
   financialOperations,
-  /findCouponConflict\(input\.coupon_number, excludeOrderId\)/,
-  "Coupon edits must exclude the current row while checking every other order.",
+  /normalizeCouponForComparison\(input\.coupon_number\)[\s\S]*normalizeCouponForComparison\(input\.order\.coupon_number\)/,
+  "Coupon edits must compare normalized new and stored coupon identities.",
+);
+assert.match(
+  financialOperations,
+  /if \(couponChanged\) \{[\s\S]*findCouponConflict\(input\.coupon_number, excludeOrderId\)/,
+  "Update preflight must run only when the coupon identity changes.",
+);
+assert.match(
+  financialOperations,
+  /if \(error\) \{[\s\S]*if \(couponChanged\) \{[\s\S]*recoverCouponConflict\(input\.coupon_number, excludeOrderId\)/,
+  "Masked update errors must only be reclassified as duplicate coupons when the coupon changed.",
+);
+assert.doesNotMatch(
+  financialOperations,
+  /const excludeOrderId = clean\(input\.order\.id\) \|\| null;\s*const existingConflict = await findCouponConflict/,
+  "Historical duplicates must remain editable when their coupon number is unchanged.",
 );
 
 assert.match(
