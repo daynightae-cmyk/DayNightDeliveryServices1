@@ -1,0 +1,44 @@
+name: Apply Admin Orders Live Recovery
+
+on:
+  push:
+    branches:
+      - diag/admin-orders-live-query-20260802
+    paths:
+      - .github/scripts/apply-admin-orders-live-recovery.mjs
+      - .github/workflows/apply-admin-orders-live-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: diag/admin-orders-live-query-20260802
+          fetch-depth: 0
+
+      - name: Apply source changes
+        run: node .github/scripts/apply-admin-orders-live-recovery.mjs
+
+      - name: Commit generated recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "daynightae-cmyk"
+          git config user.email "daynightae-cmyk@users.noreply.github.com"
+          git add \
+            artifacts/day-night-delivery/src/lib/liveDeploymentRuntime.ts \
+            artifacts/day-night-delivery/src/lib/adminData.ts \
+            artifacts/day-night-delivery/src/components/ProtectedAdminRoute.tsx
+          if git diff --cached --quiet; then
+            echo "Recovery patch already applied."
+            exit 0
+          fi
+          git commit -m "Recover stale admin bundle and refresh order session"
+          git push origin HEAD:diag/admin-orders-live-query-20260802
