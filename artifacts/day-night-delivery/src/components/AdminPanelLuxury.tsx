@@ -1399,7 +1399,7 @@ export default function AdminPanelLuxury() {
           financeSummarySource={financeSummarySource}
           financeWarning={financeWarning}
           initialMerchantId={active === "all_orders" ? merchantOrderScopeId : ""}
-          onClearMerchantScope={() => setMerchantOrderScopeId("")}
+          onMerchantScopeChange={setMerchantOrderScopeId}
           onRefresh={refreshAdminData}
           onNavigate={(id) => {
             setActive(id as SectionId);

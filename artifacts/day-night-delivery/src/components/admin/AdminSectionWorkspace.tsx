@@ -27,7 +27,7 @@ const ORDER_SECTIONS = new Set([
 type WorkspaceProps = ComponentProps<typeof AdminSectionWorkspaceComplete>;
 type AdminSectionWorkspaceProps = WorkspaceProps & {
   initialMerchantId?: string;
-  onClearMerchantScope?: () => void;
+  onMerchantScopeChange?: (merchantId: string) => void;
 };
 
 function clean(value: unknown) {
@@ -173,7 +173,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
             type="button"
             onClick={() => {
               setMerchantFilterId("");
-              props.onClearMerchantScope?.();
+              props.onMerchantScopeChange?.("");
               setOrderPage(0);
             }}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-black text-white transition hover:border-brand-gold/40 hover:text-brand-gold"
@@ -195,6 +195,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
             selectedIds={selectedOrderIds}
             onMerchantChange={(merchantId) => {
               setMerchantFilterId(merchantId);
+              props.onMerchantScopeChange?.(merchantId);
               setSelectedOrderIds([]);
               setOrderPage(0);
             }}
