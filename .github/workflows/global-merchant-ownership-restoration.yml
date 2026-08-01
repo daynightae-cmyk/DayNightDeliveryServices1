@@ -16,6 +16,7 @@ on:
       - "artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
       - "artifacts/day-night-delivery/scripts/global-merchant-ownership-*.mjs"
+      - "artifacts/day-night-delivery/scripts/all-order-creation-ownership-gate.mjs"
       - ".github/workflows/global-merchant-ownership-*.yml"
       - ".github/workflows/p1-runtime-evidence.yml"
       - "docs/production/GLOBAL_MERCHANT_OWNERSHIP_*"
@@ -95,9 +96,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Merchant ownership regression gate
+      - name: Merchant ownership migration and evidence gate
         working-directory: artifacts/day-night-delivery
         run: node scripts/global-merchant-ownership-gate.mjs
+
+      - name: All order creation ownership gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/all-order-creation-ownership-gate.mjs
 
       - name: TypeScript
         run: pnpm run web:typecheck
