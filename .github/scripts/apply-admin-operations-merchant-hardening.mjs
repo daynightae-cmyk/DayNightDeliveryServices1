@@ -4,8 +4,23 @@ import path from "node:path";
 const file = path.join(process.cwd(), "artifacts/day-night-delivery/src/lib/adminOperationsData.ts");
 let source = fs.readFileSync(file, "utf8");
 
+const alreadyHardened =
+  source.includes('import { resolveOrderMerchant } from "./merchantOrderOwnership";')
+  && source.includes("assertCompleteOpsOrderInput")
+  && source.includes("saved_order_merchant_portal_link_mismatch")
+  && source.includes("updated_order_merchant_portal_link_mismatch")
+  && !source.includes("createPublicOrder")
+  && !source.includes("attachMerchantToCreatedOrder")
+  && !source.includes("findCreatedOrder");
+
+if (alreadyHardened) {
+  console.log("Admin operations order ownership hardening is already applied.");
+  process.exit(0);
+}
+
 function replaceOnce(pattern, replacement, label) {
-  const matches = [...source.matchAll(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))].length;
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  const matches = [...source.matchAll(new RegExp(pattern.source, flags))].length;
   if (matches !== 1) throw new Error(`${label}: expected one match, found ${matches}`);
   source = source.replace(pattern, replacement);
 }
@@ -14,10 +29,14 @@ source = source.replace(
   'import { createPublicOrder, supabase } from "../supabase";',
   'import { supabase } from "../supabase";',
 );
-if (!source.includes('import { resolveOrderMerchant } from "./orderFinancialOperations";')) {
+source = source.replace(
+  'import { resolveOrderMerchant } from "./orderFinancialOperations";',
+  'import { resolveOrderMerchant } from "./merchantOrderOwnership";',
+);
+if (!source.includes('import { resolveOrderMerchant } from "./merchantOrderOwnership";')) {
   source = source.replace(
     'import { createDayNightInvoiceNumber } from "./printableDocuments";',
-    'import { createDayNightInvoiceNumber } from "./printableDocuments";\nimport { resolveOrderMerchant } from "./orderFinancialOperations";',
+    'import { createDayNightInvoiceNumber } from "./printableDocuments";\nimport { resolveOrderMerchant } from "./merchantOrderOwnership";',
   );
 }
 
@@ -73,6 +92,7 @@ const validationHelper = `function assertCompleteOpsOrderInput(input: OpsOrderIn
     !clean(input.coupon_number) && "coupon_number",
     !clean(merchant.id) && "merchant_id",
     !clean(merchant.trade_name) && "merchant.trade_name",
+    !clean(merchant.merchant_code) && "merchant.merchant_code",
     !clean(merchant.phone) && "merchant.phone",
     !clean(input.pickup_city) && "pickup_city",
     !receiverCity && (isInternational ? "destination_country" : "delivery_city"),
@@ -94,19 +114,24 @@ const validationHelper = `function assertCompleteOpsOrderInput(input: OpsOrderIn
 }
 
 `;
-source = source.replace("function buildOrderPayload(\n", `${validationHelper}function buildOrderPayload(\n`);
+if (!source.includes("function assertCompleteOpsOrderInput")) {
+  const marker = "function buildOrderPayload(\n";
+  if (!source.includes(marker)) throw new Error("buildOrderPayload marker was not found");
+  source = source.replace(marker, `${validationHelper}${marker}`);
+}
 
 source = source
-  .replace(/merchant\?\.trade_name \|\|\n      input\.merchant_name \|\|\n      "DAY NIGHT Merchant"/, "merchant?.trade_name || input.merchant_name")
-  .replace('clean(merchant?.phone || "971568757331")', "clean(merchant?.phone)")
-  .replace(/input\.pickup_city \|\| merchant\?\.emirate \|\| "Abu Dhabi"/, "input.pickup_city || merchant?.emirate")
-  .replace(/input\.payment_method \|\|\n      merchant\?\.default_payment_method \|\|\n      "merchant_pays"/, "input.payment_method || merchant?.default_payment_method")
-  .replace('const deliveryEmirate = clean(input.delivery_city || "Dubai");', "const deliveryEmirate = clean(input.delivery_city);")
-  .replace(/input\.destination_country \|\| deliveryEmirate \|\| "WORLD"/, "input.destination_country || deliveryEmirate")
-  .replace(/input\.package_description \|\|\n      input\.package_type \|\|\n      "Shipment"/, "input.package_description || input.package_type")
-  .replace('const requestedStatus = clean(input.status || "pending");', "const requestedStatus = clean(input.status);")
-  .replace('weight: Math.max(0.1, numberValue(input.weight, 1)),', "weight: Number(input.weight),")
-  .replace('notes:\n      [clean(input.notes), reviewNote, priceNote, settlementNote]\n        .filter(Boolean)\n        .join(" | ") ||\n      "Created from admin operations section",', 'notes: [clean(input.notes), reviewNote, priceNote, settlementNote]\n      .filter(Boolean)\n      .join(" | "),');
+  .replace(/merchant\?\.trade_name\s*\|\|\s*input\.merchant_name\s*\|\|\s*"DAY NIGHT Merchant"/g, "merchant?.trade_name || input.merchant_name")
+  .replace(/clean\(merchant\?\.phone\s*\|\|\s*"971568757331"\)/g, "clean(merchant?.phone)")
+  .replace(/input\.pickup_city\s*\|\|\s*merchant\?\.emirate\s*\|\|\s*"Abu Dhabi"/g, "input.pickup_city || merchant?.emirate")
+  .replace(/input\.payment_method\s*\|\|\s*merchant\?\.default_payment_method\s*\|\|\s*"merchant_pays"/g, "input.payment_method || merchant?.default_payment_method")
+  .replace(/clean\(input\.delivery_city\s*\|\|\s*"Dubai"\)/g, "clean(input.delivery_city)")
+  .replace(/input\.destination_country\s*\|\|\s*deliveryEmirate\s*\|\|\s*"WORLD"/g, "input.destination_country || deliveryEmirate")
+  .replace(/destination:\s*input\.destination_country\s*\|\|\s*"WORLD"/g, "destination: clean(input.destination_country)")
+  .replace(/input\.package_description\s*\|\|\s*input\.package_type\s*\|\|\s*"Shipment"/g, "input.package_description || input.package_type")
+  .replace(/clean\(input\.status\s*\|\|\s*"pending"\)/g, "clean(input.status)")
+  .replace(/Math\.max\(0\.1,\s*numberValue\(input\.weight,\s*1\)\)/g, "Number(input.weight)")
+  .replace(/notes:\s*\[clean\(input\.notes\), reviewNote, priceNote, settlementNote\]\s*\.filter\(Boolean\)\s*\.join\(" \| "\)\s*\|\|\s*"Created from admin operations section"/g, 'notes: [clean(input.notes), reviewNote, priceNote, settlementNote]\n      .filter(Boolean)\n      .join(" | ")');
 
 replaceOnce(
   /export async function createOpsOrder\([\s\S]*?\n}\n\n(?=export async function updateOpsOrder)/,
@@ -232,7 +257,8 @@ for (const forbidden of [
   "findCreatedOrder",
   '"DAY NIGHT Merchant"',
   '"971568757331"',
-  '"WORLD"',
+  'destination_country || deliveryEmirate || "WORLD"',
+  'destination_country || "WORLD"',
   '.from("orders")\n    .insert',
 ]) {
   if (source.includes(forbidden)) throw new Error(`Forbidden legacy order path remains: ${forbidden}`);
