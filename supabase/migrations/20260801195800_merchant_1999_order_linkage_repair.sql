@@ -1,13 +1,13 @@
 -- DAY NIGHT DELIVERY SERVICES
--- Repair three confirmed coupon orders that were stored against an unlinked duplicate
--- merchant row instead of the authenticated Merchant 1999 row.
+-- Repair three confirmed coupon orders that were stored against a duplicate merchant
+-- identity instead of the authenticated Merchant 1999 portal identity.
 --
 -- Safety:
--- - no order or merchant is deleted;
--- - receiver, status, driver, and financial fields are untouched;
--- - the transaction aborts if Merchant 1999 is missing/ambiguous or if any target
+-- - no order, merchant, COD row, statement row, or ledger row is deleted;
+-- - receiver, status, driver, and every financial amount remain untouched;
+-- - the transaction aborts if Merchant 1999 is missing/ambiguous or any target
 --   coupon is missing/duplicated;
--- - merchant portal isolation remains merchant_id-only.
+-- - merchant portal isolation remains exact merchant_id ownership.
 
 begin;
 
@@ -57,9 +57,41 @@ as $$
   );
 $$;
 
--- Canonicalize a newly selected duplicate merchant row only when exactly one active,
--- authenticated merchant has the same exact merchant code. If the code is absent,
--- exact trade name + exact phone is required. This keeps UUID isolation strict.
+-- The merchant portal supports two authoritative linkage modes:
+-- 1) an active merchant_user_links row (preferred by merchant_session_id());
+-- 2) the legacy merchants.user_id fallback.
+create or replace function public.dn_merchant_has_active_portal_link(p_merchant_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+  select exists (
+    select 1
+    from public.merchants m
+    where m.id = p_merchant_id
+      and lower(coalesce(m.status, 'active')) not in ('deleted', 'archived', 'blocked', 'suspended')
+      and (
+        m.user_id is not null
+        or exists (
+          select 1
+          from public.merchant_user_links l
+          where l.merchant_id = m.id
+            and l.active
+        )
+      )
+  );
+$$;
+
+revoke all on function public.dn_merchant_has_active_portal_link(uuid)
+  from public, anon, authenticated;
+grant execute on function public.dn_merchant_has_active_portal_link(uuid)
+  to service_role;
+
+-- Canonicalize a newly selected duplicate merchant row only when exactly one active
+-- portal-linked merchant has the same exact merchant code. If code is absent,
+-- exact trade name + exact phone is required. This never weakens UUID isolation.
 create or replace function public.dn_enforce_canonical_order_merchant_link()
 returns trigger
 language plpgsql
@@ -98,8 +130,9 @@ begin
       detail = jsonb_build_object('merchant_id', v_selected.id, 'status', v_selected.status)::text;
   end if;
 
-  -- An already authenticated merchant row is authoritative.
-  if v_selected.user_id is not null then
+  -- An already portal-linked merchant row is authoritative regardless of whether
+  -- linkage is stored directly or in merchant_user_links.
+  if public.dn_merchant_has_active_portal_link(v_selected.id) then
     new.merchant_name := v_selected.trade_name;
     new.merchant_code := v_selected.merchant_code;
     return new;
@@ -117,8 +150,7 @@ begin
     into v_candidates
     from public.merchants m
     where m.id <> v_selected.id
-      and m.user_id is not null
-      and lower(coalesce(m.status, 'active')) not in ('deleted', 'archived', 'blocked', 'suspended')
+      and public.dn_merchant_has_active_portal_link(m.id)
       and public.dn_normalized_merchant_identity(m.merchant_code) = v_code;
   elsif v_name is not null and v_phone is not null then
     select coalesce(
@@ -128,8 +160,7 @@ begin
     into v_candidates
     from public.merchants m
     where m.id <> v_selected.id
-      and m.user_id is not null
-      and lower(coalesce(m.status, 'active')) not in ('deleted', 'archived', 'blocked', 'suspended')
+      and public.dn_merchant_has_active_portal_link(m.id)
       and public.dn_normalized_merchant_identity(m.trade_name) = v_name
       and public.dn_merchant_phone_digits(m.phone) = v_phone;
   end if;
@@ -170,8 +201,10 @@ on public.orders
 for each row
 execute function public.dn_enforce_canonical_order_merchant_link();
 
-revoke all on function public.dn_enforce_canonical_order_merchant_link() from public, anon;
-grant execute on function public.dn_enforce_canonical_order_merchant_link() to authenticated, service_role;
+revoke all on function public.dn_enforce_canonical_order_merchant_link()
+  from public, anon;
+grant execute on function public.dn_enforce_canonical_order_merchant_link()
+  to authenticated, service_role;
 
 -- Targeted, atomic repair for the three photographed coupons assigned to Merchant 1999.
 do $repair$
@@ -190,8 +223,7 @@ begin
   )
   into v_candidate_ids
   from public.merchants m
-  where m.user_id is not null
-    and lower(coalesce(m.status, 'active')) not in ('deleted', 'archived', 'blocked', 'suspended')
+  where public.dn_merchant_has_active_portal_link(m.id)
     and (
       public.dn_normalized_merchant_identity(m.merchant_code) = '1999'
       or public.dn_normalized_merchant_identity(m.trade_name) = '1999'
@@ -206,7 +238,7 @@ begin
         'candidate_count', cardinality(v_candidate_ids),
         'candidate_ids', v_candidate_ids
       )::text,
-      hint = 'لم يتم تعديل أي طلب. يجب أن يوجد حساب تاجر نشط واحد فقط مرتبط بمستخدم ويحمل هوية 1999.';
+      hint = 'لم يتم تعديل أي طلب. يجب أن يوجد حساب تاجر نشط واحد فقط مرتبط ببوابة التاجر ويحمل هوية 1999.';
   end if;
 
   select * into v_canonical
@@ -246,9 +278,47 @@ begin
 
     get diagnostics v_order_count = row_count;
     v_updated := v_updated + v_order_count;
+
+    -- Keep every dependent merchant-owned finance row on the same canonical UUID.
+    -- Amounts, statuses, dates, references, and all other accounting fields are untouched.
+    if to_regclass('public.cod_collections') is not null then
+      execute
+        'update public.cod_collections
+         set merchant_id = $1
+         where order_id::text = $2
+           and merchant_id is distinct from $1'
+      using v_canonical.id, v_order_id;
+    end if;
+
+    if to_regclass('public.merchant_statement_entries') is not null then
+      execute
+        'update public.merchant_statement_entries
+         set merchant_id = $1
+         where order_id::text = $2
+           and merchant_id is distinct from $1'
+      using v_canonical.id, v_order_id;
+    end if;
+
+    if to_regclass('public.order_financial_settlements') is not null then
+      execute
+        'update public.order_financial_settlements
+         set merchant_id = $1
+         where order_id::text = $2
+           and merchant_id is distinct from $1'
+      using v_canonical.id, v_order_id;
+    end if;
+
+    if to_regclass('public.financial_account_entries') is not null then
+      execute
+        'update public.financial_account_entries
+         set merchant_id = $1
+         where order_id::text = $2
+           and merchant_id is distinct from $1'
+      using v_canonical.id, v_order_id;
+    end if;
   end loop;
 
-  raise notice 'Merchant 1999 linkage repair completed. Rows updated: %', v_updated;
+  raise notice 'Merchant 1999 linkage repair completed. Order rows updated: %', v_updated;
 end
 $repair$;
 
@@ -263,55 +333,96 @@ set search_path = public, auth, pg_temp
 as $$
 declare
   v_rows jsonb := '[]'::jsonb;
-  v_requested integer := coalesce(cardinality(p_coupons), 0);
+  v_requested integer := 0;
   v_found integer := 0;
   v_linked integer := 0;
+  v_candidate_ids uuid[] := '{}'::uuid[];
+  v_canonical_id uuid;
 begin
   if auth.role() <> 'service_role'
      and (auth.uid() is null or not public.is_admin_or_support()) then
     raise exception 'not_authorized';
   end if;
 
+  select coalesce(
+    array_agg(m.id order by m.updated_at desc nulls last, m.created_at desc nulls last, m.id),
+    '{}'::uuid[]
+  )
+  into v_candidate_ids
+  from public.merchants m
+  where public.dn_merchant_has_active_portal_link(m.id)
+    and (
+      public.dn_normalized_merchant_identity(m.merchant_code) = '1999'
+      or public.dn_normalized_merchant_identity(m.trade_name) = '1999'
+      or public.dn_normalized_merchant_identity(m.owner_name) = '1999'
+    );
+
+  if cardinality(v_candidate_ids) <> 1 then
+    return jsonb_build_object(
+      'ok', false,
+      'reason', 'merchant_1999_canonical_account_not_unique',
+      'canonical_candidate_count', cardinality(v_candidate_ids),
+      'checked_at', now()
+    );
+  end if;
+
+  v_canonical_id := v_candidate_ids[1];
+
   with requested as (
-    select public.normalized_order_coupon(value) as coupon_key
+    select distinct public.normalized_order_coupon(value) as coupon_key
     from unnest(coalesce(p_coupons, '{}'::text[])) value
     where public.normalized_order_coupon(value) is not null
   ), matched as (
     select
       public.canonical_order_coupon(o.coupon_number) as coupon_number,
       o.id::text as order_id,
-      coalesce(nullif(btrim(o.tracking_number), ''), nullif(btrim(o.invoice_number), ''), o.id::text) as tracking_number,
+      coalesce(
+        nullif(btrim(o.tracking_number), ''),
+        nullif(btrim(o.invoice_number), ''),
+        o.id::text
+      ) as tracking_number,
       o.merchant_id,
       o.merchant_name,
       o.merchant_code,
-      m.user_id as merchant_user_id,
-      (m.id is not null and m.user_id is not null and o.merchant_id = m.id) as portal_visible_by_exact_uuid
+      (o.merchant_id = v_canonical_id) as linked_to_canonical_merchant_1999,
+      (
+        o.merchant_id = v_canonical_id
+        and public.dn_merchant_has_active_portal_link(v_canonical_id)
+      ) as portal_visible_by_exact_uuid
     from requested r
     join public.orders o
       on public.normalized_order_coupon(o.coupon_number) = r.coupon_key
-    left join public.merchants m on m.id = o.merchant_id
+  ), requested_count as (
+    select count(*)::integer as value from requested
   )
   select
+    (select value from requested_count),
     coalesce(jsonb_agg(to_jsonb(matched) order by coupon_number), '[]'::jsonb),
     count(*),
-    count(*) filter (where portal_visible_by_exact_uuid)
-  into v_rows, v_found, v_linked
+    count(*) filter (
+      where linked_to_canonical_merchant_1999
+        and portal_visible_by_exact_uuid
+    )
+  into v_requested, v_rows, v_found, v_linked
   from matched;
 
   return jsonb_build_object(
     'ok', v_requested > 0 and v_found = v_requested and v_linked = v_requested,
     'requested_coupons', v_requested,
     'orders_found', v_found,
-    'orders_linked_to_authenticated_merchant', v_linked,
-    'ownership_rule', 'orders.merchant_id = merchants.id and merchants.user_id is not null',
+    'orders_linked_to_canonical_merchant_1999', v_linked,
+    'canonical_merchant_id', v_canonical_id,
+    'ownership_rule', 'orders.merchant_id = merchant_session_id() exact UUID',
     'orders', v_rows,
     'checked_at', now()
   );
 end;
 $$;
 
-revoke all on function public.admin_merchant_coupon_link_health(text[]) from public, anon;
-grant execute on function public.admin_merchant_coupon_link_health(text[]) to authenticated, service_role;
+revoke all on function public.admin_merchant_coupon_link_health(text[])
+  from public, anon;
+grant execute on function public.admin_merchant_coupon_link_health(text[])
+  to authenticated, service_role;
 
 notify pgrst, 'reload schema';
 
