@@ -1,6 +1,11 @@
 name: Repair Merchant 1999 Order Linkage
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - supabase/migrations/20260801195800_merchant_1999_order_linkage_repair.sql
+      - .github/workflows/merchant-1999-order-linkage-repair.yml
   workflow_dispatch:
 
 permissions:
