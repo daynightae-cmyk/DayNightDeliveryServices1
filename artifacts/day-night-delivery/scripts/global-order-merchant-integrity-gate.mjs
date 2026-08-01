@@ -80,6 +80,7 @@ assert.match(migration, /perform set_config\('daynight\.order_merchant_reconcili
 assert.match(migration, /old\.coupon_number|coupon_number is distinct from/i);
 assert.match(migration, /old\.status|status is distinct from/i);
 assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL/);
+assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_PHONE/);
 assert.match(migration, /MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT/);
 assert.match(migration, /order_financial_values_changed_financial_repair_rolled_back/);
 assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/gim);

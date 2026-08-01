@@ -198,39 +198,58 @@ const financialGaps = {
 };
 
 const usersByEmail = new Map();
+const usersByPhone = new Map();
 for (const user of users) {
   const email = normalizedEmail(user.email);
-  if (!email || !user.email_confirmed_at) continue;
   const role = clean(user.app_metadata?.role || user.user_metadata?.role).toLowerCase();
   if (["admin", "support", "driver"].includes(role)) continue;
-  const matches = usersByEmail.get(email) || [];
-  matches.push(user); usersByEmail.set(email, matches);
+  if (email && user.email_confirmed_at) {
+    const matches = usersByEmail.get(email) || [];
+    matches.push(user); usersByEmail.set(email, matches);
+  }
+  const userPhone = phone(user.phone);
+  if (userPhone && user.phone_confirmed_at) {
+    const matches = usersByPhone.get(userPhone) || [];
+    matches.push(user); usersByPhone.set(userPhone, matches);
+  }
 }
 const activeMerchantEmailCounts = new Map();
+const activeMerchantPhoneCounts = new Map();
 for (const merchant of activeMerchants) {
   const email = normalizedEmail(merchant.email);
   if (email) activeMerchantEmailCounts.set(email, (activeMerchantEmailCounts.get(email) || 0) + 1);
+  const merchantPhone = phone(merchant.phone);
+  if (merchantPhone) activeMerchantPhoneCounts.set(merchantPhone, (activeMerchantPhoneCounts.get(merchantPhone) || 0) + 1);
 }
 const merchantIdentityAudit = activeMerchants.map((merchant) => {
   const merchantId = clean(merchant.id);
   const currentUsers = portalUsersByMerchant.get(merchantId) || new Set();
   const email = normalizedEmail(merchant.email);
-  const candidates = (usersByEmail.get(email) || []).filter((user) => {
+  const merchantPhone = phone(merchant.phone);
+  const eligible = (user) => {
     const userId = clean(user.id);
     const activeOwner = activeLinkByUser.get(userId);
     const legacyOwner = activeMerchants.find((other) => clean(other.id) !== merchantId && clean(other.user_id) === userId);
     return (!activeOwner || activeOwner === merchantId) && !legacyOwner;
-  });
+  };
+  const emailCandidates = (usersByEmail.get(email) || []).filter(eligible);
+  const phoneCandidates = (usersByPhone.get(merchantPhone) || []).filter(eligible);
+  const candidates = [...new Map([...emailCandidates, ...phoneCandidates].map((user) => [clean(user.id), user])).values()];
   let classification = "MISSING_PORTAL_LINK";
-  let resolution_evidence = email ? "NO_EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL" : "MERCHANT_EMAIL_MISSING";
+  let resolution_evidence = email || merchantPhone ? "NO_EXACT_UNIQUE_CONFIRMED_AUTH_IDENTITY" : "MERCHANT_EMAIL_AND_PHONE_MISSING";
   if (currentUsers.size > 0) {
     classification = "ALREADY_CORRECT"; resolution_evidence = "EXPLICIT_EFFECTIVE_PORTAL_RELATION";
   } else if ((activeMerchantEmailCounts.get(email) || 0) > 1) {
     classification = "SECURITY_CONFLICT"; resolution_evidence = "EMAIL_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS";
+  } else if ((activeMerchantPhoneCounts.get(merchantPhone) || 0) > 1) {
+    classification = "SECURITY_CONFLICT"; resolution_evidence = "PHONE_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS";
   } else if (candidates.length > 1) {
-    classification = "SECURITY_CONFLICT"; resolution_evidence = "MULTIPLE_EXACT_CONFIRMED_AUTH_USERS";
+    classification = "SECURITY_CONFLICT"; resolution_evidence = "CONFLICTING_OR_MULTIPLE_EXACT_CONFIRMED_AUTH_USERS";
   } else if (candidates.length === 1) {
-    classification = "AUTO_REPAIR_SAFE"; resolution_evidence = "EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL";
+    classification = "AUTO_REPAIR_SAFE";
+    resolution_evidence = emailCandidates.length === 1
+      ? "EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL"
+      : "EXACT_UNIQUE_CONFIRMED_AUTH_PHONE";
   }
   return {
     merchant_id: merchantId,

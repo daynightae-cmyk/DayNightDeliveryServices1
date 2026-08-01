@@ -862,6 +862,7 @@ with merchant_base as (
     m.email,
     m.status,
     lower(nullif(btrim(m.email), '')) as normalized_email,
+    public.dn_merchant_phone_digits(m.phone) as normalized_phone,
     public.dn_effective_portal_user_ids(m.id) as current_portal_user_ids,
     (
       select count(*)::bigint
@@ -875,20 +876,52 @@ with merchant_base as (
         and lower(nullif(btrim(duplicate_merchant.email), '')) = lower(nullif(btrim(m.email), ''))
         and lower(coalesce(duplicate_merchant.status, 'active'))
             not in ('deleted','archived','blocked','suspended')
-    ) as duplicate_active_merchant_email_count
+    ) as duplicate_active_merchant_email_count,
+    (
+      select count(*)::integer
+      from public.merchants duplicate_merchant
+      where duplicate_merchant.id <> m.id
+        and public.dn_merchant_phone_digits(duplicate_merchant.phone)
+            = public.dn_merchant_phone_digits(m.phone)
+        and public.dn_merchant_phone_digits(m.phone) is not null
+        and lower(coalesce(duplicate_merchant.status, 'active'))
+            not in ('deleted','archived','blocked','suspended')
+    ) as duplicate_active_merchant_phone_count
   from public.merchants m
 ), auth_candidates as (
   select
     b.*,
     coalesce(c.candidate_user_ids, '{}'::uuid[]) as candidate_user_ids,
+    coalesce(c.email_candidate_user_ids, '{}'::uuid[]) as email_candidate_user_ids,
+    coalesce(c.phone_candidate_user_ids, '{}'::uuid[]) as phone_candidate_user_ids,
     cardinality(coalesce(c.candidate_user_ids, '{}'::uuid[])) as candidate_count
   from merchant_base b
   cross join lateral (
-    select array_agg(u.id order by u.id) as candidate_user_ids
+    select
+      array_agg(distinct u.id order by u.id) as candidate_user_ids,
+      array_agg(distinct u.id order by u.id) filter (
+        where b.normalized_email is not null
+          and lower(nullif(btrim(u.email), '')) = b.normalized_email
+          and u.email_confirmed_at is not null
+      ) as email_candidate_user_ids,
+      array_agg(distinct u.id order by u.id) filter (
+        where b.normalized_phone is not null
+          and public.dn_merchant_phone_digits(u.phone) = b.normalized_phone
+          and u.phone_confirmed_at is not null
+      ) as phone_candidate_user_ids
     from auth.users u
-    where b.normalized_email is not null
-      and lower(nullif(btrim(u.email), '')) = b.normalized_email
-      and u.email_confirmed_at is not null
+    where (
+        (
+          b.normalized_email is not null
+          and lower(nullif(btrim(u.email), '')) = b.normalized_email
+          and u.email_confirmed_at is not null
+        )
+        or (
+          b.normalized_phone is not null
+          and public.dn_merchant_phone_digits(u.phone) = b.normalized_phone
+          and u.phone_confirmed_at is not null
+        )
+      )
       and lower(coalesce(
         u.raw_app_meta_data ->> 'role',
         u.raw_user_meta_data ->> 'role',
@@ -918,6 +951,7 @@ with merchant_base as (
       when lower(coalesce(a.status, 'active')) in ('deleted','archived','blocked','suspended')
         then 'MISSING_PORTAL_LINK'
       when a.duplicate_active_merchant_email_count > 0 then 'SECURITY_CONFLICT'
+      when a.duplicate_active_merchant_phone_count > 0 then 'SECURITY_CONFLICT'
       when a.candidate_count > 1 then 'SECURITY_CONFLICT'
       when a.candidate_count = 1 then 'AUTO_REPAIR_SAFE'
       else 'MISSING_PORTAL_LINK'
@@ -937,14 +971,20 @@ select
   c.classification,
   case
     when c.classification = 'ALREADY_CORRECT' then 'EXPLICIT_EFFECTIVE_PORTAL_RELATION'
-    when c.classification = 'AUTO_REPAIR_SAFE' then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+    when c.classification = 'AUTO_REPAIR_SAFE'
+      and cardinality(c.email_candidate_user_ids) = 1
+      then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+    when c.classification = 'AUTO_REPAIR_SAFE' then 'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
     when c.classification = 'SECURITY_CONFLICT' and c.duplicate_active_merchant_email_count > 0
       then 'EMAIL_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS'
+    when c.classification = 'SECURITY_CONFLICT' and c.duplicate_active_merchant_phone_count > 0
+      then 'PHONE_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS'
     when c.classification = 'SECURITY_CONFLICT' then 'MULTIPLE_EXACT_CONFIRMED_AUTH_USERS'
     when lower(coalesce(c.status, 'active')) in ('deleted','archived','blocked','suspended')
       then 'INACTIVE_MERCHANT_NOT_AUTO_LINKED'
-    when c.normalized_email is null then 'MERCHANT_EMAIL_MISSING'
-    else 'NO_EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+    when c.normalized_email is null and c.normalized_phone is null
+      then 'MERCHANT_EMAIL_AND_PHONE_MISSING'
+    else 'NO_EXACT_UNIQUE_CONFIRMED_AUTH_IDENTITY'
   end as resolution_evidence,
   case
     when c.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE') then 100
@@ -1419,7 +1459,10 @@ begin
       classification <> 'AUTO_REPAIR_SAFE'
       or candidate_portal_user_id is null
       or confidence <> 100
-      or resolution_evidence <> 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+      or resolution_evidence not in (
+        'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL',
+        'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
+      )
       or cardinality(current_portal_user_ids) <> 0
     );
 
@@ -1462,6 +1505,8 @@ declare
   v_snapshot public.merchant_identity_audit_snapshot%rowtype;
   v_merchant public.merchants%rowtype;
   v_candidate_ids uuid[];
+  v_email_candidate_ids uuid[];
+  v_phone_candidate_ids uuid[];
   v_existing_user_id uuid;
   v_inserted integer := 0;
   v_already_applied integer := 0;
@@ -1494,7 +1539,10 @@ begin
     if v_snapshot.classification <> 'AUTO_REPAIR_SAFE'
        or v_snapshot.candidate_portal_user_id is null
        or v_snapshot.confidence <> 100
-       or v_snapshot.resolution_evidence <> 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+       or v_snapshot.resolution_evidence not in (
+         'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL',
+         'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
+       )
        or cardinality(v_snapshot.current_portal_user_ids) <> 0 then
       raise exception 'unsafe_merchant_link_snapshot_row_aborted';
     end if;
@@ -1537,8 +1585,13 @@ begin
         detail = jsonb_build_object('merchant_id', v_snapshot.merchant_id)::text;
     end if;
 
-    if nullif(btrim(v_merchant.email), '') is null
-       or exists (
+    if (
+         nullif(btrim(v_merchant.email), '') is null
+         and public.dn_merchant_phone_digits(v_merchant.phone) is null
+       )
+       or (
+         nullif(btrim(v_merchant.email), '') is not null
+         and exists (
          select 1
          from public.merchants duplicate_merchant
          where duplicate_merchant.id <> v_merchant.id
@@ -1546,15 +1599,49 @@ begin
                = lower(nullif(btrim(v_merchant.email), ''))
            and lower(coalesce(duplicate_merchant.status, 'active'))
                not in ('deleted','archived','blocked','suspended')
+         )
+       )
+       or (
+         public.dn_merchant_phone_digits(v_merchant.phone) is not null
+         and exists (
+           select 1
+           from public.merchants duplicate_merchant
+           where duplicate_merchant.id <> v_merchant.id
+             and public.dn_merchant_phone_digits(duplicate_merchant.phone)
+                 = public.dn_merchant_phone_digits(v_merchant.phone)
+             and lower(coalesce(duplicate_merchant.status, 'active'))
+                 not in ('deleted','archived','blocked','suspended')
+         )
        ) then
-      raise exception 'merchant_email_evidence_missing_or_duplicated';
+      raise exception 'merchant_identity_evidence_missing_or_duplicated';
     end if;
 
-    select coalesce(array_agg(u.id order by u.id), '{}'::uuid[])
-    into v_candidate_ids
+    select
+      coalesce(array_agg(distinct u.id order by u.id), '{}'::uuid[]),
+      coalesce(array_agg(distinct u.id order by u.id) filter (
+        where nullif(btrim(v_merchant.email), '') is not null
+          and lower(nullif(btrim(u.email), '')) = lower(nullif(btrim(v_merchant.email), ''))
+          and u.email_confirmed_at is not null
+      ), '{}'::uuid[]),
+      coalesce(array_agg(distinct u.id order by u.id) filter (
+        where public.dn_merchant_phone_digits(v_merchant.phone) is not null
+          and public.dn_merchant_phone_digits(u.phone) = public.dn_merchant_phone_digits(v_merchant.phone)
+          and u.phone_confirmed_at is not null
+      ), '{}'::uuid[])
+    into v_candidate_ids, v_email_candidate_ids, v_phone_candidate_ids
     from auth.users u
-    where lower(nullif(btrim(u.email), '')) = lower(nullif(btrim(v_merchant.email), ''))
-      and u.email_confirmed_at is not null
+    where (
+        (
+          nullif(btrim(v_merchant.email), '') is not null
+          and lower(nullif(btrim(u.email), '')) = lower(nullif(btrim(v_merchant.email), ''))
+          and u.email_confirmed_at is not null
+        )
+        or (
+          public.dn_merchant_phone_digits(v_merchant.phone) is not null
+          and public.dn_merchant_phone_digits(u.phone) = public.dn_merchant_phone_digits(v_merchant.phone)
+          and u.phone_confirmed_at is not null
+        )
+      )
       and lower(coalesce(
         u.raw_app_meta_data ->> 'role',
         u.raw_user_meta_data ->> 'role',
@@ -1577,7 +1664,14 @@ begin
       );
 
     if cardinality(v_candidate_ids) <> 1
-       or v_candidate_ids[1] is distinct from v_snapshot.candidate_portal_user_id then
+       or v_candidate_ids[1] is distinct from v_snapshot.candidate_portal_user_id
+       or v_snapshot.resolution_evidence is distinct from case
+         when cardinality(v_email_candidate_ids) = 1
+           then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+         when cardinality(v_phone_candidate_ids) = 1
+           then 'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
+         else null
+       end then
       raise exception using
         errcode = '23514',
         message = 'auth_identity_evidence_changed_or_ambiguous',
