@@ -16,7 +16,18 @@ jobs:
           fetch-depth: 0
 
       - name: Apply deterministic source patch
-        run: node .github/scripts/apply-admin-operations-merchant-hardening.mjs
+        run: |
+          node .github/scripts/apply-admin-operations-merchant-hardening.mjs
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('artifacts/day-night-delivery/src/lib/adminOperationsData.ts')
+          s = p.read_text()
+          s = s.replace(
+              'import { resolveOrderMerchant } from "./orderFinancialOperations";',
+              'import { resolveOrderMerchant } from "./merchantOrderOwnership";',
+          )
+          p.write_text(s)
+          PY
 
       - name: Commit final source
         run: |
