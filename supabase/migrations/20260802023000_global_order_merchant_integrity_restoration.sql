@@ -226,7 +226,7 @@ begin
   -- Merchant ownership changes must never recalculate or rewrite money. An older
   -- financial normalization trigger runs before this trigger on UPDATE, so restore
   -- every financial/legacy amount from OLD before changing canonical identity.
-  if tg_op = 'UPDATE' then
+  if tg_op = 'UPDATE' and new.merchant_id is distinct from old.merchant_id then
     new.cod_amount := old.cod_amount;
     new.goods_value := old.goods_value;
     new.delivery_fee := old.delivery_fee;
@@ -926,12 +926,18 @@ with merchant_base as (
         u.raw_app_meta_data ->> 'role',
         u.raw_user_meta_data ->> 'role',
         ''
-      )) not in ('admin','support','driver')
+      )) not in ('admin','support','driver','owner','super_admin')
+      and not exists (
+        select 1
+        from public.profiles profile_row
+        where profile_row.id = u.id
+          and lower(coalesce(profile_row.role::text, ''))
+              in ('admin','support','driver','owner','super_admin')
+      )
       and not exists (
         select 1
         from public.merchant_user_links l
         where l.user_id = u.id
-          and l.active
           and l.merchant_id <> b.merchant_id
       )
       and not exists (
@@ -943,6 +949,23 @@ with merchant_base as (
               not in ('deleted','archived','blocked','suspended')
       )
   ) c
+), candidate_usage as (
+  select
+    proposed_user_id,
+    count(*)::integer as proposed_merchant_count
+  from auth_candidates candidate_row
+  cross join lateral unnest(candidate_row.candidate_user_ids) proposed_user_id
+  where cardinality(candidate_row.current_portal_user_ids) = 0
+  group by proposed_user_id
+), auth_candidates_with_reuse as (
+  select
+    candidate_row.*,
+    coalesce((
+      select max(usage_row.proposed_merchant_count)
+      from candidate_usage usage_row
+      where usage_row.proposed_user_id = any(candidate_row.candidate_user_ids)
+    ), 0) as candidate_reuse_count
+  from auth_candidates candidate_row
 ), classified as (
   select
     a.*,
@@ -953,10 +976,11 @@ with merchant_base as (
       when a.duplicate_active_merchant_email_count > 0 then 'SECURITY_CONFLICT'
       when a.duplicate_active_merchant_phone_count > 0 then 'SECURITY_CONFLICT'
       when a.candidate_count > 1 then 'SECURITY_CONFLICT'
+      when a.candidate_count = 1 and a.candidate_reuse_count > 1 then 'SECURITY_CONFLICT'
       when a.candidate_count = 1 then 'AUTO_REPAIR_SAFE'
       else 'MISSING_PORTAL_LINK'
     end as classification
-  from auth_candidates a
+  from auth_candidates_with_reuse a
 )
 select
   c.merchant_id,
@@ -979,6 +1003,8 @@ select
       then 'EMAIL_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS'
     when c.classification = 'SECURITY_CONFLICT' and c.duplicate_active_merchant_phone_count > 0
       then 'PHONE_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS'
+    when c.classification = 'SECURITY_CONFLICT' and c.candidate_reuse_count > 1
+      then 'AUTH_USER_PROPOSED_FOR_MULTIPLE_MERCHANTS'
     when c.classification = 'SECURITY_CONFLICT' then 'MULTIPLE_EXACT_CONFIRMED_AUTH_USERS'
     when lower(coalesce(c.status, 'active')) in ('deleted','archived','blocked','suspended')
       then 'INACTIVE_MERCHANT_NOT_AUTO_LINKED'
@@ -1313,7 +1339,7 @@ begin
         order by category_code
       ) x
     ), '{}'::jsonb),
-    'acceptance_010505', coalesce((
+    'acceptance_merchant_1999', coalesce((
       select jsonb_agg(jsonb_build_object(
         'order_id', order_id,
         'coupon_number', coupon_number,
@@ -1325,7 +1351,13 @@ begin
       ))
       from public.order_merchant_audit_snapshot
       where run_id = v_run_id
-        and public.normalized_order_coupon(coupon_number) = public.normalized_order_coupon('010505')
+        and public.normalized_order_coupon(coupon_number) = any (
+          array[
+            public.normalized_order_coupon('010505'),
+            public.normalized_order_coupon('010503'),
+            public.normalized_order_coupon('003860')
+          ]
+        )
     ), '[]'::jsonb)
   )
   into v_summary
@@ -1646,12 +1678,18 @@ begin
         u.raw_app_meta_data ->> 'role',
         u.raw_user_meta_data ->> 'role',
         ''
-      )) not in ('admin','support','driver')
+      )) not in ('admin','support','driver','owner','super_admin')
+      and not exists (
+        select 1
+        from public.profiles profile_row
+        where profile_row.id = u.id
+          and lower(coalesce(profile_row.role::text, ''))
+              in ('admin','support','driver','owner','super_admin')
+      )
       and not exists (
         select 1
         from public.merchant_user_links l
         where l.user_id = u.id
-          and l.active
           and l.merchant_id <> v_merchant.id
       )
       and not exists (
@@ -1681,11 +1719,20 @@ begin
         )::text;
     end if;
 
-    insert into public.merchant_user_links (
-      merchant_id, user_id, access_role, active
-    ) values (
-      v_merchant.id, v_candidate_ids[1], 'owner', true
-    );
+    update public.merchant_user_links
+    set active = true,
+        access_role = coalesce(nullif(btrim(access_role), ''), 'owner')
+    where merchant_id = v_merchant.id
+      and user_id = v_candidate_ids[1]
+      and not active;
+
+    if not found then
+      insert into public.merchant_user_links (
+        merchant_id, user_id, access_role, active
+      ) values (
+        v_merchant.id, v_candidate_ids[1], 'owner', true
+      );
+    end if;
 
     insert into public.merchant_link_repair_audit (
       run_id,

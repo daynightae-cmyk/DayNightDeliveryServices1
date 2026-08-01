@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
+      - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
+      - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -109,15 +111,19 @@ jobs:
           cp supabase/config.toml "$release_dir/supabase/config.toml"
           supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$release_dir" migration fetch --linked
-          target="20260802023000_global_order_merchant_integrity_restoration.sql"
-          if [ -f "$release_dir/supabase/migrations/$target" ]; then
-            cmp --silent "supabase/migrations/$target" "$release_dir/supabase/migrations/$target" || {
-              echo "Refusing to mutate an already-applied migration" >&2
-              exit 1
-            }
-          else
-            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
-          fi
+          for target in \
+            20260802023000_global_order_merchant_integrity_restoration.sql \
+            20260802031500_personal_order_optional_coupon_policy.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              cmp --silent "supabase/migrations/$target" "$release_dir/supabase/migrations/$target" || {
+                echo "Refusing to mutate an already-applied migration: $target" >&2
+                exit 1
+              }
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            fi
+          done
           supabase --workdir "$release_dir" db push --dry-run
 
   install-schema-only:
@@ -150,13 +156,22 @@ jobs:
           cp supabase/config.toml "$release_dir/supabase/config.toml"
           supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$release_dir" migration fetch --linked
-          target="20260802023000_global_order_merchant_integrity_restoration.sql"
-          if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
-            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
-            echo "SCHEMA_PENDING=true" >> "$GITHUB_ENV"
-          else
-            echo "SCHEMA_PENDING=false" >> "$GITHUB_ENV"
-          fi
+          schema_pending=false
+          for target in \
+            20260802023000_global_order_merchant_integrity_restoration.sql \
+            20260802031500_personal_order_optional_coupon_policy.sql
+          do
+            if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              schema_pending=true
+            else
+              cmp --silent "supabase/migrations/$target" "$release_dir/supabase/migrations/$target" || {
+                echo "Refusing to mutate an already-applied migration: $target" >&2
+                exit 1
+              }
+            fi
+          done
+          echo "SCHEMA_PENDING=$schema_pending" >> "$GITHUB_ENV"
           supabase --workdir "$release_dir" db push --dry-run
           echo "SCHEMA_RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
       - name: Install schema contracts only (no historical backfill)

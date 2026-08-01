@@ -364,14 +364,17 @@ export default function MerchantPortalCommandCenter() {
       let p = recordFrom(profile.data); let merchants = arrayFrom<MerchantRecord>(p.merchants);
       if (!merchants.length) { const claim=await supabase.rpc("merchant_claim_approved_account"); if (claim.error && !/not_approved/i.test(claim.error.message)) throw claim.error; profile=await supabase.rpc("merchant_get_session_profile"); if(profile.error)throw profile.error;p=recordFrom(profile.data); merchants=arrayFrom<MerchantRecord>(p.merchants); }
       if (merchants.length > 1) throw new Error("merchant_identity_ambiguous_multiple_uuid");
-      setMerchantRows(merchants);
       if (!merchants.length) throw new Error("merchant_profile_not_found");
       const ordersResult=await fetchAllMerchantPortalOrders();
       if (!merchants.some((item) => clean(item.id) === ordersResult.merchantId)) throw new Error("merchant_profile_order_owner_mismatch");
+      const center=await supabase.rpc("merchant_portal_business_center"); if(center.error) throw center.error;
+      // Commit one complete owner-scoped snapshot. Never combine a newly resolved
+      // merchant/profile with COD or statement data left from a previous owner.
+      setMerchantRows(merchants);
       setRawOrders(ordersResult.orders as OrderRecord[]);
-      const center=await supabase.rpc("merchant_portal_business_center"); if(center.error) throw center.error; setBusiness(recordFrom(center.data) as BusinessCenterPayload);
+      setBusiness(recordFrom(center.data) as BusinessCenterPayload);
       const now=new Date().toISOString(); setLastSync(now); setRealtime({state:"connected",lastSuccessfulSyncAt:now});
-    } catch(error){setDataError(errorMessage(error,isArabic));setRealtime(current=>({state:navigator.onLine?"stale":"offline",lastSuccessfulSyncAt:current.lastSuccessfulSyncAt,messageAr:"تعذر تحديث البيانات الحية.",messageEn:"Live data refresh failed."}))}
+    } catch(error){setMerchantRows([]);setRawOrders([]);setBusiness({});setLastSync(null);setSelectedOrderId(null);setDataError(errorMessage(error,isArabic));setRealtime(current=>({state:navigator.onLine?"stale":"offline",lastSuccessfulSyncAt:current.lastSuccessfulSyncAt,messageAr:"تعذر تحديث البيانات الحية.",messageEn:"Live data refresh failed."}))}
     finally{setLoading(false);setRefreshing(false)}
   },[isArabic]);
 

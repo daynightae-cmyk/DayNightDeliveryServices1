@@ -13,7 +13,9 @@ const identity = (value) => clean(value)
   .toLocaleLowerCase()
   .replace(/[^\p{L}\p{N}]+/gu, "") || null;
 const normalizedEmail = (value) => clean(value).toLocaleLowerCase() || null;
-const phone = (value) => clean(value).replace(/\D/g, "") || null;
+const phone = (value) => clean(value)
+  .replace(/[٠-٩۰-۹]/g, (digit) => localizedDigitMap.get(digit) || digit)
+  .replace(/\D/g, "") || null;
 const inactive = (value) => ["deleted", "archived", "blocked", "suspended"].includes(clean(value || "active").toLowerCase());
 const num = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -49,12 +51,14 @@ async function authUsers() {
   }
 }
 
-const [orders, merchants, links, users] = await Promise.all([
+const [orders, merchants, links, users, profileRows] = await Promise.all([
   allRows("orders", "*"),
   allRows("merchants", "id,merchant_code,trade_name,status,user_id,phone,email"),
   allRows("merchant_user_links", "merchant_id,user_id,active"),
   authUsers(),
+  allRows("profiles", "id,role", true),
 ]);
+const profiles = profileRows || [];
 
 const dependencyTables = [
   ["cod_collections", "order_id,merchant_id"],
@@ -75,6 +79,12 @@ for (const [table, select] of dependencyTables) {
 const merchantById = new Map(merchants.map((merchant) => [clean(merchant.id), merchant]));
 const activeLinkByUser = new Map();
 for (const link of links) if (link.active) activeLinkByUser.set(clean(link.user_id), clean(link.merchant_id));
+const linkedMerchantIdsByUser = new Map();
+for (const link of links) {
+  const userId = clean(link.user_id); const merchantId = clean(link.merchant_id);
+  const ids = linkedMerchantIdsByUser.get(userId) || new Set();
+  if (merchantId) ids.add(merchantId); linkedMerchantIdsByUser.set(userId, ids);
+}
 const portalUsersByMerchant = new Map();
 const addPortalUser = (merchantId, userId) => {
   if (!merchantId || !userId) return;
@@ -175,7 +185,61 @@ const merchantMatrix = activeMerchants.map((merchant) => {
 });
 const authUserIds = new Set(users.map((user) => clean(user.id)));
 const linkedUserIds = new Set([...portalUsersByMerchant.values()].flatMap((set) => [...set]));
-const acceptance = classified.filter(({ order }) => identity(order.coupon_number) === identity("010505"));
+const merchant1999CouponNumbers = ["010505", "010503", "003860"];
+const canonicalMerchant1999Rows = activeMerchants.filter(
+  (merchant) => identity(merchant.merchant_code) === identity("DN-MER-1999-MFAWI"),
+);
+const canonicalMerchant1999 = canonicalMerchant1999Rows.length === 1 ? canonicalMerchant1999Rows[0] : null;
+const canonicalMerchant1999Id = clean(canonicalMerchant1999?.id);
+const merchant1999Acceptance = merchant1999CouponNumbers.map((couponNumber) => {
+  const matches = classified.filter(({ order }) => identity(order.coupon_number) === identity(couponNumber));
+  const row = matches.length === 1 ? matches[0] : null;
+  const ownershipMatches = Boolean(row && canonicalMerchant1999Id && clean(row.order.merchant_id) === canonicalMerchant1999Id);
+  const portalLinked = Boolean(canonicalMerchant1999Id && (portalUsersByMerchant.get(canonicalMerchant1999Id)?.size || 0) > 0);
+  return {
+    coupon_number: couponNumber,
+    matching_order_count: matches.length,
+    order_id: row ? clean(row.order.id) : null,
+    current_merchant_id: row ? clean(row.order.merchant_id) || null : null,
+    canonical_merchant_id: canonicalMerchant1999Id || null,
+    classification: row?.classification || "MISSING_ORDER",
+    admin_visible: matches.length === 1,
+    portal_visible: ownershipMatches && portalLinked,
+    result: matches.length === 1 && ownershipMatches && portalLinked ? "PASS" : "FAIL",
+  };
+});
+
+const merchantIlytkCode = "DN-MER-SHOP-ILYTK";
+const merchantIlytkPhone = "971501050516";
+const canonicalMerchantIlytkRows = activeMerchants.filter(
+  (merchant) => identity(merchant.merchant_code) === identity(merchantIlytkCode),
+);
+const canonicalMerchantIlytk = canonicalMerchantIlytkRows.length === 1 ? canonicalMerchantIlytkRows[0] : null;
+const canonicalMerchantIlytkId = clean(canonicalMerchantIlytk?.id);
+const canonicalMerchantIlytkName = identity(canonicalMerchantIlytk?.trade_name);
+const canonicalMerchantIlytkPhoneMatches = phone(canonicalMerchantIlytk?.phone) === merchantIlytkPhone;
+const merchantIlytkCandidates = classified.flatMap(({ order, classification, candidateId }) => {
+  const evidence = [
+    clean(order.merchant_id) === canonicalMerchantIlytkId && "CURRENT_MERCHANT_UUID",
+    identity(order.merchant_code) === identity(merchantIlytkCode) && "EXACT_MERCHANT_CODE",
+    phone(order.sender_phone) === merchantIlytkPhone && "EXACT_SENDER_PHONE",
+    canonicalMerchantIlytkName && identity(order.merchant_name) === canonicalMerchantIlytkName && "EXACT_LEGAL_DISPLAY_NAME",
+    canonicalMerchantIlytkName && identity(order.sender_name) === canonicalMerchantIlytkName && "EXACT_SENDER_NAME",
+  ].filter(Boolean);
+  if (!evidence.length) return [];
+  return [{
+    order_id: clean(order.id),
+    coupon_number: clean(order.coupon_number) || null,
+    tracking_number: clean(order.tracking_number || order.invoice_number) || null,
+    current_merchant_id: clean(order.merchant_id) || null,
+    current_merchant_code: clean(order.merchant_code) || null,
+    current_merchant_name: clean(order.merchant_name) || null,
+    candidate_canonical_merchant_id: canonicalMerchantIlytkId || candidateId || null,
+    classification,
+    resolution_evidence: evidence,
+    auto_repair_safe: evidence.includes("CURRENT_MERCHANT_UUID") || evidence.includes("EXACT_MERCHANT_CODE"),
+  }];
+});
 
 const normalizedStatus = (value) => clean(value).toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
 const deliveredOrders = orders.filter((order) => ["delivered", "completed", "complete"].includes(normalizedStatus(order.status)));
@@ -199,10 +263,12 @@ const financialGaps = {
 
 const usersByEmail = new Map();
 const usersByPhone = new Map();
+const profileRoleByUser = new Map(profiles.map((profile) => [clean(profile.id), clean(profile.role).toLowerCase()]));
+const privilegedRoles = new Set(["admin", "support", "driver", "owner", "super_admin"]);
 for (const user of users) {
   const email = normalizedEmail(user.email);
   const role = clean(user.app_metadata?.role || user.user_metadata?.role).toLowerCase();
-  if (["admin", "support", "driver"].includes(role)) continue;
+  if (privilegedRoles.has(role) || privilegedRoles.has(profileRoleByUser.get(clean(user.id)))) continue;
   if (email && user.email_confirmed_at) {
     const matches = usersByEmail.get(email) || [];
     matches.push(user); usersByEmail.set(email, matches);
@@ -221,7 +287,7 @@ for (const merchant of activeMerchants) {
   const merchantPhone = phone(merchant.phone);
   if (merchantPhone) activeMerchantPhoneCounts.set(merchantPhone, (activeMerchantPhoneCounts.get(merchantPhone) || 0) + 1);
 }
-const merchantIdentityAudit = activeMerchants.map((merchant) => {
+const merchantIdentityCandidates = activeMerchants.map((merchant) => {
   const merchantId = clean(merchant.id);
   const currentUsers = portalUsersByMerchant.get(merchantId) || new Set();
   const email = normalizedEmail(merchant.email);
@@ -229,12 +295,26 @@ const merchantIdentityAudit = activeMerchants.map((merchant) => {
   const eligible = (user) => {
     const userId = clean(user.id);
     const activeOwner = activeLinkByUser.get(userId);
+    const priorOwners = linkedMerchantIdsByUser.get(userId) || new Set();
     const legacyOwner = activeMerchants.find((other) => clean(other.id) !== merchantId && clean(other.user_id) === userId);
-    return (!activeOwner || activeOwner === merchantId) && !legacyOwner;
+    return (!activeOwner || activeOwner === merchantId)
+      && [...priorOwners].every((ownerId) => ownerId === merchantId)
+      && !legacyOwner;
   };
   const emailCandidates = (usersByEmail.get(email) || []).filter(eligible);
   const phoneCandidates = (usersByPhone.get(merchantPhone) || []).filter(eligible);
   const candidates = [...new Map([...emailCandidates, ...phoneCandidates].map((user) => [clean(user.id), user])).values()];
+  return { merchant, merchantId, currentUsers, email, merchantPhone, emailCandidates, phoneCandidates, candidates };
+});
+const proposedMerchantCountByUser = new Map();
+for (const row of merchantIdentityCandidates) {
+  if (row.currentUsers.size > 0 || row.candidates.length !== 1) continue;
+  const userId = clean(row.candidates[0].id);
+  proposedMerchantCountByUser.set(userId, (proposedMerchantCountByUser.get(userId) || 0) + 1);
+}
+const merchantIdentityAudit = merchantIdentityCandidates.map((row) => {
+  const { merchant, merchantId, currentUsers, email, merchantPhone, emailCandidates, phoneCandidates, candidates } = row;
+  const candidateReuseCount = candidates.length === 1 ? proposedMerchantCountByUser.get(clean(candidates[0].id)) || 0 : 0;
   let classification = "MISSING_PORTAL_LINK";
   let resolution_evidence = email || merchantPhone ? "NO_EXACT_UNIQUE_CONFIRMED_AUTH_IDENTITY" : "MERCHANT_EMAIL_AND_PHONE_MISSING";
   if (currentUsers.size > 0) {
@@ -245,6 +325,8 @@ const merchantIdentityAudit = activeMerchants.map((merchant) => {
     classification = "SECURITY_CONFLICT"; resolution_evidence = "PHONE_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS";
   } else if (candidates.length > 1) {
     classification = "SECURITY_CONFLICT"; resolution_evidence = "CONFLICTING_OR_MULTIPLE_EXACT_CONFIRMED_AUTH_USERS";
+  } else if (candidates.length === 1 && candidateReuseCount > 1) {
+    classification = "SECURITY_CONFLICT"; resolution_evidence = "AUTH_USER_PROPOSED_FOR_MULTIPLE_MERCHANTS";
   } else if (candidates.length === 1) {
     classification = "AUTO_REPAIR_SAFE";
     resolution_evidence = emailCandidates.length === 1
@@ -258,6 +340,7 @@ const merchantIdentityAudit = activeMerchants.map((merchant) => {
     classification,
     resolution_evidence,
     candidate_found: candidates.length === 1,
+    candidate_reuse_count: candidateReuseCount,
   };
 });
 const merchantIdentityCounts = Object.fromEntries([...merchantIdentityAudit.reduce((counts, row) => {
@@ -271,6 +354,7 @@ const report = {
     merchants: merchants.length,
     merchant_user_links: links.length,
     auth_users: users.length,
+    profiles: profiles.length,
     auth_users_linked_to_merchants: [...linkedUserIds].filter((id) => authUserIds.has(id)).length,
     active_merchants: activeMerchants.length,
     portal_linked_merchants: activeMerchants.filter((merchant) => (portalUsersByMerchant.get(clean(merchant.id))?.size || 0) > 0).length,
@@ -294,7 +378,24 @@ const report = {
   },
   financial_dependency_gaps: financialGaps,
   financial_totals: sums,
-  acceptance_010505: acceptance.map(({ classification, candidateId }) => ({ classification, candidate_found: Boolean(candidateId) })),
+  acceptance_merchant_1999: {
+    canonical_merchant_match_count: canonicalMerchant1999Rows.length,
+    canonical_merchant_id: canonicalMerchant1999Id || null,
+    coupons: merchant1999Acceptance,
+    result: merchant1999Acceptance.every((row) => row.result === "PASS") ? "PASS" : "FAIL",
+  },
+  diagnostic_merchant_ilytk: {
+    supplied_code: merchantIlytkCode,
+    supplied_phone: merchantIlytkPhone,
+    canonical_merchant_match_count: canonicalMerchantIlytkRows.length,
+    canonical_merchant_id: canonicalMerchantIlytkId || null,
+    canonical_phone_matches_supplied_phone: canonicalMerchantIlytkPhoneMatches,
+    portal_linked: Boolean(canonicalMerchantIlytkId && (portalUsersByMerchant.get(canonicalMerchantIlytkId)?.size || 0) > 0),
+    database_count_by_canonical_uuid: orderCounts.get(canonicalMerchantIlytkId) || 0,
+    candidate_order_count: merchantIlytkCandidates.length,
+    candidate_orders: merchantIlytkCandidates,
+    mode: "DIAGNOSTIC_ONLY_NO_REASSIGNMENT",
+  },
   orders_modified: 0,
 };
 

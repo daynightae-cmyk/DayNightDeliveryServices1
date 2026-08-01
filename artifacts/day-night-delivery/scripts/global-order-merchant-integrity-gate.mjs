@@ -90,5 +90,9 @@ assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || [
 assert.match(productionAudit, /order:\s*["']id\.asc["']/);
 assert.match(productionAudit, /٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹/);
 assert.match(productionAudit, /\[\^\\p\{L\}\\p\{N\}\]/);
+for (const coupon of ["010505", "010503", "003860"]) assert.ok(productionAudit.includes(coupon));
+assert.match(productionAudit, /DN-MER-SHOP-ILYTK/);
+assert.match(productionAudit, /971501050516/);
+assert.match(productionAudit, /DIAGNOSTIC_ONLY_NO_REASSIGNMENT/);
 
 console.log("PASS global order/merchant ownership, visibility and integrity gate");
