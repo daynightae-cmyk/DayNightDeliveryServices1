@@ -1,3 +1,4 @@
+# Production execution trigger: 2026-08-01 Merchant 1999 linkage repair
 name: Repair Merchant 1999 Order Linkage
 
 on:
