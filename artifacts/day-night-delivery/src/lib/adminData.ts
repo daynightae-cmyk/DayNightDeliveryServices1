@@ -424,10 +424,10 @@ export async function fetchAdminOrders(): Promise<Order[]> {
 }
 
 export async function fetchAdminStats(): Promise<AdminStats> {
-  const fallback: AdminStats = { pending: 0, in_transit: 0, delivered: 0, cancelled: 0, total_orders: 0, today_orders: 0, active_merchants: 0, cod_total: 0, delivery_income: 0 };
-  const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const merchants = merchantsResult.status === "fulfilled" ? merchantsResult.value : [];
+  const [orders, merchants] = await Promise.all([
+    fetchAdminOrders(),
+    fetchMerchants(),
+  ]);
   const today = new Date().toISOString().slice(0, 10);
   return orders.reduce<AdminStats>((stats, order) => {
     const status = orderStatus(order);
@@ -440,7 +440,17 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     stats.cod_total += numberValue(order.cod_amount, 0);
     stats.delivery_income += orderDeliveryIncome(order);
     return stats;
-  }, { ...fallback, active_merchants: merchants.filter((m) => clean(m.status || "active").toLowerCase() !== "paused").length });
+  }, {
+    pending: 0,
+    in_transit: 0,
+    delivered: 0,
+    cancelled: 0,
+    total_orders: 0,
+    today_orders: 0,
+    active_merchants: merchants.filter((merchant) => clean(merchant.status || "active").toLowerCase() !== "paused").length,
+    cod_total: 0,
+    delivery_income: 0,
+  });
 }
 
 export async function updateOrderStatus(orderId: string, status: string, note?: string): Promise<Order | null> {
