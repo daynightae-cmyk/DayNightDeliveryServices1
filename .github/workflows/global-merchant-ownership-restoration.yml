@@ -13,7 +13,7 @@ on:
       - "artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
       - "artifacts/day-night-delivery/scripts/global-merchant-ownership-*.mjs"
-      - ".github/scripts/apply-global-merchant-source-hardening.mjs"
+      - ".github/scripts/apply-global-merchant-*.mjs"
       - ".github/workflows/global-merchant-ownership-restoration.yml"
   workflow_dispatch:
 
@@ -36,7 +36,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply deterministic source hardening
-        run: node .github/scripts/apply-global-merchant-source-hardening.mjs
+        run: |
+          node .github/scripts/apply-global-merchant-source-hardening.mjs
+          node .github/scripts/apply-global-merchant-stats-hardening.mjs
 
       - name: Commit generated source patch on the dedicated branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/fix/global-order-merchant-restoration-20260802-v2'
@@ -86,5 +88,6 @@ jobs:
         shell: bash
         run: |
           node .github/scripts/apply-global-merchant-source-hardening.mjs
+          node .github/scripts/apply-global-merchant-stats-hardening.mjs
           git diff --exit-code -- artifacts/day-night-delivery/src/lib/adminData.ts \
             artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx
