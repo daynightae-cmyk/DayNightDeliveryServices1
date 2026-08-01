@@ -19,8 +19,8 @@ async function allRows(table, select = "*", optional = false) {
     const response = await fetch(`${root}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
       headers: { ...headers, Range: `${from}-${from + pageSize - 1}`, Prefer: "count=exact" },
     });
-    if (optional && response.status === 404) return null;
     const payload = await response.json().catch(() => null);
+    if (optional && (response.status === 404 || (response.status === 400 && payload?.code === "42703"))) return null;
     if (!response.ok || !Array.isArray(payload)) {
       throw new Error(`${table}_readonly_fetch_${response.status}_${JSON.stringify(payload)}`);
     }
