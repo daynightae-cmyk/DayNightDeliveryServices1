@@ -825,6 +825,7 @@ export default function AdminPanelLuxury() {
   const [financeWarning, setFinanceWarning] = useState("");
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -919,13 +920,15 @@ export default function AdminPanelLuxury() {
       ]);
 
     if (ordersResult.status === "fulfilled") {
-      setOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+      const loadedOrders = Array.isArray(ordersResult.value) ? ordersResult.value : [];
+      setOrders(loadedOrders);
+      setOrdersLoaded(true);
     } else {
       console.warn("Orders request failed:", ordersResult.reason);
       setAdminError(
         isArabic
-          ? "تعذر تحميل الطلبات حالياً."
-          : "Could not load orders right now.",
+          ? "تعذر تحميل الطلبات من قاعدة البيانات. لم يتم استبدال البيانات السابقة بصفر كاذب. اضغط تحديث أو سجّل الدخول مجددًا."
+          : "Orders could not be loaded from the database. Existing rows were preserved instead of showing a false zero. Refresh or sign in again.",
       );
     }
 
@@ -1271,7 +1274,15 @@ export default function AdminPanelLuxury() {
           <AdminNewOrder
             isArabic={isArabic}
             merchants={merchants}
-            onSaved={() => void refreshAdminData()}
+            onSaved={(savedOrder) => {
+              setOrders((current) => [
+                savedOrder,
+                ...current.filter((order) => String(order.id) !== String(savedOrder.id)),
+              ]);
+              setOrdersLoaded(true);
+              setSection("all_orders");
+              void refreshAdminData();
+            }}
           />
         </section>
       );
@@ -1479,12 +1490,14 @@ export default function AdminPanelLuxury() {
             </div>
           </div>
 
-          <AdminOrderCommandDeck
-            isArabic={isArabic}
-            active={active}
-            orders={orders}
-            onSelect={(id) => setSection(id)}
-          />
+          {ordersLoaded && (
+            <AdminOrderCommandDeck
+              isArabic={isArabic}
+              active={active}
+              orders={orders}
+              onSelect={(id) => setSection(id)}
+            />
+          )}
 
           {adminLoading && (
             <div className="dn-admin-loading-banner" role="status">
