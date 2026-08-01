@@ -275,6 +275,16 @@ export default function AdminSectionWorkspaceComplete({
     [baseRows, query],
   );
 
+  const couponCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const order of liveOrders) {
+      const couponKey = normalize(order.coupon_number);
+      if (!couponKey) continue;
+      counts.set(couponKey, (counts.get(couponKey) || 0) + 1);
+    }
+    return counts;
+  }, [liveOrders]);
+
   if (financeSections.has(id)) {
     return (
       <AdminFinanceOperationsCenter
@@ -520,7 +530,8 @@ export default function AdminSectionWorkspaceComplete({
           <table>
             <thead>
               <tr>
-                <th>{isArabic ? "التتبع والكوبون" : "Tracking / coupon"}</th>
+                <th>{isArabic ? "رقم التتبع" : "Tracking number"}</th>
+                <th>{isArabic ? "رقم الكوبون" : "Coupon number"}</th>
                 <th>{isArabic ? "الحالة" : "Status"}</th>
                 <th>{id === "personal_orders" ? (isArabic ? "المرسل والمستلم" : "Sender / recipient") : (isArabic ? "التاجر والعميل" : "Merchant / customer")}</th>
                 <th>{isArabic ? "المسار" : "Route"}</th>
@@ -541,6 +552,10 @@ export default function AdminSectionWorkspaceComplete({
                   order.driver_name ||
                   order.driver_code;
                 const chip = stateChip(order.status);
+                const couponKey = normalize(order.coupon_number);
+                const duplicateCoupon = Boolean(
+                  couponKey && (couponCounts.get(couponKey) || 0) > 1,
+                );
 
                 return (
                   <tr key={rowKey}>
@@ -548,9 +563,23 @@ export default function AdminSectionWorkspaceComplete({
                       <span dir="ltr" className="dn-order-track-ref">
                         {tracking(order)}
                       </span>
-                      <small className="block opacity-60" dir="ltr">
-                        {order.coupon_number || (isArabic ? "الكوبون غير موجود" : "No coupon")}
-                      </small>
+                    </td>
+                    <td>
+                      <strong
+                        dir="ltr"
+                        className={`inline-flex min-w-[92px] justify-center rounded-xl border px-3 py-2 font-mono text-xs font-black ${
+                          duplicateCoupon
+                            ? "border-rose-400/40 bg-rose-400/10 text-rose-200"
+                            : "border-brand-gold/30 bg-brand-gold/10 text-brand-gold"
+                        }`}
+                      >
+                        {order.coupon_number || "—"}
+                      </strong>
+                      {duplicateCoupon && (
+                        <small className="mt-1 block font-black text-rose-200">
+                          {isArabic ? "مكرر في البيانات الحالية" : "Existing duplicate"}
+                        </small>
+                      )}
                     </td>
                     <td>
                       <AdminStateChip name={chip.name} tone={chip.tone}>
