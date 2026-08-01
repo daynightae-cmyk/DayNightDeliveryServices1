@@ -1,0 +1,90 @@
+name: Global Merchant Ownership Restoration
+
+on:
+  push:
+    branches:
+      - fix/global-order-merchant-restoration-20260802-v2
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/20260802023000_global_order_merchant_ownership_restoration.sql"
+      - "artifacts/day-night-delivery/src/lib/adminData.ts"
+      - "artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx"
+      - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
+      - "artifacts/day-night-delivery/scripts/global-merchant-ownership-*.mjs"
+      - ".github/scripts/apply-global-merchant-source-hardening.mjs"
+      - ".github/workflows/global-merchant-ownership-restoration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: global-merchant-ownership-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-hardening-and-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply deterministic source hardening
+        run: node .github/scripts/apply-global-merchant-source-hardening.mjs
+
+      - name: Commit generated source patch on the dedicated branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/global-order-merchant-restoration-20260802-v2'
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Source hardening is already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/day-night-delivery/src/lib/adminData.ts \
+                  artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx
+          git commit -m "fix(orders): enforce canonical merchant ownership across admin and portal"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Merchant ownership regression gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/global-merchant-ownership-gate.mjs
+
+      - name: TypeScript
+        run: pnpm run web:typecheck
+
+      - name: Production gate
+        run: pnpm run web:gate
+
+      - name: Production build
+        run: pnpm run web:build
+
+      - name: Confirm clean generated source
+        shell: bash
+        run: |
+          node .github/scripts/apply-global-merchant-source-hardening.mjs
+          git diff --exit-code -- artifacts/day-night-delivery/src/lib/adminData.ts \
+            artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx
