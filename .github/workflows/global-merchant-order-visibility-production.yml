@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - supabase/migrations/20260802004000_global_order_merchant_portal_visibility.sql
+      - supabase/migrations/20260802005500_global_order_merchant_portal_visibility_followup.sql
       - artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts
       - artifacts/day-night-delivery/src/lib/adminData.ts
       - artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - supabase/migrations/20260802004000_global_order_merchant_portal_visibility.sql
+      - supabase/migrations/20260802005500_global_order_merchant_portal_visibility_followup.sql
       - .github/workflows/global-merchant-order-visibility-production.yml
   workflow_dispatch:
 
@@ -60,14 +62,13 @@ jobs:
           test "$project_ref" = "ngdwybpgacauorygoedi"
           echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
 
-      - name: Build isolated migration release
+      - name: Build isolated reviewed migration release
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          target="20260802004000_global_order_merchant_portal_visibility.sql"
           workdir="$RUNNER_TEMP/day-night-global-merchant-visibility"
           rm -rf "$workdir"
           mkdir -p "$workdir/supabase/migrations"
@@ -76,17 +77,27 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_REF" \
             --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$workdir" migration fetch --linked
-          if [ -f "$workdir/supabase/migrations/$target" ]; then
-            echo "TARGET_ALREADY_APPLIED=true" >> "$GITHUB_ENV"
-          else
-            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
-            echo "TARGET_ALREADY_APPLIED=false" >> "$GITHUB_ENV"
-          fi
-          echo "VISIBILITY_WORKDIR=$workdir" >> "$GITHUB_ENV"
-          echo "VISIBILITY_TARGET=$target" >> "$GITHUB_ENV"
 
-      - name: Dry-run exact visibility migration
-        if: env.TARGET_ALREADY_APPLIED != 'true'
+          targets=(
+            20260802004000_global_order_merchant_portal_visibility.sql
+            20260802005500_global_order_merchant_portal_visibility_followup.sql
+          )
+          pending="$RUNNER_TEMP/global-merchant-visibility-pending.txt"
+          : > "$pending"
+          for target in "${targets[@]}"; do
+            if [ ! -f "$workdir/supabase/migrations/$target" ]; then
+              cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+              echo "$target" >> "$pending"
+            fi
+          done
+          pending_count="$(wc -l < "$pending" | tr -d ' ')"
+          echo "VISIBILITY_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "VISIBILITY_PENDING_FILE=$pending" >> "$GITHUB_ENV"
+          echo "VISIBILITY_PENDING_COUNT=$pending_count" >> "$GITHUB_ENV"
+          echo "Pending reviewed migrations: $pending_count"
+
+      - name: Dry-run reviewed visibility migrations
+        if: env.VISIBILITY_PENDING_COUNT != '0'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -95,10 +106,12 @@ jobs:
           set -euo pipefail
           output="$RUNNER_TEMP/global-merchant-visibility-dry-run.txt"
           supabase --workdir "$VISIBILITY_WORKDIR" db push --dry-run 2>&1 | tee "$output"
-          grep -Fq "$VISIBILITY_TARGET" "$output"
+          while IFS= read -r target; do
+            grep -Fq "$target" "$output"
+          done < "$VISIBILITY_PENDING_FILE"
 
-      - name: Apply exact migration atomically
-        if: env.TARGET_ALREADY_APPLIED != 'true'
+      - name: Apply reviewed migrations atomically
+        if: env.VISIBILITY_PENDING_COUNT != '0'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
