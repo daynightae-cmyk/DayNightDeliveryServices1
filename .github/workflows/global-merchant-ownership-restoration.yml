@@ -1,0 +1,114 @@
+name: Global Merchant Ownership Restoration
+
+on:
+  push:
+    branches:
+      - fix/global-order-merchant-restoration-20260802-v2
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/20260802023000_global_order_merchant_ownership_restoration.sql"
+      - "supabase/migrations/20260802024000_global_order_merchant_ownership_followup.sql"
+      - "artifacts/day-night-delivery/src/lib/adminData.ts"
+      - "artifacts/day-night-delivery/src/lib/adminOperationsData.ts"
+      - "artifacts/day-night-delivery/src/lib/merchantOrderOwnership.ts"
+      - "artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx"
+      - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
+      - "artifacts/day-night-delivery/scripts/global-merchant-ownership-*.mjs"
+      - "artifacts/day-night-delivery/scripts/all-order-creation-ownership-gate.mjs"
+      - ".github/workflows/global-merchant-ownership-*.yml"
+      - ".github/workflows/p1-runtime-evidence.yml"
+      - "docs/production/GLOBAL_MERCHANT_OWNERSHIP_*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: global-merchant-ownership-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply final deterministic source hardening
+        run: |
+          node .github/scripts/apply-admin-operations-merchant-hardening.mjs
+          node .github/scripts/apply-financial-merchant-hardening.mjs
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('artifacts/day-night-delivery/src/lib/adminOperationsData.ts')
+          s = p.read_text().replace(
+              'import { resolveOrderMerchant } from "./orderFinancialOperations";',
+              'import { resolveOrderMerchant } from "./merchantOrderOwnership";',
+          )
+          p.write_text(s)
+          PY
+
+      - name: Commit generated source on dedicated branch only
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/global-order-merchant-restoration-20260802-v2'
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'Final source hardening is already applied.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add \
+              artifacts/day-night-delivery/src/lib/adminOperationsData.ts \
+              artifacts/day-night-delivery/src/lib/adminData.ts \
+              artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts
+            git commit -m 'fix(orders): harden all merchant ownership creation paths'
+            git push origin HEAD:${GITHUB_REF_NAME}
+            echo 'Generated source committed; a new validation run will verify the branch.'
+            exit 0
+          fi
+
+      - name: Verify pull-request source is already hardened
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code -- \
+          artifacts/day-night-delivery/src/lib/adminOperationsData.ts \
+          artifacts/day-night-delivery/src/lib/adminData.ts \
+          artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Merchant ownership migration and evidence gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/global-merchant-ownership-gate.mjs
+
+      - name: All order creation ownership gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/all-order-creation-ownership-gate.mjs
+
+      - name: TypeScript
+        run: pnpm run web:typecheck
+
+      - name: Production gate
+        run: pnpm run web:gate
+
+      - name: Production build
+        run: pnpm run web:build

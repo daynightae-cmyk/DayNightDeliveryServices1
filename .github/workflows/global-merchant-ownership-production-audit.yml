@@ -1,0 +1,106 @@
+name: Global Merchant Ownership Production Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-merchant-ownership-production-audit
+  cancel-in-progress: false
+
+jobs:
+  trusted-production-dry-run:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify protected real-account evidence inputs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          RUNTIME_MERCHANT_ACCOUNTS_JSON: ${{ secrets.RUNTIME_MERCHANT_ACCOUNTS_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY \
+            RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD \
+            RUNTIME_MERCHANT_ACCOUNTS_JSON
+          do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected production evidence inputs: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          if [ "$project_ref" != "ngdwybpgacauorygoedi" ]; then
+            echo "Refusing non-production project ref." >&2
+            exit 3
+          fi
+          echo "Active production project verified: ${project_ref:0:4}…${project_ref: -4}"
+
+      - name: Run complete production dry-run audit as real admin
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+          MERCHANT_OWNERSHIP_REPORT_PATH: global-merchant-ownership-runtime-report.json
+        run: node scripts/global-merchant-ownership-runtime-audit.mjs
+
+      - name: Run authenticated multi-merchant isolation and count comparison
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_MERCHANT_ACCOUNTS_JSON: ${{ secrets.RUNTIME_MERCHANT_ACCOUNTS_JSON }}
+          MERCHANT_OWNERSHIP_MULTI_ACCOUNT_REPORT_PATH: global-merchant-ownership-multi-account-report.json
+        run: node scripts/global-merchant-ownership-multi-account-e2e.mjs
+
+      - name: Upload complete audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-merchant-ownership-production-audit
+          path: |
+            artifacts/day-night-delivery/global-merchant-ownership-runtime-report.json
+            artifacts/day-night-delivery/global-merchant-ownership-multi-account-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Confirm no production repair was executed
+        if: always()
+        run: |
+          echo "This workflow authenticates as real admin/merchant users."
+          echo "It never uses service_role to bypass portal RLS."
+          echo "It never calls admin_apply_global_merchant_ownership_repair."
+          echo "It never calls admin_apply_global_merchant_finance_reconciliation."
+          echo "Any production mutation requires separate reviewed human approval."

@@ -1,0 +1,154 @@
+name: Global Merchant Ownership Schema Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-merchant-ownership-schema-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-reviewed-schema-only:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify protected production deployment inputs
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VITE_SUPABASE_URL SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected deployment inputs: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          if [ "$project_ref" != "ngdwybpgacauorygoedi" ]; then
+            echo "Refusing non-production project ref." >&2
+            exit 3
+          fi
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Active production project verified: ${project_ref:0:4}…${project_ref: -4}"
+
+      - name: Build isolated reviewed migration workspace
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/merchant-ownership-evidence"
+          workdir="$RUNNER_TEMP/merchant-ownership-supabase"
+          rm -rf "$evidence" "$workdir"
+          mkdir -p "$evidence" "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+
+          supabase --workdir "$workdir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+
+          find "$workdir/supabase/migrations" -maxdepth 1 -type f -printf '%f\n' \
+            | sort > "$evidence/remote-baseline-files.txt"
+
+          targets=(
+            20260802023000_global_order_merchant_ownership_restoration.sql
+            20260802024000_global_order_merchant_ownership_followup.sql
+          )
+          : > "$evidence/pending-migrations.txt"
+          : > "$evidence/migration-state.txt"
+
+          for target in "${targets[@]}"; do
+            test -f "supabase/migrations/$target"
+            if grep -Fxq "$target" "$evidence/remote-baseline-files.txt"; then
+              echo "$target: already_recorded" | tee -a "$evidence/migration-state.txt"
+            else
+              cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+              echo "$target" >> "$evidence/pending-migrations.txt"
+              echo "$target: pending" | tee -a "$evidence/migration-state.txt"
+            fi
+          done
+
+          pending_count="$(wc -l < "$evidence/pending-migrations.txt" | tr -d ' ')"
+          echo "OWNERSHIP_PENDING_COUNT=$pending_count" >> "$GITHUB_ENV"
+          echo "OWNERSHIP_SUPABASE_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "OWNERSHIP_EVIDENCE_DIR=$evidence" >> "$GITHUB_ENV"
+
+      - name: Validate isolated migration plan
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$OWNERSHIP_PENDING_COUNT" -eq 0 ]; then
+            echo 'Both reviewed migrations are already recorded.' \
+              | tee "$OWNERSHIP_EVIDENCE_DIR/db-push-dry-run.txt"
+            exit 0
+          fi
+          supabase --workdir "$OWNERSHIP_SUPABASE_WORKDIR" db push --dry-run 2>&1 \
+            | tee "$OWNERSHIP_EVIDENCE_DIR/db-push-dry-run.txt"
+          while IFS= read -r target; do
+            grep -Fq "$target" "$OWNERSHIP_EVIDENCE_DIR/db-push-dry-run.txt" || {
+              echo "Expected reviewed migration missing from dry run: $target" >&2
+              exit 1
+            }
+          done < "$OWNERSHIP_EVIDENCE_DIR/pending-migrations.txt"
+
+      - name: Apply schema and audit functions only
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$OWNERSHIP_PENDING_COUNT" -gt 0 ]; then
+            supabase --workdir "$OWNERSHIP_SUPABASE_WORKDIR" db push --yes 2>&1 \
+              | tee "$OWNERSHIP_EVIDENCE_DIR/db-push.txt"
+          else
+            echo 'No schema write required.' | tee "$OWNERSHIP_EVIDENCE_DIR/db-push.txt"
+          fi
+          supabase --workdir "$OWNERSHIP_SUPABASE_WORKDIR" migration list --linked 2>&1 \
+            | tee "$OWNERSHIP_EVIDENCE_DIR/migrations-after.txt"
+          for version in 20260802023000 20260802024000; do
+            grep -Fq "$version" "$OWNERSHIP_EVIDENCE_DIR/migrations-after.txt" || {
+              echo "Required production migration version missing: $version" >&2
+              exit 1
+            }
+          done
+
+      - name: Upload schema deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-merchant-ownership-schema-deployment
+          path: ${{ env.OWNERSHIP_EVIDENCE_DIR }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Confirm no order or finance apply RPC was invoked
+        if: always()
+        run: |
+          echo "This workflow deploys schema, audit functions and future-write protections only."
+          echo "It never calls admin_apply_global_merchant_ownership_repair."
+          echo "It never calls admin_apply_global_merchant_finance_reconciliation."

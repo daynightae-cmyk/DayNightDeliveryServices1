@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import { resolveOrderMerchant } from "./merchantOrderOwnership";
 
 function clean(value?: unknown) {
   return String(value ?? "").trim();
@@ -92,7 +93,7 @@ export type AdminOrderInput = {
 };
 
 export async function fetchMerchants(): Promise<Merchant[]> {
-  if (!supabase) return [];
+  if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from("merchants")
@@ -100,8 +101,7 @@ export async function fetchMerchants(): Promise<Merchant[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.warn("Failed to fetch merchants:", error.message);
-    return [];
+    throw new Error(`Merchants could not be loaded safely: ${error.message}`);
   }
 
   return (data || []) as Merchant[];
@@ -171,77 +171,98 @@ export function calculateAdminOrderPrice(input: AdminOrderInput) {
   };
 }
 
-function buildLegacyAdminOrderPayload(payload: Record<string, unknown>) {
-  const legacy = { ...payload };
-  for (const key of [
-    "invoice_number",
-    "coupon_number",
-    "merchant_id",
-    "merchant_name",
-    "merchant_code",
-    "order_count",
-    "shipping_scope",
-    "destination_country",
-    "source_channel",
-    "package_description",
-    "source_domain",
-    "subtotal",
-    "base_price",
-    "total",
-    "total_price",
-    "amount",
-    "price",
-    "currency",
-    "status_history",
-  ]) {
-    delete legacy[key];
-  }
-  return legacy;
-}
-
 export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const merchant = input.merchant || null;
-  const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
-  const pricing = calculateAdminOrderPrice({ ...input, order_count: count });
-  const createdAt = new Date().toISOString();
-  const trackingSeed = clean(input.coupon_number) || `${merchant?.merchant_code || "ADMIN"}-${Date.now().toString(36)}`;
-  const invoiceNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
-  const senderName = clean(merchant?.trade_name || input.merchant_name || "DAY NIGHT Merchant");
-  const senderPhone = clean(merchant?.phone || "971568757331");
-  const senderCity = clean(merchant?.city || merchant?.emirate || input.pickup_city || "Abu Dhabi");
-  const senderAddress = clean(merchant?.pickup_address || merchant?.address || senderCity);
-  const description = clean(input.package_description || input.package_type || "Admin shipment");
-  const paymentMethod = clean(input.payment_method || merchant?.default_payment_method || "sender_pays");
+  const selectedMerchant = input.merchant;
+  if (!selectedMerchant?.id) {
+    throw new Error("تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.");
+  }
+  const merchant = await resolveOrderMerchant(selectedMerchant);
+
+  const couponNumber = clean(input.coupon_number);
+  const receiverName = clean(input.receiver_name);
+  const receiverPhone = clean(input.receiver_phone);
+  const receiverAddress = clean(input.receiver_address);
+  const pickupCity = clean(input.pickup_city);
+  const packageDescription = clean(input.package_description || input.package_type);
+  const paymentMethod = clean(input.payment_method);
+  const status = clean(input.status);
   const isInternational = input.shipping_scope === "international";
   const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
-    : clean(input.delivery_city || "Dubai");
-  const deliveryWeight = isInternational ? Math.max(1, numberValue(input.weight, 1)) : 1;
+    ? clean(input.destination_country || input.delivery_city)
+    : clean(input.delivery_city);
+  const rawWeight = Number(input.weight);
+
+  const missing = [
+    !couponNumber && "coupon_number",
+    !receiverName && "receiver_name",
+    !receiverPhone && "receiver_phone",
+    !receiverAddress && "receiver_address",
+    !pickupCity && "pickup_city",
+    !receiverCity && (isInternational ? "destination_country" : "delivery_city"),
+    !packageDescription && "package_type",
+    !paymentMethod && "payment_method",
+    !status && "status",
+    !clean(merchant.trade_name) && "merchant.trade_name",
+    !clean(merchant.phone) && "merchant.phone",
+  ].filter(Boolean);
+  if (missing.length) {
+    throw new Error(`order_required_fields_missing:${missing.join(",")}`);
+  }
+  if (isInternational && (!Number.isFinite(rawWeight) || rawWeight <= 0)) {
+    throw new Error("international_order_weight_required");
+  }
+
+  const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
+  const strictInput = {
+    ...input,
+    merchant,
+    merchant_id: merchant.id,
+    merchant_name: merchant.trade_name,
+    merchant_code: merchant.merchant_code,
+    coupon_number: couponNumber,
+    pickup_city: pickupCity,
+    delivery_city: receiverCity,
+    destination_country: isInternational ? receiverCity : undefined,
+    receiver_name: receiverName,
+    receiver_phone: receiverPhone,
+    receiver_address: receiverAddress,
+    package_type: packageDescription,
+    package_description: packageDescription,
+    payment_method: paymentMethod,
+    status,
+    order_count: count,
+    weight: isInternational ? rawWeight : input.weight,
+  } satisfies AdminOrderInput;
+  const pricing = calculateAdminOrderPrice(strictInput);
+  const createdAt = new Date().toISOString();
+  const invoiceNumber = createDayNightInvoiceNumber(couponNumber, new Date(createdAt));
+  const senderCity = clean(merchant.city || merchant.emirate || pickupCity);
+  const senderAddress = clean(merchant.pickup_address || merchant.address || senderCity);
 
   const payload: Record<string, unknown> = removeEmptyUndefined({
     invoice_number: invoiceNumber,
-    coupon_number: clean(input.coupon_number),
-    merchant_id: merchant?.id || clean(input.merchant_id) || null,
-    merchant_name: senderName,
-    merchant_code: merchant?.merchant_code || clean(input.merchant_code),
+    coupon_number: couponNumber,
+    merchant_id: merchant.id,
+    merchant_name: merchant.trade_name,
+    merchant_code: merchant.merchant_code,
     order_count: count,
     shipping_scope: input.shipping_scope,
-    destination_country: isInternational ? clean(input.destination_country || receiverCity || "WORLD") : null,
+    destination_country: isInternational ? receiverCity : null,
     source_channel: "admin_panel",
     source_domain: "daynightae.com",
-    sender_name: senderName,
-    sender_phone: senderPhone,
+    sender_name: merchant.trade_name,
+    sender_phone: merchant.phone,
     sender_city: senderCity,
     sender_address: senderAddress,
-    receiver_name: clean(input.receiver_name),
-    receiver_phone: clean(input.receiver_phone),
+    receiver_name: receiverName,
+    receiver_phone: receiverPhone,
     receiver_city: receiverCity,
-    receiver_address: clean(input.receiver_address),
-    package_type: description,
-    package_description: description,
-    weight: deliveryWeight,
+    receiver_address: receiverAddress,
+    package_type: packageDescription,
+    package_description: packageDescription,
+    weight: isInternational ? rawWeight : numberValue(input.weight, 1),
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
@@ -254,29 +275,28 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     amount: pricing.total,
     price: pricing.total,
     currency: "AED",
-    notes: clean(input.notes) || "N/A",
-    status: clean(input.status || "pending"),
+    notes: clean(input.notes) || null,
+    status,
     created_at: createdAt,
     updated_at: createdAt,
-    status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: "Created from DAY NIGHT admin merchant operations hub" }],
+    status_history: [{ status, date: createdAt, note: "Created from DAY NIGHT admin merchant operations hub" }],
   });
 
-  const rpcOrder = await callRpc<Order>("admin_create_coupon_order", { p_order: payload });
-  if (rpcOrder?.id || rpcOrder?.invoice_number) return rpcOrder;
+  const { data, error } = await supabase.rpc("admin_create_coupon_order", { p_order: payload });
+  if (error) throw new Error(error.message);
+  const returned = (Array.isArray(data) ? data[0] : data) as Order | null;
+  if (!returned?.id) throw new Error("admin_order_creation_returned_no_row");
 
-  for (const candidate of [payload, buildLegacyAdminOrderPayload(payload)]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(candidate)
-      .select("*")
-      .single();
-
-    if (!error && data) return data as Order;
-    if (error && !isMissingSchemaError(error)) throw new Error(error.message);
-    if (error) console.warn("Admin order insert fallback failed:", error.message);
+  const { data: saved, error: readError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", returned.id)
+    .single();
+  if (readError || !saved) throw new Error(readError?.message || "saved_order_verification_failed");
+  if (clean(saved.merchant_id) !== clean(merchant.id)) {
+    throw new Error("saved_order_merchant_portal_link_mismatch");
   }
-
-  throw new Error("Order could not be created. Confirm the admin SQL migration was applied and the signed-in user has admin/support role.");
+  return saved as Order;
 }
 
 export type AdminStats = {
@@ -365,7 +385,7 @@ export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): P
   const pageSize = Math.min(100, Math.max(1, Math.floor(numberValue(params.pageSize, 50))));
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  if (!supabase) return { rows: [], count: 0, page, pageSize, totalPages: 0, source: "fallback", warning: "Supabase is not configured." };
+  if (!supabase) throw new Error("Supabase is not configured.");
   let query = supabase.from("orders").select("*", { count: "exact" });
   if (params.status) query = query.eq("status", params.status);
   if (params.merchantId) query = query.eq("merchant_id", params.merchantId);
@@ -375,12 +395,11 @@ export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): P
   if (params.dateTo) query = query.lte("created_at", params.dateTo);
   if (params.search) {
     const term = safeLike(params.search);
-    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,receiver_name.ilike.%${term}%`);
+    query = query.or(`coupon_number.ilike.%${term}%,tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,receiver_name.ilike.%${term}%,merchant_code.ilike.%${term}%,merchant_name.ilike.%${term}%`);
   }
   const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
   if (error) {
-    console.warn("Failed to fetch paginated admin orders:", error.message);
-    return { rows: [], count: 0, page, pageSize, totalPages: 0, source: "fallback", warning: "Orders could not be loaded safely right now." };
+    throw new Error(`Orders could not be loaded safely: ${error.message}`);
   }
   const safeCount = typeof count === "number" ? count : (data || []).length;
   return { rows: (data || []) as Order[], count: safeCount, page, pageSize, totalPages: Math.ceil(safeCount / pageSize), source: "db" };
@@ -405,10 +424,10 @@ export async function fetchAdminOrders(): Promise<Order[]> {
 }
 
 export async function fetchAdminStats(): Promise<AdminStats> {
-  const fallback: AdminStats = { pending: 0, in_transit: 0, delivered: 0, cancelled: 0, total_orders: 0, today_orders: 0, active_merchants: 0, cod_total: 0, delivery_income: 0 };
-  const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const merchants = merchantsResult.status === "fulfilled" ? merchantsResult.value : [];
+  const [orders, merchants] = await Promise.all([
+    fetchAdminOrders(),
+    fetchMerchants(),
+  ]);
   const today = new Date().toISOString().slice(0, 10);
   return orders.reduce<AdminStats>((stats, order) => {
     const status = orderStatus(order);
@@ -421,7 +440,17 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     stats.cod_total += numberValue(order.cod_amount, 0);
     stats.delivery_income += orderDeliveryIncome(order);
     return stats;
-  }, { ...fallback, active_merchants: merchants.filter((m) => clean(m.status || "active").toLowerCase() !== "paused").length });
+  }, {
+    pending: 0,
+    in_transit: 0,
+    delivered: 0,
+    cancelled: 0,
+    total_orders: 0,
+    today_orders: 0,
+    active_merchants: merchants.filter((merchant) => clean(merchant.status || "active").toLowerCase() !== "paused").length,
+    cod_total: 0,
+    delivery_income: 0,
+  });
 }
 
 export async function updateOrderStatus(orderId: string, status: string, note?: string): Promise<Order | null> {

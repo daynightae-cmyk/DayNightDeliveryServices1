@@ -9,6 +9,7 @@ import {
   type OpsOrderUpdateInput,
 } from "./adminOperationsData";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import { resolveOrderMerchant } from "./merchantOrderOwnership";
 import {
   calculateOrderFinancials,
   financialNumber,
@@ -34,16 +35,6 @@ export type CouponConflict = {
   merchant_name: string;
   receiver_name: string;
   receiver_phone: string;
-};
-
-export type MerchantPortalResolution = {
-  ok: boolean;
-  selected_merchant_id: string;
-  canonical_merchant_id: string;
-  canonicalized: boolean;
-  portal_link_count: number;
-  merchant: Merchant;
-  ownership_rule: string;
 };
 
 export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;
@@ -163,41 +154,6 @@ export async function findCouponConflict(
   return conflict;
 }
 
-function merchantPortalLinkError(error: unknown, merchant: Merchant) {
-  const detail = opsErrorDetail(error);
-  const normalized = detail.toLowerCase();
-  let message = detail;
-
-  if (normalized.includes("merchant_portal_account_not_linked")) {
-    message = `التاجر «${clean(merchant.trade_name) || clean(merchant.merchant_code) || "غير محدد"}» غير مرتبط بحساب دخول في بوابة التاجر. لم يتم حفظ الطلب حتى لا يختفي من حساب التاجر. اربط حساب التاجر أولًا ثم أعد الحفظ.`;
-  } else if (normalized.includes("merchant_portal_link_ambiguous")) {
-    message = `يوجد أكثر من حساب بوابة مطابق للتاجر «${clean(merchant.trade_name) || "غير محدد"}». لم يتم حفظ الطلب. وحّد سجل التاجر واربط حسابًا واحدًا فقط.`;
-  } else if (normalized.includes("merchant_inactive_for_order")) {
-    message = `حساب التاجر «${clean(merchant.trade_name) || "غير محدد"}» غير نشط ولا يمكن إنشاء طلب عليه.`;
-  }
-
-  const wrapped = new Error(message || "تعذر التحقق من ربط الطلب بحساب التاجر. لم يتم حفظ الطلب.") as Error & { code?: string };
-  wrapped.name = "MerchantPortalLinkError";
-  wrapped.code = "merchant_portal_link_required";
-  return wrapped;
-}
-
-export async function resolveOrderMerchant(merchant: Merchant): Promise<Merchant> {
-  if (!supabase || !merchant?.id) throw merchantPortalLinkError(null, merchant);
-
-  const { data, error } = await supabase.rpc("admin_resolve_order_merchant", {
-    p_merchant_id: merchant.id,
-  });
-  if (error) throw merchantPortalLinkError(error, merchant);
-
-  const value = (Array.isArray(data) ? data[0] : data) as MerchantPortalResolution | null;
-  const resolved = value?.merchant;
-  if (!value?.ok || !resolved?.id || Number(value.portal_link_count || 0) < 1) {
-    throw merchantPortalLinkError(null, merchant);
-  }
-  return resolved;
-}
-
 async function recoverCouponConflict(
   couponNumber: unknown,
   excludeOrderId: string | null = null,
@@ -269,6 +225,35 @@ function persistedManualDeliveryPrice(
   return financials.priceSource === "manual" ? financials.deliveryFee : null;
 }
 
+function assertCompleteFinancialOrderInput(
+  input: FinancialOpsOrderInput,
+  merchant: Merchant,
+) {
+  const isInternational = input.shipping_scope === "international";
+  const destination = clean(isInternational ? input.destination_country : input.delivery_city);
+  const weight = Number(input.weight);
+  const orderCount = Number(input.order_count);
+  const missing = [
+    !clean(input.coupon_number) && "coupon_number",
+    !clean(merchant.id) && "merchant_id",
+    !clean(merchant.trade_name) && "merchant.trade_name",
+    !clean(merchant.merchant_code) && "merchant.merchant_code",
+    !clean(merchant.phone) && "merchant.phone",
+    !clean(input.pickup_city) && "pickup_city",
+    !destination && (isInternational ? "destination_country" : "delivery_city"),
+    !clean(input.receiver_name) && "receiver_name",
+    !clean(input.receiver_phone) && "receiver_phone",
+    !clean(input.receiver_address) && "receiver_address",
+    !clean(input.package_description || input.package_type) && "package_type",
+    !clean(input.payment_method) && "payment_method",
+    (!Number.isFinite(weight) || weight <= 0) && "weight",
+    (!Number.isFinite(orderCount) || orderCount <= 0) && "order_count",
+  ].filter(Boolean);
+  if (missing.length) {
+    throw operationError(null, `order_required_fields_missing:${missing.join(",")}`);
+  }
+}
+
 function buildFinancialOrderPayload(
   input: FinancialOpsOrderInput,
   merchant: Merchant,
@@ -278,9 +263,9 @@ function buildFinancialOrderPayload(
 ) {
   const isInternational = input.shipping_scope === "international";
   const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
-    : clean(input.delivery_city || "Abu Dhabi");
-  const senderCity = clean(input.pickup_city || merchant.emirate || "Abu Dhabi");
+    ? clean(input.destination_country || input.delivery_city)
+    : clean(input.delivery_city);
+  const senderCity = clean(input.pickup_city || merchant.emirate);
   const senderAddress = composeAddress([
     input.pickup_area,
     input.pickup_street,
@@ -291,7 +276,7 @@ function buildFinancialOrderPayload(
     input.delivery_street,
     input.receiver_address || receiverCity,
   ]);
-  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+  const packageValue = clean(input.package_description || input.package_type);
   const paymentMethod = normalizePaymentMethod(input.payment_method);
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
   const codAmount = paymentMethod === "cod" ? financials.customerTotal : 0;
@@ -311,7 +296,7 @@ function buildFinancialOrderPayload(
     source_channel: "admin_financial_order",
     source_domain: "daynightae.com",
     sender_name: merchant.trade_name,
-    sender_phone: clean(merchant.phone || "971568757331"),
+    sender_phone: clean(merchant.phone),
     sender_city: senderCity,
     sender_address: senderAddress,
     receiver_name: clean(input.receiver_name),
@@ -320,7 +305,7 @@ function buildFinancialOrderPayload(
     receiver_address: receiverAddress,
     package_type: packageValue,
     package_description: packageValue,
-    weight: Math.max(0.1, numberValue(input.weight, 1)),
+    weight: Number(input.weight),
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
@@ -366,6 +351,7 @@ export async function createFinancialOpsOrder(
   const selectedMerchant = input.merchant;
   if (!selectedMerchant?.id) throw operationError(null, "merchant_required");
   const merchant = await resolveOrderMerchant(selectedMerchant);
+  assertCompleteFinancialOrderInput(input, merchant);
 
   const existingConflict = await findCouponConflict(input.coupon_number);
   if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
@@ -385,14 +371,23 @@ export async function createFinancialOpsOrder(
       "Could not create the financially separated merchant order. Apply the order financial ledger migration.",
     );
   }
-  const row = (Array.isArray(data) ? data[0] : data) as Order | null;
-  if (!row?.id && !row?.tracking_number && !row?.invoice_number) {
+  const returned = (Array.isArray(data) ? data[0] : data) as Order | null;
+  if (!returned?.id) {
     throw operationError(null, "financial_order_creation_returned_no_row");
   }
-  if (clean(row.merchant_id) !== clean(merchant.id)) {
+
+  const { data: saved, error: readError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", returned.id)
+    .single();
+  if (readError || !saved) {
+    throw operationError(readError, "saved_financial_order_verification_failed");
+  }
+  if (clean(saved.merchant_id) !== clean(merchant.id)) {
     throw operationError(null, "saved_order_merchant_portal_link_mismatch");
   }
-  return { row, source: "rpc" };
+  return { row: saved as Order, source: "rpc" };
 }
 
 function buildCorePatch(
@@ -402,9 +397,9 @@ function buildCorePatch(
 ) {
   const isInternational = input.shipping_scope === "international";
   const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
-    : clean(input.delivery_city || "Abu Dhabi");
-  const packageValue = clean(input.package_description || input.package_type || "Shipment");
+    ? clean(input.destination_country || input.delivery_city)
+    : clean(input.delivery_city);
+  const packageValue = clean(input.package_description || input.package_type);
   const paymentMethod = normalizePaymentMethod(input.payment_method);
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
 
@@ -423,7 +418,7 @@ function buildCorePatch(
     coupon_number: clean(input.coupon_number),
     package_type: packageValue,
     package_description: packageValue,
-    weight: Math.max(0.1, numberValue(input.weight, 1)),
+    weight: Number(input.weight),
     pieces: count,
     order_count: count,
     shipping_scope: input.shipping_scope,
@@ -453,10 +448,8 @@ export async function updateFinancialOpsOrder(
   if (!reference) throw operationError(null, "order_reference_required");
   const selectedMerchant = input.merchant;
   if (!selectedMerchant?.id) throw operationError(null, "merchant_required");
-  const merchantChanged = clean(selectedMerchant.id) !== clean(input.order.merchant_id);
-  const merchant = merchantChanged
-    ? await resolveOrderMerchant(selectedMerchant)
-    : selectedMerchant;
+  const merchant = await resolveOrderMerchant(selectedMerchant);
+  assertCompleteFinancialOrderInput(input, merchant);
 
   const excludeOrderId = clean(input.order.id) || null;
   const couponChanged =
@@ -494,5 +487,8 @@ export async function updateFinancialOpsOrder(
   }
   const row = (Array.isArray(data) ? data[0] : data) as Order | null;
   if (!row?.id) throw operationError(null, "financial_order_update_returned_no_row");
+  if (clean(row.merchant_id) !== clean(merchant.id)) {
+    throw operationError(null, "updated_order_merchant_portal_link_mismatch");
+  }
   return { row, source: "rpc" };
 }
