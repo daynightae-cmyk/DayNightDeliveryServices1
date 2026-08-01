@@ -1,0 +1,139 @@
+-- Follow-up for production where 20260802004000 was already recorded.
+-- Corrects effective portal ownership to match merchant_session_id() precedence
+-- and prevents name/phone fallback when a merchant code is present.
+
+begin;
+
+create or replace function public.dn_merchant_portal_link_count(p_merchant_id uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+  select count(*)::integer
+  from (
+    select l.user_id
+    from public.merchant_user_links l
+    join public.merchants m on m.id = l.merchant_id
+    where l.merchant_id = p_merchant_id
+      and l.active
+      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+
+    union
+
+    select m.user_id
+    from public.merchants m
+    where m.id = p_merchant_id
+      and m.user_id is not null
+      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+      and not exists (
+        select 1
+        from public.merchant_user_links l
+        where l.user_id = m.user_id
+          and l.active
+          and l.merchant_id <> m.id
+      )
+  ) effective_users;
+$$;
+
+create or replace function public.dn_resolve_portal_merchant_uuid(p_merchant_id uuid)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_selected public.merchants%rowtype;
+  v_candidates uuid[] := '{}'::uuid[];
+  v_code text;
+  v_name text;
+  v_phone text;
+begin
+  if p_merchant_id is null then
+    raise exception using errcode = '23502', message = 'merchant_required';
+  end if;
+
+  select * into v_selected
+  from public.merchants m
+  where m.id = p_merchant_id
+  limit 1;
+
+  if v_selected.id is null then
+    raise exception using
+      errcode = '23503',
+      message = 'merchant_not_found_for_order',
+      detail = jsonb_build_object('merchant_id', p_merchant_id)::text;
+  end if;
+
+  if lower(coalesce(v_selected.status, 'active')) in ('deleted','archived','blocked','suspended') then
+    raise exception using
+      errcode = '23514',
+      message = 'merchant_inactive_for_order',
+      detail = jsonb_build_object('merchant_id', v_selected.id, 'status', v_selected.status)::text;
+  end if;
+
+  if coalesce(public.dn_merchant_portal_link_count(v_selected.id), 0) > 0 then
+    return v_selected.id;
+  end if;
+
+  v_code := public.dn_normalized_merchant_identity(v_selected.merchant_code);
+  v_name := public.dn_normalized_merchant_identity(v_selected.trade_name);
+  v_phone := public.dn_merchant_phone_digits(v_selected.phone);
+
+  select coalesce(
+    array_agg(m.id order by m.updated_at desc nulls last, m.created_at desc nulls last, m.id),
+    '{}'::uuid[]
+  )
+  into v_candidates
+  from public.merchants m
+  where m.id <> v_selected.id
+    and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+    and coalesce(public.dn_merchant_portal_link_count(m.id), 0) > 0
+    and (
+      (v_code is not null and public.dn_normalized_merchant_identity(m.merchant_code) = v_code)
+      or (
+        v_code is null
+        and v_name is not null
+        and v_phone is not null
+        and public.dn_normalized_merchant_identity(m.trade_name) = v_name
+        and public.dn_merchant_phone_digits(m.phone) = v_phone
+      )
+    );
+
+  if cardinality(v_candidates) = 1 then
+    return v_candidates[1];
+  end if;
+
+  if cardinality(v_candidates) > 1 then
+    raise exception using
+      errcode = '23514',
+      message = 'merchant_portal_link_ambiguous',
+      detail = jsonb_build_object(
+        'selected_merchant_id', v_selected.id,
+        'candidate_ids', v_candidates
+      )::text,
+      hint = 'يوجد أكثر من حساب بوابة مطابق. وحّد سجل التاجر واربط مستخدمًا واحدًا قبل حفظ الطلب.';
+  end if;
+
+  raise exception using
+    errcode = '23514',
+    message = 'merchant_portal_account_not_linked',
+    detail = jsonb_build_object(
+      'merchant_id', v_selected.id,
+      'merchant_code', v_selected.merchant_code,
+      'merchant_name', v_selected.trade_name
+    )::text,
+    hint = 'اربط حساب دخول التاجر بهذا السجل أولًا. لم يتم حفظ الطلب حتى لا يختفي من بوابة التاجر.';
+end;
+$$;
+
+revoke all on function public.dn_merchant_portal_link_count(uuid) from public, anon, authenticated;
+revoke all on function public.dn_resolve_portal_merchant_uuid(uuid) from public, anon, authenticated;
+grant execute on function public.dn_merchant_portal_link_count(uuid) to service_role;
+grant execute on function public.dn_resolve_portal_merchant_uuid(uuid) to service_role;
+
+notify pgrst, 'reload schema';
+
+commit;
