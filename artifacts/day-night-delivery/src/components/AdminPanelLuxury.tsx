@@ -826,6 +826,7 @@ export default function AdminPanelLuxury() {
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminError, setAdminError] = useState("");
   const [ordersLoaded, setOrdersLoaded] = useState(false);
+  const [merchantOrderScopeId, setMerchantOrderScopeId] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -971,6 +972,7 @@ export default function AdminPanelLuxury() {
       return;
     }
 
+    if (id === "all_orders") setMerchantOrderScopeId("");
     setActive(id);
     setMobileMenu(false);
   }
@@ -1294,7 +1296,11 @@ export default function AdminPanelLuxury() {
           <div className="dn-admin-core-full">
             <AdminMerchantIntelligence
               isArabic={isArabic}
-              onSearchOrders={() => setSection("all_orders")}
+              onSearchOrders={(merchantId) => {
+                setMerchantOrderScopeId(String(merchantId || "").trim());
+                setActive("all_orders");
+                setMobileMenu(false);
+              }}
               onCreateOrder={() => setSection("new_order")}
             />
           </div>
@@ -1392,6 +1398,8 @@ export default function AdminPanelLuxury() {
           financeSummary={financeSummary}
           financeSummarySource={financeSummarySource}
           financeWarning={financeWarning}
+          initialMerchantId={active === "all_orders" ? merchantOrderScopeId : ""}
+          onClearMerchantScope={() => setMerchantOrderScopeId("")}
           onRefresh={refreshAdminData}
           onNavigate={(id) => {
             setActive(id as SectionId);

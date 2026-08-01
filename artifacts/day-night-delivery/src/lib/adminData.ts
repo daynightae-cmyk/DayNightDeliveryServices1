@@ -2,6 +2,10 @@ import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import {
+  resolveCanonicalMerchantForOrder,
+  verifySavedOrderMerchant,
+} from "./orderMerchantResolver";
 
 function clean(value?: unknown) {
   return String(value ?? "").trim();
@@ -171,38 +175,12 @@ export function calculateAdminOrderPrice(input: AdminOrderInput) {
   };
 }
 
-function buildLegacyAdminOrderPayload(payload: Record<string, unknown>) {
-  const legacy = { ...payload };
-  for (const key of [
-    "invoice_number",
-    "coupon_number",
-    "merchant_id",
-    "merchant_name",
-    "merchant_code",
-    "order_count",
-    "shipping_scope",
-    "destination_country",
-    "source_channel",
-    "package_description",
-    "source_domain",
-    "subtotal",
-    "base_price",
-    "total",
-    "total_price",
-    "amount",
-    "price",
-    "currency",
-    "status_history",
-  ]) {
-    delete legacy[key];
-  }
-  return legacy;
-}
-
 export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const merchant = input.merchant || null;
+  const selectedMerchant = input.merchant || ({ id: clean(input.merchant_id) } as Merchant);
+  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
+  const merchant = resolution.merchant;
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
   const pricing = calculateAdminOrderPrice({ ...input, order_count: count });
   const createdAt = new Date().toISOString();
@@ -261,22 +239,13 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: "Created from DAY NIGHT admin merchant operations hub" }],
   });
 
-  const rpcOrder = await callRpc<Order>("admin_create_coupon_order", { p_order: payload });
-  if (rpcOrder?.id || rpcOrder?.invoice_number) return rpcOrder;
-
-  for (const candidate of [payload, buildLegacyAdminOrderPayload(payload)]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(candidate)
-      .select("*")
-      .single();
-
-    if (!error && data) return data as Order;
-    if (error && !isMissingSchemaError(error)) throw new Error(error.message);
-    if (error) console.warn("Admin order insert fallback failed:", error.message);
-  }
-
-  throw new Error("Order could not be created. Confirm the admin SQL migration was applied and the signed-in user has admin/support role.");
+  const { data, error } = await supabase.rpc("admin_create_canonical_merchant_order", {
+    p_order: payload,
+  });
+  if (error) throw new Error(error.message);
+  const rpcOrder = (Array.isArray(data) ? data[0] : data) as Order | null;
+  if (!rpcOrder?.id) throw new Error("canonical_merchant_order_creation_returned_no_row");
+  return verifySavedOrderMerchant(rpcOrder, resolution.merchantId);
 }
 
 export type AdminStats = {

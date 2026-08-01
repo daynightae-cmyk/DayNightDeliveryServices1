@@ -55,8 +55,8 @@ export function adminStepUpRulePlugin(): Plugin {
       if (normalized.endsWith("/src/lib/adminOperationsData.ts")) {
         let code = replaceRequired(
           source,
-          'import { createPublicOrder, supabase } from "../supabase";',
-          'import { createPublicOrder, supabase } from "../supabase";\nimport { requireAdminStepUp } from "./adminStepUp";',
+          'import { supabase } from "../supabase";',
+          'import { supabase } from "../supabase";\nimport { requireAdminStepUp } from "./adminStepUp";',
           "admin operations import step-up",
         );
         code = replaceRequired(

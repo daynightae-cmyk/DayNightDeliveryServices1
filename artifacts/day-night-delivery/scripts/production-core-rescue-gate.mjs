@@ -49,8 +49,8 @@ reject(adminOrder, /localStorage|sessionStorage|Math\.random|mock order|demo ord
 const adminData = read("src/lib/adminOperationsData.ts");
 expect(adminData, /from\(["']merchants["']\)[\s\S]*insert/, "Merchant creation writes to the merchants table when RPC compatibility is needed");
 expect(adminData, /admin_create_merchant/, "Merchant creation uses the protected admin RPC");
-expect(adminData, /admin_create_coupon_order/, "Order creation uses the protected admin order RPC");
-expect(adminData, /from\(["']orders["']\)[\s\S]*insert/, "Order creation has a real database write fallback");
+expect(adminData, /admin_create_canonical_merchant_order/, "Order creation uses the canonical protected admin order RPC");
+reject(adminData, /\.from\(["']orders["']\)\s*\.insert/, "Order creation has no direct-insert fallback that can bypass canonical ownership");
 expect(adminData, /merchant_id:/, "Orders persist the merchant relationship");
 
 const financialAdminOrder = read("src/components/admin/AdminNewOrderComplete.tsx");
@@ -105,13 +105,15 @@ for (const operation of [
 reject(driverData, /Math\.random|mock driver|demo order/i, "Driver runtime contains no fake assignments or GPS generation");
 
 const merchantPortal = read("src/components/merchant/MerchantPortalCommandCenter.tsx");
+const merchantPortalPages = read("src/lib/merchantPortalOrders.ts");
 for (const operation of [
   "merchant_get_session_profile",
-  "merchant_portal_orders",
+  "fetchAllMerchantPortalOrders",
   "merchant_portal_business_center",
 ]) {
   expect(merchantPortal, new RegExp(operation), `Merchant portal uses ${operation}`);
 }
+expect(merchantPortalPages, /merchant_portal_orders_page/, "Merchant portal uses complete paginated exact-UUID order reads");
 reject(merchantPortal, /Math\.random|mock merchant|demo order/i, "Merchant command center contains no generated merchant/order data");
 
 if (failed) {

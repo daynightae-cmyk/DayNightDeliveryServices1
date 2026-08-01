@@ -191,7 +191,7 @@ export default function AdminMerchantIntelligence({
   onCreateOrder,
 }: {
   isArabic: boolean;
-  onSearchOrders: (term: string) => void;
+  onSearchOrders: (merchantId: string) => void;
   onCreateOrder: () => void;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -434,7 +434,7 @@ export default function AdminMerchantIntelligence({
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   <button type="button" onClick={() => onCreateOrder()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-3 text-xs font-black text-brand-deep transition hover:-translate-y-0.5"><PackagePlus className="h-4 w-4" />{isArabic ? "إضافة طلب لهذا التاجر" : "Create order"}</button>
-                  <button type="button" onClick={() => onSearchOrders(selected.merchant.merchant_code || selected.merchant.trade_name)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-sky/25 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky transition hover:-translate-y-0.5"><Eye className="h-4 w-4" />{isArabic ? "فتح طلباته" : "Open orders"}</button>
+                  <button type="button" onClick={() => onSearchOrders(selected.merchant.id)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-sky/25 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky transition hover:-translate-y-0.5"><Eye className="h-4 w-4" />{isArabic ? "فتح طلباته" : "Open orders"}</button>
                   <button type="button" onClick={() => copyCard(selected)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white transition hover:-translate-y-0.5"><Copy className="h-4 w-4" />{isArabic ? "نسخ البطاقة" : "Copy card"}</button>
                 </div>
 

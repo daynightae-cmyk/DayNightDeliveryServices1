@@ -8,6 +8,8 @@ import type { Merchant, Order, OrderStatusHistoryItem } from "../../types";
 import TrackingMap from "../tracking/TrackingMap";
 import { exportOrderPDF } from "../../lib/exportUtils";
 import { buildAdminCsv, buildAdminPdf } from "../../lib/adminPdfExport";
+import { fetchAllMerchantPortalOrders } from "../../lib/merchantPortalOrders";
+import { verifySavedOrderMerchant } from "../../lib/orderMerchantResolver";
 import { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "../../lib/exportLocalization";
 import {
   MerchantPortalShell,
@@ -358,20 +360,23 @@ export default function MerchantPortalCommandCenter() {
     if (!supabase) return; setLoading(true); setRefreshing(true); setDataError("");
     try {
       let profile = await supabase.rpc("merchant_get_session_profile");
-      let p = recordFrom(profile.data); let merchants = arrayFrom<MerchantRecord>(p.merchants);
-      if (!merchants.length) { const claim=await supabase.rpc("merchant_claim_approved_account"); if (claim.error && !/not_approved/i.test(claim.error.message)) throw claim.error; profile=await supabase.rpc("merchant_get_session_profile"); p=recordFrom(profile.data); merchants=arrayFrom<MerchantRecord>(p.merchants); }
       if (profile.error) throw profile.error;
+      let p = recordFrom(profile.data); let merchants = arrayFrom<MerchantRecord>(p.merchants);
+      if (!merchants.length) { const claim=await supabase.rpc("merchant_claim_approved_account"); if (claim.error && !/not_approved/i.test(claim.error.message)) throw claim.error; profile=await supabase.rpc("merchant_get_session_profile"); if(profile.error)throw profile.error;p=recordFrom(profile.data); merchants=arrayFrom<MerchantRecord>(p.merchants); }
+      if (merchants.length > 1) throw new Error("merchant_identity_ambiguous_multiple_uuid");
       setMerchantRows(merchants);
-      if (!merchants.length) { setRawOrders([]); return; }
-      const ordersResult=await supabase.rpc("merchant_portal_orders",{p_limit:250}); if(ordersResult.error) throw ordersResult.error; const op=recordFrom(ordersResult.data); const orders=arrayFrom<OrderRecord>(op.orders); setRawOrders(orders);
-      const center=await supabase.rpc("merchant_portal_business_center"); if(!center.error) setBusiness(recordFrom(center.data) as BusinessCenterPayload); else setBusiness({});
+      if (!merchants.length) throw new Error("merchant_profile_not_found");
+      const ordersResult=await fetchAllMerchantPortalOrders();
+      if (!merchants.some((item) => clean(item.id) === ordersResult.merchantId)) throw new Error("merchant_profile_order_owner_mismatch");
+      setRawOrders(ordersResult.orders as OrderRecord[]);
+      const center=await supabase.rpc("merchant_portal_business_center"); if(center.error) throw center.error; setBusiness(recordFrom(center.data) as BusinessCenterPayload);
       const now=new Date().toISOString(); setLastSync(now); setRealtime({state:"connected",lastSuccessfulSyncAt:now});
     } catch(error){setDataError(errorMessage(error,isArabic));setRealtime(current=>({state:navigator.onLine?"stale":"offline",lastSuccessfulSyncAt:current.lastSuccessfulSyncAt,messageAr:"تعذر تحديث البيانات الحية.",messageEn:"Live data refresh failed."}))}
     finally{setLoading(false);setRefreshing(false)}
   },[isArabic]);
 
   useEffect(()=>{if(user)void loadData(user);else{setMerchantRows([]);setRawOrders([]);setBusiness({});}},[user,loadData]);
-  useEffect(()=>{if(!supabase||!user||!merchantRows.length)return;const channel=supabase.channel(`merchant-command-${user.id}`).on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>void loadData(user)).on("postgres_changes",{event:"UPDATE",schema:"public",table:"merchants"},()=>void loadData(user)).subscribe(status=>setRealtime(current=>({state:status==="SUBSCRIBED"?"connected":status==="CHANNEL_ERROR"?"reconnecting":current.state,lastSuccessfulSyncAt:current.lastSuccessfulSyncAt})));return()=>{void supabase?.removeChannel(channel)}},[user,merchantRows.length,loadData]);
+  useEffect(()=>{const merchantId=clean(merchantRows[0]?.id);if(!supabase||!user||!merchantId)return;const channel=supabase.channel(`merchant-command-${user.id}`).on("postgres_changes",{event:"*",schema:"public",table:"orders",filter:`merchant_id=eq.${merchantId}`},()=>void loadData(user)).on("postgres_changes",{event:"UPDATE",schema:"public",table:"merchants",filter:`id=eq.${merchantId}`},()=>void loadData(user)).subscribe(status=>setRealtime(current=>({state:status==="SUBSCRIBED"?"connected":status==="CHANNEL_ERROR"?"reconnecting":current.state,lastSuccessfulSyncAt:current.lastSuccessfulSyncAt})));return()=>{void supabase?.removeChannel(channel)}},[user,merchantRows,loadData]);
   useEffect(()=>{const offline=()=>setRealtime(current=>({...current,state:"offline"}));const online=()=>{setRealtime(current=>({...current,state:"reconnecting"}));if(user)void loadData(user)};window.addEventListener("offline",offline);window.addEventListener("online",online);return()=>{window.removeEventListener("offline",offline);window.removeEventListener("online",online)}},[user,loadData]);
 
   async function passwordSignIn(event:FormEvent){event.preventDefault();if(!supabase)return;setAuthBusy(true);setAuthError("");const {error}=await supabase.auth.signInWithPassword({email:email.trim().toLowerCase(),password});if(error)setAuthError(errorMessage(error,isArabic));setAuthBusy(false)}
@@ -456,6 +461,7 @@ export default function MerchantPortalCommandCenter() {
       const row=recordFrom(created) as OrderRecord;
       const tracking=reference(row);
       if(!tracking)return{success:false,error:{code:"CREATE_UNCONFIRMED",message:isArabic?"أُرسل الطلب لكن لم يرجع النظام رقم تتبع موثوقاً.":"The order was submitted but no authoritative tracking number was returned."}};
+      try { await verifySavedOrderMerchant(row, merchant.id); } catch (ownershipError) { return{success:false,error:{code:"CREATE_OWNERSHIP_UNCONFIRMED",message:errorMessage(ownershipError,isArabic)}}; }
       await loadData(user);
       return{success:true,orderId:clean(row.id)||tracking,trackingNumber:tracking,invoiceNumber:clean(row.invoice_number),amount:orderAmount(row),currency:"AED",createdAt:clean(row.created_at)||new Date().toISOString()};
     },
