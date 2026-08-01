@@ -424,7 +424,7 @@ function systemOrderPrice(input: OpsOrderInput) {
   if (input.shipping_scope === "international") {
     const intl = calculateInternationalPrice({
       destination: clean(input.destination_country),
-      weight: Math.max(1, numberValue(input.weight, 1)),
+      weight: Number(input.weight),
     });
     return {
       unitPrice: intl.total,
@@ -505,7 +505,7 @@ function paymentMethodArabic(paymentMethod: string) {
 export function calculateMerchantStatementNet(input: OpsOrderInput) {
   const pricing = calculateOpsOrderPrice(input);
   const paymentMethod = clean(
-    input.payment_method || "merchant_pays",
+    input.payment_method,
   );
   const collectionAmount = collectionAmountForPayment(
     paymentMethod,
