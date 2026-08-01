@@ -24,6 +24,18 @@ adminData = adminData.replace(
 fs.writeFileSync(adminDataPath, adminData, "utf8");
 
 let source = fs.readFileSync(financialPath, "utf8");
+const alreadyHardened =
+  source.includes('import { resolveOrderMerchant } from "./merchantOrderOwnership";')
+  && source.includes("assertCompleteFinancialOrderInput")
+  && source.includes("saved_financial_order_verification_failed")
+  && source.includes("updated_order_merchant_portal_link_mismatch")
+  && !source.includes("export async function resolveOrderMerchant");
+
+if (alreadyHardened) {
+  console.log("Financial order merchant ownership hardening is already applied.");
+  process.exit(0);
+}
+
 if (!source.includes('import { resolveOrderMerchant } from "./merchantOrderOwnership";')) {
   source = source.replace(
     'import { createDayNightInvoiceNumber } from "./printableDocuments";',
@@ -35,12 +47,14 @@ source = source.replace(
   /export type MerchantPortalResolution = \{[\s\S]*?\n\};\n\n/,
   "",
 );
-source = replaceExactly(
-  source,
-  /function merchantPortalLinkError[\s\S]*?\n}\n\nexport async function resolveOrderMerchant[\s\S]*?\n}\n\n(?=async function recoverCouponConflict)/,
-  "",
-  "remove duplicated merchant resolver",
-);
+if (source.includes("export async function resolveOrderMerchant")) {
+  source = replaceExactly(
+    source,
+    /function merchantPortalLinkError[\s\S]*?\n}\n\nexport async function resolveOrderMerchant[\s\S]*?\n}\n\n(?=async function recoverCouponConflict)/,
+    "",
+    "remove duplicated merchant resolver",
+  );
+}
 
 const validator = `function assertCompleteFinancialOrderInput(
   input: FinancialOpsOrderInput,
@@ -72,15 +86,19 @@ const validator = `function assertCompleteFinancialOrderInput(
 }
 
 `;
-source = source.replace("function buildFinancialOrderPayload(\n", `${validator}function buildFinancialOrderPayload(\n`);
+if (!source.includes("function assertCompleteFinancialOrderInput")) {
+  const marker = "function buildFinancialOrderPayload(\n";
+  if (!source.includes(marker)) throw new Error("buildFinancialOrderPayload marker was not found");
+  source = source.replace(marker, `${validator}${marker}`);
+}
 
 source = source
-  .replace(/clean\(input\.destination_country \|\| input\.delivery_city \|\| "WORLD"\)/g, "clean(input.destination_country || input.delivery_city)")
-  .replace(/clean\(input\.delivery_city \|\| "Abu Dhabi"\)/g, "clean(input.delivery_city)")
-  .replace(/clean\(input\.pickup_city \|\| merchant\.emirate \|\| "Abu Dhabi"\)/g, "clean(input.pickup_city || merchant.emirate)")
-  .replace(/clean\(input\.package_description \|\| input\.package_type \|\| "Shipment"\)/g, "clean(input.package_description || input.package_type)")
-  .replace('clean(merchant.phone || "971568757331")', "clean(merchant.phone)")
-  .replace(/Math\.max\(0\.1, numberValue\(input\.weight, 1\)\)/g, "Number(input.weight)");
+  .replace(/clean\(input\.destination_country\s*\|\|\s*input\.delivery_city\s*\|\|\s*"WORLD"\)/g, "clean(input.destination_country || input.delivery_city)")
+  .replace(/clean\(input\.delivery_city\s*\|\|\s*"Abu Dhabi"\)/g, "clean(input.delivery_city)")
+  .replace(/clean\(input\.pickup_city\s*\|\|\s*merchant\.emirate\s*\|\|\s*"Abu Dhabi"\)/g, "clean(input.pickup_city || merchant.emirate)")
+  .replace(/clean\(input\.package_description\s*\|\|\s*input\.package_type\s*\|\|\s*"Shipment"\)/g, "clean(input.package_description || input.package_type)")
+  .replace(/clean\(merchant\.phone\s*\|\|\s*"971568757331"\)/g, "clean(merchant.phone)")
+  .replace(/Math\.max\(0\.1,\s*numberValue\(input\.weight,\s*1\)\)/g, "Number(input.weight)");
 
 source = source.replace(
   "  const merchant = await resolveOrderMerchant(selectedMerchant);\n\n  const existingConflict",
@@ -122,8 +140,10 @@ const newCreateTail = `  const returned = (Array.isArray(data) ? data[0] : data)
   }
   return { row: saved as Order, source: "rpc" };
 }`;
-if (!source.includes(oldCreateTail)) throw new Error("financial creation tail marker missing");
-source = source.replace(oldCreateTail, newCreateTail);
+if (!source.includes("saved_financial_order_verification_failed")) {
+  if (!source.includes(oldCreateTail)) throw new Error("financial creation tail marker missing");
+  source = source.replace(oldCreateTail, newCreateTail);
+}
 
 source = source.replace(
   '  const row = (Array.isArray(data) ? data[0] : data) as Order | null;\n  if (!row?.id) throw operationError(null, "financial_order_update_returned_no_row");\n  return { row, source: "rpc" };',
@@ -141,6 +161,9 @@ for (const forbidden of [
 }
 if (!source.includes("saved_financial_order_verification_failed")) {
   throw new Error("Financial post-save database verification missing");
+}
+if (!source.includes("updated_order_merchant_portal_link_mismatch")) {
+  throw new Error("Financial update merchant verification missing");
 }
 
 fs.writeFileSync(financialPath, source, "utf8");
