@@ -23,7 +23,9 @@ function assert(condition, message) {
 }
 
 const camera = read("src/components/shared/CouponPhotoIntake.tsx");
-const admin = read("src/components/admin/AdminNewOrderComplete.tsx");
+const adminWrapper = read("src/components/admin/AdminNewOrderComplete.tsx");
+const adminBase = read("src/components/admin/AdminNewOrderCompleteBase.tsx");
+const admin = `${adminWrapper}\n${adminBase}`;
 const publicRequest = read("src/components/RequestDelivery.tsx");
 const recognition = read("src/lib/couponImport.ts");
 const vercelPath = path.join(repoRoot, "vercel.json");
@@ -40,6 +42,7 @@ assert(camera.includes("BarcodeDetector") && camera.includes("LIVE_SCAN_INTERVAL
 assert(camera.includes("window.isSecureContext"), "Camera reports secure-context requirements instead of silently opening a file picker");
 assert(!camera.includes("cameraRef.current?.click()"), "Primary camera action no longer depends on a file input click");
 
+assert(adminWrapper.includes('from "./AdminNewOrderCompleteBase"'), "Admin new-order wrapper preserves the complete original order form");
 assert(admin.includes('from "../shared/CouponPhotoIntake"'), "Admin new-order flow uses the hardened shared camera");
 assert(publicRequest.includes('from "./shared/CouponPhotoIntake"'), "Public request flow uses the hardened shared camera");
 assert(recognition.includes('createWorker("eng+ara"'), "Recognition model loads Arabic and English OCR together");
