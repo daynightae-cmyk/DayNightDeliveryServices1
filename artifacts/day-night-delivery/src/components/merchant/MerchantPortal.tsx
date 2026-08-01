@@ -217,72 +217,6 @@ function portalErrorMessage(error: unknown, isArabic: boolean) {
   return isArabic ? "تعذر تحديث البيانات حالياً. حاول مرة أخرى أو تواصل مع الدعم." : "We could not update the data right now. Please retry or contact support.";
 }
 
-async function queryMerchantsBy(client: SupabaseClient, column: string, value: string, mode: "eq" | "ilike" = "eq") {
-  if (!value) return { rows: [] as MerchantRecord[], error: "" };
-  const query = client.from("merchants").select("*").limit(20);
-  const { data, error } = mode === "ilike" ? await query.ilike(column, value) : await query.eq(column, value);
-  return { rows: (data || []) as MerchantRecord[], error: error?.message || "" };
-}
-
-async function queryOrdersBy(client: SupabaseClient, column: string, value: string, mode: "eq" | "ilike" = "eq") {
-  if (!value) return { rows: [] as MerchantOrder[], error: "" };
-  const query = client.from("orders").select("*").order("created_at", { ascending: false }).limit(180);
-  const { data, error } = mode === "ilike" ? await query.ilike(column, value) : await query.eq(column, value);
-  return { rows: (data || []) as MerchantOrder[], error: error?.message || "" };
-}
-
-async function directMerchantLookup(client: SupabaseClient, user: User) {
-  const identity = userIdentity(user);
-  const rows: MerchantRecord[] = [];
-  const errors: string[] = [];
-
-  async function collect(column: string, value: string, mode: "eq" | "ilike" = "eq") {
-    const result = await queryMerchantsBy(client, column, value, mode);
-    rows.push(...result.rows);
-    if (result.error) errors.push(result.error);
-  }
-
-  if (identity.email) {
-    await collect("email", identity.email);
-    await collect("email", identity.email, "ilike");
-  }
-  if (identity.phone) {
-    await collect("phone", identity.phone);
-    await collect("alt_phone", identity.phone);
-  }
-
-  const fragments = Array.from(new Set([identity.phoneDigits, identity.phoneDigits.slice(-9), identity.phoneDigits.slice(-7)].filter((part) => part && part.length >= 7)));
-  for (const fragment of fragments) {
-    await collect("phone", `%${fragment}%`, "ilike");
-    await collect("alt_phone", `%${fragment}%`, "ilike");
-  }
-
-  return { rows: dedupeRows(rows, "merchant"), errors: Array.from(new Set(errors)) };
-}
-
-async function directOrderLookup(client: SupabaseClient, merchants: MerchantRecord[]) {
-  const rows: MerchantOrder[] = [];
-  const errors: string[] = [];
-
-  async function collect(column: string, value: string, mode: "eq" | "ilike" = "eq") {
-    const result = await queryOrdersBy(client, column, value, mode);
-    rows.push(...result.rows);
-    if (result.error) errors.push(result.error);
-  }
-
-  for (const merchant of merchants) {
-    const id = clean(merchant.id);
-    const code = clean(merchant.merchant_code);
-    const title = merchantTitle(merchant);
-    if (id) await collect("merchant_id", id);
-    if (code) await collect("merchant_code", code);
-    if (title) await collect("merchant_name", title);
-    if (title) await collect("merchant_name", `%${title}%`, "ilike");
-  }
-
-  return { rows: dedupeRows(rows, "order"), errors: Array.from(new Set(errors)) };
-}
-
 export default function MerchantPortal() {
   const { language } = useAppContext();
   const isArabic = language === "ar";
@@ -332,58 +266,68 @@ export default function MerchantPortal() {
     };
   }, []);
 
-  const loadMerchantData = useCallback(async (activeUser: User) => {
+  const loadMerchantData = useCallback(async (_activeUser: User) => {
     if (!supabase) return;
     setDataLoading(true);
     setDataError("");
     const client = supabase;
-    const errors: string[] = [];
-    let resolvedMerchants: MerchantRecord[] = [];
-    let resolvedOrders: MerchantOrder[] = [];
 
     try {
-      let merchantRpc = await client.rpc("merchant_get_session_profile");
-      if (!merchantRpc.error) {
-        const payload = merchantRpc.data as any;
-        if (Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
-      } else errors.push(merchantRpc.error.message);
+      let profileRpc = await client.rpc("merchant_get_session_profile");
+      if (profileRpc.error) throw new Error(profileRpc.error.message);
+      let profilePayload = profileRpc.data as { merchants?: MerchantRecord[] } | null;
+      let resolvedMerchants = Array.isArray(profilePayload?.merchants) ? profilePayload.merchants : [];
 
       if (!resolvedMerchants.length) {
         const claim = await client.rpc("merchant_claim_approved_account");
-        if (!claim.error) {
-          merchantRpc = await client.rpc("merchant_get_session_profile");
-          const payload = merchantRpc.data as any;
-          if (!merchantRpc.error && Array.isArray(payload?.merchants)) resolvedMerchants = payload.merchants as MerchantRecord[];
-        } else if (!/merchant_account_not_approved/i.test(claim.error.message)) errors.push(claim.error.message);
-      }
-
-      if (resolvedMerchants.length) {
-        const ordersRpc = await client.rpc("merchant_portal_orders", { p_limit: 180 });
-        if (!ordersRpc.error) {
-          const payload = ordersRpc.data as any;
-          if (Array.isArray(payload?.orders)) resolvedOrders = payload.orders as MerchantOrder[];
-        } else errors.push(ordersRpc.error.message);
-      }
-
-      if (!resolvedMerchants.length) {
-        const directMerchants = await directMerchantLookup(client, activeUser);
-        resolvedMerchants = directMerchants.rows;
-        errors.push(...directMerchants.errors);
-      }
-      if (resolvedMerchants.length && !resolvedOrders.length) {
-        const directOrders = await directOrderLookup(client, resolvedMerchants);
-        resolvedOrders = directOrders.rows;
-        errors.push(...directOrders.errors);
+        if (claim.error) throw new Error(claim.error.message);
+        profileRpc = await client.rpc("merchant_get_session_profile");
+        if (profileRpc.error) throw new Error(profileRpc.error.message);
+        profilePayload = profileRpc.data as { merchants?: MerchantRecord[] } | null;
+        resolvedMerchants = Array.isArray(profilePayload?.merchants) ? profilePayload.merchants : [];
       }
 
       resolvedMerchants = dedupeRows(resolvedMerchants, "merchant");
-      resolvedOrders = dedupeRows(resolvedOrders, "order").sort((a, b) => new Date(b.created_at || b.updated_at || 0).getTime() - new Date(a.created_at || a.updated_at || 0).getTime());
-      setMerchants(resolvedMerchants);
-      setOrders(resolvedOrders);
+      if (resolvedMerchants.length !== 1) {
+        throw new Error(resolvedMerchants.length === 0
+          ? "merchant_profile_not_found"
+          : "merchant_identity_ambiguous_contact_support");
+      }
 
-      const meaningfulErrors = Array.from(new Set(errors.filter(Boolean))).filter((message) => !/does not exist|schema cache/i.test(message));
-      if ((!resolvedMerchants.length || (resolvedMerchants.length && !resolvedOrders.length)) && meaningfulErrors.length) setDataError(portalErrorMessage(meaningfulErrors[0], isArabic));
+      const resolvedOrders: MerchantOrder[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const ordersRpc = await client.rpc("merchant_portal_orders_page", {
+          p_page: page,
+          p_page_size: 100,
+          p_search: null,
+          p_status: null,
+        });
+        if (ordersRpc.error) throw new Error(ordersRpc.error.message);
+        const payload = ordersRpc.data as {
+          merchant_id?: string;
+          page?: number;
+          total_pages?: number;
+          orders?: MerchantOrder[];
+        } | null;
+        if (clean(payload?.merchant_id) !== clean(resolvedMerchants[0]?.id)) {
+          throw new Error("merchant_portal_uuid_resolution_mismatch");
+        }
+        if (Array.isArray(payload?.orders)) resolvedOrders.push(...payload.orders);
+        totalPages = Math.max(0, Number(payload?.total_pages || 0));
+        page += 1;
+      } while (page <= totalPages);
+
+      setMerchants(resolvedMerchants);
+      setOrders(
+        dedupeRows(resolvedOrders, "order").sort(
+          (a, b) => new Date(b.created_at || b.updated_at || 0).getTime()
+            - new Date(a.created_at || a.updated_at || 0).getTime(),
+        ),
+      );
     } catch (error) {
+      // Preserve the last successful rows. A load failure must never become a false empty success.
       setDataError(portalErrorMessage(error, isArabic));
     } finally {
       setDataLoading(false);
