@@ -1,1 +1,1 @@
-export { default } from "./AdminNewOrderComplete";
+export { default } from "./AdminNewOrderCouponGuard";
