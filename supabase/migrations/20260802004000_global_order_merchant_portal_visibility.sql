@@ -19,18 +19,33 @@ stable
 security definer
 set search_path = public, auth, pg_temp
 as $$
-  select
-    (case when m.user_id is not null then 1 else 0 end)
-    + (
-      select count(*)::integer
-      from public.merchant_user_links l
-      where l.merchant_id = m.id
-        and l.active
-        and l.user_id is distinct from m.user_id
-    )
-  from public.merchants m
-  where m.id = p_merchant_id
-    and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended');
+  select count(*)::integer
+  from (
+    -- Active merchant_user_links always win in merchant_session_id().
+    select l.user_id
+    from public.merchant_user_links l
+    join public.merchants m on m.id = l.merchant_id
+    where l.merchant_id = p_merchant_id
+      and l.active
+      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+
+    union
+
+    -- A legacy merchants.user_id is reachable only when that user has no active
+    -- link to another merchant, because merchant_session_id() prioritizes links.
+    select m.user_id
+    from public.merchants m
+    where m.id = p_merchant_id
+      and m.user_id is not null
+      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+      and not exists (
+        select 1
+        from public.merchant_user_links l
+        where l.user_id = m.user_id
+          and l.active
+          and l.merchant_id <> m.id
+      )
+  ) effective_users;
 $$;
 
 create or replace function public.dn_resolve_portal_merchant_uuid(p_merchant_id uuid)
@@ -90,7 +105,8 @@ begin
     and (
       (v_code is not null and public.dn_normalized_merchant_identity(m.merchant_code) = v_code)
       or (
-        v_name is not null
+        v_code is null
+        and v_name is not null
         and v_phone is not null
         and public.dn_normalized_merchant_identity(m.trade_name) = v_name
         and public.dn_merchant_phone_digits(m.phone) = v_phone
