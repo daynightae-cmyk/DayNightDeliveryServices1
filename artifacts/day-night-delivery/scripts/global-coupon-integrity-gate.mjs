@@ -24,6 +24,48 @@ const workspace = fs.readFileSync(workspacePath, "utf8");
 const financialOperations = fs.readFileSync(financialOperationsPath, "utf8");
 const migration = fs.readFileSync(migrationPath, "utf8");
 
+function extractBalancedBlock(source, marker, label) {
+  const markerIndex = source.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `${label}: marker not found.`);
+
+  const openBraceIndex = source.indexOf("{", markerIndex);
+  assert.notEqual(openBraceIndex, -1, `${label}: opening brace not found.`);
+
+  let depth = 0;
+  for (let index = openBraceIndex; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) return source.slice(markerIndex, index + 1);
+  }
+
+  assert.fail(`${label}: closing brace not found.`);
+}
+
+const updateFinancialOperations = extractBalancedBlock(
+  financialOperations,
+  "export async function updateFinancialOpsOrder(",
+  "updateFinancialOpsOrder",
+);
+const updateCouponPreflightBlock = extractBalancedBlock(
+  updateFinancialOperations,
+  "if (couponChanged) {",
+  "update coupon preflight",
+);
+const updateErrorBlock = extractBalancedBlock(
+  updateFinancialOperations,
+  "if (error) {",
+  "update error block",
+);
+const updateCouponRecoveryBlock = extractBalancedBlock(
+  updateErrorBlock,
+  "if (couponChanged) {",
+  "update coupon recovery guard",
+);
+const updateErrorOutsideCouponRecovery = updateErrorBlock.replace(
+  updateCouponRecoveryBlock,
+  "",
+);
+
 assert.match(
   workspace,
   /"رقم التتبع"\s*:\s*"Tracking number"/,
@@ -76,22 +118,32 @@ assert.match(
   "Order entry must fail closed when the coupon integrity RPC is unavailable.",
 );
 assert.match(
-  financialOperations,
+  updateFinancialOperations,
   /normalizeCouponForComparison\(input\.coupon_number\)[\s\S]*normalizeCouponForComparison\(input\.order\.coupon_number\)/,
   "Coupon edits must compare normalized new and stored coupon identities.",
 );
 assert.match(
-  financialOperations,
-  /if \(couponChanged\) \{[\s\S]*findCouponConflict\(input\.coupon_number, excludeOrderId\)/,
-  "Update preflight must run only when the coupon identity changes.",
+  updateCouponPreflightBlock,
+  /findCouponConflict\(input\.coupon_number, excludeOrderId\)/,
+  "Update preflight must run inside the couponChanged guard.",
 );
 assert.match(
-  financialOperations,
-  /if \(error\) \{[\s\S]*if \(couponChanged\) \{[\s\S]*recoverCouponConflict\(input\.coupon_number, excludeOrderId\)/,
-  "Masked update errors must only be reclassified as duplicate coupons when the coupon changed.",
+  updateCouponRecoveryBlock,
+  /recoverCouponConflict\(input\.coupon_number, excludeOrderId\)/,
+  "Masked update errors must recover coupon conflicts inside the couponChanged guard.",
 );
 assert.doesNotMatch(
-  financialOperations,
+  updateErrorOutsideCouponRecovery,
+  /recoverCouponConflict\(/,
+  "Update error recovery must never classify an unchanged historical coupon as a duplicate.",
+);
+assert.match(
+  updateErrorBlock,
+  /throw operationError\(/,
+  "Non-coupon update errors must retain their normal operation error path.",
+);
+assert.doesNotMatch(
+  updateFinancialOperations,
   /const excludeOrderId = clean\(input\.order\.id\) \|\| null;\s*const existingConflict = await findCouponConflict/,
   "Historical duplicates must remain editable when their coupon number is unchanged.",
 );
