@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   diagnose:
-    name: Compare authenticated merchant session with stored order ownership
+    name: Compare authenticated merchant and admin sessions with stored orders
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production-runtime-tests
@@ -21,13 +21,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Diagnose production merchant ownership without writes
+      - name: Diagnose production ownership and RLS without writes
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
           RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -35,83 +37,109 @@ jobs:
           const root = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
           const anon = String(process.env.VITE_SUPABASE_ANON_KEY || '');
           const service = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
-          const email = String(process.env.RUNTIME_MERCHANT_EMAIL || '');
-          const password = String(process.env.RUNTIME_MERCHANT_PASSWORD || '');
-          for (const [name, value] of Object.entries({ root, anon, service, email, password })) {
+          const merchantEmail = String(process.env.RUNTIME_MERCHANT_EMAIL || '');
+          const merchantPassword = String(process.env.RUNTIME_MERCHANT_PASSWORD || '');
+          const adminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || '');
+          const adminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || '');
+          for (const [name, value] of Object.entries({ root, anon, service, merchantEmail, merchantPassword, adminEmail, adminPassword })) {
             if (!value) throw new Error(`missing_${name}`);
           }
 
-          const authResponse = await fetch(`${root}/auth/v1/token?grant_type=password`, {
-            method: 'POST',
-            headers: { apikey: anon, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-          });
-          const auth = await authResponse.json().catch(() => ({}));
-          if (!authResponse.ok || !auth.access_token || !auth.user?.id) {
-            throw new Error(`merchant_auth_failed_http_${authResponse.status}`);
-          }
-          console.log(`::add-mask::${auth.access_token}`);
-          const merchantHeaders = {
-            apikey: anon,
-            Authorization: `Bearer ${auth.access_token}`,
-            'Content-Type': 'application/json',
-          };
-          const serviceHeaders = {
-            apikey: service,
-            Authorization: `Bearer ${service}`,
-            'Content-Type': 'application/json',
-          };
-
-          async function rpc(name, body, headers = merchantHeaders) {
-            const response = await fetch(`${root}/rest/v1/rpc/${name}`, {
+          async function authenticate(email, password, label) {
+            const response = await fetch(`${root}/auth/v1/token?grant_type=password`, {
               method: 'POST',
-              headers,
-              body: JSON.stringify(body ?? {}),
+              headers: { apikey: anon, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password }),
             });
             const payload = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(`${name}_http_${response.status}_${JSON.stringify(payload)}`);
+            if (!response.ok || !payload.access_token || !payload.user?.id) {
+              throw new Error(`${label}_auth_failed_http_${response.status}`);
+            }
+            console.log(`::add-mask::${payload.access_token}`);
             return payload;
           }
 
-          async function table(path) {
-            const response = await fetch(`${root}/rest/v1/${path}`, { headers: serviceHeaders });
+          const merchantAuth = await authenticate(merchantEmail, merchantPassword, 'merchant');
+          const adminAuth = await authenticate(adminEmail, adminPassword, 'admin');
+          const headersFor = (token, key = anon) => ({
+            apikey: key,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          });
+          const merchantHeaders = headersFor(merchantAuth.access_token);
+          const adminHeaders = headersFor(adminAuth.access_token);
+          const serviceHeaders = headersFor(service, service);
+
+          async function rpc(name, body, headers) {
+            const response = await fetch(`${root}/rest/v1/rpc/${name}`, {
+              method: 'POST', headers, body: JSON.stringify(body ?? {}),
+            });
+            const payload = await response.json().catch(() => ({}));
+            return { ok: response.ok, status: response.status, payload };
+          }
+
+          async function table(path, headers = serviceHeaders, extraHeaders = {}) {
+            const response = await fetch(`${root}/rest/v1/${path}`, { headers: { ...headers, ...extraHeaders } });
             const payload = await response.json().catch(() => ([]));
-            if (!response.ok) throw new Error(`table_http_${response.status}_${JSON.stringify(payload)}`);
-            return payload;
+            return { ok: response.ok, status: response.status, payload, contentRange: response.headers.get('content-range') };
           }
 
-          const profile = await rpc('merchant_get_session_profile', {});
-          const portal = await rpc('merchant_portal_orders', { p_limit: 250 });
+          const profileResponse = await rpc('merchant_get_session_profile', {}, merchantHeaders);
+          const portalResponse = await rpc('merchant_portal_orders', { p_limit: 250 }, merchantHeaders);
+          if (!profileResponse.ok) throw new Error(`merchant_get_session_profile_http_${profileResponse.status}`);
+          if (!portalResponse.ok) throw new Error(`merchant_portal_orders_http_${portalResponse.status}`);
+          const profile = profileResponse.payload;
+          const portal = portalResponse.payload;
           const merchants = Array.isArray(profile?.merchants) ? profile.merchants : [];
           const portalOrders = Array.isArray(portal?.orders) ? portal.orders : [];
           const sessionMerchantIds = merchants.map((row) => String(row.id || '')).filter(Boolean);
 
-          const encodedUser = encodeURIComponent(auth.user.id);
-          const links = await table(`merchant_user_links?select=merchant_id,user_id,active,access_role&user_id=eq.${encodedUser}`);
+          const encodedMerchantUser = encodeURIComponent(merchantAuth.user.id);
+          const linksResponse = await table(`merchant_user_links?select=merchant_id,user_id,active,access_role&user_id=eq.${encodedMerchantUser}`);
+          if (!linksResponse.ok) throw new Error(`merchant_links_http_${linksResponse.status}`);
           const targetCoupons = ['010505', '010503', '003860'];
           const couponFilter = encodeURIComponent(`(${targetCoupons.join(',')})`);
-          const targetOrders = await table(`orders?select=id,coupon_number,merchant_id,merchant_name,merchant_code,source_channel,created_at&coupon_number=in.${couponFilter}&order=created_at.desc`);
-          const recentAdminOrders = await table('orders?select=id,coupon_number,merchant_id,merchant_name,merchant_code,source_channel,created_at&source_channel=eq.admin_financial_order&order=created_at.desc&limit=25');
-          const merchant1999 = await table('merchants?select=id,merchant_code,trade_name,owner_name,user_id,status,created_at,updated_at&or=(merchant_code.eq.1999,trade_name.eq.1999,owner_name.eq.1999)&order=updated_at.desc');
+          const targetOrdersResponse = await table(`orders?select=id,coupon_number,merchant_id,merchant_name,merchant_code,source_channel,created_at&coupon_number=in.${couponFilter}&order=created_at.desc`);
+          const recentAdminResponse = await table('orders?select=id,coupon_number,merchant_id,merchant_name,merchant_code,source_channel,created_at&source_channel=eq.admin_financial_order&order=created_at.desc&limit=25');
+          const merchant1999Response = await table('merchants?select=id,merchant_code,trade_name,owner_name,user_id,status,created_at,updated_at&or=(merchant_code.eq.1999,trade_name.eq.1999,owner_name.eq.1999)&order=updated_at.desc');
+
+          const adminOrdersResponse = await table(
+            'orders?select=id,coupon_number,merchant_id,merchant_name,created_at&order=created_at.desc&limit=5',
+            adminHeaders,
+            { Prefer: 'count=exact', Range: '0-4' },
+          );
+          const adminRoleResponse = await rpc('is_admin_or_support', {}, adminHeaders);
+          const encodedAdminUser = encodeURIComponent(adminAuth.user.id);
+          const adminProfileResponse = await table(
+            `profiles?select=id,role,status,email&or=(id.eq.${encodedAdminUser},user_id.eq.${encodedAdminUser})`,
+            serviceHeaders,
+          );
 
           const result = {
-            runtimeMerchantUser: String(auth.user.id).slice(0, 8),
-            sessionMerchantIds,
-            sessionMerchants: merchants.map((row) => ({
-              id: row.id,
-              merchant_code: row.merchant_code,
-              trade_name: row.trade_name,
-              owner_name: row.owner_name,
-              status: row.status,
-            })),
-            activeLinks: links.map((row) => ({ merchant_id: row.merchant_id, active: row.active, access_role: row.access_role })),
-            portalOrderCount: portalOrders.length,
-            portalCoupons: portalOrders.map((row) => row.coupon_number).filter(Boolean).slice(0, 50),
-            targetOrders,
-            merchant1999,
-            recentAdminOrders,
+            merchantSession: {
+              user: String(merchantAuth.user.id).slice(0, 8),
+              sessionMerchantIds,
+              merchants: merchants.map((row) => ({ id: row.id, merchant_code: row.merchant_code, trade_name: row.trade_name, owner_name: row.owner_name, status: row.status })),
+              activeLinks: Array.isArray(linksResponse.payload) ? linksResponse.payload.map((row) => ({ merchant_id: row.merchant_id, active: row.active, access_role: row.access_role })) : [],
+              portalOrderCount: portalOrders.length,
+              portalCoupons: portalOrders.map((row) => row.coupon_number).filter(Boolean).slice(0, 50),
+            },
+            adminSession: {
+              user: String(adminAuth.user.id).slice(0, 8),
+              jwtAppRole: adminAuth.user?.app_metadata?.role || null,
+              jwtUserRole: adminAuth.user?.user_metadata?.role || null,
+              isAdminOrSupportRpc: adminRoleResponse,
+              ordersHttp: adminOrdersResponse.status,
+              ordersContentRange: adminOrdersResponse.contentRange,
+              visibleOrders: Array.isArray(adminOrdersResponse.payload) ? adminOrdersResponse.payload : adminOrdersResponse.payload,
+              profileRows: adminProfileResponse.payload,
+            },
+            targetOrders: targetOrdersResponse.payload,
+            merchant1999: merchant1999Response.payload,
+            recentAdminOrders: recentAdminResponse.payload,
           };
           console.log(JSON.stringify(result, null, 2));
 
           if (!sessionMerchantIds.length) process.exitCode = 2;
+          if (!adminOrdersResponse.ok) process.exitCode = 3;
           NODE
