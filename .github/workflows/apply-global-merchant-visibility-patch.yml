@@ -1,0 +1,44 @@
+name: Apply Global Merchant Visibility Patch
+
+on:
+  push:
+    branches:
+      - fix/global-merchant-order-visibility-20260802
+    paths:
+      - .github/workflows/apply-global-merchant-visibility-patch.yml
+      - .github/scripts/apply-global-merchant-visibility-patch.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout patch branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/global-merchant-order-visibility-20260802
+          fetch-depth: 0
+
+      - name: Apply deterministic source patch
+        run: node .github/scripts/apply-global-merchant-visibility-patch.mjs
+
+      - name: Commit generated source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "daynightae-cmyk"
+          git config user.email "daynightae-cmyk@users.noreply.github.com"
+          git add \
+            artifacts/day-night-delivery/src/lib/adminData.ts \
+            artifacts/day-night-delivery/src/components/AdminPanelLuxury.tsx \
+            artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts
+          if git diff --cached --quiet; then
+            echo "Source patch already applied."
+            exit 0
+          fi
+          git commit -m "Fix global merchant order visibility and false zero states"
+          git push origin HEAD:fix/global-merchant-order-visibility-20260802
