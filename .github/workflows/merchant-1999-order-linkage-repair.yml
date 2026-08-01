@@ -129,13 +129,17 @@ jobs:
           }
           const orders = Array.isArray(payload.orders) ? payload.orders : [];
           for (const order of orders) {
-            console.log(`${order.coupon_number}: portal_visible=${order.portal_visible_by_exact_uuid === true}`);
+            console.log(`${order.coupon_number}: portal_visible=${order.portal_visible_by_exact_uuid === true}; canonical_1999=${order.linked_to_canonical_merchant_1999 === true}`);
           }
-          if (payload.ok !== true || payload.orders_found !== 3 || payload.orders_linked_to_authenticated_merchant !== 3) {
-            console.error('Merchant linkage acceptance failed.');
+          if (
+            payload.ok !== true ||
+            payload.orders_found !== 3 ||
+            payload.orders_linked_to_canonical_merchant_1999 !== 3
+          ) {
+            console.error('Merchant 1999 canonical linkage acceptance failed.');
             process.exit(1);
           }
-          console.log('PASS: coupons 010505, 010503, and 003860 are linked to the authenticated Merchant 1999 row.');
+          console.log('PASS: coupons 010505, 010503, and 003860 belong to the canonical authenticated Merchant 1999 row.');
           NODE
 
       - name: Publish safe result summary
@@ -146,6 +150,7 @@ jobs:
             echo
             echo '- Target coupons: `010505`, `010503`, `003860`'
             echo '- Ownership remains strict exact UUID isolation.'
+            echo '- Direct user links and active merchant_user_links are both supported.'
+            echo '- Dependent COD, statement, settlement, and ledger ownership is aligned without changing amounts.'
             echo '- No orders, merchants, receiver data, statuses, or financial values are deleted.'
-            echo '- Verification requires all three orders to be linked to an authenticated merchant row.'
           } >> "$GITHUB_STEP_SUMMARY"
