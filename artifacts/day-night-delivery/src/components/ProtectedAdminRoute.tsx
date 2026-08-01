@@ -24,7 +24,16 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
           return;
         }
 
-        const { data, error } = await supabase.auth.getUser();
+        let { data, error } = await supabase.auth.getUser();
+
+        if (error || !data.user?.id) {
+          const refreshed = await supabase.auth.refreshSession();
+          if (!refreshed.error) {
+            const retried = await supabase.auth.getUser();
+            data = retried.data;
+            error = retried.error;
+          }
+        }
 
         if (error || !data.user?.id) {
           clearAdminStepUp();
@@ -32,7 +41,11 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
           return;
         }
 
-        const allowed = await isAdminUser(data.user.id);
+        const [profileAllowed, databaseRole] = await Promise.all([
+          isAdminUser(data.user.id),
+          supabase.rpc("is_admin_or_support"),
+        ]);
+        const allowed = profileAllowed && !databaseRole.error && databaseRole.data === true;
 
         if (active) {
           if (!allowed) clearAdminStepUp(data.user.id);
