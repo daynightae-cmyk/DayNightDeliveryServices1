@@ -42,3 +42,5 @@ jobs:
           fi
           git commit -m "Fix global merchant order visibility and false zero states"
           git push origin HEAD:fix/global-merchant-order-visibility-20260802
+
+# Trigger revision: 2026-08-02T00:36+04:00
