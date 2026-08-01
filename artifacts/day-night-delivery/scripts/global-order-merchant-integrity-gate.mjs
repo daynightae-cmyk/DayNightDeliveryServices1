@@ -51,9 +51,12 @@ assert.doesNotMatch(portal, /merchant_portal_orders["']\s*,\s*\{p_limit:250\}/);
 
 for (const token of [
   "dn_order_merchant_dry_run_live",
+  "dn_merchant_identity_dry_run_live",
   "admin_run_order_merchant_dry_run",
   "admin_review_order_merchant_dry_run",
+  "admin_apply_safe_merchant_portal_links",
   "admin_apply_order_merchant_safe_backfill",
+  "admin_apply_safe_missing_financial_dependencies",
   "AUTO_REPAIR_SAFE",
   "MANUAL_REVIEW",
   "SECURITY_CONFLICT",
@@ -61,6 +64,8 @@ for (const token of [
   "MISSING_PORTAL_LINK",
   "order_merchant_audit_snapshot",
   "order_merchant_repair_audit",
+  "merchant_link_repair_audit",
+  "order_merchant_financial_repair_audit",
   "financial_integrity_changed_backfill_rolled_back",
   "non_ownership_order_data_changed_backfill_rolled_back",
   "orders_merchant_id_legal_fk",
@@ -71,6 +76,9 @@ assert.match(migration, /lock table public\.orders in share row exclusive mode/i
 assert.match(migration, /perform set_config\('daynight\.order_merchant_reconciliation', 'backfill', true\)/i);
 assert.match(migration, /old\.coupon_number|coupon_number is distinct from/i);
 assert.match(migration, /old\.status|status is distinct from/i);
+assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL/);
+assert.match(migration, /MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT/);
+assert.match(migration, /order_financial_values_changed_financial_repair_rolled_back/);
 assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/gim);
 assert.doesNotMatch(migration, /\bon delete cascade\b/i);
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");

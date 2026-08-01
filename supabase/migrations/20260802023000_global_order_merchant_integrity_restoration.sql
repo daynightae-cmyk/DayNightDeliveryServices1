@@ -472,6 +472,54 @@ create table if not exists public.order_merchant_repair_audit (
   unique (run_id, order_id)
 );
 
+create table if not exists public.merchant_identity_audit_snapshot (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references public.order_merchant_audit_runs(id),
+  merchant_id uuid not null references public.merchants(id),
+  merchant_code text,
+  official_name text,
+  phone text,
+  email text,
+  status text,
+  current_portal_user_ids uuid[] not null default '{}',
+  candidate_portal_user_id uuid,
+  classification text not null,
+  resolution_evidence text not null,
+  confidence integer not null default 0,
+  auto_repair_safe boolean not null default false,
+  linked_order_count bigint not null default 0,
+  captured_at timestamptz not null default now(),
+  unique (run_id, merchant_id)
+);
+
+create table if not exists public.merchant_link_repair_audit (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references public.order_merchant_audit_runs(id),
+  merchant_id uuid not null references public.merchants(id),
+  user_id uuid not null,
+  resolution_evidence text not null,
+  migration_version text not null,
+  executed_by uuid,
+  executed_at timestamptz not null default now(),
+  unique (run_id, merchant_id),
+  unique (run_id, user_id)
+);
+
+create table if not exists public.order_merchant_financial_repair_audit (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references public.order_merchant_audit_runs(id),
+  order_id uuid not null references public.orders(id),
+  dependency_table text not null,
+  dependency_key text not null,
+  inserted_row_id text not null,
+  resolution_evidence text not null,
+  financial_values jsonb not null,
+  migration_version text not null,
+  executed_by uuid,
+  executed_at timestamptz not null default now(),
+  unique (run_id, order_id, dependency_table, dependency_key)
+);
+
 alter table public.order_merchant_repair_audit
   add column if not exists operation_type text not null default 'BACKFILL';
 
@@ -481,6 +529,9 @@ alter table public.order_merchant_audit_snapshot
 alter table public.order_merchant_audit_runs enable row level security;
 alter table public.order_merchant_audit_snapshot enable row level security;
 alter table public.order_merchant_repair_audit enable row level security;
+alter table public.merchant_identity_audit_snapshot enable row level security;
+alter table public.merchant_link_repair_audit enable row level security;
+alter table public.order_merchant_financial_repair_audit enable row level security;
 
 drop policy if exists order_merchant_audit_runs_admin_select on public.order_merchant_audit_runs;
 create policy order_merchant_audit_runs_admin_select on public.order_merchant_audit_runs
@@ -490,6 +541,15 @@ create policy order_merchant_audit_snapshot_admin_select on public.order_merchan
 for select to authenticated using (public.is_admin_or_support());
 drop policy if exists order_merchant_repair_audit_admin_select on public.order_merchant_repair_audit;
 create policy order_merchant_repair_audit_admin_select on public.order_merchant_repair_audit
+for select to authenticated using (public.is_admin_or_support());
+drop policy if exists merchant_identity_audit_snapshot_admin_select on public.merchant_identity_audit_snapshot;
+create policy merchant_identity_audit_snapshot_admin_select on public.merchant_identity_audit_snapshot
+for select to authenticated using (public.is_admin_or_support());
+drop policy if exists merchant_link_repair_audit_admin_select on public.merchant_link_repair_audit;
+create policy merchant_link_repair_audit_admin_select on public.merchant_link_repair_audit
+for select to authenticated using (public.is_admin_or_support());
+drop policy if exists order_merchant_financial_repair_audit_admin_select on public.order_merchant_financial_repair_audit;
+create policy order_merchant_financial_repair_audit_admin_select on public.order_merchant_financial_repair_audit
 for select to authenticated using (public.is_admin_or_support());
 
 -- Hash every non-ownership value in financial/operational dependent tables. The
@@ -511,6 +571,7 @@ begin
   foreach v_table in array array[
     'cod_collections',
     'merchant_statement_entries',
+    'driver_statement_entries',
     'order_financial_settlements',
     'financial_account_entries',
     'merchant_invoices',
@@ -535,6 +596,68 @@ begin
   end loop;
   return v_result;
 end;
+$$;
+
+create or replace function public.dn_missing_financial_dependencies_snapshot()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with delivered as (
+    select o.*
+    from public.orders o
+    where lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
+      in ('delivered','completed','complete')
+  )
+  select jsonb_build_object(
+    'delivered_orders', (select count(*) from delivered),
+    'missing_settlements', (
+      select count(*) from delivered o
+      where not exists (
+        select 1 from public.order_financial_settlements s where s.order_id = o.id::text
+      )
+    ),
+    'missing_merchant_accounts', (
+      select count(*) from delivered o
+      where o.merchant_id is not null
+        and not exists (
+          select 1 from public.financial_account_entries e
+          where e.order_id = o.id::text
+            and e.account_type = 'merchant'
+            and e.entry_type = 'delivered_order_settlement'
+        )
+    ),
+    'missing_company_accounts', (
+      select count(*) from delivered o
+      where not exists (
+        select 1 from public.financial_account_entries e
+        where e.order_id = o.id::text
+          and e.account_type = 'company'
+          and e.entry_type = 'delivered_order_settlement'
+      )
+    ),
+    'missing_cod', (
+      select count(*) from delivered o
+      where lower(coalesce(o.payment_method::text, '')) = 'cod'
+        and coalesce(o.customer_total, 0) > 0
+        and not exists (select 1 from public.cod_collections c where c.order_id = o.id)
+    ),
+    'missing_merchant_statements', (
+      select count(*) from delivered o
+      where o.merchant_id is not null
+        and not exists (select 1 from public.merchant_statement_entries m where m.order_id = o.id)
+    ),
+    'missing_driver_statements', (
+      select count(*) from delivered o
+      where public.dn_safe_uuid(coalesce(
+        nullif(to_jsonb(o)->>'assigned_driver_id', ''),
+        nullif(to_jsonb(o)->>'driver_id', '')
+      )) is not null
+        and not exists (select 1 from public.driver_statement_entries d where d.order_id = o.id)
+    )
+  );
 $$;
 
 create or replace function public.dn_financial_integrity_snapshot()
@@ -582,6 +705,7 @@ as $$
     'manual_delivery_price', t.manual_delivery_price,
     'financial_posted_count', t.financial_posted_count,
     'status_counts', s.value,
+    'missing_dependencies', public.dn_missing_financial_dependencies_snapshot(),
     'dependent_tables', public.dn_financial_dependency_integrity_snapshot()
   )
   from totals t cross join statuses s;
@@ -685,6 +809,7 @@ declare
 begin
   foreach v_table in array array[
     'orders', 'merchants', 'merchant_user_links', 'merchant_statement_entries',
+    'driver_statement_entries',
     'cod_collections', 'financial_account_entries', 'order_financial_settlements',
     'invoices', 'merchant_invoices', 'order_status_history'
   ]
@@ -717,6 +842,113 @@ begin
   );
 end;
 $$;
+
+-- Merchant account reconciliation is intentionally stricter than order display
+-- reconciliation.  A portal link can only be proposed from one exact, confirmed
+-- Auth email which is not already owned by another merchant and does not declare
+-- an administrative, support, or driver role.  Names and phone numbers are never
+-- used as account ownership evidence.
+create or replace view public.dn_merchant_identity_dry_run_live as
+with merchant_base as (
+  select
+    m.id as merchant_id,
+    m.merchant_code,
+    m.trade_name as official_name,
+    m.phone,
+    m.email,
+    m.status,
+    lower(nullif(btrim(m.email), '')) as normalized_email,
+    public.dn_effective_portal_user_ids(m.id) as current_portal_user_ids,
+    (
+      select count(*)::bigint
+      from public.orders o
+      where o.merchant_id = m.id
+    ) as linked_order_count,
+    (
+      select count(*)::integer
+      from public.merchants duplicate_merchant
+      where duplicate_merchant.id <> m.id
+        and lower(nullif(btrim(duplicate_merchant.email), '')) = lower(nullif(btrim(m.email), ''))
+        and lower(coalesce(duplicate_merchant.status, 'active'))
+            not in ('deleted','archived','blocked','suspended')
+    ) as duplicate_active_merchant_email_count
+  from public.merchants m
+), auth_candidates as (
+  select
+    b.*,
+    coalesce(c.candidate_user_ids, '{}'::uuid[]) as candidate_user_ids,
+    cardinality(coalesce(c.candidate_user_ids, '{}'::uuid[])) as candidate_count
+  from merchant_base b
+  cross join lateral (
+    select array_agg(u.id order by u.id) as candidate_user_ids
+    from auth.users u
+    where b.normalized_email is not null
+      and lower(nullif(btrim(u.email), '')) = b.normalized_email
+      and u.email_confirmed_at is not null
+      and lower(coalesce(
+        u.raw_app_meta_data ->> 'role',
+        u.raw_user_meta_data ->> 'role',
+        ''
+      )) not in ('admin','support','driver')
+      and not exists (
+        select 1
+        from public.merchant_user_links l
+        where l.user_id = u.id
+          and l.active
+          and l.merchant_id <> b.merchant_id
+      )
+      and not exists (
+        select 1
+        from public.merchants other_merchant
+        where other_merchant.id <> b.merchant_id
+          and other_merchant.user_id = u.id
+          and lower(coalesce(other_merchant.status, 'active'))
+              not in ('deleted','archived','blocked','suspended')
+      )
+  ) c
+), classified as (
+  select
+    a.*,
+    case
+      when cardinality(a.current_portal_user_ids) > 0 then 'ALREADY_CORRECT'
+      when lower(coalesce(a.status, 'active')) in ('deleted','archived','blocked','suspended')
+        then 'MISSING_PORTAL_LINK'
+      when a.duplicate_active_merchant_email_count > 0 then 'SECURITY_CONFLICT'
+      when a.candidate_count > 1 then 'SECURITY_CONFLICT'
+      when a.candidate_count = 1 then 'AUTO_REPAIR_SAFE'
+      else 'MISSING_PORTAL_LINK'
+    end as classification
+  from auth_candidates a
+)
+select
+  c.merchant_id,
+  c.merchant_code,
+  c.official_name,
+  c.phone,
+  c.email,
+  c.status,
+  c.current_portal_user_ids,
+  case when c.classification = 'AUTO_REPAIR_SAFE' then c.candidate_user_ids[1] end
+    as candidate_portal_user_id,
+  c.classification,
+  case
+    when c.classification = 'ALREADY_CORRECT' then 'EXPLICIT_EFFECTIVE_PORTAL_RELATION'
+    when c.classification = 'AUTO_REPAIR_SAFE' then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+    when c.classification = 'SECURITY_CONFLICT' and c.duplicate_active_merchant_email_count > 0
+      then 'EMAIL_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS'
+    when c.classification = 'SECURITY_CONFLICT' then 'MULTIPLE_EXACT_CONFIRMED_AUTH_USERS'
+    when lower(coalesce(c.status, 'active')) in ('deleted','archived','blocked','suspended')
+      then 'INACTIVE_MERCHANT_NOT_AUTO_LINKED'
+    when c.normalized_email is null then 'MERCHANT_EMAIL_MISSING'
+    else 'NO_EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+  end as resolution_evidence,
+  case
+    when c.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE') then 100
+    else 0
+  end as confidence,
+  c.classification = 'AUTO_REPAIR_SAFE' as auto_repair_safe,
+  c.linked_order_count
+from classified c;
 
 create or replace view public.dn_order_merchant_dry_run_live as
 with base as (
@@ -981,6 +1213,39 @@ begin
   from public.dn_order_merchant_dry_run_live d
   join public.orders o on o.id = d.order_id;
 
+  insert into public.merchant_identity_audit_snapshot (
+    run_id,
+    merchant_id,
+    merchant_code,
+    official_name,
+    phone,
+    email,
+    status,
+    current_portal_user_ids,
+    candidate_portal_user_id,
+    classification,
+    resolution_evidence,
+    confidence,
+    auto_repair_safe,
+    linked_order_count
+  )
+  select
+    v_run_id,
+    d.merchant_id,
+    d.merchant_code,
+    d.official_name,
+    d.phone,
+    d.email,
+    d.status,
+    d.current_portal_user_ids,
+    d.candidate_portal_user_id,
+    d.classification,
+    d.resolution_evidence,
+    d.confidence,
+    d.auto_repair_safe,
+    d.linked_order_count
+  from public.dn_merchant_identity_dry_run_live d;
+
   select jsonb_build_object(
     'total_orders', count(*),
     'classification_counts', coalesce((
@@ -1057,8 +1322,28 @@ begin
     'conflicting_user_links', (
       select count(*)
       from public.merchant_user_links l
-      join public.merchants m on m.user_id = l.user_id
-      where l.active and l.merchant_id <> m.id
+      where l.active
+        and exists (
+          select 1
+          from public.merchants m
+          where m.user_id = l.user_id
+            and m.id <> l.merchant_id
+        )
+    ),
+    'identity_classification_counts', coalesce((
+      select jsonb_object_agg(classification, row_count)
+      from (
+        select classification, count(*)::bigint as row_count
+        from public.merchant_identity_audit_snapshot
+        where run_id = v_run_id
+        group by classification
+        order by classification
+      ) identity_counts
+    ), '{}'::jsonb),
+    'safe_portal_links_proposed', (
+      select count(*)
+      from public.merchant_identity_audit_snapshot
+      where run_id = v_run_id and auto_repair_safe
     ),
     'count_matrix', coalesce((
       select jsonb_agg(to_jsonb(matrix) order by merchant_code nulls last, merchant_id)
@@ -1122,6 +1407,22 @@ begin
     raise exception 'dry_run_contains_unsafe_auto_repair_rows';
   end if;
 
+  select count(*) into v_bad
+  from public.merchant_identity_audit_snapshot
+  where run_id = p_run_id
+    and auto_repair_safe
+    and (
+      classification <> 'AUTO_REPAIR_SAFE'
+      or candidate_portal_user_id is null
+      or confidence <> 100
+      or resolution_evidence <> 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+      or cardinality(current_portal_user_ids) <> 0
+    );
+
+  if v_bad > 0 then
+    raise exception 'dry_run_contains_unsafe_merchant_link_rows';
+  end if;
+
   update public.order_merchant_audit_runs
   set status = 'DRY_RUN_REVIEWED', reviewed_at = now()
   where id = p_run_id;
@@ -1134,7 +1435,188 @@ begin
       select count(*) from public.order_merchant_audit_snapshot
       where run_id = p_run_id and auto_repair_safe
     ),
+    'auto_repair_safe_merchant_links', (
+      select count(*) from public.merchant_identity_audit_snapshot
+      where run_id = p_run_id and auto_repair_safe
+    ),
     'orders_modified', 0
+  );
+end;
+$$;
+
+create or replace function public.admin_apply_safe_merchant_portal_links(
+  p_run_id uuid,
+  p_confirm boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_run public.order_merchant_audit_runs%rowtype;
+  v_snapshot public.merchant_identity_audit_snapshot%rowtype;
+  v_merchant public.merchants%rowtype;
+  v_candidate_ids uuid[];
+  v_existing_user_id uuid;
+  v_inserted integer := 0;
+  v_already_applied integer := 0;
+begin
+  if not p_confirm then raise exception 'explicit_merchant_link_confirmation_required'; end if;
+  if auth.role() <> 'service_role'
+     and (auth.uid() is null or not public.is_admin_or_support()) then
+    raise exception 'not_authorized';
+  end if;
+
+  select * into v_run
+  from public.order_merchant_audit_runs
+  where id = p_run_id
+  for update;
+
+  if v_run.id is null or v_run.status <> 'DRY_RUN_REVIEWED' then
+    raise exception 'reviewed_dry_run_required';
+  end if;
+
+  lock table public.merchants in share row exclusive mode;
+  lock table public.merchant_user_links in share row exclusive mode;
+
+  for v_snapshot in
+    select *
+    from public.merchant_identity_audit_snapshot
+    where run_id = p_run_id
+      and auto_repair_safe
+    order by merchant_id
+  loop
+    if v_snapshot.classification <> 'AUTO_REPAIR_SAFE'
+       or v_snapshot.candidate_portal_user_id is null
+       or v_snapshot.confidence <> 100
+       or v_snapshot.resolution_evidence <> 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+       or cardinality(v_snapshot.current_portal_user_ids) <> 0 then
+      raise exception 'unsafe_merchant_link_snapshot_row_aborted';
+    end if;
+
+    select user_id into v_existing_user_id
+    from public.merchant_link_repair_audit
+    where run_id = p_run_id
+      and merchant_id = v_snapshot.merchant_id;
+
+    if v_existing_user_id is not null then
+      if v_existing_user_id is distinct from v_snapshot.candidate_portal_user_id
+         or not exists (
+           select 1 from public.merchant_user_links l
+           where l.merchant_id = v_snapshot.merchant_id
+             and l.user_id = v_existing_user_id
+             and l.active
+         ) then
+        raise exception 'previous_merchant_link_application_no_longer_matches';
+      end if;
+      v_already_applied := v_already_applied + 1;
+      continue;
+    end if;
+
+    select * into v_merchant
+    from public.merchants
+    where id = v_snapshot.merchant_id
+    for update;
+
+    if v_merchant.id is null
+       or v_merchant.merchant_code is distinct from v_snapshot.merchant_code
+       or v_merchant.trade_name is distinct from v_snapshot.official_name
+       or v_merchant.phone is distinct from v_snapshot.phone
+       or v_merchant.email is distinct from v_snapshot.email
+       or v_merchant.status is distinct from v_snapshot.status
+       or lower(coalesce(v_merchant.status, 'active')) in ('deleted','archived','blocked','suspended')
+       or cardinality(public.dn_effective_portal_user_ids(v_merchant.id)) <> 0 then
+      raise exception using
+        errcode = '40001',
+        message = 'merchant_changed_since_dry_run',
+        detail = jsonb_build_object('merchant_id', v_snapshot.merchant_id)::text;
+    end if;
+
+    if nullif(btrim(v_merchant.email), '') is null
+       or exists (
+         select 1
+         from public.merchants duplicate_merchant
+         where duplicate_merchant.id <> v_merchant.id
+           and lower(nullif(btrim(duplicate_merchant.email), ''))
+               = lower(nullif(btrim(v_merchant.email), ''))
+           and lower(coalesce(duplicate_merchant.status, 'active'))
+               not in ('deleted','archived','blocked','suspended')
+       ) then
+      raise exception 'merchant_email_evidence_missing_or_duplicated';
+    end if;
+
+    select coalesce(array_agg(u.id order by u.id), '{}'::uuid[])
+    into v_candidate_ids
+    from auth.users u
+    where lower(nullif(btrim(u.email), '')) = lower(nullif(btrim(v_merchant.email), ''))
+      and u.email_confirmed_at is not null
+      and lower(coalesce(
+        u.raw_app_meta_data ->> 'role',
+        u.raw_user_meta_data ->> 'role',
+        ''
+      )) not in ('admin','support','driver')
+      and not exists (
+        select 1
+        from public.merchant_user_links l
+        where l.user_id = u.id
+          and l.active
+          and l.merchant_id <> v_merchant.id
+      )
+      and not exists (
+        select 1
+        from public.merchants other_merchant
+        where other_merchant.id <> v_merchant.id
+          and other_merchant.user_id = u.id
+          and lower(coalesce(other_merchant.status, 'active'))
+              not in ('deleted','archived','blocked','suspended')
+      );
+
+    if cardinality(v_candidate_ids) <> 1
+       or v_candidate_ids[1] is distinct from v_snapshot.candidate_portal_user_id then
+      raise exception using
+        errcode = '23514',
+        message = 'auth_identity_evidence_changed_or_ambiguous',
+        detail = jsonb_build_object(
+          'merchant_id', v_snapshot.merchant_id,
+          'candidate_count', cardinality(v_candidate_ids)
+        )::text;
+    end if;
+
+    insert into public.merchant_user_links (
+      merchant_id, user_id, access_role, active
+    ) values (
+      v_merchant.id, v_candidate_ids[1], 'owner', true
+    );
+
+    insert into public.merchant_link_repair_audit (
+      run_id,
+      merchant_id,
+      user_id,
+      resolution_evidence,
+      migration_version,
+      executed_by
+    ) values (
+      p_run_id,
+      v_merchant.id,
+      v_candidate_ids[1],
+      v_snapshot.resolution_evidence,
+      v_run.migration_version,
+      auth.uid()
+    );
+    v_inserted := v_inserted + 1;
+  end loop;
+
+  return jsonb_build_object(
+    'ok', true,
+    'run_id', p_run_id,
+    'links_inserted', v_inserted,
+    'links_already_applied', v_already_applied,
+    'orders_modified', 0,
+    'count_matrix', (
+      select coalesce(jsonb_agg(to_jsonb(matrix) order by merchant_code nulls last, merchant_id), '[]'::jsonb)
+      from public.admin_order_merchant_count_matrix() matrix
+    )
   );
 end;
 $$;
@@ -1454,6 +1936,347 @@ begin
 end;
 $$;
 
+create or replace function public.admin_apply_safe_missing_financial_dependencies(
+  p_run_id uuid,
+  p_confirm boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_run public.order_merchant_audit_runs%rowtype;
+  v_now timestamptz := now();
+  v_before_order_financial jsonb;
+  v_after_order_financial jsonb;
+  v_settlements integer := 0;
+  v_merchant_accounts integer := 0;
+  v_company_accounts integer := 0;
+  v_cod integer := 0;
+  v_merchant_statements integer := 0;
+  v_driver_statements integer := 0;
+begin
+  if not p_confirm then raise exception 'explicit_financial_dependency_confirmation_required'; end if;
+  if auth.role() <> 'service_role'
+     and (auth.uid() is null or not public.is_admin_or_support()) then
+    raise exception 'not_authorized';
+  end if;
+
+  select * into v_run
+  from public.order_merchant_audit_runs
+  where id = p_run_id
+  for update;
+
+  if v_run.id is null
+     or v_run.status not in ('APPLIED_SAFE_ONLY','FINANCE_RECONCILED_SAFE_ONLY') then
+    raise exception 'safe_order_backfill_must_be_applied_first';
+  end if;
+
+  lock table public.orders in share row exclusive mode;
+  lock table public.order_financial_settlements in share row exclusive mode;
+  lock table public.financial_account_entries in share row exclusive mode;
+  lock table public.cod_collections in share row exclusive mode;
+  lock table public.merchant_statement_entries in share row exclusive mode;
+  lock table public.driver_statement_entries in share row exclusive mode;
+
+  v_before_order_financial := public.dn_financial_integrity_snapshot()
+    - 'dependent_tables' - 'missing_dependencies';
+  if v_before_order_financial is distinct from
+     (v_run.financial_before - 'dependent_tables' - 'missing_dependencies') then
+    raise exception using
+      errcode = '40001',
+      message = 'order_financial_baseline_changed_since_dry_run';
+  end if;
+
+  if exists (
+    select 1
+    from public.order_merchant_audit_snapshot s
+    join public.orders o on o.id = s.order_id
+    where s.run_id = p_run_id
+      and lower(replace(replace(coalesce(s.status::text, ''), '-', '_'), ' ', '_'))
+          in ('delivered','completed','complete')
+      and (
+        s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE')
+        or (
+          s.classification = 'MISSING_PORTAL_LINK'
+          and exists (
+            select 1 from public.merchant_link_repair_audit a
+            where a.run_id = p_run_id
+              and a.merchant_id = s.current_merchant_id
+          )
+        )
+      )
+      and (
+        (to_jsonb(o) - 'merchant_id' - 'merchant_code' - 'merchant_name' - 'updated_at')
+          is distinct from
+        (s.order_before - 'merchant_id' - 'merchant_code' - 'merchant_name' - 'updated_at')
+        or o.merchant_id is distinct from case
+          when s.classification = 'AUTO_REPAIR_SAFE' then s.candidate_canonical_merchant_id
+          else s.current_merchant_id
+        end
+        or o.status is distinct from s.status
+        or coalesce((s.dependency_ownership ->> 'total_conflicts')::integer, 0) <> 0
+      )
+  ) then
+    raise exception 'eligible_financial_order_changed_or_conflicted_since_dry_run';
+  end if;
+
+  create temporary table dn_finance_eligible_orders (
+    order_id uuid primary key
+  ) on commit drop;
+
+  insert into dn_finance_eligible_orders(order_id)
+  select s.order_id
+  from public.order_merchant_audit_snapshot s
+  join public.orders o on o.id = s.order_id
+  where s.run_id = p_run_id
+    and lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
+        in ('delivered','completed','complete')
+    and (
+      s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE')
+      or (
+        s.classification = 'MISSING_PORTAL_LINK'
+        and exists (
+          select 1 from public.merchant_link_repair_audit a
+          where a.run_id = p_run_id
+            and a.merchant_id = s.current_merchant_id
+        )
+      )
+    )
+    and (
+      o.merchant_id is null
+      or (
+        exists (
+          select 1 from public.merchants m
+          where m.id = o.merchant_id
+            and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')
+        )
+        and public.dn_merchant_portal_link_count(o.merchant_id) > 0
+      )
+    );
+
+  with inserted as (
+    insert into public.order_financial_settlements (
+      order_id, order_reference, merchant_id, coupon_number, goods_value,
+      delivery_fee, discount_amount, delivery_fee_mode, customer_total,
+      collected_amount, merchant_due, company_revenue, currency, posted_at,
+      posted_by, source_status, snapshot
+    )
+    select
+      o.id::text,
+      coalesce(nullif(o.tracking_number, ''), nullif(o.invoice_number, ''), nullif(o.coupon_number, ''), o.id::text),
+      o.merchant_id,
+      nullif(o.coupon_number, ''),
+      coalesce(o.goods_value, 0), coalesce(o.delivery_fee, 0), coalesce(o.discount_amount, 0),
+      coalesce(nullif(o.delivery_fee_mode, ''), 'customer_pays'),
+      coalesce(o.customer_total, 0), coalesce(o.collected_amount, 0),
+      coalesce(o.merchant_due, 0), coalesce(o.company_revenue, 0),
+      coalesce(nullif(o.currency, ''), 'AED'),
+      coalesce(o.financial_posted_at, nullif(to_jsonb(o)->>'delivered_at', '')::timestamptz, o.updated_at, o.created_at, v_now),
+      auth.uid(),
+      lower(replace(replace(coalesce(o.status::text, 'delivered'), '-', '_'), ' ', '_')),
+      to_jsonb(o)
+    from dn_finance_eligible_orders e
+    join public.orders o on o.id = e.order_id
+    where not exists (
+      select 1 from public.order_financial_settlements s where s.order_id = o.id::text
+    )
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id::uuid, 'order_financial_settlements', 'settlement', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i
+  join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id::uuid;
+  get diagnostics v_settlements = row_count;
+
+  with inserted as (
+    insert into public.financial_account_entries (
+      order_id, order_reference, merchant_id, account_type, entry_type,
+      direction, amount, currency, notes, posted_at
+    )
+    select s.order_id, s.order_reference, s.merchant_id, 'merchant',
+      'delivered_order_settlement',
+      case when s.merchant_due < 0 then 'debit' else 'credit' end,
+      abs(s.merchant_due), s.currency,
+      'Authoritative merchant settlement restored from reviewed order snapshot', s.posted_at
+    from dn_finance_eligible_orders e
+    join public.order_financial_settlements s on s.order_id = e.order_id::text
+    where s.merchant_id is not null
+      and not exists (
+        select 1 from public.financial_account_entries a
+        where a.order_id = s.order_id and a.account_type = 'merchant'
+          and a.entry_type = 'delivered_order_settlement'
+      )
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id::uuid, 'financial_account_entries', 'merchant_delivered_settlement', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id::uuid;
+  get diagnostics v_merchant_accounts = row_count;
+
+  with inserted as (
+    insert into public.financial_account_entries (
+      order_id, order_reference, merchant_id, account_type, entry_type,
+      direction, amount, currency, notes, posted_at
+    )
+    select s.order_id, s.order_reference, s.merchant_id, 'company',
+      'delivered_order_settlement', 'credit', greatest(s.company_revenue, 0),
+      s.currency, 'Authoritative company revenue restored from reviewed order snapshot', s.posted_at
+    from dn_finance_eligible_orders e
+    join public.order_financial_settlements s on s.order_id = e.order_id::text
+    where not exists (
+      select 1 from public.financial_account_entries a
+      where a.order_id = s.order_id and a.account_type = 'company'
+        and a.entry_type = 'delivered_order_settlement'
+    )
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id::uuid, 'financial_account_entries', 'company_delivered_settlement', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id::uuid;
+  get diagnostics v_company_accounts = row_count;
+
+  with inserted as (
+    insert into public.cod_collections (
+      order_id, tracking_number, merchant_id, driver_id, cod_amount,
+      collected_amount, reconciled_amount, collection_date, status,
+      payment_method, notes, created_by, created_at, updated_at
+    )
+    select o.id,
+      coalesce(nullif(o.tracking_number, ''), nullif(o.invoice_number, ''), nullif(o.coupon_number, ''), o.id::text),
+      o.merchant_id,
+      public.dn_safe_uuid(coalesce(nullif(to_jsonb(o)->>'assigned_driver_id', ''), nullif(to_jsonb(o)->>'driver_id', ''))),
+      greatest(coalesce(o.customer_total, 0), 0),
+      greatest(coalesce(nullif(o.collected_amount, 0), o.customer_total, 0), 0),
+      0,
+      coalesce(nullif(to_jsonb(o)->>'delivered_at', '')::timestamptz, o.updated_at, o.created_at, v_now)::date,
+      'collected', 'cod', 'Authoritative COD restored from reviewed order snapshot',
+      auth.uid(), v_now, v_now
+    from dn_finance_eligible_orders e join public.orders o on o.id = e.order_id
+    where lower(coalesce(o.payment_method::text, '')) = 'cod'
+      and coalesce(o.customer_total, 0) > 0
+      and not exists (select 1 from public.cod_collections c where c.order_id = o.id)
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id, 'cod_collections', 'cod', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id;
+  get diagnostics v_cod = row_count;
+
+  with inserted as (
+    insert into public.merchant_statement_entries (
+      merchant_id, order_id, tracking_number, entry_date, entry_type,
+      debit, credit, balance, status, notes, created_by, created_at, updated_at
+    )
+    select o.merchant_id, o.id,
+      coalesce(nullif(o.tracking_number, ''), nullif(o.invoice_number, ''), nullif(o.coupon_number, ''), o.id::text),
+      coalesce(nullif(to_jsonb(o)->>'delivered_at', '')::timestamptz, o.updated_at, o.created_at, v_now)::date,
+      'order_cod',
+      case when coalesce(o.merchant_due, 0) < 0 then abs(o.merchant_due) else 0 end,
+      case when coalesce(o.merchant_due, 0) >= 0 then o.merchant_due else 0 end,
+      coalesce(o.merchant_due, 0), 'posted',
+      'Authoritative merchant statement restored from reviewed order snapshot',
+      auth.uid(), v_now, v_now
+    from dn_finance_eligible_orders e join public.orders o on o.id = e.order_id
+    where o.merchant_id is not null
+      and not exists (select 1 from public.merchant_statement_entries m where m.order_id = o.id)
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id, 'merchant_statement_entries', 'merchant_statement', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id;
+  get diagnostics v_merchant_statements = row_count;
+
+  with inserted as (
+    insert into public.driver_statement_entries (
+      driver_id, order_id, tracking_number, entry_date, entry_type,
+      debit, credit, balance, status, notes, created_by, created_at, updated_at
+    )
+    select public.dn_safe_uuid(coalesce(nullif(to_jsonb(o)->>'assigned_driver_id', ''), nullif(to_jsonb(o)->>'driver_id', ''))),
+      o.id,
+      coalesce(nullif(o.tracking_number, ''), nullif(o.invoice_number, ''), nullif(o.coupon_number, ''), o.id::text),
+      coalesce(nullif(to_jsonb(o)->>'delivered_at', '')::timestamptz, o.updated_at, o.created_at, v_now)::date,
+      'delivery_earning', 0,
+      greatest(public.dn_safe_numeric(to_jsonb(o)->>'driver_earning', 0), 0),
+      greatest(public.dn_safe_numeric(to_jsonb(o)->>'driver_earning', 0), 0),
+      'posted', 'Authoritative driver statement restored from reviewed order snapshot',
+      auth.uid(), v_now, v_now
+    from dn_finance_eligible_orders e join public.orders o on o.id = e.order_id
+    where public.dn_safe_uuid(coalesce(nullif(to_jsonb(o)->>'assigned_driver_id', ''), nullif(to_jsonb(o)->>'driver_id', ''))) is not null
+      and not exists (select 1 from public.driver_statement_entries d where d.order_id = o.id)
+    returning id, order_id
+  )
+  insert into public.order_merchant_financial_repair_audit (
+    run_id, order_id, dependency_table, dependency_key, inserted_row_id,
+    resolution_evidence, financial_values, migration_version, executed_by
+  )
+  select p_run_id, i.order_id, 'driver_statement_entries', 'driver_statement', i.id::text,
+    'MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT', s.financial_values,
+    v_run.migration_version, auth.uid()
+  from inserted i join public.order_merchant_audit_snapshot s
+    on s.run_id = p_run_id and s.order_id = i.order_id;
+  get diagnostics v_driver_statements = row_count;
+
+  v_after_order_financial := public.dn_financial_integrity_snapshot()
+    - 'dependent_tables' - 'missing_dependencies';
+  if v_after_order_financial is distinct from v_before_order_financial then
+    raise exception 'order_financial_values_changed_financial_repair_rolled_back';
+  end if;
+
+  update public.order_merchant_audit_runs
+  set status = 'FINANCE_RECONCILED_SAFE_ONLY',
+      financial_after = public.dn_financial_integrity_snapshot()
+  where id = p_run_id;
+
+  return jsonb_build_object(
+    'ok', true,
+    'run_id', p_run_id,
+    'status', 'FINANCE_RECONCILED_SAFE_ONLY',
+    'orders_modified', 0,
+    'settlements_inserted', v_settlements,
+    'merchant_account_entries_inserted', v_merchant_accounts,
+    'company_account_entries_inserted', v_company_accounts,
+    'cod_rows_inserted', v_cod,
+    'merchant_statement_rows_inserted', v_merchant_statements,
+    'driver_statement_rows_inserted', v_driver_statements,
+    'remaining_missing_dependencies', public.dn_missing_financial_dependencies_snapshot(),
+    'order_financial_before', v_before_order_financial,
+    'order_financial_after', v_after_order_financial
+  );
+end;
+$$;
+
 create or replace function public.admin_order_merchant_integrity_health()
 returns jsonb
 language plpgsql
@@ -1481,7 +2304,9 @@ begin
     'canonical_create_ready', to_regprocedure('public.admin_create_canonical_merchant_order(jsonb)') is not null,
     'portal_pagination_ready', to_regprocedure('public.merchant_portal_orders_page(integer,integer)') is not null,
     'dry_run_ready', to_regprocedure('public.admin_run_order_merchant_dry_run()') is not null,
+    'merchant_link_repair_ready', to_regprocedure('public.admin_apply_safe_merchant_portal_links(uuid,boolean)') is not null,
     'transactional_backfill_ready', to_regprocedure('public.admin_apply_order_merchant_safe_backfill(uuid,boolean)') is not null,
+    'safe_financial_dependency_repair_ready', to_regprocedure('public.admin_apply_safe_missing_financial_dependencies(uuid,boolean)') is not null,
     'financial_snapshot', public.dn_financial_integrity_snapshot(),
     'checked_at', now()
   );
@@ -1492,6 +2317,7 @@ revoke all on function public.dn_effective_portal_user_ids(uuid) from public, an
 revoke all on function public.dn_merchant_portal_link_count(uuid) from public, anon, authenticated;
 revoke all on function public.dn_resolve_portal_merchant_uuid(uuid) from public, anon, authenticated;
 revoke all on function public.dn_financial_dependency_integrity_snapshot() from public, anon, authenticated;
+revoke all on function public.dn_missing_financial_dependencies_snapshot() from public, anon, authenticated;
 revoke all on function public.dn_financial_integrity_snapshot() from public, anon, authenticated;
 revoke all on function public.dn_order_dependency_ownership_snapshot(uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.dn_production_inventory_snapshot() from public, anon, authenticated;
@@ -1502,9 +2328,12 @@ revoke all on function public.merchant_portal_orders_page(integer,integer) from 
 revoke all on function public.admin_order_merchant_count_matrix() from public, anon;
 revoke all on function public.admin_run_order_merchant_dry_run() from public, anon;
 revoke all on function public.admin_review_order_merchant_dry_run(uuid) from public, anon;
+revoke all on function public.admin_apply_safe_merchant_portal_links(uuid,boolean) from public, anon;
 revoke all on function public.admin_apply_order_merchant_safe_backfill(uuid,boolean) from public, anon;
+revoke all on function public.admin_apply_safe_missing_financial_dependencies(uuid,boolean) from public, anon;
 revoke all on function public.admin_order_merchant_integrity_health() from public, anon;
 revoke all on table public.dn_order_merchant_dry_run_live from public, anon, authenticated;
+revoke all on table public.dn_merchant_identity_dry_run_live from public, anon, authenticated;
 
 grant execute on function public.admin_resolve_order_merchant(uuid) to authenticated, service_role;
 grant execute on function public.admin_create_canonical_merchant_order(jsonb) to authenticated, service_role;
@@ -1512,19 +2341,28 @@ grant execute on function public.merchant_portal_orders_page(integer,integer) to
 grant execute on function public.admin_order_merchant_count_matrix() to authenticated, service_role;
 grant execute on function public.admin_run_order_merchant_dry_run() to authenticated, service_role;
 grant execute on function public.admin_review_order_merchant_dry_run(uuid) to authenticated, service_role;
+grant execute on function public.admin_apply_safe_merchant_portal_links(uuid,boolean) to authenticated, service_role;
 grant execute on function public.admin_apply_order_merchant_safe_backfill(uuid,boolean) to authenticated, service_role;
+grant execute on function public.admin_apply_safe_missing_financial_dependencies(uuid,boolean) to authenticated, service_role;
 grant execute on function public.admin_order_merchant_integrity_health() to authenticated, service_role;
 grant select on public.order_merchant_audit_runs to authenticated;
 grant select on public.order_merchant_audit_snapshot to authenticated;
 grant select on public.order_merchant_repair_audit to authenticated;
+grant select on public.merchant_identity_audit_snapshot to authenticated;
+grant select on public.merchant_link_repair_audit to authenticated;
+grant select on public.order_merchant_financial_repair_audit to authenticated;
 grant all on public.order_merchant_audit_runs to service_role;
 grant all on public.order_merchant_audit_snapshot to service_role;
 grant all on public.order_merchant_repair_audit to service_role;
+grant all on public.merchant_identity_audit_snapshot to service_role;
+grant all on public.merchant_link_repair_audit to service_role;
+grant all on public.order_merchant_financial_repair_audit to service_role;
 
 grant execute on function public.dn_effective_portal_user_ids(uuid) to service_role;
 grant execute on function public.dn_merchant_portal_link_count(uuid) to service_role;
 grant execute on function public.dn_resolve_portal_merchant_uuid(uuid) to service_role;
 grant execute on function public.dn_financial_dependency_integrity_snapshot() to service_role;
+grant execute on function public.dn_missing_financial_dependencies_snapshot() to service_role;
 grant execute on function public.dn_financial_integrity_snapshot() to service_role;
 grant execute on function public.dn_order_dependency_ownership_snapshot(uuid,uuid,uuid) to service_role;
 grant execute on function public.dn_production_inventory_snapshot() to service_role;

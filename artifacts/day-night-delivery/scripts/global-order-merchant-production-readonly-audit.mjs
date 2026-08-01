@@ -8,6 +8,7 @@ if (new URL(root).hostname.split(".")[0] !== "ngdwybpgacauorygoedi") {
 const headers = { apikey: key, Authorization: `Bearer ${key}` };
 const clean = (value) => String(value ?? "").trim();
 const identity = (value) => clean(value).toLocaleLowerCase().replace(/[\s_-]+/g, "") || null;
+const normalizedEmail = (value) => clean(value).toLocaleLowerCase() || null;
 const phone = (value) => clean(value).replace(/\D/g, "") || null;
 const inactive = (value) => ["deleted", "archived", "blocked", "suspended"].includes(clean(value || "active").toLowerCase());
 const num = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -51,12 +52,18 @@ const [orders, merchants, links, users] = await Promise.all([
 ]);
 
 const dependencyTables = [
-  "cod_collections", "merchant_statement_entries", "order_financial_settlements",
-  "financial_account_entries", "merchant_invoices", "invoices", "notifications",
+  ["cod_collections", "order_id,merchant_id"],
+  ["merchant_statement_entries", "order_id,merchant_id"],
+  ["driver_statement_entries", "order_id,driver_id"],
+  ["order_financial_settlements", "order_id,merchant_id"],
+  ["financial_account_entries", "order_id,merchant_id,account_type,entry_type"],
+  ["merchant_invoices", "order_id,merchant_id"],
+  ["invoices", "order_id,merchant_id"],
+  ["notifications", "order_id,merchant_id"],
 ];
 const dependencyRows = new Map();
-for (const table of dependencyTables) {
-  const rows = await allRows(table, "order_id,merchant_id", true);
+for (const [table, select] of dependencyTables) {
+  const rows = await allRows(table, select, true);
   dependencyRows.set(table, rows || []);
 }
 
@@ -89,7 +96,8 @@ for (const merchant of merchants) {
 }
 const ownersByOrder = new Map();
 const dependencyMerchantIdsByOrder = new Map();
-for (const rows of dependencyRows.values()) for (const row of rows) {
+for (const [table, rows] of dependencyRows) for (const row of rows) {
+  if (table === "driver_statement_entries") continue;
   const orderId = clean(row.order_id); const merchantId = clean(row.merchant_id);
   if (!orderId) continue;
   const dependencyIds = dependencyMerchantIdsByOrder.get(orderId) || [];
@@ -151,11 +159,86 @@ const activeMerchants = merchants.filter((merchant) => !inactive(merchant.status
 const merchantMatrix = activeMerchants.map((merchant) => {
   const merchantId = clean(merchant.id); const databaseCount = orderCounts.get(merchantId) || 0;
   const linked = (portalUsersByMerchant.get(merchantId)?.size || 0) > 0;
-  return { databaseCount, adminCount: databaseCount, portalCount: linked ? databaseCount : 0, result: linked ? "PASS" : "MISSING_PORTAL_LINK" };
+  return {
+    merchant_id: merchantId,
+    merchant_code: clean(merchant.merchant_code) || null,
+    database_count: databaseCount,
+    admin_count: databaseCount,
+    portal_count: linked ? databaseCount : 0,
+    result: linked ? "PASS" : "MISSING_PORTAL_LINK",
+  };
 });
 const authUserIds = new Set(users.map((user) => clean(user.id)));
 const linkedUserIds = new Set([...portalUsersByMerchant.values()].flatMap((set) => [...set]));
 const acceptance = classified.filter(({ order }) => identity(order.coupon_number) === identity("010505"));
+
+const normalizedStatus = (value) => clean(value).toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+const deliveredOrders = orders.filter((order) => ["delivered", "completed", "complete"].includes(normalizedStatus(order.status)));
+const idsFor = (table) => new Set((dependencyRows.get(table) || []).map((row) => clean(row.order_id)).filter(Boolean));
+const settlementIds = idsFor("order_financial_settlements");
+const codIds = idsFor("cod_collections");
+const merchantStatementIds = idsFor("merchant_statement_entries");
+const driverStatementIds = idsFor("driver_statement_entries");
+const financeAccountRows = dependencyRows.get("financial_account_entries") || [];
+const financeAccountKey = new Set(financeAccountRows.map((row) => `${clean(row.order_id)}:${clean(row.account_type)}:${clean(row.entry_type)}`));
+const driverId = (order) => clean(order.assigned_driver_id || order.driver_id);
+const financialGaps = {
+  delivered_orders: deliveredOrders.length,
+  missing_settlements: deliveredOrders.filter((order) => !settlementIds.has(clean(order.id))).length,
+  missing_cod: deliveredOrders.filter((order) => clean(order.payment_method).toLowerCase() === "cod" && num(order.customer_total) > 0 && !codIds.has(clean(order.id))).length,
+  missing_merchant_statements: deliveredOrders.filter((order) => clean(order.merchant_id) && !merchantStatementIds.has(clean(order.id))).length,
+  missing_driver_statements: deliveredOrders.filter((order) => driverId(order) && !driverStatementIds.has(clean(order.id))).length,
+  missing_merchant_accounts: deliveredOrders.filter((order) => clean(order.merchant_id) && !financeAccountKey.has(`${clean(order.id)}:merchant:delivered_order_settlement`)).length,
+  missing_company_accounts: deliveredOrders.filter((order) => !financeAccountKey.has(`${clean(order.id)}:company:delivered_order_settlement`)).length,
+};
+
+const usersByEmail = new Map();
+for (const user of users) {
+  const email = normalizedEmail(user.email);
+  if (!email || !user.email_confirmed_at) continue;
+  const role = clean(user.app_metadata?.role || user.user_metadata?.role).toLowerCase();
+  if (["admin", "support", "driver"].includes(role)) continue;
+  const matches = usersByEmail.get(email) || [];
+  matches.push(user); usersByEmail.set(email, matches);
+}
+const activeMerchantEmailCounts = new Map();
+for (const merchant of activeMerchants) {
+  const email = normalizedEmail(merchant.email);
+  if (email) activeMerchantEmailCounts.set(email, (activeMerchantEmailCounts.get(email) || 0) + 1);
+}
+const merchantIdentityAudit = activeMerchants.map((merchant) => {
+  const merchantId = clean(merchant.id);
+  const currentUsers = portalUsersByMerchant.get(merchantId) || new Set();
+  const email = normalizedEmail(merchant.email);
+  const candidates = (usersByEmail.get(email) || []).filter((user) => {
+    const userId = clean(user.id);
+    const activeOwner = activeLinkByUser.get(userId);
+    const legacyOwner = activeMerchants.find((other) => clean(other.id) !== merchantId && clean(other.user_id) === userId);
+    return (!activeOwner || activeOwner === merchantId) && !legacyOwner;
+  });
+  let classification = "MISSING_PORTAL_LINK";
+  let resolution_evidence = email ? "NO_EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL" : "MERCHANT_EMAIL_MISSING";
+  if (currentUsers.size > 0) {
+    classification = "ALREADY_CORRECT"; resolution_evidence = "EXPLICIT_EFFECTIVE_PORTAL_RELATION";
+  } else if ((activeMerchantEmailCounts.get(email) || 0) > 1) {
+    classification = "SECURITY_CONFLICT"; resolution_evidence = "EMAIL_SHARED_BY_MULTIPLE_ACTIVE_MERCHANTS";
+  } else if (candidates.length > 1) {
+    classification = "SECURITY_CONFLICT"; resolution_evidence = "MULTIPLE_EXACT_CONFIRMED_AUTH_USERS";
+  } else if (candidates.length === 1) {
+    classification = "AUTO_REPAIR_SAFE"; resolution_evidence = "EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL";
+  }
+  return {
+    merchant_id: merchantId,
+    merchant_code: clean(merchant.merchant_code) || null,
+    linked_order_count: orderCounts.get(merchantId) || 0,
+    classification,
+    resolution_evidence,
+    candidate_found: candidates.length === 1,
+  };
+});
+const merchantIdentityCounts = Object.fromEntries([...merchantIdentityAudit.reduce((counts, row) => {
+  counts.set(row.classification, (counts.get(row.classification) || 0) + 1); return counts;
+}, new Map())].sort());
 
 const report = {
   mode: "READ_ONLY_NO_WRITES",
@@ -174,14 +257,18 @@ const report = {
   merchant_audit: {
     duplicate_code_groups: groupCount((merchant) => identity(merchant.merchant_code)),
     duplicate_phone_groups: groupCount((merchant) => phone(merchant.phone)),
-    duplicate_email_groups: groupCount((merchant) => identity(merchant.email)),
+    duplicate_email_groups: groupCount((merchant) => normalizedEmail(merchant.email)),
     duplicate_legacy_user_id_groups: groupCount((merchant) => clean(merchant.user_id)),
-    conflicting_user_links: links.filter((link) => link.active && merchantById.get(clean(link.merchant_id))?.user_id && clean(merchantById.get(clean(link.merchant_id)).user_id) !== clean(link.user_id)).length,
+    conflicting_user_links: links.filter((link) => link.active && merchants.some((merchant) => clean(merchant.id) !== clean(link.merchant_id) && clean(merchant.user_id) === clean(link.user_id))).length,
     links_to_missing_merchants: links.filter((link) => !merchantById.has(clean(link.merchant_id))).length,
     merchants_without_portal_link: merchants.filter((merchant) => (portalUsersByMerchant.get(clean(merchant.id))?.size || 0) === 0).length,
     merchants_with_count_match: merchantMatrix.filter((row) => row.result === "PASS").length,
     merchants_missing_portal_link: merchantMatrix.filter((row) => row.result !== "PASS").length,
+    identity_classification_counts: merchantIdentityCounts,
+    identity_rows_requiring_attention: merchantIdentityAudit.filter((row) => row.classification !== "ALREADY_CORRECT"),
+    count_matrix: merchantMatrix,
   },
+  financial_dependency_gaps: financialGaps,
   financial_totals: sums,
   acceptance_010505: acceptance.map(({ classification, candidateId }) => ({ classification, candidate_found: Boolean(candidateId) })),
   orders_modified: 0,
