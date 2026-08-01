@@ -8,40 +8,51 @@ The authoritative rule is:
 
 ```text
 orders.merchant_id = merchants.id
-merchant session → merchant_user_links active row, then safe merchants.user_id fallback
+merchant session → active merchant_user_links row, then safe non-conflicting merchants.user_id fallback
 ```
 
-Names, codes, email and phone are evidence for dry-run classification only. They never grant portal access.
+Names, codes, email and phone are dry-run evidence only. They never grant portal access.
 
 ## Production project
 
-Use only the active production Supabase project selected by the DAY NIGHT production environment. Never use a paused/retired project and never run `supabase db reset --linked`, `db push --include-all`, destructive migration-history repair, `TRUNCATE`, or RLS disablement.
+Use only the active project:
+
+```text
+ngdwybpgacauorygoedi
+```
+
+Never use a paused/retired project. Never run `supabase db reset --linked`, `db push --include-all`, destructive migration-history repair, `TRUNCATE`, `CASCADE`, or RLS disablement.
 
 ## Phase 0 — Preconditions
 
 1. Merge only after TypeScript, production gate, build and merchant-ownership gate pass.
-2. Apply `supabase/migrations/20260802023000_global_order_merchant_ownership_restoration.sql` manually from a trusted production operator context.
-3. Do not expose the service-role key to pull-request code.
-4. Do not call the apply RPC during migration deployment.
+2. Obtain independent review. If Codex review is unavailable, record that limitation and use a human database/security reviewer.
+3. Apply only these two migrations from a trusted production operator context:
+   - `20260802023000_global_order_merchant_ownership_restoration.sql`
+   - `20260802024000_global_order_merchant_ownership_followup.sql`
+4. Do not expose service-role credentials to pull-request code.
+5. Do not call either apply RPC during migration deployment.
 
-The migration creates audit/report functions and future-write protection. It does not rewrite historical orders automatically.
+The migrations create audit/report functions, exact portal pagination and future-write protections. They do not rewrite historical orders automatically.
 
-## Phase 1 — Dry run
+## Phase 1 — Complete system dry run
 
-From a trusted admin/service session:
+Authenticate with the real protected admin account and run:
 
 ```sql
-select public.admin_run_global_merchant_ownership_dry_run(
+select public.admin_run_global_merchant_system_dry_run(
   'Global merchant ownership production inventory'
 );
 ```
 
-Record the returned `audit_id`, then fetch the complete report:
+Record the returned `audit_id`, then fetch:
 
 ```sql
 select public.admin_global_merchant_ownership_report('<AUDIT_ID>'::uuid);
+select public.admin_merchant_identity_inventory();
 select public.admin_merchant_ownership_visibility_matrix();
-select public.admin_order_merchant_acceptance('010505');
+select public.admin_order_merchant_acceptance('010505', '1999');
+select public.admin_finance_reconciliation_health();
 ```
 
 The dry run classifies every order as one of:
@@ -53,13 +64,13 @@ The dry run classifies every order as one of:
 - `MISSING_MERCHANT`
 - `MISSING_PORTAL_LINK`
 
-No historical order is modified by these calls.
+No historical order or financial row is changed by these calls. The only writes are immutable diagnostic snapshots.
 
 ## Phase 2 — Mandatory review
 
-Do not proceed while any row is unresolved. The run status is `blocked` when any row is `MANUAL_REVIEW`, `SECURITY_CONFLICT`, `MISSING_MERCHANT`, or `MISSING_PORTAL_LINK`.
+Do not proceed while any row is unresolved. The run is `blocked` when any row is `MANUAL_REVIEW`, `SECURITY_CONFLICT`, `MISSING_MERCHANT`, or `MISSING_PORTAL_LINK`.
 
-For every unresolved merchant entity, verify:
+For every unresolved entity, verify:
 
 1. active `merchant_user_links` relationship;
 2. safe `merchants.user_id` fallback only when it does not conflict;
@@ -67,9 +78,9 @@ For every unresolved merchant entity, verify:
 4. verified email/phone;
 5. manual owner approval when identity is not mathematically unique.
 
-Run a new dry run after correcting merchant/account linkage. Do not edit order financial fields.
+Run a new complete system dry run after correcting merchant/account linkage. Do not edit order financial facts to make a report pass.
 
-## Phase 3 — Explicit transactional apply
+## Phase 3 — Explicit transactional ownership apply
 
 Only after a reviewed dry run returns `status = completed`:
 
@@ -88,23 +99,49 @@ The RPC:
 - synchronizes merchant UUID ownership in supported dependent tables without changing amounts;
 - writes immutable repair/audit records;
 - compares global order count, status counts, COD, goods value, delivery fees, discounts, customer totals and merchant dues before/after;
-- rolls back the complete call on any variance.
+- rolls back the complete call on any protected-field or financial variance.
 
-## Phase 4 — Evidence
+## Phase 4 — Separate explicit finance reconciliation
 
-Run the trusted manual workflow from `main`:
+Ownership apply does not invent missing accounting rows. After ownership is applied and reviewed, inspect:
+
+```sql
+select public.admin_finance_reconciliation_health();
+```
+
+If required finance tables are present, pre-existing value variance is zero, and only missing authoritative rows remain, obtain separate human approval and call:
+
+```sql
+select public.admin_apply_global_merchant_finance_reconciliation(
+  '<AUDIT_ID>'::uuid,
+  'RECONCILE_MISSING_FINANCE_ROWS_FROM_REVIEWED_ORDER_SNAPSHOTS'
+);
+```
+
+This RPC uses the existing idempotent authoritative finance reconciler, requires ownership to have been applied first, verifies health after reconciliation, confirms order financial totals did not change, and records before/after evidence. It rolls back on any variance or incomplete result.
+
+## Phase 5 — Trusted production evidence
+
+Run from trusted `main`:
 
 ```text
 Global Merchant Ownership Production Audit
 ```
 
-The workflow performs a new dry run only and uploads:
+Required protected inputs:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `RUNTIME_ADMIN_EMAIL`
+- `RUNTIME_ADMIN_PASSWORD`
+- `RUNTIME_MERCHANT_ACCOUNTS_JSON` containing at least two distinct merchant accounts
+
+The workflow authenticates as the real admin and real merchants. It never uses service-role to bypass portal RLS and never calls either apply RPC. It uploads:
 
 ```text
 global-merchant-ownership-runtime-report.json
+global-merchant-ownership-multi-account-report.json
 ```
-
-It never invokes the apply RPC.
 
 ## Required merchant matrix
 
@@ -114,19 +151,19 @@ Every active merchant must have:
 merchant_id | merchant_code | database_count | admin_count | portal_count | result
 ```
 
-`result` must be `PASS`. Actual authenticated portal tests for multiple merchants remain mandatory in addition to the expected exact-UUID matrix.
+`result` must be `PASS`. The multi-account artifact must additionally prove that each portal returns only its exact merchant UUID, pagination totals match unique rows, and no order appears in two merchant accounts.
 
 ## Required acceptance checks
 
-- Coupon `010505` resolves to exactly one order and one canonical portal-linked merchant UUID.
+- Coupon `010505` resolves to exactly one order, legal merchant code `1999`, one canonical portal-linked UUID, and zero dependent ownership mismatch.
 - Admin All Orders loads every page and never converts errors into zero.
 - Merchant portal loads every exact-UUID page and never falls back to merchant name/code/phone ownership.
 - A newly created order is returned by the creation RPC, re-read from `orders`, and verified against the resolved merchant UUID.
 - Merchant A cannot read Merchant B orders.
-- COD, statements, settlements, account entries and invoices retain their amounts.
-- Global financial variance is exactly zero.
+- COD, statements, settlements, account entries and invoices retain amounts.
+- Finance health is authoritative and variance is exactly zero.
 - No order or merchant row is deleted.
 
 ## Roll-forward policy
 
-This repair is idempotent. If the dry-run evidence becomes stale, do not attempt a broad rollback. Create a new dry run, resolve conflicts, and apply only the new reviewed `AUTO_REPAIR_SAFE` set.
+The framework is idempotent. If evidence becomes stale, do not perform a broad rollback. Create a new dry run, resolve conflicts, and apply only the new reviewed `AUTO_REPAIR_SAFE` set. Finance reconciliation remains a separate reviewed step.
