@@ -132,7 +132,7 @@ forbidText(runtimeAudit, "admin_apply_global_merchant_ownership_repair", "runtim
 forbidText(runtimeAudit, "admin_apply_global_merchant_finance_reconciliation", "runtime audit finance mutation");
 
 requireText(multiAccount, "RUNTIME_MERCHANT_ACCOUNTS_JSON", "multi-account protected input");
-requireText(multiAccount, 'client.rpc("merchant_portal_orders_page"', "multi-account exact UUID reads");
+requireText(multiAccount, 'supabase.rpc("merchant_portal_orders_page"', "multi-account exact UUID reads");
 requireText(multiAccount, "cross_account_order_overlap: false", "cross-account overlap assertion");
 requireText(multiAccount, "At least two protected merchant accounts", "multi-account minimum");
 forbidText(multiAccount, "SUPABASE_SERVICE_ROLE_KEY", "multi-account service-role bypass");
