@@ -1,0 +1,31 @@
+name: One-time Admin Operations Merchant Hardening
+
+on:
+  push:
+    branches: [fix/global-order-merchant-restoration-20260802-v2]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply deterministic source patch
+        run: node .github/scripts/apply-admin-operations-merchant-hardening.mjs
+
+      - name: Commit final source
+        run: |
+          if git diff --quiet; then
+            echo 'Admin operations hardening already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add artifacts/day-night-delivery/src/lib/adminOperationsData.ts
+          git commit -m 'fix(orders): harden admin operations merchant ownership path'
+          git push origin HEAD:${GITHUB_REF_NAME}
