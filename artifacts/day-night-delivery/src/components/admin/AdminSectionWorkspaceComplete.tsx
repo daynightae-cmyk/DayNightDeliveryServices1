@@ -17,7 +17,7 @@ import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import { cleanAdminText, matchesAdminSection, normalizeAdminKey, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
 import { financialsFromOrder } from "../../lib/orderFinancials";
-import { localizedOrderCity, localizedOrderDestination } from "../../lib/exportLocalization";
+import { localizedOrderDestination, localizedOrderDestinationTooltip } from "../../lib/exportLocalization";
 import { updateExistingOrderStatus } from "../../supabaseAdminOps";
 import type { Merchant, Order } from "../../types";
 import AdminDriverAssignmentModal from "./AdminDriverAssignmentModal";
@@ -103,7 +103,10 @@ const tracking = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
 const route = (order: Order, isArabic: boolean) =>
-  `${localizedOrderCity(order, isArabic ? "ar" : "en", "sender")} → ${localizedOrderDestination(order, isArabic ? "ar" : "en")}`;
+  localizedOrderDestination(order, isArabic ? "ar" : "en");
+
+const routeTooltip = (order: Order, isArabic: boolean) =>
+  localizedOrderDestinationTooltip(order, isArabic ? "ar" : "en");
 
 const canonicalStatus = (value: unknown) =>
   normalizeOrderStatus(value as string | Order | null | undefined);
@@ -271,6 +274,16 @@ export default function AdminSectionWorkspaceComplete({
         .slice(0, 200),
     [baseRows, query],
   );
+
+  const couponCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const order of liveOrders) {
+      const couponKey = normalize(order.coupon_number);
+      if (!couponKey) continue;
+      counts.set(couponKey, (counts.get(couponKey) || 0) + 1);
+    }
+    return counts;
+  }, [liveOrders]);
 
   if (financeSections.has(id)) {
     return (
@@ -517,7 +530,8 @@ export default function AdminSectionWorkspaceComplete({
           <table>
             <thead>
               <tr>
-                <th>{isArabic ? "التتبع والكوبون" : "Tracking / coupon"}</th>
+                <th>{isArabic ? "رقم التتبع" : "Tracking number"}</th>
+                <th>{isArabic ? "رقم الكوبون" : "Coupon number"}</th>
                 <th>{isArabic ? "الحالة" : "Status"}</th>
                 <th>{id === "personal_orders" ? (isArabic ? "المرسل والمستلم" : "Sender / recipient") : (isArabic ? "التاجر والعميل" : "Merchant / customer")}</th>
                 <th>{isArabic ? "المسار" : "Route"}</th>
@@ -538,6 +552,10 @@ export default function AdminSectionWorkspaceComplete({
                   order.driver_name ||
                   order.driver_code;
                 const chip = stateChip(order.status);
+                const couponKey = normalize(order.coupon_number);
+                const duplicateCoupon = Boolean(
+                  couponKey && (couponCounts.get(couponKey) || 0) > 1,
+                );
 
                 return (
                   <tr key={rowKey}>
@@ -545,9 +563,23 @@ export default function AdminSectionWorkspaceComplete({
                       <span dir="ltr" className="dn-order-track-ref">
                         {tracking(order)}
                       </span>
-                      <small className="block opacity-60" dir="ltr">
-                        {order.coupon_number || (isArabic ? "الكوبون غير موجود" : "No coupon")}
-                      </small>
+                    </td>
+                    <td>
+                      <strong
+                        dir="ltr"
+                        className={`inline-flex min-w-[92px] justify-center rounded-xl border px-3 py-2 font-mono text-xs font-black ${
+                          duplicateCoupon
+                            ? "border-rose-400/40 bg-rose-400/10 text-rose-200"
+                            : "border-brand-gold/30 bg-brand-gold/10 text-brand-gold"
+                        }`}
+                      >
+                        {order.coupon_number || "—"}
+                      </strong>
+                      {duplicateCoupon && (
+                        <small className="mt-1 block font-black text-rose-200">
+                          {isArabic ? "مكرر في البيانات الحالية" : "Existing duplicate"}
+                        </small>
+                      )}
                     </td>
                     <td>
                       <AdminStateChip name={chip.name} tone={chip.tone}>
@@ -561,7 +593,15 @@ export default function AdminSectionWorkspaceComplete({
                         <span dir="ltr">{order.receiver_phone || "—"}</span>
                       </small>
                     </td>
-                    <td>{route(order, isArabic)}</td>
+                    <td>
+                      <span
+                        className="block max-w-[260px] truncate whitespace-nowrap font-semibold text-white/85"
+                        title={routeTooltip(order, isArabic)}
+                        dir={isArabic ? "rtl" : "ltr"}
+                      >
+                        {route(order, isArabic)}
+                      </span>
+                    </td>
                     <td>
                       <FinancialCell order={order} isArabic={isArabic} />
                     </td>

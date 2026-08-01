@@ -1,0 +1,157 @@
+# Production execution trigger: 2026-08-01 Merchant 1999 linkage repair
+name: Repair Merchant 1999 Order Linkage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - supabase/migrations/20260801195800_merchant_1999_order_linkage_repair.sql
+      - .github/workflows/merchant-1999-order-linkage-repair.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merchant-1999-order-linkage-production
+  cancel-in-progress: false
+
+jobs:
+  repair-production:
+    name: Link confirmed coupons to authenticated Merchant 1999
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout exact main revision
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate protected production configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VITE_SUPABASE_URL SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing protected production secrets: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Confirmed protected DAY NIGHT production project."
+
+      - name: Build isolated one-migration release
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="20260801195800_merchant_1999_order_linkage_repair.sql"
+          workdir="$RUNNER_TEMP/day-night-merchant-linkage"
+          rm -rf "$workdir"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+
+          supabase --workdir "$workdir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+
+          if [ -f "$workdir/supabase/migrations/$target" ]; then
+            echo "TARGET_ALREADY_APPLIED=true" >> "$GITHUB_ENV"
+            echo "Migration is already recorded; deployment write is not required."
+          else
+            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+            echo "TARGET_ALREADY_APPLIED=false" >> "$GITHUB_ENV"
+          fi
+          echo "MERCHANT_LINKAGE_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "MERCHANT_LINKAGE_TARGET=$target" >> "$GITHUB_ENV"
+
+      - name: Dry-run exact repair migration
+        if: env.TARGET_ALREADY_APPLIED != 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/merchant-linkage-dry-run.txt"
+          supabase --workdir "$MERCHANT_LINKAGE_WORKDIR" db push --dry-run 2>&1 | tee "$output"
+          grep -Fq "$MERCHANT_LINKAGE_TARGET" "$output"
+
+      - name: Apply exact repair migration atomically
+        if: env.TARGET_ALREADY_APPLIED != 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --workdir "$MERCHANT_LINKAGE_WORKDIR" db push --yes
+
+      - name: Verify all three coupons are portal-visible by exact UUID
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const root = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+          const response = await fetch(`${root}/rest/v1/rpc/admin_merchant_coupon_link_health`, {
+            method: 'POST',
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ p_coupons: ['010505', '010503', '003860'] }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            console.error(`Health RPC failed with HTTP ${response.status}.`);
+            process.exit(1);
+          }
+          const orders = Array.isArray(payload.orders) ? payload.orders : [];
+          for (const order of orders) {
+            console.log(`${order.coupon_number}: portal_visible=${order.portal_visible_by_exact_uuid === true}; canonical_1999=${order.linked_to_canonical_merchant_1999 === true}`);
+          }
+          if (
+            payload.ok !== true ||
+            payload.orders_found !== 3 ||
+            payload.orders_linked_to_canonical_merchant_1999 !== 3
+          ) {
+            console.error('Merchant 1999 canonical linkage acceptance failed.');
+            process.exit(1);
+          }
+          console.log('PASS: coupons 010505, 010503, and 003860 belong to the canonical authenticated Merchant 1999 row.');
+          NODE
+
+      - name: Publish safe result summary
+        if: always()
+        run: |
+          {
+            echo '## Merchant 1999 order-linkage repair'
+            echo
+            echo '- Target coupons: `010505`, `010503`, `003860`'
+            echo '- Ownership remains strict exact UUID isolation.'
+            echo '- Direct user links and active merchant_user_links are both supported.'
+            echo '- Dependent COD, statement, settlement, and ledger ownership is aligned without changing amounts.'
+            echo '- No orders, merchants, receiver data, statuses, or financial values are deleted.'
+          } >> "$GITHUB_STEP_SUMMARY"

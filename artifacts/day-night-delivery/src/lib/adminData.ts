@@ -387,8 +387,21 @@ export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): P
 }
 
 export async function fetchAdminOrders(): Promise<Order[]> {
-  const result = await fetchAdminOrdersPage({ page: 1, pageSize: 100 });
-  return result.rows;
+  const first = await fetchAdminOrdersPage({ page: 1, pageSize: 100 });
+  if (first.source !== "db" || first.warning) {
+    throw new Error(first.warning || "Orders could not be loaded safely right now.");
+  }
+
+  const rows = [...first.rows];
+  for (let page = 2; page <= first.totalPages; page += 1) {
+    const next = await fetchAdminOrdersPage({ page, pageSize: first.pageSize });
+    if (next.source !== "db" || next.warning) {
+      throw new Error(next.warning || `Orders page ${page} could not be loaded safely.`);
+    }
+    rows.push(...next.rows);
+  }
+
+  return rows;
 }
 
 export async function fetchAdminStats(): Promise<AdminStats> {
