@@ -146,6 +146,7 @@ try {
       service_type: "standard",
       payment_method: "cod",
       cod_amount: 87.65,
+      coupon_number: runId,
       merchant_reference: runId,
       notes: `CUSTOMER_EXPERIENCE_E2E:${runId}`,
     },
