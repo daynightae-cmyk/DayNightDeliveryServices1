@@ -9,11 +9,14 @@ on:
       - main
     paths:
       - "supabase/migrations/20260802023000_global_order_merchant_ownership_restoration.sql"
+      - "supabase/migrations/20260802024000_global_order_merchant_ownership_followup.sql"
       - "artifacts/day-night-delivery/src/lib/adminData.ts"
       - "artifacts/day-night-delivery/src/components/merchant/MerchantPortal.tsx"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
       - "artifacts/day-night-delivery/scripts/global-merchant-ownership-*.mjs"
-      - ".github/workflows/global-merchant-ownership-restoration.yml"
+      - ".github/workflows/global-merchant-ownership-*.yml"
+      - ".github/workflows/p1-runtime-evidence.yml"
+      - "docs/production/GLOBAL_MERCHANT_OWNERSHIP_*"
   workflow_dispatch:
 
 permissions:
