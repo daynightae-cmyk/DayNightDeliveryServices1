@@ -1,7 +1,8 @@
-import { createPublicOrder, supabase } from "../supabase";
+import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import { resolveOrderMerchant } from "./merchantOrderOwnership";
 
 export type OpsDataSource = "rpc" | "db";
 export type OpsPriceMode = "system" | "manual";
@@ -186,56 +187,6 @@ export function getOpsOrderReference(order: Order) {
   );
 }
 
-async function findCreatedOrder(reference: string): Promise<Order | null> {
-  if (!supabase || !reference) return null;
-  for (const column of [
-    "tracking_number",
-    "invoice_number",
-    "coupon_number",
-    "id",
-  ]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq(column, reference)
-      .limit(1);
-    if (!error && data?.[0]) return data[0] as Order;
-  }
-  return null;
-}
-
-async function attachMerchantToCreatedOrder(
-  reference: string,
-  merchant: Merchant | null,
-  input: OpsOrderInput,
-) {
-  if (!supabase || !reference) return;
-  const patch = removeEmptyUndefined({
-    merchant_id: merchant?.id || clean(input.merchant_id) || undefined,
-    merchant_name:
-      clean(merchant?.trade_name || input.merchant_name) || undefined,
-    merchant_code:
-      clean(merchant?.merchant_code || input.merchant_code) || undefined,
-    updated_at: new Date().toISOString(),
-  });
-  if (!Object.keys(patch).some((key) => key !== "updated_at")) return;
-
-  for (const column of [
-    "tracking_number",
-    "invoice_number",
-    "coupon_number",
-    "id",
-  ]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .update(patch)
-      .eq(column, reference)
-      .select("*")
-      .limit(1);
-    if (!error && data?.[0]) return;
-  }
-}
-
 function normalizeInitialOrderStatus(status: unknown) {
   const normalized = clean(status)
     .toLowerCase()
@@ -284,23 +235,36 @@ export async function fetchOpsMerchants(): Promise<Merchant[]> {
   return (data || []) as Merchant[];
 }
 
-export async function fetchOpsOrders(limit = 1000): Promise<Order[]> {
+export async function fetchOpsOrders(pageSize = 1000): Promise<Order[]> {
   if (!supabase)
     throw operationsError(
       null,
       "Supabase is not configured for order operations.",
     );
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error)
-    throw operationsError(
-      error,
-      "Orders table is not ready. Apply the admin operations migration.",
-    );
-  return (data || []) as Order[];
+
+  const safePageSize = Math.min(Math.max(Math.trunc(pageSize || 1000), 1), 1000);
+  const rows: Order[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + safePageSize - 1);
+    if (error)
+      throw operationsError(
+        error,
+        "Orders table could not be loaded safely.",
+      );
+
+    const page = (data || []) as Order[];
+    rows.push(...page);
+    if (page.length < safePageSize) break;
+    from += safePageSize;
+  }
+
+  return rows;
 }
 
 export async function fetchOpsSnapshot(): Promise<OpsSnapshot> {
@@ -459,7 +423,7 @@ export async function deleteOpsMerchant(
 function systemOrderPrice(input: OpsOrderInput) {
   if (input.shipping_scope === "international") {
     const intl = calculateInternationalPrice({
-      destination: input.destination_country || "WORLD",
+      destination: clean(input.destination_country),
       weight: Math.max(1, numberValue(input.weight, 1)),
     });
     return {
@@ -560,6 +524,35 @@ export function calculateMerchantStatementNet(input: OpsOrderInput) {
   };
 }
 
+function assertCompleteOpsOrderInput(input: OpsOrderInput, merchant: Merchant) {
+  const isInternational = input.shipping_scope === "international";
+  const receiverCity = clean(isInternational ? input.destination_country : input.delivery_city);
+  const weight = Number(input.weight);
+  const missing = [
+    !clean(input.coupon_number) && "coupon_number",
+    !clean(merchant.id) && "merchant_id",
+    !clean(merchant.trade_name) && "merchant.trade_name",
+    !clean(merchant.merchant_code) && "merchant.merchant_code",
+    !clean(merchant.phone) && "merchant.phone",
+    !clean(input.pickup_city) && "pickup_city",
+    !receiverCity && (isInternational ? "destination_country" : "delivery_city"),
+    !clean(input.receiver_name) && "receiver_name",
+    !clean(input.receiver_phone) && "receiver_phone",
+    !clean(input.receiver_address) && "receiver_address",
+    !clean(input.package_description || input.package_type) && "package_type",
+    !clean(input.payment_method) && "payment_method",
+    !clean(input.status) && "status",
+    (!Number.isFinite(Number(input.order_count)) || Number(input.order_count) <= 0) && "order_count",
+    (!Number.isFinite(weight) || weight <= 0) && "weight",
+  ].filter(Boolean);
+  if (missing.length) {
+    throw operationsError(
+      null,
+      `order_required_fields_missing:${missing.join(",")}`,
+    );
+  }
+}
+
 function buildOrderPayload(
   input: OpsOrderInput,
   merchant: Merchant | null,
@@ -575,13 +568,11 @@ function buildOrderPayload(
     order_count: count,
   });
   const senderName = clean(
-    merchant?.trade_name ||
-      input.merchant_name ||
-      "DAY NIGHT Merchant",
+    merchant?.trade_name || input.merchant_name,
   );
-  const senderPhone = clean(merchant?.phone || "971568757331");
+  const senderPhone = clean(merchant?.phone);
   const pickupEmirate = clean(
-    input.pickup_city || merchant?.emirate || "Abu Dhabi",
+    input.pickup_city || merchant?.emirate,
   );
   const merchantArea = clean(merchant?.city);
   const pickupArea = clean(
@@ -598,16 +589,14 @@ function buildOrderPayload(
       pickupEmirate,
   ]);
   const uiPaymentMethod = clean(
-    input.payment_method ||
-      merchant?.default_payment_method ||
-      "merchant_pays",
+    input.payment_method || merchant?.default_payment_method,
   );
   const paymentMethod = normalizedPaymentMethod(uiPaymentMethod);
   const isInternational = input.shipping_scope === "international";
-  const deliveryEmirate = clean(input.delivery_city || "Dubai");
+  const deliveryEmirate = clean(input.delivery_city);
   const receiverCity = isInternational
     ? clean(
-        input.destination_country || deliveryEmirate || "WORLD",
+        input.destination_country || deliveryEmirate,
       )
     : deliveryEmirate;
   const receiverAddress = composeLocationAddress([
@@ -616,9 +605,7 @@ function buildOrderPayload(
     input.receiver_address || receiverCity,
   ]);
   const description = clean(
-    input.package_description ||
-      input.package_type ||
-      "Shipment",
+    input.package_description || input.package_type,
   );
   const codAmount = collectionAmountForPayment(
     uiPaymentMethod,
@@ -648,7 +635,7 @@ function buildOrderPayload(
     codAmount,
     deliveryFee,
   );
-  const requestedStatus = clean(input.status || "pending");
+  const requestedStatus = clean(input.status);
   const safeInitialStatus =
     normalizeInitialOrderStatus(requestedStatus);
   const reviewNote =
@@ -690,7 +677,7 @@ function buildOrderPayload(
     receiver_address: receiverAddress,
     package_type: description,
     package_description: description,
-    weight: Math.max(0.1, numberValue(input.weight, 1)),
+    weight: Number(input.weight),
     pieces: count,
     service_type: isInternational ? "international" : "standard",
     payment_method: paymentMethod,
@@ -715,11 +702,9 @@ function buildOrderPayload(
       pricing.priceSource === "manual" ? deliveryFee : null,
     price_source: pricing.priceSource,
     currency: "AED",
-    notes:
-      [clean(input.notes), reviewNote, priceNote, settlementNote]
-        .filter(Boolean)
-        .join(" | ") ||
-      "Created from admin operations section",
+    notes: [clean(input.notes), reviewNote, priceNote, settlementNote]
+      .filter(Boolean)
+      .join(" | "),
     status: safeInitialStatus,
     status_history: [
       {
@@ -743,66 +728,53 @@ export async function createOpsOrder(
       null,
       "Supabase is not configured for order operations.",
     );
-  const merchant = input.merchant || null;
+
+  const selectedMerchant = input.merchant;
+  if (!selectedMerchant?.id) {
+    throw operationsError(
+      null,
+      "تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.",
+    );
+  }
+  const merchant = await resolveOrderMerchant(selectedMerchant);
+  assertCompleteOpsOrderInput(input, merchant);
+
   const createdAt = new Date().toISOString();
-  const trackingSeed =
-    clean(input.coupon_number) ||
-    `${merchant?.merchant_code || "ADMIN"}-${Date.now().toString(
-      36,
-    )}`;
+  const couponNumber = clean(input.coupon_number);
   const trackingNumber = createDayNightInvoiceNumber(
-    trackingSeed,
+    couponNumber,
     new Date(createdAt),
   );
   const payload = buildOrderPayload(
-    input,
+    { ...input, merchant, merchant_id: merchant.id, merchant_name: merchant.trade_name, merchant_code: merchant.merchant_code },
     merchant,
     trackingNumber,
     createdAt,
   );
 
-  const rpcOrder = await rpcOne<Order>(
-    "admin_create_coupon_order",
-    { p_order: payload },
-  );
-  if (
-    rpcOrder?.id ||
-    rpcOrder?.tracking_number ||
-    rpcOrder?.invoice_number
-  )
-    return { row: rpcOrder, source: "rpc" };
-
-  const publicReference = await createPublicOrder(payload);
-  if (publicReference) {
-    await attachMerchantToCreatedOrder(
-      publicReference,
-      merchant,
-      input,
-    );
-    const created = await findCreatedOrder(publicReference);
-    if (created) return { row: created, source: "rpc" };
-    return {
-      row: {
-        ...(payload as Record<string, unknown>),
-        id: publicReference,
-        tracking_number: publicReference,
-        invoice_number: trackingNumber,
-      } as Order,
-      source: "rpc",
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("admin_create_coupon_order", {
+    p_order: payload,
+  });
   if (error)
     throw operationsError(
       error,
-      "Could not create order through the admin or public production routes.",
+      "Could not create the order through the canonical admin RPC.",
     );
-  return { row: data as Order, source: "db" };
+
+  const returned = (Array.isArray(data) ? data[0] : data) as Order | null;
+  if (!returned?.id) throw operationsError(null, "admin_order_creation_returned_no_row");
+
+  const { data: saved, error: readError } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", returned.id)
+    .single();
+  if (readError || !saved)
+    throw operationsError(readError, "saved_order_verification_failed");
+  if (clean(saved.merchant_id) !== clean(merchant.id))
+    throw operationsError(null, "saved_order_merchant_portal_link_mismatch");
+
+  return { row: saved as Order, source: "rpc" };
 }
 
 export async function updateOpsOrder(
@@ -811,31 +783,23 @@ export async function updateOpsOrder(
   const reference = getOpsOrderReference(input.order);
   if (!reference)
     throw operationsError(null, "Order reference is missing.");
+  if (!supabase)
+    throw operationsError(null, "Supabase is not configured for order operations.");
 
-  const merchant =
-    input.merchant ||
-    ({
-      id: input.merchant_id || input.order.merchant_id || "",
-      trade_name:
-        input.merchant_name ||
-        input.order.merchant_name ||
-        input.order.sender_name ||
-        "",
-      merchant_code:
-        input.merchant_code || input.order.merchant_code,
-      phone: input.order.sender_phone || "",
-      emirate: input.pickup_city || input.order.sender_city,
-      city: input.pickup_area,
-      address: input.order.sender_address,
-      pickup_address: input.pickup_street,
-    } as Merchant);
+  const candidate = input.merchant || ({
+    id: input.merchant_id || input.order.merchant_id || "",
+    trade_name: input.merchant_name || input.order.merchant_name || "",
+    merchant_code: input.merchant_code || input.order.merchant_code,
+    phone: input.order.sender_phone || "",
+  } as Merchant);
+  if (!candidate.id) throw operationsError(null, "merchant_required");
+  const merchant = await resolveOrderMerchant(candidate);
+  assertCompleteOpsOrderInput(input, merchant);
 
   const patch = buildOrderPayload(
-    input,
+    { ...input, merchant, merchant_id: merchant.id, merchant_name: merchant.trade_name, merchant_code: merchant.merchant_code },
     merchant,
-    input.order.tracking_number ||
-      input.order.invoice_number ||
-      reference,
+    input.order.tracking_number || input.order.invoice_number || reference,
     input.order.created_at || new Date().toISOString(),
   );
 
@@ -851,13 +815,13 @@ export async function updateOpsOrder(
       p_payload: {
         reference,
         patch,
-        reason:
-          clean(input.edit_reason) ||
-          "Updated from admin flexible order editor",
+        reason: clean(input.edit_reason) || "Updated from admin flexible order editor",
       },
     },
     "Could not update this order. Apply the flexible-order migration and confirm admin permissions.",
   );
+  if (clean(row.merchant_id) !== clean(merchant.id))
+    throw operationsError(null, "updated_order_merchant_portal_link_mismatch");
 
   return { row, source: "rpc" };
 }

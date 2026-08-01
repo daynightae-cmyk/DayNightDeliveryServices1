@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
-import { resolveOrderMerchant } from "./orderFinancialOperations";
+import { resolveOrderMerchant } from "./merchantOrderOwnership";
 
 function clean(value?: unknown) {
   return String(value ?? "").trim();
@@ -93,7 +93,7 @@ export type AdminOrderInput = {
 };
 
 export async function fetchMerchants(): Promise<Merchant[]> {
-  if (!supabase) return [];
+  if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from("merchants")
