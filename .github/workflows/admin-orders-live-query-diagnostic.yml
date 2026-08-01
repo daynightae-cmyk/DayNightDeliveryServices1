@@ -1,0 +1,118 @@
+name: Admin Orders Live Query Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/admin-orders-live-query-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Reproduce the exact All Orders production query
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Query production as the protected admin account
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const root = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const anon = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const email = String(process.env.RUNTIME_ADMIN_EMAIL || '');
+          const password = String(process.env.RUNTIME_ADMIN_PASSWORD || '');
+          for (const [name, value] of Object.entries({ root, anon, email, password })) {
+            if (!value) throw new Error(`missing_${name}`);
+          }
+
+          const authResponse = await fetch(`${root}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: anon, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const auth = await authResponse.json().catch(() => ({}));
+          if (!authResponse.ok || !auth.access_token || !auth.user?.id) {
+            throw new Error(`admin_auth_failed_${authResponse.status}_${JSON.stringify(auth)}`);
+          }
+          console.log(`::add-mask::${auth.access_token}`);
+          const headers = {
+            apikey: anon,
+            Authorization: `Bearer ${auth.access_token}`,
+            Accept: 'application/json',
+          };
+
+          async function readPage(from, to, select = '*', count = true) {
+            const url = `${root}/rest/v1/orders?select=${encodeURIComponent(select)}&order=created_at.desc`;
+            const response = await fetch(url, {
+              headers: {
+                ...headers,
+                Range: `${from}-${to}`,
+                ...(count ? { Prefer: 'count=exact' } : {}),
+              },
+            });
+            const text = await response.text();
+            let payload;
+            try { payload = JSON.parse(text); } catch { payload = text; }
+            return {
+              ok: response.ok,
+              status: response.status,
+              contentRange: response.headers.get('content-range'),
+              payload,
+            };
+          }
+
+          const page1All = await readPage(0, 99, '*', true);
+          const page2All = await readPage(100, 199, '*', true);
+          const page1Core = await readPage(0, 99, 'id,coupon_number,merchant_id,merchant_name,created_at', true);
+          const roleResponse = await fetch(`${root}/rest/v1/rpc/is_admin_or_support`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          const rolePayload = await roleResponse.json().catch(() => null);
+
+          const compact = (result) => ({
+            ok: result.ok,
+            status: result.status,
+            contentRange: result.contentRange,
+            rowCount: Array.isArray(result.payload) ? result.payload.length : null,
+            error: Array.isArray(result.payload) ? null : result.payload,
+            first: Array.isArray(result.payload) && result.payload[0]
+              ? {
+                  id: result.payload[0].id,
+                  coupon_number: result.payload[0].coupon_number,
+                  merchant_id: result.payload[0].merchant_id,
+                  merchant_name: result.payload[0].merchant_name,
+                  created_at: result.payload[0].created_at,
+                }
+              : null,
+          });
+
+          const report = {
+            projectRef: new URL(root).hostname.split('.')[0],
+            adminUser: String(auth.user.id).slice(0, 8),
+            roleRpc: { ok: roleResponse.ok, status: roleResponse.status, payload: rolePayload },
+            page1All: compact(page1All),
+            page2All: compact(page2All),
+            page1Core: compact(page1Core),
+          };
+          console.log(JSON.stringify(report, null, 2));
+
+          if (!roleResponse.ok || rolePayload !== true) process.exitCode = 2;
+          if (!page1All.ok || !Array.isArray(page1All.payload) || page1All.payload.length === 0) process.exitCode = 3;
+          if (!page2All.ok || !Array.isArray(page2All.payload)) process.exitCode = 4;
+          NODE
