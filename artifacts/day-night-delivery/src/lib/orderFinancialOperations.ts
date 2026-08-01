@@ -27,6 +27,15 @@ export type FinancialOpsOrderInput = OpsOrderInput & {
 export type FinancialOpsOrderUpdateInput = Omit<OpsOrderUpdateInput, keyof OpsOrderInput> &
   FinancialOpsOrderInput;
 
+export type CouponConflict = {
+  coupon_number: string;
+  order_id: string;
+  tracking_number: string;
+  merchant_name: string;
+  receiver_name: string;
+  receiver_phone: string;
+};
+
 export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -80,6 +89,74 @@ function operationError(error: unknown, fallback: string) {
   const wrapped = new Error(detail || fallback) as Error & { dbDetail?: string };
   wrapped.dbDetail = detail;
   return wrapped;
+}
+
+function couponIntegrityUnavailable(error: unknown) {
+  const detail = opsErrorDetail(error);
+  if (detail) console.warn("Coupon integrity preflight unavailable:", detail);
+  const wrapped = new Error(
+    "تعذر التحقق من تكرار رقم الكوبون بأمان. لم يتم حفظ الطلب. تأكد من تطبيق Migration حماية الكوبونات ثم أعد المحاولة.",
+  ) as Error & { code?: string };
+  wrapped.name = "CouponIntegrityCheckUnavailable";
+  wrapped.code = "coupon_integrity_check_unavailable";
+  return wrapped;
+}
+
+function duplicateCouponError(conflict: CouponConflict, requestedCoupon: unknown) {
+  const coupon = clean(conflict.coupon_number || requestedCoupon) || "غير محدد";
+  const tracking = clean(conflict.tracking_number || conflict.order_id) || "غير محدد";
+  const merchant = clean(conflict.merchant_name) || "غير محدد";
+  const receiver = clean(conflict.receiver_name);
+  const receiverSuffix = receiver ? `، والمستلم ${receiver}` : "";
+  const wrapped = new Error(
+    `رقم الكوبون «${coupon}» مسجل بالفعل على الطلب ${tracking} للتاجر ${merchant}${receiverSuffix}. لا يمكن تكرار رقم الكوبون. افتح الطلب الموجود من صفحة كافة الطلبات أو استخدم رقم كوبون جديدًا.`,
+  ) as Error & { code?: string; conflict?: CouponConflict };
+  wrapped.name = "DuplicateCouponError";
+  wrapped.code = "coupon_number_already_exists";
+  wrapped.conflict = conflict;
+  return wrapped;
+}
+
+export async function findCouponConflict(
+  couponNumber: unknown,
+  excludeOrderId: string | null = null,
+): Promise<CouponConflict | null> {
+  if (!supabase) throw couponIntegrityUnavailable(null);
+  const coupon = clean(couponNumber);
+  if (!coupon) return null;
+
+  const { data, error } = await supabase.rpc("admin_find_coupon_conflict", {
+    p_coupon: coupon,
+    p_exclude_order_id: excludeOrderId,
+  });
+  if (error) throw couponIntegrityUnavailable(error);
+
+  const value = Array.isArray(data) ? data[0] : data;
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const conflict: CouponConflict = {
+    coupon_number: clean(row.coupon_number || coupon),
+    order_id: clean(row.order_id),
+    tracking_number: clean(row.tracking_number),
+    merchant_name: clean(row.merchant_name),
+    receiver_name: clean(row.receiver_name),
+    receiver_phone: clean(row.receiver_phone),
+  };
+
+  if (!conflict.order_id && !conflict.tracking_number) return null;
+  return conflict;
+}
+
+async function recoverCouponConflict(
+  couponNumber: unknown,
+  excludeOrderId: string | null = null,
+) {
+  try {
+    return await findCouponConflict(couponNumber, excludeOrderId);
+  } catch (error) {
+    console.warn("Could not recover precise coupon conflict after database rejection:", opsErrorDetail(error));
+    return null;
+  }
 }
 
 function buildFinanceNote(financials: OrderFinancialBreakdown) {
@@ -238,6 +315,9 @@ export async function createFinancialOpsOrder(
   const merchant = input.merchant;
   if (!merchant?.id) throw operationError(null, "merchant_required");
 
+  const existingConflict = await findCouponConflict(input.coupon_number);
+  if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
+
   const financials = calculateFinancialOpsOrder(input);
   const createdAt = new Date().toISOString();
   const trackingSeed = clean(input.coupon_number) || `${merchant.merchant_code || "ADMIN"}-${Date.now().toString(36)}`;
@@ -246,6 +326,8 @@ export async function createFinancialOpsOrder(
 
   const { data, error } = await supabase.rpc("admin_create_coupon_order", { p_order: payload });
   if (error) {
+    const conflict = await recoverCouponConflict(input.coupon_number);
+    if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
     throw operationError(
       error,
       "Could not create the financially separated merchant order. Apply the order financial ledger migration.",
@@ -317,6 +399,10 @@ export async function updateFinancialOpsOrder(
   const merchant = input.merchant;
   if (!merchant?.id) throw operationError(null, "merchant_required");
 
+  const excludeOrderId = clean(input.order.id) || null;
+  const existingConflict = await findCouponConflict(input.coupon_number, excludeOrderId);
+  if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
+
   const financials = calculateFinancialOpsOrder(input);
   const corePatch = buildCorePatch(input, merchant, financials);
   const { data, error } = await supabase.rpc("admin_update_order_with_financials", {
@@ -333,6 +419,8 @@ export async function updateFinancialOpsOrder(
     },
   });
   if (error) {
+    const conflict = await recoverCouponConflict(input.coupon_number, excludeOrderId);
+    if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
     throw operationError(
       error,
       "Could not update the financial order. Delivered settlements are locked and require an audited adjustment.",

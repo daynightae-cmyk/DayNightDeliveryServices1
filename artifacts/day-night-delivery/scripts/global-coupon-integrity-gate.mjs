@@ -11,12 +11,17 @@ const workspacePath = path.join(
   appRoot,
   "src/components/admin/AdminSectionWorkspaceComplete.tsx",
 );
+const financialOperationsPath = path.join(
+  appRoot,
+  "src/lib/orderFinancialOperations.ts",
+);
 const migrationPath = path.join(
   repositoryRoot,
   "supabase/migrations/20260801043000_global_coupon_uniqueness.sql",
 );
 
 const workspace = fs.readFileSync(workspacePath, "utf8");
+const financialOperations = fs.readFileSync(financialOperationsPath, "utf8");
 const migration = fs.readFileSync(migrationPath, "utf8");
 
 assert.match(
@@ -43,6 +48,37 @@ assert.match(
   workspace,
   /مكرر في البيانات الحالية/,
   "Arabic duplicate warning must remain visible.",
+);
+
+assert.match(
+  financialOperations,
+  /supabase\.rpc\("admin_find_coupon_conflict"/,
+  "Financial order creation must preflight the authoritative coupon-conflict RPC.",
+);
+assert.match(
+  financialOperations,
+  /const existingConflict = await findCouponConflict\(input\.coupon_number\)/,
+  "New financial orders must be checked before the create RPC is called.",
+);
+assert.match(
+  financialOperations,
+  /const conflict = await recoverCouponConflict\(input\.coupon_number\)/,
+  "A masked database rejection must be followed by a conflict lookup for precise diagnostics.",
+);
+assert.match(
+  financialOperations,
+  /رقم الكوبون «\$\{coupon\}» مسجل بالفعل على الطلب \$\{tracking\} للتاجر \$\{merchant\}/,
+  "The operator-facing error must identify coupon, existing order, and merchant.",
+);
+assert.match(
+  financialOperations,
+  /coupon_integrity_check_unavailable/,
+  "Order entry must fail closed when the coupon integrity RPC is unavailable.",
+);
+assert.match(
+  financialOperations,
+  /findCouponConflict\(input\.coupon_number, excludeOrderId\)/,
+  "Coupon edits must exclude the current row while checking every other order.",
 );
 
 assert.match(
