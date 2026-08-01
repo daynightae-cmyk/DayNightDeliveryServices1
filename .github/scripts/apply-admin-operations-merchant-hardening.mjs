@@ -3,6 +3,12 @@ import path from "node:path";
 
 const file = path.join(process.cwd(), "artifacts/day-night-delivery/src/lib/adminOperationsData.ts");
 let source = fs.readFileSync(file, "utf8");
+const originalSource = source;
+
+// These replacements are safe on both legacy and already-hardened source.
+source = source
+  .replace(/weight:\s*Math\.max\(1,\s*numberValue\(input\.weight,\s*1\)\)/g, "weight: Number(input.weight)")
+  .replace(/input\.payment_method\s*\|\|\s*"merchant_pays"/g, "input.payment_method");
 
 const alreadyHardened =
   source.includes('import { resolveOrderMerchant } from "./merchantOrderOwnership";')
@@ -14,6 +20,7 @@ const alreadyHardened =
   && !source.includes("findCreatedOrder");
 
 if (alreadyHardened) {
+  if (source !== originalSource) fs.writeFileSync(file, source, "utf8");
   console.log("Admin operations order ownership hardening is already applied.");
   process.exit(0);
 }
