@@ -1,1 +1,0 @@
-Branch implementation is complete enough for pull-request review. No further documentation-only commits should be added before review.
