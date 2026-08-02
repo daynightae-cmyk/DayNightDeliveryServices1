@@ -1,43 +1,98 @@
 /* DAY NIGHT merchant finance files
- * Scoped contrast contract for light and dark admin themes.
- * These rules never alter data, geometry, or unrelated admin sections.
+ * Scoped light-theme contrast for the surfaces that remain navy after the
+ * global admin theme converts rounded sections and headers to light panels.
+ * No layout, business data, or unrelated admin route is affected.
  */
 
-/* The global light theme intentionally converts Tailwind text-white utilities
- * to navy. Merchant finance uses a few deliberately dark navy surfaces, so
- * those descendants must remain light with a more specific scoped contract. */
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#031226]"],
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#071A33]"],
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#031226]"],
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#071A33]"] {
+/* Dark merchant directory and metric cards. Headers and light overview cards
+ * are intentionally excluded even when their source JSX contains navy tokens. */
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  article:is([class*="bg-[#031226]"], [class*="bg-[#071A33]"], [class*="bg-[#071a33]"]) {
   color: #f8fafc !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#031226]"] :is(span, small, p, strong, b, h1, h2, h3, h4, label),
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#071A33]"] :is(span, small, p, strong, b, h1, h2, h3, h4, label),
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#031226]"] :is(span, small, p, strong, b, h1, h2, h3, h4, label),
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#071A33]"] :is(span, small, p, strong, b, h1, h2, h3, h4, label) {
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  article:is([class*="bg-[#031226]"], [class*="bg-[#071A33]"], [class*="bg-[#071a33]"])
+  :is(h2, h3, h4, p, span, small, strong, b, label) {
   color: rgba(248, 250, 252, 0.9) !important;
 }
 
-/* Dark operational rows stay dark in the premium theme, including light mode. */
-:root.light-theme main [data-admin-merchant-account-file="true"] tbody tr,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] tbody tr {
-  color: #f8fafc !important;
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  article:is([class*="bg-[#031226]"], [class*="bg-[#071A33]"], [class*="bg-[#071a33]"])
+  > strong {
+  color: #ffffff !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] tbody td,
-:root.light-theme main [data-admin-merchant-account-file="true"] tbody td :is(span, small, p, strong, b),
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] tbody td,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] tbody td :is(span, small, p, strong, b) {
+/* The premium table engine keeps body rows navy in light mode. Force readable
+ * row text with a selector stronger than the global text-white conversion. */
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  table tbody tr,
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  table tbody td {
   color: rgba(248, 250, 252, 0.92) !important;
 }
 
-/* Inputs nested inside the intentional navy search shells must not be changed
- * into white pills by the global light-theme form rule. Date/select controls
- * remain light because they are not nested transparent inputs. */
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#071A33]"] input[class~="bg-transparent"],
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#071A33]"] input[class~="bg-transparent"] {
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  table tbody td :is(p, span, small, strong, b) {
+  color: rgba(248, 250, 252, 0.92) !important;
+}
+
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  table tbody td strong {
+  color: #ffffff !important;
+}
+
+/* Dark search shells only. Date controls and other light-theme form controls
+ * retain the standard light appearance. */
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  label:is([class*="bg-[#071A33]"], [class*="bg-[#071a33]"]) {
+  color: rgba(248, 250, 252, 0.88) !important;
+}
+
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  label:is([class*="bg-[#071A33]"], [class*="bg-[#071a33]"])
+  input[class~="bg-transparent"] {
   min-height: 0 !important;
   border: 0 !important;
   background: transparent !important;
@@ -45,40 +100,74 @@
   color: #f8fafc !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] [class*="bg-[#071A33]"] input[class~="bg-transparent"]::placeholder,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] [class*="bg-[#071A33]"] input[class~="bg-transparent"]::placeholder {
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  label:is([class*="bg-[#071A33]"], [class*="bg-[#071a33]"])
+  input[class~="bg-transparent"]::placeholder {
   color: rgba(226, 232, 240, 0.76) !important;
   opacity: 1;
 }
 
-/* Restore semantic accents after the dark-surface text correction. */
-:root.light-theme main [data-admin-merchant-account-file="true"] .text-brand-gold,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] .text-brand-gold {
+/* The account footer and PDF action tray remain intentionally navy. Text
+ * elements are corrected without overriding gold/WhatsApp button foregrounds. */
+html:root.light-theme body #root main
+  [data-admin-merchant-account-file="true"] > footer,
+html:root.light-theme body #root main
+  [data-admin-merchant-pdf-statements="true"] aside {
+  color: #f8fafc !important;
+}
+
+html:root.light-theme body #root main
+  [data-admin-merchant-account-file="true"] > footer
+  :is(h2, h3, h4, p, span, small, strong, b, label),
+html:root.light-theme body #root main
+  [data-admin-merchant-pdf-statements="true"] aside
+  :is(h2, h3, h4, p, span, small, strong, b, label) {
+  color: rgba(248, 250, 252, 0.9) !important;
+}
+
+/* Semantic accents on dark surfaces. These selectors deliberately exclude
+ * light headers and gold-filled action buttons. */
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  :is(article[class*="bg-[#03"], table tbody, footer, aside)
+  .text-brand-gold {
   color: #f2c94c !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] .text-brand-sky,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] .text-brand-sky {
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  :is(article[class*="bg-[#03"], table tbody, footer, aside)
+  .text-brand-sky {
   color: #4fd7ff !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] .text-emerald-200,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] .text-emerald-200 {
+html:root.light-theme body #root main
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
+    [data-admin-merchant-account-file="true"],
+    [data-admin-merchant-pdf-statements="true"]
+  )
+  :is(article[class*="bg-[#03"], table tbody, footer, aside)
+  .text-emerald-200 {
   color: #a7f3d0 !important;
 }
 
-:root.light-theme main [data-admin-merchant-account-file="true"] .text-rose-200,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] .text-rose-200 {
-  color: #fecdd3 !important;
-}
-
-:root.light-theme main [data-admin-merchant-account-file="true"] .text-amber-100,
-:root.light-theme main [data-admin-merchant-pdf-statements="true"] .text-amber-100 {
-  color: #fef3c7 !important;
-}
-
 @media (max-width: 640px) {
-  :where(
+  :is(
+    [data-admin-merchant-accounts-directory="true"],
     [data-admin-merchant-account-file="true"],
     [data-admin-merchant-pdf-statements="true"]
   ) article {
