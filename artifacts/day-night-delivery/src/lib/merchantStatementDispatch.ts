@@ -37,6 +37,7 @@ const SESSION_TIMEOUT_MS = 12_000;
 const STATUS_RPC_TIMEOUT_MS = 12_000;
 const STATUS_TABLE_TIMEOUT_MS = 15_000;
 const CONFIRM_TIMEOUT_MS = 30_000;
+const PROTECTED_HISTORY_ATTEMPTS = 2;
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -47,12 +48,57 @@ function numeric(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function wait(milliseconds: number) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
+}
+
 function withTimeout<T>(operation: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = globalThis.setTimeout(
       () => reject(new Error(`${label}_timeout_${timeoutMs}ms`)),
       timeoutMs,
     );
+
+    Promise.resolve(operation).then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        globalThis.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
+
+/**
+ * A normal Promise timeout stops only the caller's wait. PostgREST would keep
+ * the original HTTP request alive, which can leave the phone runtime with two
+ * competing authenticated reads. Abort the request itself before starting the
+ * protected fallback.
+ */
+function withAbortTimeout<T>(
+  createOperation: (signal: AbortSignal) => PromiseLike<T>,
+  label: string,
+  timeoutMs: number,
+): Promise<T> {
+  const controller = new AbortController();
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => {
+      controller.abort();
+      reject(new Error(`${label}_timeout_${timeoutMs}ms`));
+    }, timeoutMs);
+
+    let operation: PromiseLike<T>;
+    try {
+      operation = createOperation(controller.signal);
+    } catch (cause) {
+      globalThis.clearTimeout(timer);
+      reject(cause);
+      return;
+    }
 
     Promise.resolve(operation).then(
       (value) => {
@@ -155,14 +201,16 @@ async function fetchDispatchStatusDirectly(merchantId: string) {
   for (let page = 0; page < 100; page += 1) {
     const from = page * DIRECT_HISTORY_PAGE_SIZE;
     const to = from + DIRECT_HISTORY_PAGE_SIZE - 1;
-    const result = await withTimeout(
-      supabase
-        .from("merchant_statement_dispatch_log")
-        .select("order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id")
-        .eq("merchant_id", merchantId)
-        .order("sent_at", { ascending: false })
-        .order("created_at", { ascending: false })
-        .range(from, to),
+    const result = await withAbortTimeout(
+      (signal) =>
+        supabase
+          .from("merchant_statement_dispatch_log")
+          .select("order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id")
+          .eq("merchant_id", merchantId)
+          .order("sent_at", { ascending: false })
+          .order("created_at", { ascending: false })
+          .range(from, to)
+          .abortSignal(signal),
       `merchant_statement_dispatch_direct_page_${page + 1}`,
       STATUS_TABLE_TIMEOUT_MS,
     );
@@ -204,10 +252,13 @@ export async function fetchMerchantStatementDispatchStatus(
 
   let rpcDetail = "merchant_statement_dispatch_status_failed";
   try {
-    const result = await withTimeout(
-      supabase.rpc("admin_get_merchant_statement_dispatch_status", {
-        p_merchant_id: normalizedMerchantId,
-      }),
+    const result = await withAbortTimeout(
+      (signal) =>
+        supabase
+          .rpc("admin_get_merchant_statement_dispatch_status", {
+            p_merchant_id: normalizedMerchantId,
+          })
+          .abortSignal(signal),
       "merchant_statement_dispatch_status_rpc",
       STATUS_RPC_TIMEOUT_MS,
     );
@@ -223,14 +274,26 @@ export async function fetchMerchantStatementDispatchStatus(
     rpcDetail,
   );
 
-  try {
-    return await fetchDispatchStatusDirectly(normalizedMerchantId);
-  } catch (fallbackError) {
-    const fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
-    throw new Error(
-      `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
-    );
+  let fallbackDetail = "protected history read was not attempted";
+  for (let attempt = 1; attempt <= PROTECTED_HISTORY_ATTEMPTS; attempt += 1) {
+    try {
+      if (attempt > 1) {
+        await wait(600);
+        await ensureAuthenticatedDispatchSession();
+      }
+      return await fetchDispatchStatusDirectly(normalizedMerchantId);
+    } catch (fallbackError) {
+      fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
+      console.warn(
+        `Merchant statement protected history attempt ${attempt} failed.`,
+        fallbackDetail,
+      );
+    }
   }
+
+  throw new Error(
+    `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
+  );
 }
 
 export async function confirmMerchantStatementDispatch(
@@ -245,22 +308,25 @@ export async function confirmMerchantStatementDispatch(
 
   await ensureAuthenticatedDispatchSession();
 
-  const result = await withTimeout(
-    supabase.rpc("admin_confirm_merchant_statement_dispatch", {
-      p_merchant_id: merchantId,
-      p_order_ids: orderIds,
-      p_period_label: clean(input.periodLabel) || null,
-      p_channel: "pdf_only",
-      p_resend_reason: clean(input.resendReason) || null,
-      p_metadata: {
-        source: "admin_merchant_statements_center",
-        status_trigger: "successful_pdf_export",
-        pdf_generation_succeeded: true,
-        whatsapp_changes_status: false,
-        ...input.metadata,
-      },
-      p_dry_run: false,
-    }),
+  const result = await withAbortTimeout(
+    (signal) =>
+      supabase
+        .rpc("admin_confirm_merchant_statement_dispatch", {
+          p_merchant_id: merchantId,
+          p_order_ids: orderIds,
+          p_period_label: clean(input.periodLabel) || null,
+          p_channel: "pdf_only",
+          p_resend_reason: clean(input.resendReason) || null,
+          p_metadata: {
+            source: "admin_merchant_statements_center",
+            status_trigger: "successful_pdf_export",
+            pdf_generation_succeeded: true,
+            whatsapp_changes_status: false,
+            ...input.metadata,
+          },
+          p_dry_run: false,
+        })
+        .abortSignal(signal),
     "merchant_statement_dispatch_confirm_rpc",
     CONFIRM_TIMEOUT_MS,
   );
