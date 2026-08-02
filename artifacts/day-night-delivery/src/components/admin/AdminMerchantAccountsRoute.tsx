@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader2, RefreshCw, Search } from "lucide-react";
 import type { Merchant, Order } from "../../types";
-import { fetchAdminOrders, fetchMerchants } from "../../lib/adminData";
+import { fetchMerchants } from "../../lib/adminData";
+import { fetchAdminOrdersResilient } from "../../lib/adminOrderRecovery";
 import {
   fetchFinanceLedgerSnapshot,
   type FinanceLedgerSnapshot,
@@ -54,10 +55,9 @@ async function withOperationalRetry<T>(task: () => Promise<T>, label: string): P
 }
 
 /**
- * The merchant directory and exact-UUID order view are operational data and
- * must remain usable even while the heavier finance snapshot is still loading.
- * Missing parent data is recovered directly from the same protected admin
- * sources, while finance rows fail closed and never replace merchant/order data.
+ * Merchant ownership is exposed only after both the complete protected order
+ * set and merchant directory have been verified. Finance remains an independent
+ * fail-closed layer and can never replace or fabricate operational ownership.
  */
 export default function AdminMerchantAccountsRoute({
   isArabic,
@@ -71,6 +71,8 @@ export default function AdminMerchantAccountsRoute({
   const [query, setQuery] = useState("");
   const [authoritativeOrders, setAuthoritativeOrders] = useState<Order[]>(orders);
   const [authoritativeMerchants, setAuthoritativeMerchants] = useState<Merchant[]>(merchants);
+  const [ordersVerified, setOrdersVerified] = useState(() => orders.length > 0);
+  const [merchantsVerified, setMerchantsVerified] = useState(() => merchants.length > 0);
   const [snapshot, setSnapshot] = useState<FinanceLedgerSnapshot | null>(null);
   const [financeBusy, setFinanceBusy] = useState(false);
   const [operationalBusy, setOperationalBusy] = useState(() => !orders.length || !merchants.length);
@@ -80,17 +82,23 @@ export default function AdminMerchantAccountsRoute({
   const operationalRequest = useRef(0);
 
   useEffect(() => {
-    if (orders.length) setAuthoritativeOrders(orders);
+    if (orders.length) {
+      setAuthoritativeOrders(orders);
+      setOrdersVerified(true);
+    }
   }, [orders]);
 
   useEffect(() => {
-    if (merchants.length) setAuthoritativeMerchants(merchants);
+    if (merchants.length) {
+      setAuthoritativeMerchants(merchants);
+      setMerchantsVerified(true);
+    }
   }, [merchants]);
 
   async function recoverOperationalData(force = false) {
     const requestId = ++operationalRequest.current;
-    const needOrders = force || !orders.length;
-    const needMerchants = force || !merchants.length;
+    const needOrders = force || !ordersVerified;
+    const needMerchants = force || !merchantsVerified;
     if (!needOrders && !needMerchants) {
       setOperationalBusy(false);
       return;
@@ -99,12 +107,10 @@ export default function AdminMerchantAccountsRoute({
     setOperationalBusy(true);
     setOperationalError("");
     const [ordersResult, merchantsResult] = await Promise.allSettled([
-      needOrders
-        ? withOperationalRetry(fetchAdminOrders, "orders recovery failed")
-        : Promise.resolve(orders),
+      needOrders ? fetchAdminOrdersResilient() : Promise.resolve(authoritativeOrders),
       needMerchants
         ? withOperationalRetry(fetchMerchants, "merchants recovery failed")
-        : Promise.resolve(merchants),
+        : Promise.resolve(authoritativeMerchants),
     ]);
 
     if (requestId !== operationalRequest.current) return;
@@ -112,21 +118,25 @@ export default function AdminMerchantAccountsRoute({
     const failures: string[] = [];
     if (ordersResult.status === "fulfilled") {
       setAuthoritativeOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+      setOrdersVerified(true);
     } else {
+      if (!ordersVerified) setOrdersVerified(false);
       failures.push(ordersResult.reason instanceof Error ? ordersResult.reason.message : String(ordersResult.reason));
     }
 
     if (merchantsResult.status === "fulfilled") {
       setAuthoritativeMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
+      setMerchantsVerified(true);
     } else {
+      if (!merchantsVerified) setMerchantsVerified(false);
       failures.push(merchantsResult.reason instanceof Error ? merchantsResult.reason.message : String(merchantsResult.reason));
     }
 
     if (failures.length) {
       setOperationalError(
         isArabic
-          ? "تعذر تحديث الطلبات أو التجار بعد إعادة المحاولة. استمر عرض البيانات المحمية المحملة مسبقاً، ولم يتم عرض بيانات مختلطة."
-          : "Orders or merchants could not be refreshed after retrying. Previously loaded protected data remains visible, and no mixed data was shown.",
+          ? "تعذر التحقق الكامل من الطلبات أو التجار بعد إعادة المحاولة. لم يتم فتح أي ملف تاجر ببيانات ناقصة أو مختلطة."
+          : "Orders or merchants could not be fully verified after retrying. No merchant account was opened with incomplete or mixed data.",
       );
     }
     setOperationalBusy(false);
@@ -134,13 +144,13 @@ export default function AdminMerchantAccountsRoute({
 
   useEffect(() => {
     void recoverOperationalData(false);
-  }, [orders.length, merchants.length]);
+  }, [ordersVerified, merchantsVerified]);
 
   useEffect(() => {
     const requestId = ++financeRequest.current;
     setFinanceError("");
 
-    if (!authoritativeOrders.length) {
+    if (!ordersVerified) {
       setSnapshot(null);
       setFinanceBusy(false);
       return;
@@ -165,7 +175,7 @@ export default function AdminMerchantAccountsRoute({
       .finally(() => {
         if (requestId === financeRequest.current) setFinanceBusy(false);
       });
-  }, [authoritativeOrders, dateFrom, dateTo, isArabic]);
+  }, [authoritativeOrders, dateFrom, dateTo, isArabic, ordersVerified]);
 
   async function refreshAll() {
     await recoverOperationalData(true);
@@ -174,14 +184,17 @@ export default function AdminMerchantAccountsRoute({
     });
   }
 
+  const operationalReady = ordersVerified && merchantsVerified;
   const busy = operationalBusy || financeBusy;
+  const visibleMerchants = operationalReady ? authoritativeMerchants : [];
 
   return (
     <section
       className="space-y-4"
       dir={isArabic ? "rtl" : "ltr"}
-      data-authoritative-order-count={authoritativeOrders.length}
-      data-authoritative-merchant-count={authoritativeMerchants.length}
+      data-authoritative-order-count={operationalReady ? authoritativeOrders.length : 0}
+      data-authoritative-merchant-count={visibleMerchants.length}
+      data-admin-merchant-accounts-ready={operationalReady ? "true" : "false"}
     >
       <section className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-[1fr_1fr_minmax(260px,1.3fr)_auto]">
         <label className="block">
@@ -220,6 +233,7 @@ export default function AdminMerchantAccountsRoute({
               onChange={(event) => setQuery(event.target.value)}
               className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none"
               placeholder={isArabic ? "الاسم، الكود، الهاتف..." : "Name, code, phone..."}
+              disabled={!operationalReady}
             />
           </span>
         </label>
@@ -254,8 +268,8 @@ export default function AdminMerchantAccountsRoute({
           <Loader2 className="h-4 w-4 animate-spin" />
           {operationalBusy
             ? isArabic
-              ? "جاري تحديث الطلبات والتجار من المصادر المحمية دون إخفاء الدليل الحالي..."
-              : "Refreshing orders and merchants from protected sources without hiding the current directory..."
+              ? "جاري التحقق الكامل من الطلبات والتجار عبر المصادر المحمية..."
+              : "Verifying the complete orders and merchant sets through protected sources..."
             : isArabic
               ? "دليل التجار والطلبيات جاهز؛ يجري تحميل الحركات المالية في الخلفية..."
               : "Merchant directory and orders are ready; finance movements are loading in the background..."}
@@ -264,8 +278,8 @@ export default function AdminMerchantAccountsRoute({
 
       <AdminMerchantAccountsCenter
         isArabic={isArabic}
-        merchants={authoritativeMerchants}
-        orders={authoritativeOrders}
+        merchants={visibleMerchants}
+        orders={operationalReady ? authoritativeOrders : []}
         accountEntries={snapshot?.accountEntries || []}
         settlements={snapshot?.settlements || []}
         query={query}
