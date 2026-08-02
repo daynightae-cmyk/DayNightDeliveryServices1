@@ -134,7 +134,12 @@ begin
   where id = '0b5e4b66-587c-4923-a372-9758a11578d4';
   v_current := public.dn_financial_integrity_snapshot();
   if v_expected is null or v_current is distinct from v_expected then
-    raise exception 'customer_e2e_cleanup_did_not_restore_reviewed_snapshot';
+    raise exception using
+      message = 'customer_e2e_cleanup_did_not_restore_reviewed_snapshot',
+      detail = jsonb_build_object(
+        'expected', v_expected,
+        'current_after_candidate_cleanup', v_current
+      )::text;
   end if;
 end;
 $verify$;
