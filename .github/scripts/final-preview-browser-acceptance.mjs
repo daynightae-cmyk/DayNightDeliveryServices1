@@ -227,9 +227,24 @@ async function openAdminFromInjectedSession(page) {
   await page.locator('[data-dn-command-section="all_orders"]').first().waitFor({ state: 'attached', timeout: 90000 });
 }
 
-async function selectorText(page) {
-  await page.waitForTimeout(700);
-  return page.locator('.dn-admin-bulk-selector-list').innerText();
+async function selectorText(page, expectedText = '') {
+  const list = page.locator('.dn-admin-bulk-selector-list');
+  await list.waitFor({ state: 'visible', timeout: 90000 });
+
+  if (expectedText) {
+    let latest = '';
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      latest = await list.innerText().catch(() => '');
+      if (latest.includes(expectedText)) return latest;
+      await page.waitForTimeout(500);
+    }
+    throw new Error(
+      `Timed out waiting for admin selector text ${expectedText}. Last text: ${latest.slice(0, 500)}`,
+    );
+  }
+
+  await page.waitForTimeout(1500);
+  return list.innerText();
 }
 
 async function verifyCompleteOrderEditor(page, label) {
@@ -275,7 +290,7 @@ async function testAdmin(page, label) {
 
     await merchantSelect.selectOption(ilytkId);
     await search.fill('003860');
-    let text = await selectorText(page);
+    let text = await selectorText(page, '003860');
     assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
 
     await merchantSelect.selectOption(g3bxgId);
@@ -283,7 +298,7 @@ async function testAdmin(page, label) {
     assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
 
     await search.fill(excludedCoupon);
-    text = await selectorText(page);
+    text = await selectorText(page, excludedCoupon);
     assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
 
     await merchantSelect.selectOption(ilytkId);
@@ -291,7 +306,7 @@ async function testAdmin(page, label) {
     assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
 
     await search.fill('003860');
-    text = await selectorText(page);
+    text = await selectorText(page, '003860');
     assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
     await verifyCompleteOrderEditor(page, label);
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
