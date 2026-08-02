@@ -72,29 +72,29 @@ replaceRequired(
 
   const directory = page.locator('[data-admin-merchant-accounts-directory="true"]');
   await directory.waitFor({ state: 'visible', timeout: 90000 });
-  assert(!(await page.locator('text=70 صف مالي حقيقي').isVisible().catch(() => false)), `${label}: legacy mixed finance table is still visible.`);
-  await selectIlytkCard(directory, /فتح الحساب والطلبيات|Open account and orders/, `${label} accounts`);
+  assert(!(await page.locator('text=70 صف مالي حقيقي').isVisible().catch(() => false)), label + ': legacy mixed finance table is still visible.');
+  await selectIlytkCard(directory, /فتح الحساب والطلبيات|Open account and orders/, label + ' accounts');
 
   const account = page.locator('[data-admin-merchant-account-file="true"]');
   await account.waitFor({ state: 'visible', timeout: 90000 });
   let accountText = await account.innerText();
-  assert(/DN-MER-SHOP-ILYTK|استبي ما عرفنالك/.test(accountText), `${label}: selected merchant account header is missing.`);
-  assert(!accountText.includes('DN-MER-SHOP-G3BXG'), `${label}: another merchant identity leaked into the selected account.`);
+  assert(/DN-MER-SHOP-ILYTK|استبي ما عرفنالك/.test(accountText), label + ': selected merchant account header is missing.');
+  assert(!accountText.includes('DN-MER-SHOP-G3BXG'), label + ': another merchant identity leaked into the selected account.');
 
-  await clickFirstVisible(account.getByRole('button', { name: /طلبيات التاجر|Merchant orders/ }), `${label}: merchant orders tab`);
+  await clickFirstVisible(account.getByRole('button', { name: /طلبيات التاجر|Merchant orders/ }), label + ': merchant orders tab');
   const orderRows = account.locator('tbody tr');
   await orderRows.first().waitFor({ state: 'visible', timeout: 90000 });
-  assert((await orderRows.count()) > 0, `${label}: selected merchant has no rendered order rows.`);
+  assert((await orderRows.count()) > 0, label + ': selected merchant has no rendered order rows.');
   accountText = await account.innerText();
-  assert(!accountText.includes('DN-MER-SHOP-G3BXG'), `${label}: another merchant leaked into the selected order list.`);
+  assert(!accountText.includes('DN-MER-SHOP-G3BXG'), label + ': another merchant leaked into the selected order list.');
 
-  await clickFirstVisible(account.getByRole('button', { name: /الحركات المالية|Finance ledger/ }), `${label}: finance ledger tab`);
+  await clickFirstVisible(account.getByRole('button', { name: /الحركات المالية|Finance ledger/ }), label + ': finance ledger tab');
   await page.waitForTimeout(700);
   const ledgerText = await account.innerText();
-  assert(!ledgerText.includes('DN-MER-SHOP-G3BXG'), `${label}: another merchant leaked into the finance ledger.`);
-  assert(/عزل البيانات|Data isolation|merchant_id مطابق فقط|ميرتشانت_يد مطابق فقط|Exact merchant_id only/.test(ledgerText), `${label}: exact merchant isolation indicator missing.`);
+  assert(!ledgerText.includes('DN-MER-SHOP-G3BXG'), label + ': another merchant leaked into the finance ledger.');
+  assert(/عزل البيانات|Data isolation|merchant_id مطابق فقط|ميرتشانت_يد مطابق فقط|Exact merchant_id only/.test(ledgerText), label + ': exact merchant isolation indicator missing.');
 
-  await account.screenshot({ path: `merchant-accounts-pdf-evidence/${label}-merchant-account.png` });
+  await account.screenshot({ path: 'merchant-accounts-pdf-evidence/' + label + '-merchant-account.png' });
 }`,
   'verify_accounts',
 );
@@ -105,7 +105,7 @@ replaceRequired(
   await openSection(page, 'merchant_statements', 'Merchant statements');
   const section = page.locator('section').filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ }).first();
   await section.waitFor({ state: 'visible', timeout: 90000 });
-  await selectIlytkCard(section, /فتح كشوف التاجر|Open statements/, `${label} PDF statements`);
+  await selectIlytkCard(section, /فتح كشوف التاجر|Open statements/, label + ' PDF statements');
 
   await page
     .getByText(/جاري تحميل سجل كشوف|Loading PDF statement history/)
@@ -115,23 +115,23 @@ replaceRequired(
 
   const body = page.locator('body');
   const bodyText = await body.innerText();
-  assert(/DN-MER-SHOP-ILYTK|استبي ما عرفنالك/.test(bodyText), `${label}: selected merchant PDF workspace is missing.`);
-  assert(!bodyText.includes('DN-MER-SHOP-G3BXG'), `${label}: another merchant leaked into the PDF workspace.`);
+  assert(/DN-MER-SHOP-ILYTK|استبي ما عرفنالك/.test(bodyText), label + ': selected merchant PDF workspace is missing.');
+  assert(!bodyText.includes('DN-MER-SHOP-G3BXG'), label + ': another merchant leaked into the PDF workspace.');
 
   const statusBadges = page.locator('[data-merchant-pdf-exported="true"], [data-merchant-pdf-not-exported="true"]');
   await statusBadges.first().waitFor({ state: 'visible', timeout: 90000 });
-  assert((await statusBadges.count()) > 0, `${label}: PDF inclusion status is missing beside merchant orders.`);
-  assert((await page.getByText(/تم تحويلها للتاجر|Sent to merchant/).count()) === 0, `${label}: obsolete WhatsApp transfer status is still rendered.`);
+  assert((await statusBadges.count()) > 0, label + ': PDF inclusion status is missing beside merchant orders.');
+  assert((await page.getByText(/تم تحويلها للتاجر|Sent to merchant/).count()) === 0, label + ': obsolete WhatsApp transfer status is still rendered.');
 
   const whatsapp = page.getByRole('link', { name: /فتح واتساب — بدون تغيير الحالة|Open WhatsApp — no status change/ }).first();
   await whatsapp.waitFor({ state: 'visible', timeout: 30000 });
   const href = await whatsapp.getAttribute('href');
-  assert(href?.startsWith('https://wa.me/'), `${label}: prefilled WhatsApp link is invalid.`);
-  assert(href.includes('text='), `${label}: WhatsApp summary is not prefilled.`);
+  assert(href?.startsWith('https://wa.me/'), label + ': prefilled WhatsApp link is invalid.');
+  assert(href.includes('text='), label + ': WhatsApp summary is not prefilled.');
 
   const pdfButtons = page.locator('.dn-admin-pdf-button');
-  assert((await pdfButtons.count()) > 0, `${label}: PDF export control is missing.`);
-  await page.screenshot({ path: `merchant-accounts-pdf-evidence/${label}-pdf-statements.png`, fullPage: true });
+  assert((await pdfButtons.count()) > 0, label + ': PDF export control is missing.');
+  await page.screenshot({ path: 'merchant-accounts-pdf-evidence/' + label + '-pdf-statements.png', fullPage: true });
 }`,
   'verify_pdf',
 );
