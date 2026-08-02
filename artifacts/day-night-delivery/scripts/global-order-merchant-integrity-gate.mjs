@@ -130,7 +130,6 @@ for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802033000_order_merchant_dry_run_timeout\.sql/);
   assert.match(workflow, /20260802034000_financial_reconciliation_without_portal_link\.sql/);
   assert.match(workflow, /20260802034500_customer_e2e_dependency_cleanup\.sql/);
-  assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
 }
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
 assert.match(unlinkedMerchantFinanceMigration, /financial_reconciliation_eligibility_contract_not_found/);
@@ -148,7 +147,9 @@ assert.match(reviewedReconciliationMigration, /driver_statement_rows_inserted'[\
 assert.match(reviewedReconciliationMigration, /post_reconciliation_financial_health_failed/);
 assert.match(customerE2eCleanupMigration, /CUSTOMER_EXPERIENCE_E2E:%/);
 assert.match(customerE2eCleanupMigration, /production_test_dependency_cleanup_audit/);
-assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_did_not_restore_reviewed_snapshot/);
+assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_changed_order_financial_integrity/);
+assert.match(customerE2eCleanupMigration, /v_current - 'dependent_tables'/);
+assert.match(customerE2eCleanupMigration, /missing_dependencies/);
 for (const table of [
   "financial_account_entries",
   "cod_collections",

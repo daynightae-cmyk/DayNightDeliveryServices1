@@ -27,6 +27,13 @@ create temporary table dn_customer_e2e_orphan_orders (
   run_marker text not null
 ) on commit drop;
 
+create temporary table dn_customer_e2e_cleanup_baseline (
+  financial_snapshot jsonb not null
+) on commit drop;
+
+insert into dn_customer_e2e_cleanup_baseline(financial_snapshot)
+values (public.dn_financial_integrity_snapshot());
+
 insert into dn_customer_e2e_orphan_orders(order_id, run_marker)
 select distinct
   public.dn_safe_uuid(s.order_id),
@@ -126,18 +133,19 @@ where s.order_id = c.order_id::text;
 
 do $verify$
 declare
-  v_expected jsonb;
+  v_before jsonb;
   v_current jsonb;
 begin
-  select financial_before into v_expected
-  from public.order_merchant_audit_runs
-  where id = '0b5e4b66-587c-4923-a372-9758a11578d4';
+  select financial_snapshot into v_before
+  from dn_customer_e2e_cleanup_baseline;
   v_current := public.dn_financial_integrity_snapshot();
-  if v_expected is null or v_current is distinct from v_expected then
+  if v_before is null
+     or (v_current - 'dependent_tables') is distinct from (v_before - 'dependent_tables')
+     or v_current -> 'missing_dependencies' is distinct from v_before -> 'missing_dependencies' then
     raise exception using
-      message = 'customer_e2e_cleanup_did_not_restore_reviewed_snapshot',
+      message = 'customer_e2e_cleanup_changed_order_financial_integrity',
       detail = jsonb_build_object(
-        'expected', v_expected,
+        'before', v_before,
         'current_after_candidate_cleanup', v_current
       )::text;
   end if;

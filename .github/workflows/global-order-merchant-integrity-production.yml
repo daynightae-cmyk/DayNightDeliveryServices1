@@ -124,8 +124,7 @@ jobs:
             20260802031500_personal_order_optional_coupon_policy.sql \
             20260802033000_order_merchant_dry_run_timeout.sql \
             20260802034000_financial_reconciliation_without_portal_link.sql \
-            20260802034500_customer_e2e_dependency_cleanup.sql \
-            20260802035000_apply_reviewed_order_merchant_reconciliation.sql
+            20260802034500_customer_e2e_dependency_cleanup.sql
           do
             if [ -f "$release_dir/supabase/migrations/$target" ]; then
               cmp --silent "supabase/migrations/$target" "$release_dir/supabase/migrations/$target" || {
@@ -174,8 +173,7 @@ jobs:
             20260802031500_personal_order_optional_coupon_policy.sql \
             20260802033000_order_merchant_dry_run_timeout.sql \
             20260802034000_financial_reconciliation_without_portal_link.sql \
-            20260802034500_customer_e2e_dependency_cleanup.sql \
-            20260802035000_apply_reviewed_order_merchant_reconciliation.sql
+            20260802034500_customer_e2e_dependency_cleanup.sql
           do
             if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
               cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
