@@ -10,6 +10,8 @@ type Props = {
   payload: MerchantStatementPayload;
   isArabic: boolean;
   disabled?: boolean;
+  pdfLabel?: string;
+  onPdfCreated?: () => void | Promise<void>;
 };
 
 const EPSILON = 0.005;
@@ -45,21 +47,34 @@ function preservePreciseSettlement(payload: MerchantStatementPayload): MerchantS
   };
 }
 
-export default function MerchantStatementExportButton({ payload, isArabic, disabled = false }: Props) {
+export default function MerchantStatementExportButton({
+  payload,
+  isArabic,
+  disabled = false,
+  pdfLabel,
+  onPdfCreated,
+}: Props) {
   const [busy, setBusy] = useState<"pdf" | "csv" | null>(null);
   const protectedPayload = useMemo(() => preservePreciseSettlement(payload), [payload]);
 
   async function exportPdf() {
     if (disabled || busy) return;
     setBusy("pdf");
+    let pdfCreated = false;
     try {
       await buildMerchantStatementPdf(protectedPayload);
+      pdfCreated = true;
+      await onPdfCreated?.();
     } catch (error) {
       console.error("Merchant statement PDF export failed.", error);
       window.alert(
-        isArabic
-          ? "تعذر إنشاء كشف التاجر الآن. تحقق من الاتصال ثم أعد المحاولة."
-          : "The merchant statement could not be created. Check the connection and try again.",
+        pdfCreated
+          ? isArabic
+            ? "تم إنشاء ملف PDF، لكن تعذر تسجيله في سجل كشوف التاجر. لا تعِد تصديره قبل تحديث الصفحة والتحقق من العلامة."
+            : "The PDF was created, but its merchant-statement record could not be saved. Refresh and verify the badge before exporting again."
+          : isArabic
+            ? "تعذر إنشاء كشف التاجر الآن. تحقق من الاتصال ثم أعد المحاولة."
+            : "The merchant statement could not be created. Check the connection and try again.",
       );
     } finally {
       setBusy(null);
@@ -85,7 +100,11 @@ export default function MerchantStatementExportButton({ payload, isArabic, disab
         className="dn-admin-pdf-button disabled:cursor-not-allowed disabled:opacity-40"
       >
         {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
-        {busy === "pdf" ? (isArabic ? "جاري إنشاء الكشف..." : "Creating statement...") : (isArabic ? "كشف التاجر PDF" : "Merchant PDF")}
+        {busy === "pdf"
+          ? isArabic
+            ? "جاري إنشاء الكشف..."
+            : "Creating statement..."
+          : pdfLabel || (isArabic ? "كشف التاجر PDF" : "Merchant PDF")}
       </button>
       <button
         type="button"
