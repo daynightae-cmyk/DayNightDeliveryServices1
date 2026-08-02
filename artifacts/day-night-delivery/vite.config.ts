@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { adminStepUpRulePlugin } from "./scripts/admin-step-up-rule-plugin";
-import { preciseFinancialRulePlugin } from "./scripts/precise-financial-rule-plugin";
+import { preciseFinancialRuleCompatiblePlugin } from "./scripts/precise-financial-rule-compatible-plugin";
 import { friendlyErrorMessagePlugin } from "./scripts/friendly-error-message-plugin";
 import { merchantStatementLayoutPlugin } from "./scripts/merchant-statement-layout-plugin";
 
@@ -84,7 +84,7 @@ export default defineConfig({
   },
   plugins: [
     adminStepUpRulePlugin(),
-    preciseFinancialRulePlugin(),
+    preciseFinancialRuleCompatiblePlugin(),
     friendlyErrorMessagePlugin(),
     merchantStatementLayoutPlugin(),
     react(),
