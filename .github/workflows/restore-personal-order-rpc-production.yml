@@ -1,0 +1,113 @@
+name: Restore Personal Order RPC Production
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260803011500_restore_admin_personal_order_rpc.sql"
+      - ".github/workflows/restore-personal-order-rpc-production.yml"
+      - ".github/scripts/personal-order-rpc-diagnostic.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-personal-order-rpc-production
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Validate protected production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply only the reviewed personal-order RPC migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="20260803011500_restore_admin_personal_order_rpc.sql"
+          release_dir="$RUNNER_TEMP/daynight-personal-order-rpc"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+
+          supabase --workdir "$release_dir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+
+          if [ -f "$release_dir/supabase/migrations/$target" ]; then
+            echo "$target is already recorded in production; verifying final state."
+          else
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Wait for PostgREST schema reload
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            status="$(curl -sS -o "$RUNNER_TEMP/personal-health.json" -w '%{http_code}' \
+              -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/admin_personal_orders_runtime_health" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H 'Content-Type: application/json' \
+              --data '{}')"
+            if [ "$status" = "200" ]; then
+              cat "$RUNNER_TEMP/personal-health.json"
+              exit 0
+            fi
+            cat "$RUNNER_TEMP/personal-health.json" || true
+            sleep 2
+          done
+          echo "Personal-order RPC did not enter the PostgREST schema cache." >&2
+          exit 1
+
+      - name: Install Supabase client
+        run: pnpm install --frozen-lockfile
+
+      - name: Create, verify, and clean a genuine personal order through the authenticated RPC
+        run: node .github/scripts/personal-order-rpc-diagnostic.mjs
