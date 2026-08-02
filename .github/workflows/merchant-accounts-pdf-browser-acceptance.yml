@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/merchant-accounts-pdf-browser-acceptance.yml"
       - ".github/scripts/merchant-accounts-pdf-browser-acceptance.mjs"
+      - ".github/scripts/merchant-statement-history-production-diagnostic.mjs"
       - "artifacts/day-night-delivery/src/components/admin/AdminMerchantAccountsCenter.tsx"
       - "artifacts/day-night-delivery/src/components/admin/AdminMerchantAccountsRoute.tsx"
       - "artifacts/day-night-delivery/src/components/admin/AdminMerchantStatementsCenter.tsx"
@@ -82,6 +83,12 @@ jobs:
           done
           cat merchant-accounts-pdf-evidence/local-web.log >&2
           exit 1
+
+      - name: Diagnose production PDF history authorization without writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/merchant-statement-history-production-diagnostic.mjs | tee merchant-accounts-pdf-evidence/history-production-diagnostic.json
 
       - name: Install isolated Chromium runtime
         shell: bash
