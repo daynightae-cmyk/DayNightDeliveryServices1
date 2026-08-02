@@ -7,7 +7,6 @@ on:
       - ".github/workflows/final-preview-browser-acceptance.yml"
       - ".github/scripts/final-preview-browser-acceptance.mjs"
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
-      - ".github/scripts/ilytk-session-rpc-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -23,7 +22,7 @@ concurrency:
 
 jobs:
   authenticated-preview-source:
-    name: Admin and merchant browser acceptance
+    name: Admin accounts, PDF routes, and merchant shell acceptance
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -81,12 +80,6 @@ jobs:
           cat preview-browser-evidence/local-web.log >&2
           exit 1
 
-      - name: Diagnose canonical merchant RPC chain
-        shell: bash
-        run: |
-          set -euo pipefail
-          node .github/scripts/ilytk-session-rpc-diagnostic.mjs
-
       - name: Install isolated Chromium acceptance runtime
         shell: bash
         run: |
@@ -100,7 +93,7 @@ jobs:
           npx playwright install --with-deps chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Test authenticated admin and merchant surfaces on desktop and phone
+      - name: Test authenticated accounts, PDF routes, and merchant shell on desktop and phone
         shell: bash
         run: |
           set -euo pipefail
