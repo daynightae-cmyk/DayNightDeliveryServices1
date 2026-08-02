@@ -12,7 +12,8 @@ on:
       - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
       - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
       - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
-      - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
+      - "supabase/migrations/20260802035500_delivered_statement_entry_type_integrity.sql"
+      - "supabase/production-reconciliation/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -29,7 +30,8 @@ on:
       - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
       - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
       - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
-      - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
+      - "supabase/migrations/20260802035500_delivered_statement_entry_type_integrity.sql"
+      - "supabase/production-reconciliation/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -134,7 +136,7 @@ jobs:
             20260802034700_defer_projection_during_merchant_backfill.sql \
             20260802034800_order_status_snapshot_type_compat.sql \
             20260802034900_privileged_db_reconciliation_executor.sql \
-            20260802035000_apply_reviewed_order_merchant_reconciliation.sql
+            20260802035500_delivered_statement_entry_type_integrity.sql
           do
             if [ -f "$release_dir/supabase/migrations/$target" ]; then
               echo "$target: already_recorded; preserving the production copy"
@@ -184,7 +186,7 @@ jobs:
             20260802034700_defer_projection_during_merchant_backfill.sql \
             20260802034800_order_status_snapshot_type_compat.sql \
             20260802034900_privileged_db_reconciliation_executor.sql \
-            20260802035000_apply_reviewed_order_merchant_reconciliation.sql
+            20260802035500_delivered_statement_entry_type_integrity.sql
           do
             if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
               cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"

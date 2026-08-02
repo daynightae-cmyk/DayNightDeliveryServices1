@@ -176,7 +176,7 @@ jobs:
             20260802034700_defer_projection_during_merchant_backfill.sql
             20260802034800_order_status_snapshot_type_compat.sql
             20260802034900_privileged_db_reconciliation_executor.sql
-            20260802035000_apply_reviewed_order_merchant_reconciliation.sql
+            20260802035500_delivered_statement_entry_type_integrity.sql
           )
 
           for target in "${targets[@]}"; do
@@ -239,7 +239,7 @@ jobs:
             20260730135000 20260730136000 20260730137000 \
             20260802023000 20260802031500 20260802033000 20260802034000 \
             20260802034500 20260802034700 20260802034800 20260802034900 \
-            20260802035000
+            20260802035000 20260802035500
           do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2

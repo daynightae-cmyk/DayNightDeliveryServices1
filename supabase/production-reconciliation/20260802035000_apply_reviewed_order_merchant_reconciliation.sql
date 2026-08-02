@@ -1,4 +1,8 @@
--- Apply only the exact Dry Run reviewed in production.  The migration is
+-- Production execution record: apply only the exact Dry Run reviewed in production.
+-- This file is intentionally outside supabase/migrations so fresh, staging,
+-- preview, and disaster-recovery databases never require this production UUID.
+--
+-- The execution is
 -- resumable across the three allowed statuses, and every call remains guarded
 -- by the snapshot, row locks, audit logs, and financial before/after checks in
 -- the reconciliation functions.

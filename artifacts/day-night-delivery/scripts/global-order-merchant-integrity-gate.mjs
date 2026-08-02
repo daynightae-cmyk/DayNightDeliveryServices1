@@ -31,7 +31,11 @@ const unlinkedMerchantFinanceMigration = read(
   repoRoot,
 );
 const reviewedReconciliationMigration = read(
-  "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql",
+  "supabase/production-reconciliation/20260802035000_apply_reviewed_order_merchant_reconciliation.sql",
+  repoRoot,
+);
+const statementEntryTypeMigration = read(
+  "supabase/migrations/20260802035500_delivered_statement_entry_type_integrity.sql",
   repoRoot,
 );
 const customerE2eCleanupMigration = read(
@@ -145,8 +149,19 @@ for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802034700_defer_projection_during_merchant_backfill\.sql/);
   assert.match(workflow, /20260802034800_order_status_snapshot_type_compat\.sql/);
   assert.match(workflow, /20260802034900_privileged_db_reconciliation_executor\.sql/);
-  assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
+  assert.match(workflow, /20260802035500_delivered_statement_entry_type_integrity\.sql/);
 }
+assert.match(integrityWorkflow, /supabase\/production-reconciliation\/20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
+assert.equal(
+  fs.existsSync(
+    path.join(
+      repoRoot,
+      "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql",
+    ),
+  ),
+  false,
+  "production-only reviewed reconciliation must not block portable migration chains",
+);
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
 assert.match(unlinkedMerchantFinanceMigration, /financial_reconciliation_eligibility_contract_not_found/);
 assert.doesNotMatch(
@@ -165,6 +180,16 @@ assert.match(reviewedReconciliationMigration, /driver_statement_rows_inserted'[\
 assert.match(reviewedReconciliationMigration, /post_reconciliation_missing_dependencies_failed/);
 assert.match(reviewedReconciliationMigration, /remaining_missing_dependencies/);
 assert.doesNotMatch(reviewedReconciliationMigration, /admin_finance_reconciliation_health/);
+for (const fragment of [
+  "dn_missing_financial_dependencies_snapshot",
+  "admin_apply_safe_missing_financial_dependencies",
+  "dn_project_delivered_order_dependencies",
+  "m.entry_type = ''order_cod''",
+  "d.entry_type = ''delivery_earning''",
+  "delivered_statement_entry_type_integrity_install_failed",
+]) {
+  assert.ok(statementEntryTypeMigration.includes(fragment), `statement entry migration contains ${fragment}`);
+}
 assert.match(customerE2eCleanupMigration, /CUSTOMER_EXPERIENCE_E2E:%/);
 assert.match(customerE2eCleanupMigration, /production_test_dependency_cleanup_audit/);
 assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_changed_order_financial_integrity/);
