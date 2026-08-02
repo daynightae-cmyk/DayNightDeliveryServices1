@@ -1,0 +1,171 @@
+name: Merchant Accounts PDF Finalize Once
+
+on:
+  push:
+    branches:
+      - feat/merchant-statement-dispatch-tracking-20260802
+    paths:
+      - .github/workflows/merchant-accounts-pdf-finalize-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/merchant-statement-dispatch-tracking-20260802
+          fetch-depth: 0
+
+      - name: Patch finance routing and validation gates
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          finance_path = Path('artifacts/day-night-delivery/src/components/admin/AdminFinanceOperationsCenter.tsx')
+          finance = finance_path.read_text(encoding='utf-8')
+
+          old = 'import AdminDriverStatementsCenter from "./AdminDriverStatementsCenter";\n'
+          new = old + 'import AdminMerchantAccountsCenter from "./AdminMerchantAccountsCenter";\n'
+          assert old in finance and 'AdminMerchantAccountsCenter' not in finance
+          finance = finance.replace(old, new, 1)
+
+          old_h1 = '<h1 className="mt-2 text-3xl font-black text-white">{view === "merchant_statements" ? (isArabic ? "كشوفات التجار والطلبيات" : "Merchant Order Statements") : view === "driver_statements" ? (isArabic ? "كشوفات المناديب والرواتب" : "Driver Statements & Payroll") : (isArabic ? "مركز المالية والميزانية" : "Finance & Budget Control Center")}</h1>'
+          new_h1 = '<h1 className="mt-2 text-3xl font-black text-white">{view === "merchant_statements" ? (isArabic ? "كشوفات التجار والطلبيات" : "Merchant Order Statements") : view === "driver_statements" ? (isArabic ? "كشوفات المناديب والرواتب" : "Driver Statements & Payroll") : view === "accounts" ? (isArabic ? "ملفات حسابات التجار" : "Merchant Account Files") : (isArabic ? "مركز المالية والميزانية" : "Finance & Budget Control Center")}</h1>'
+          assert old_h1 in finance
+          finance = finance.replace(old_h1, new_h1, 1)
+
+          old_desc = '''                {view === "merchant_statements"
+                  ? (isArabic ? "اختر أي تاجر مسجل، راجع طلباته كاملة، حدّد المطلوب ثم اطبع كشفاً احترافياً أو أرسله مباشرة إلى رقم واتساب المسجل." : "Choose any registered merchant, review the full order history, select exact orders, then export a professional statement or send it to the saved WhatsApp number.")
+                  : view === "driver_statements"
+                  ? (isArabic ? "ملفات المناديب والطلبيات المسندة والراتب والمصاريف والخصومات والدفعات من قاعدة البيانات الحقيقية، مع طباعة وإرسال الكشف." : "Real driver profiles, assigned orders, salaries, expenses, deductions, and payments with statement export and delivery.")
+                  : isArabic
+                  ? "مصدر واحد للحقيقة: ترحيلات الطلبات المسلّمة، مستحقات التجار، دخل داي نايت، المصروفات، التسويات والميزانية — بدون أرقام وهمية أو معادلات COD قديمة."
+                  : "One source of truth for delivered settlements, merchant liabilities, DAY NIGHT revenue, expenses, adjustments, and budgets—without fake rows or legacy COD formulas."}'''
+          new_desc = '''                {view === "merchant_statements"
+                  ? (isArabic ? "اختر التاجر وحدد الطلبات. تُسجل العلامة فقط بعد نجاح إنشاء كشف PDF؛ فتح واتساب لا يغير أي حالة." : "Choose the merchant and exact orders. The badge is recorded only after successful PDF creation; opening WhatsApp never changes status.")
+                  : view === "driver_statements"
+                  ? (isArabic ? "ملفات المناديب والطلبيات المسندة والراتب والمصاريف والخصومات والدفعات من قاعدة البيانات الحقيقية، مع طباعة وإرسال الكشف." : "Real driver profiles, assigned orders, salaries, expenses, deductions, and payments with statement export and delivery.")
+                  : view === "accounts"
+                  ? (isArabic ? "اختر التاجر أولاً لفتح حساباته وطلبياته وحركاته المالية في ملف مستقل بالـUUID الحقيقي، بدون خلط أو تكرار بصري مزعج." : "Choose the merchant first to open an exact-UUID isolated account, orders, and ledger workspace without mixed or visually duplicated rows.")
+                  : isArabic
+                  ? "مصدر واحد للحقيقة: ترحيلات الطلبات المسلّمة، مستحقات التجار، دخل داي نايت، المصروفات، التسويات والميزانية — بدون أرقام وهمية أو معادلات COD قديمة."
+                  : "One source of truth for delivered settlements, merchant liabilities, DAY NIGHT revenue, expenses, adjustments, and budgets—without fake rows or legacy COD formulas."}'''
+          assert old_desc in finance
+          finance = finance.replace(old_desc, new_desc, 1)
+
+          finance = finance.replace(
+              'view !== "merchant_statements" && view !== "driver_statements"',
+              'view !== "merchant_statements" && view !== "driver_statements" && view !== "accounts"',
+          )
+
+          driver_block = '''      {view === "driver_statements" && (
+        <AdminDriverStatementsCenter
+          isArabic={isArabic}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          query={query}
+          onNavigate={onNavigate}
+        />
+      )}
+'''
+          accounts_block = driver_block + '''
+      {view === "accounts" && (
+        <AdminMerchantAccountsCenter
+          isArabic={isArabic}
+          merchants={merchants}
+          orders={orders}
+          accountEntries={snapshot?.accountEntries || []}
+          settlements={snapshot?.settlements || []}
+          query={query}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onNavigate={onNavigate}
+        />
+      )}
+'''
+          assert driver_block in finance
+          finance = finance.replace(driver_block, accounts_block, 1)
+          finance_path.write_text(finance, encoding='utf-8')
+
+          ops_path = Path('artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs')
+          ops = ops_path.read_text(encoding='utf-8')
+          old = 'const statements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");'
+          new = 'const statements = read("src/components/admin/AdminMerchantStatementsCenterPdf.tsx");'
+          assert old in ops
+          ops = ops.replace(old, new, 1)
+          ops_path.write_text(ops, encoding='utf-8')
+
+          gate_path = Path('artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs')
+          gate = gate_path.read_text(encoding='utf-8')
+          gate = gate.replace(
+              'const statement = read("src/components/admin/AdminMerchantStatementsCenter.tsx");',
+              'const statement = read("src/components/admin/AdminMerchantStatementsCenterPdf.tsx");\nconst accounts = read("src/components/admin/AdminMerchantAccountsCenter.tsx");\nconst financeCenter = read("src/components/admin/AdminFinanceOperationsCenter.tsx");',
+              1,
+          )
+          gate = gate.replace(
+              'expect(statement, /تم تحويلها للتاجر|Sent to merchant/, "Every transferred order has a clear persistent badge");',
+              'expect(statement, /تم تضمينها في كشف PDF|Included in a PDF statement/, "Every PDF-exported order has a clear persistent badge");',
+              1,
+          )
+          gate = gate.replace(
+              'expect(statement, /لم يتم تحويلها|Not sent/, "Unsent orders remain visibly distinguished");',
+              'expect(statement, /لم تدخل كشف PDF|Not included in PDF/, "Orders outside PDF statements remain visibly distinguished");',
+              1,
+          )
+          gate = gate.replace(
+              'expect(statement, /data-merchant-dispatch-confirm="true"/, "Opening WhatsApp does not mark orders sent without explicit confirmation");',
+              'expect(statement, /onPdfCreated=\{\(\) => recordPdfExport/, "Only successful PDF generation records statement inclusion");',
+              1,
+          )
+          gate = gate.replace(
+              'expect(statement, /dispatchReady/, "Sending fails closed while transfer history cannot be verified");',
+              'expect(statement, /statusReady/, "PDF export fails closed while statement history cannot be verified");',
+              1,
+          )
+          gate = gate.replace(
+              'expect(dispatchClient, /ui_confirmation:\\s*true/, "Dispatch writes record explicit UI confirmation");',
+              'expect(dispatchClient, /pdf_generation_succeeded:\\s*true/, "Statement records require successful PDF generation");\nexpect(dispatchClient, /whatsapp_changes_status:\\s*false/, "WhatsApp cannot change statement status");',
+              1,
+          )
+
+          anchor = 'expect(dispatchMigration, /enable row level security/, "Merchant transfer history is protected by RLS");\n'
+          additions = anchor + '''expect(accounts, /data-admin-merchant-accounts-directory="true"/, "Accounts opens with a merchant directory instead of a mixed ledger table");
+expect(accounts, /ownsOrder\(order, merchant\.id\)/, "Merchant orders are isolated by exact merchant UUID");
+expect(accounts, /ownsLedgerRow\(row, merchant\.id\)/, "Merchant ledger rows are isolated by exact merchant UUID");
+expect(accounts, /groupDuplicateLedgerRows/, "Identical accounting rows are collapsed visually without deleting database rows");
+expect(accounts, /ملخص الحساب|Account summary/, "Merchant account has a professional summary tab");
+expect(accounts, /طلبيات التاجر|Merchant orders/, "Merchant account has an isolated orders tab");
+expect(accounts, /الحركات المالية|Finance ledger/, "Merchant account has an isolated ledger tab");
+expect(financeCenter, /AdminMerchantAccountsCenter/, "Finance accounts route mounts the specialized merchant account workspace");
+'''
+          assert anchor in gate
+          gate = gate.replace(anchor, additions, 1)
+          gate_path.write_text(gate, encoding='utf-8')
+          PY
+
+      - name: Verify patched contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'AdminMerchantAccountsCenter' artifacts/day-night-delivery/src/components/admin/AdminFinanceOperationsCenter.tsx
+          grep -F 'view !== "accounts"' artifacts/day-night-delivery/src/components/admin/AdminFinanceOperationsCenter.tsx
+          grep -F 'AdminMerchantStatementsCenterPdf.tsx' artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs
+          grep -F 'pdf_generation_succeeded' artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs
+
+      - name: Remove one-time workflow and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/merchant-accounts-pdf-finalize-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/day-night-delivery/src/components/admin/AdminFinanceOperationsCenter.tsx \
+                  artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs \
+                  artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs \
+                  .github/workflows/merchant-accounts-pdf-finalize-once.yml
+          git commit -m "feat(finance): isolate merchant accounts and PDF statement tracking"
+          git push origin HEAD:feat/merchant-statement-dispatch-tracking-20260802
