@@ -20,7 +20,7 @@ function addImport(source: string, marker: string, statement: string, label: str
 
 export function friendlyErrorMessagePlugin(): Plugin {
   return {
-    name: "day-night-friendly-error-messages-v3",
+    name: "day-night-friendly-error-messages-v4",
     enforce: "pre",
     transform(source, id) {
       const normalized = id.replace(/\\/g, "/").split("?")[0];
@@ -115,6 +115,16 @@ async function rpcOne`,
         return { code, map: null };
       }
 
+      if (normalized.endsWith("/src/lib/adminOrderEditPersistence.ts")) {
+        const code = replaceRequired(
+          source,
+          'supabase.rpc("admin_update_order_complete_verified", {',
+          'supabase.rpc("admin_update_order_complete_verified_v2", {',
+          "complete order Save corrected RPC route",
+        );
+        return { code, map: null };
+      }
+
       if (normalized.endsWith("/src/components/admin/AdminOrderEditModalComplete.tsx")) {
         const code = replaceRequired(
           source,
@@ -148,10 +158,10 @@ async function rpcOne`,
         saveError = isArabic
           ? "القيم المالية غير صالحة أو لم تُحفظ كما أُدخلت. راجع قيمة البضاعة والتوصيل والخصم وطريقة التحصيل، ثم اضغط حفظ. لم يحدث أي تعديل جزئي."
           : "The financial values are invalid or were not stored as entered. Review goods, delivery, discount, and payment method, then save. No partial change was made.";
-      } else if (/admin_order_validation_failed/.test(reason)) {
+      } else if (/complete_order_edit_created_invalid_fields|admin_order_validation_failed/.test(reason)) {
         saveError = isArabic
-          ? "بيانات الطلب الأساسية ناقصة. أكمل اسم وهاتف المرسل والمستلم والعنوان ومحتوى الشحنة، ثم اضغط حفظ. لم يحدث أي تعديل جزئي. السبب الفني: " + detail
-          : "Required order details are incomplete. Complete sender, recipient, address, and package details, then save. No partial change was made. Technical reason: " + detail;
+          ? "التعديل سيجعل بيانات الطلب الأساسية ناقصة. أكمل اسم وهاتف المرسل والمستلم والعنوان ومحتوى الشحنة، ثم اضغط حفظ. لم يحدث أي تعديل جزئي. السبب الفني: " + detail
+          : "The edit would leave required order details incomplete. Complete sender, recipient, address, and package details, then save. No partial change was made. Technical reason: " + detail;
       } else if (/admin_edit_reason_required_min_6/.test(reason)) {
         saveError = isArabic
           ? "اكتب سببًا واضحًا للتعديل لا يقل عن 6 أحرف، ثم اضغط حفظ."
