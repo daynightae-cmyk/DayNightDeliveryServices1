@@ -9,6 +9,7 @@
 -- - merchant changes resolve to the canonical portal-linked UUID;
 -- - the existing canonical merchant trigger synchronizes dependent ownership rows;
 -- - delivered financial changes use admin_adjust_order_financials_verified();
+-- - core-only edits never create a no-op financial adjustment/version increment;
 -- - every successful edit records before/after JSON and changed fields;
 -- - any failure rolls the whole edit back.
 
@@ -64,13 +65,19 @@ declare
   v_merchant public.merchants%rowtype;
   v_merchant_changed boolean := false;
   v_posted boolean := false;
+  v_financial_changed boolean := false;
   v_core_patch jsonb;
   v_set_clause text;
   v_adjustment jsonb;
   v_changed_fields text[] := '{}';
   v_audit_id uuid;
-  v_entered_delivery numeric;
+  v_entered_delivery numeric(14,2);
+  v_desired_goods numeric(14,2);
+  v_desired_discount numeric(14,2);
+  v_desired_mode text;
+  v_desired_payment text;
   v_price_source text;
+  v_desired_manual_delivery numeric(14,2);
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
@@ -121,6 +128,66 @@ begin
   end if;
 
   v_merchant_changed := v_before.merchant_id is distinct from v_merchant.id;
+
+  -- Resolve and validate the desired accounting state before writing anything.
+  v_price_source := lower(coalesce(nullif(btrim(v_patch ->> 'price_source'), ''), 'system'));
+  if v_price_source not in ('system', 'manual') then
+    raise exception 'invalid_price_source';
+  end if;
+
+  if v_price_source = 'manual' then
+    v_entered_delivery := round(public.dn_safe_numeric(v_patch ->> 'manual_delivery_price', null), 2);
+    v_desired_manual_delivery := v_entered_delivery;
+  else
+    v_entered_delivery := round(public.dn_safe_numeric(v_financials ->> 'delivery_fee', 0), 2);
+    v_desired_manual_delivery := null;
+  end if;
+  if v_entered_delivery is null or v_entered_delivery < 0 then
+    raise exception 'invalid_delivery_fee';
+  end if;
+
+  v_desired_goods := round(public.dn_safe_numeric(v_financials ->> 'goods_value', 0), 2);
+  v_desired_discount := round(public.dn_safe_numeric(v_financials ->> 'discount_amount', 0), 2);
+  if v_desired_goods < 0 or v_desired_discount < 0 then
+    raise exception 'negative_financial_value';
+  end if;
+
+  v_desired_payment := lower(replace(btrim(coalesce(
+    nullif(v_patch ->> 'payment_method', ''),
+    v_before.payment_method::text,
+    'cod'
+  )), '-', '_'));
+  if v_desired_payment = 'merchant_pays' then
+    v_desired_payment := 'sender_pays';
+  elsif v_desired_payment = 'cash' then
+    v_desired_payment := 'cod';
+  elsif v_desired_payment in ('card', 'bank_transfer') then
+    v_desired_payment := 'prepaid';
+  end if;
+  if v_desired_payment not in ('cod', 'receiver_pays', 'sender_pays', 'prepaid') then
+    raise exception 'invalid_payment_method: %', v_desired_payment;
+  end if;
+
+  v_desired_mode := lower(replace(btrim(coalesce(
+    nullif(v_financials ->> 'delivery_fee_mode', ''),
+    'customer_pays'
+  )), '-', '_'));
+  if v_desired_payment = 'sender_pays' then
+    v_desired_mode := 'deduct_from_merchant';
+  elsif v_desired_mode not in ('customer_pays', 'deduct_from_merchant') then
+    raise exception 'invalid_delivery_fee_mode: %', v_desired_mode;
+  end if;
+
+  v_financial_changed :=
+    round(coalesce(v_before.goods_value, 0)::numeric, 2) is distinct from v_desired_goods
+    or round(coalesce(v_before.delivery_fee, v_before.delivery_price, 0)::numeric, 2) is distinct from v_entered_delivery
+    or round(coalesce(v_before.discount_amount, 0)::numeric, 2) is distinct from v_desired_discount
+    or lower(replace(coalesce(v_before.delivery_fee_mode::text, 'customer_pays'), '-', '_'))
+      is distinct from v_desired_mode
+    or lower(replace(coalesce(v_before.payment_method::text, 'cod'), '-', '_'))
+      is distinct from v_desired_payment
+    or lower(coalesce(v_before.price_source::text, 'system')) is distinct from v_price_source
+    or round(v_before.manual_delivery_price::numeric, 2) is distinct from v_desired_manual_delivery;
 
   -- Change ownership first. The canonical merchant trigger keeps financial values
   -- unchanged, verifies dependent ownership conflicts, synchronizes dependency
@@ -190,27 +257,26 @@ begin
       using v_core_patch, v_before.id;
   end if;
 
-  v_price_source := lower(coalesce(nullif(btrim(v_patch ->> 'price_source'), ''), 'system'));
-  if v_price_source = 'manual' then
-    v_entered_delivery := public.dn_safe_numeric(v_patch ->> 'manual_delivery_price', null);
-  else
-    v_entered_delivery := public.dn_safe_numeric(v_financials ->> 'delivery_fee', 0);
-  end if;
-  if v_entered_delivery is null or v_entered_delivery < 0 then
-    raise exception 'invalid_delivery_fee';
-  end if;
-
-  if v_posted then
+  if v_posted and v_financial_changed then
     select public.admin_adjust_order_financials_verified(
       v_before.id,
-      public.dn_safe_numeric(v_financials ->> 'goods_value', 0),
+      v_desired_goods,
       v_entered_delivery,
-      public.dn_safe_numeric(v_financials ->> 'discount_amount', 0),
-      coalesce(nullif(v_financials ->> 'delivery_fee_mode', ''), 'customer_pays'),
-      coalesce(nullif(v_patch ->> 'payment_method', ''), v_before.payment_method::text, 'cod'),
+      v_desired_discount,
+      v_desired_mode,
+      v_desired_payment,
       v_reason
     ) into v_adjustment;
-  else
+
+    -- The existing audited adjustment intentionally records manual correction.
+    -- Restore the administrator's explicit source choice inside this same outer
+    -- transaction and preserve the final state in order_admin_edit_audit.
+    update public.orders
+    set price_source = v_price_source,
+        manual_delivery_price = v_desired_manual_delivery,
+        updated_at = clock_timestamp()
+    where id = v_before.id;
+  elsif not v_posted then
     perform public.admin_update_order_with_financials(
       jsonb_build_object(
         'reference', v_before.id::text,
@@ -286,6 +352,7 @@ begin
     'changed_fields', v_changed_fields,
     'merchant_changed', v_merchant_changed,
     'financially_posted', v_posted,
+    'financial_changed', v_financial_changed,
     'financial_adjustment_id', coalesce(v_adjustment ->> 'adjustment_id', '')
   );
 exception when others then
