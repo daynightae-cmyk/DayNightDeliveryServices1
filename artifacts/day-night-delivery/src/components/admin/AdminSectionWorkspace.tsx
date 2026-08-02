@@ -12,6 +12,7 @@ import AdminInternationalOrdersWorkspace from "./AdminInternationalOrdersWorkspa
 import AdminSectionWorkspaceComplete from "./AdminSectionWorkspaceComplete";
 
 const ORDER_PAGE_SIZE = 20;
+const OPERATIONAL_REQUEST_TIMEOUT_MS = 8_000;
 
 const ORDER_SECTIONS = new Set([
   "all_orders",
@@ -72,11 +73,30 @@ function orderSearchValues(order: WorkspaceProps["orders"][number]) {
 
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
+function withOperationalTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(`${label}_timeout`)),
+      OPERATIONAL_REQUEST_TIMEOUT_MS,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        window.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
+
 async function withOperationalRetry<T>(task: () => Promise<T>, label: string): Promise<T> {
   let latest: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await task();
+      return await withOperationalTimeout(task(), label);
     } catch (cause) {
       latest = cause;
       if (attempt < 2) await wait(500 * (attempt + 1));
@@ -98,16 +118,12 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const [recoveryError, setRecoveryError] = useState("");
   const [recoveryNonce, setRecoveryNonce] = useState(0);
 
-  const effectiveOrders = showBulkConsole
-    ? authoritativeReady
-      ? recoveredOrders
-      : []
-    : props.orders;
-  const effectiveMerchants = showBulkConsole
-    ? authoritativeReady
-      ? recoveredMerchants
-      : []
-    : props.merchants;
+  // Parent data is already loaded through the protected admin data layer. Keep
+  // it visible while an independent refresh runs, then atomically replace both
+  // lists only after the same refresh succeeds. This prevents a slow finance or
+  // auth request from hiding a valid merchant filter without ever mixing owners.
+  const effectiveOrders = showBulkConsole && authoritativeReady ? recoveredOrders : props.orders;
+  const effectiveMerchants = showBulkConsole && authoritativeReady ? recoveredMerchants : props.merchants;
 
   useEffect(() => {
     setMerchantFilterId(props.id === "all_orders" ? clean(props.initialMerchantId) : "");
@@ -125,7 +141,6 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     }
 
     let active = true;
-    setAuthoritativeReady(false);
     setRecoveryLoading(true);
     setRecoveryError("");
 
@@ -134,30 +149,18 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
       withOperationalRetry(fetchMerchants, "merchants recovery failed"),
     ]).then(([ordersResult, merchantsResult]) => {
       if (!active) return;
-      const failures: string[] = [];
 
-      if (ordersResult.status === "fulfilled") {
+      if (ordersResult.status === "fulfilled" && merchantsResult.status === "fulfilled") {
         setRecoveredOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
-      } else {
-        failures.push(ordersResult.reason instanceof Error ? ordersResult.reason.message : String(ordersResult.reason));
-      }
-
-      if (merchantsResult.status === "fulfilled") {
         setRecoveredMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
-      } else {
-        failures.push(merchantsResult.reason instanceof Error ? merchantsResult.reason.message : String(merchantsResult.reason));
-      }
-
-      if (failures.length === 0) {
         setAuthoritativeReady(true);
+        setRecoveryError("");
       } else {
-        setRecoveredOrders([]);
-        setRecoveredMerchants([]);
         setAuthoritativeReady(false);
         setRecoveryError(
           props.isArabic
-            ? "تعذر استكمال تحميل الطلبات أو التجار بعد إعادة المحاولة. لم يتم عرض بيانات مختلطة."
-            : "Orders or merchants could not be fully loaded after retrying. No mixed data was shown.",
+            ? "تعذر تحديث الطلبات أو التجار بعد إعادة المحاولة. استمر عرض البيانات المحمية المحملة مسبقاً، ولم يتم عرض بيانات مختلطة."
+            : "Orders or merchants could not be refreshed after retrying. Previously loaded protected data remains visible, and no mixed data was shown.",
         );
       }
       setRecoveryLoading(false);
@@ -166,14 +169,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     return () => {
       active = false;
     };
-  }, [
-    props.id,
-    props.isArabic,
-    props.orders.length,
-    props.merchants.length,
-    recoveryNonce,
-    showBulkConsole,
-  ]);
+  }, [props.id, props.isArabic, recoveryNonce, showBulkConsole]);
 
   const scopedMerchant = useMemo(
     () => effectiveMerchants.find((merchant) => clean(merchant.id) === merchantFilterId) || null,
@@ -220,7 +216,11 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const renderedWorkspaceOrders = shouldPageWorkspace ? pagedSectionOrders : workspaceOrders;
 
   return (
-    <>
+    <section
+      data-admin-order-data-source={authoritativeReady ? "refreshed" : "protected-parent"}
+      data-admin-order-count={effectiveOrders.length}
+      data-admin-merchant-count={effectiveMerchants.length}
+    >
       {recoveryLoading && showBulkConsole && (
         <p
           data-admin-order-operational-recovery="true"
@@ -228,8 +228,8 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           dir={props.isArabic ? "rtl" : "ltr"}
         >
           {props.isArabic
-            ? "جاري تحميل الطلبات والتجار مباشرة من المصادر المحمية دون انتظار ملخص المالية..."
-            : "Loading orders and merchants directly from protected sources without waiting for the finance summary..."}
+            ? "جاري تحديث الطلبات والتجار مباشرة من المصادر المحمية دون إخفاء البيانات الحالية..."
+            : "Refreshing orders and merchants directly from protected sources without hiding current data..."}
         </p>
       )}
 
@@ -351,6 +351,6 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           searchManaged={showBulkConsole}
         />
       )}
-    </>
+    </section>
   );
 }
