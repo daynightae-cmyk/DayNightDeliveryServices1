@@ -1,38 +1,121 @@
-name: Admin Financial Order Runtime Diagnostic
+name: Admin Financial Order Runtime Acceptance
 
 on:
   pull_request:
     branches: [main]
     paths:
+      - "artifacts/day-night-delivery/src/lib/orderMerchantResolver.ts"
+      - "supabase/migrations/20260803033500_admin_orders_allow_active_unlinked_merchants.sql"
+      - "supabase/migrations/20260803033600_admin_order_create_rollback_probe.sql"
       - ".github/workflows/diagnose-admin-financial-order-pr.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: admin-financial-order-runtime-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  exact-production-probe:
+  deploy-and-prove:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment: production-runtime-tests
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
       RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
 
     steps:
-      - name: Reproduce screenshot order and print raw database response
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify client and migration contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "order_write_allowed" artifacts/day-night-delivery/src/lib/orderMerchantResolver.ts
+          grep -q "actual_portal_link_count" artifacts/day-night-delivery/src/lib/orderMerchantResolver.ts
+          ! grep -q "portalLinkCount < 1" artifacts/day-night-delivery/src/lib/orderMerchantResolver.ts
+          grep -q "dn_resolve_admin_order_merchant_uuid" supabase/migrations/20260803033500_admin_orders_allow_active_unlinked_merchants.sql
+          grep -q "EXACT_ACTIVE_MERCHANT_NO_PORTAL_LINK" supabase/migrations/20260803033500_admin_orders_allow_active_unlinked_merchants.sql
+          grep -q "portal_visibility_rule_unchanged" supabase/migrations/20260803033500_admin_orders_allow_active_unlinked_merchants.sql
+          grep -q "daynight_admin_order_probe_rollback" supabase/migrations/20260803033600_admin_order_create_rollback_probe.sql
+          pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate protected production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply reviewed admin-order compatibility migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/daynight-admin-order-runtime"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+
+          pending=false
+          for target in \
+            20260803033500_admin_orders_allow_active_unlinked_merchants.sql \
+            20260803033600_admin_order_create_rollback_probe.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              echo "$target already exists in production."
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              pending=true
+            fi
+          done
+
+          supabase --workdir "$release_dir" db push --dry-run
+          if [ "$pending" = "true" ]; then
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Prove exact screenshot order saves and rolls back
         shell: bash
         run: |
           set -euo pipefail
           node <<'NODE'
-          const base = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const base = process.env.VITE_SUPABASE_URL.replace(/\/$/, '');
           const anon = process.env.VITE_SUPABASE_ANON_KEY;
           const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-          for (const name of ['VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','RUNTIME_ADMIN_EMAIL','RUNTIME_ADMIN_PASSWORD']) {
-            if (!process.env[name]) throw new Error(`missing ${name}`);
-          }
+          const merchantId = 'eb43f118-7dca-4284-8ba6-57128b2dc114';
 
           async function call(path, options = {}) {
             const token = options.token || anon;
@@ -43,7 +126,6 @@ jobs:
                 apikey: key,
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
-                ...(options.prefer ? { Prefer: options.prefer } : {}),
               },
               body: options.body === undefined ? undefined : JSON.stringify(options.body),
             });
@@ -55,71 +137,87 @@ jobs:
 
           const auth = await call('/auth/v1/token?grant_type=password', {
             method: 'POST',
-            body: { email: process.env.RUNTIME_ADMIN_EMAIL, password: process.env.RUNTIME_ADMIN_PASSWORD },
+            body: {
+              email: process.env.RUNTIME_ADMIN_EMAIL,
+              password: process.env.RUNTIME_ADMIN_PASSWORD,
+            },
           });
-          if (!auth.ok || !auth.value?.access_token) throw new Error(`auth failed ${JSON.stringify(auth.value)}`);
+          if (!auth.ok || !auth.value?.access_token) {
+            throw new Error(`admin_auth_failed: ${JSON.stringify(auth.value)}`);
+          }
           const access = auth.value.access_token;
 
-          const merchants = await call('/rest/v1/merchants?select=id,trade_name,owner_name,merchant_code,phone,emirate,city,address,pickup_address,status&limit=1000', { token: access });
-          if (!merchants.ok || !Array.isArray(merchants.value)) throw new Error(`merchant read failed ${JSON.stringify(merchants.value)}`);
-
-          const norm = (value) => String(value || '')
-            .normalize('NFKD')
-            .replace(/[\u064B-\u065F\u0670]/g, '')
-            .replace(/[أإآ]/g, 'ا')
-            .replace(/ة/g, 'ه')
-            .replace(/ى/g, 'ي')
-            .replace(/[^\p{L}\p{N}]+/gu, '')
-            .toLowerCase();
-          const needles = ['موزه','لين','اكواب','رسي40','rsi40','rsky40'];
-          const ranked = merchants.value.map((merchant) => {
-            const text = norm(`${merchant.owner_name} ${merchant.trade_name} ${merchant.merchant_code}`);
-            return { merchant, score: needles.filter((needle) => text.includes(norm(needle))).length };
-          }).sort((a, b) => b.score - a.score);
-          console.log('MERCHANT_CANDIDATES', JSON.stringify(ranked.slice(0, 6).map(({ merchant, score }) => ({
-            score,
-            id: merchant.id,
-            owner_name: merchant.owner_name,
-            trade_name: merchant.trade_name,
-            merchant_code: merchant.merchant_code,
-            status: merchant.status,
-          })), null, 2));
-          const selected = ranked[0]?.merchant;
-          if (!selected || ranked[0].score < 2) throw new Error('screenshot merchant not found');
-
-          const conflict = await call('/rest/v1/rpc/admin_find_coupon_conflict', {
-            method: 'POST', token: access, body: { p_coupon: '009050', p_exclude_order_id: null },
+          const merchant = await call(`/rest/v1/merchants?id=eq.${merchantId}&select=id,owner_name,trade_name,merchant_code,status`, {
+            token: service,
+            key: service,
           });
-          console.log('COUPON_009050', JSON.stringify(conflict, null, 2));
+          if (!merchant.ok || !Array.isArray(merchant.value) || merchant.value.length !== 1) {
+            throw new Error(`target_merchant_missing: ${JSON.stringify(merchant.value)}`);
+          }
+          const row = merchant.value[0];
+          if (row.owner_name !== 'موزه لين' || row.trade_name !== 'اكواب' || row.merchant_code !== 'DN-MER-SHOP-RSE40') {
+            throw new Error(`target_merchant_identity_changed: ${JSON.stringify(row)}`);
+          }
+          if (String(row.status || 'active').toLowerCase() !== 'active') {
+            throw new Error(`target_merchant_not_active: ${JSON.stringify(row)}`);
+          }
+
+          const linksBefore = await call(`/rest/v1/merchant_user_links?merchant_id=eq.${merchantId}&active=eq.true&select=user_id`, {
+            token: service,
+            key: service,
+          });
+          if (!linksBefore.ok || !Array.isArray(linksBefore.value)) {
+            throw new Error(`portal_link_read_failed: ${JSON.stringify(linksBefore.value)}`);
+          }
 
           const resolution = await call('/rest/v1/rpc/admin_resolve_order_merchant', {
-            method: 'POST', token: access, body: { p_merchant_id: selected.id },
+            method: 'POST',
+            token: access,
+            body: { p_merchant_id: merchantId },
           });
-          console.log('MERCHANT_RESOLUTION', JSON.stringify(resolution, null, 2));
+          if (!resolution.ok || !resolution.value?.ok) {
+            throw new Error(`admin_resolution_failed: ${JSON.stringify(resolution.value)}`);
+          }
+          if (resolution.value.canonical_merchant_id !== merchantId || resolution.value.order_write_allowed !== true) {
+            throw new Error(`admin_resolution_wrong_identity: ${JSON.stringify(resolution.value)}`);
+          }
+          if (Number(resolution.value.actual_portal_link_count) !== linksBefore.value.length) {
+            throw new Error(`portal_readiness_metadata_mismatch: ${JSON.stringify(resolution.value)}`);
+          }
+          if (Number(resolution.value.portal_link_count) < 1) {
+            throw new Error(`deployed_client_compatibility_missing: ${JSON.stringify(resolution.value)}`);
+          }
+
+          const realCouponCheck = await call('/rest/v1/rpc/admin_find_coupon_conflict', {
+            method: 'POST',
+            token: access,
+            body: { p_coupon: '009050', p_exclude_order_id: null },
+          });
+          if (!realCouponCheck.ok || realCouponCheck.value !== null) {
+            throw new Error(`coupon_009050_conflict: ${JSON.stringify(realCouponCheck.value)}`);
+          }
 
           const now = new Date().toISOString();
           const suffix = Date.now().toString(36).toUpperCase();
-          const ref = `DN-DIAG-${suffix}`;
-          const senderCity = String(selected.emirate || 'Abu Dhabi').trim();
-          const senderAddress = [selected.city, selected.pickup_address || selected.address || senderCity]
-            .map((value) => String(value || '').trim()).filter(Boolean).join(' - ');
+          const reference = `DN-PROBE-${suffix}`;
+          const coupon = `PROBE-009050-${suffix}`;
           const payload = {
-            tracking_number: ref,
-            tracking_code: ref,
-            invoice_number: ref,
-            coupon_number: `DIAG-009050-${suffix}`,
-            merchant_id: selected.id,
-            merchant_name: selected.trade_name,
-            merchant_code: selected.merchant_code || '',
+            tracking_number: reference,
+            tracking_code: reference,
+            invoice_number: reference,
+            coupon_number: coupon,
+            merchant_id: merchantId,
+            merchant_name: row.trade_name,
+            merchant_code: row.merchant_code,
             order_count: 1,
             shipping_scope: 'international',
             destination_country: 'KW',
             source_channel: 'admin_financial_order',
             source_domain: 'daynightae.com',
-            sender_name: selected.trade_name,
-            sender_phone: String(selected.phone || '971568757331').trim(),
-            sender_city: senderCity,
-            sender_address: senderAddress,
+            sender_name: row.trade_name,
+            sender_phone: '971568757331',
+            sender_city: 'Abu Dhabi',
+            sender_address: 'Abu Dhabi',
             receiver_name: 'عميل',
             receiver_phone: '96562221989',
             receiver_city: 'KW',
@@ -150,29 +248,67 @@ jobs:
             manual_delivery_price: null,
             price_source: 'system',
             currency: 'AED',
-            notes: 'Exact runtime diagnostic for failed admin order',
+            notes: 'Rollback-safe runtime acceptance matching user screenshot',
             status: 'pending',
-            status_history: [{ status: 'pending', date: now, created_at: now, note: 'runtime diagnostic' }],
+            status_history: [{ status: 'pending', date: now, created_at: now, note: 'rollback-safe runtime acceptance' }],
             created_at: now,
             updated_at: now,
           };
 
-          const created = await call('/rest/v1/rpc/admin_create_canonical_merchant_order', {
-            method: 'POST', token: access, body: { p_order: payload },
+          const probe = await call('/rest/v1/rpc/admin_probe_canonical_merchant_order', {
+            method: 'POST',
+            token: access,
+            body: { p_order: payload },
           });
-          console.log('CREATE_RAW', JSON.stringify(created, null, 2));
-          if (!created.ok) throw new Error(`production create failed ${JSON.stringify(created.value)}`);
+          if (!probe.ok || !probe.value?.ok || probe.value.rolled_back !== true) {
+            throw new Error(`exact_order_probe_failed: ${JSON.stringify(probe.value)}`);
+          }
 
-          const row = Array.isArray(created.value) ? created.value[0] : created.value;
-          const id = row?.id;
-          if (!id) throw new Error('created row has no id');
-          await call(`/rest/v1/order_status_history?order_id=eq.${encodeURIComponent(id)}`, {
-            method: 'DELETE', token: service, key: service, prefer: 'return=minimal',
+          const expected = {
+            merchant_id: merchantId,
+            coupon_number: coupon,
+            shipping_scope: 'international',
+            destination_country: 'KW',
+            goods_value: 0,
+            delivery_fee: 95,
+            customer_total: 95,
+            merchant_due: 0,
+            company_revenue: 95,
+            status: 'pending',
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (String(probe.value[key]) !== String(value)) {
+              throw new Error(`probe_${key}_mismatch expected=${value} actual=${probe.value[key]}`);
+            }
+          }
+
+          const persisted = await call(`/rest/v1/orders?coupon_number=eq.${encodeURIComponent(coupon)}&select=id`, {
+            token: service,
+            key: service,
           });
-          const removed = await call(`/rest/v1/orders?id=eq.${encodeURIComponent(id)}`, {
-            method: 'DELETE', token: service, key: service, prefer: 'return=minimal',
+          if (!persisted.ok || !Array.isArray(persisted.value) || persisted.value.length !== 0) {
+            throw new Error(`probe_order_persisted: ${JSON.stringify(persisted.value)}`);
+          }
+
+          const linksAfter = await call(`/rest/v1/merchant_user_links?merchant_id=eq.${merchantId}&active=eq.true&select=user_id`, {
+            token: service,
+            key: service,
           });
-          console.log('CLEANUP', JSON.stringify(removed, null, 2));
-          if (!removed.ok) throw new Error(`cleanup failed ${JSON.stringify(removed.value)}`);
-          console.log('EXACT_SAVE_PASS_AND_CLEANED', id);
+          if (!linksAfter.ok || JSON.stringify(linksAfter.value) !== JSON.stringify(linksBefore.value)) {
+            throw new Error(`portal_links_changed: before=${JSON.stringify(linksBefore.value)} after=${JSON.stringify(linksAfter.value)}`);
+          }
+
+          console.log(JSON.stringify({
+            result: 'PASS',
+            merchant: `${row.owner_name} — ${row.trade_name}`,
+            merchant_id: merchantId,
+            coupon_009050_available: true,
+            admin_order_write_allowed: true,
+            actual_portal_link_count: resolution.value.actual_portal_link_count,
+            portal_visibility_links_unchanged: true,
+            exact_international_kw_order_created_inside_probe: true,
+            goods_value_zero_accepted: true,
+            delivery_fee_95_accepted: true,
+            probe_rolled_back: true,
+          }, null, 2));
           NODE
