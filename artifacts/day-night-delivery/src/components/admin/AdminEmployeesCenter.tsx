@@ -38,6 +38,7 @@ import {
   type EmployeePayrollSnapshot,
   type NewEmployeeInput,
 } from "../../lib/adminEmployees";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 export type EmployeeCenterMode = "new" | "directory";
 
@@ -354,12 +355,11 @@ export default function AdminEmployeesCenter({ isArabic, mode, onNavigate }: Pro
   }
 
   const visibleEmployees = useMemo(() => {
-    const needle = normalize(query);
     return employees.filter((employee) => {
-      const searchMatches = !needle || normalize([
+      const searchMatches = matchesSearchQuery([
         employee.full_name, employee.employee_code, employee.phone, employee.email,
         employee.employee_type, employee.custom_job_title, employee.department,
-      ].join(" ")).includes(needle);
+      ], query);
       const typeMatches = typeFilter === "all" || employee.employee_type === typeFilter;
       const statusMatches = statusFilter === "all" || employee.employment_status === statusFilter;
       return searchMatches && typeMatches && statusMatches;

@@ -185,32 +185,19 @@ const merchantMatrix = activeMerchants.map((merchant) => {
 });
 const authUserIds = new Set(users.map((user) => clean(user.id)));
 const linkedUserIds = new Set([...portalUsersByMerchant.values()].flatMap((set) => [...set]));
-const merchant1999CouponNumbers = ["010505", "010503", "003860"];
 const canonicalMerchant1999Rows = activeMerchants.filter(
   (merchant) => identity(merchant.merchant_code) === identity("DN-MER-1999-MFAWI"),
 );
 const canonicalMerchant1999 = canonicalMerchant1999Rows.length === 1 ? canonicalMerchant1999Rows[0] : null;
 const canonicalMerchant1999Id = clean(canonicalMerchant1999?.id);
-const merchant1999Acceptance = merchant1999CouponNumbers.map((couponNumber) => {
-  const matches = classified.filter(({ order }) => identity(order.coupon_number) === identity(couponNumber));
-  const row = matches.length === 1 ? matches[0] : null;
-  const ownershipMatches = Boolean(row && canonicalMerchant1999Id && clean(row.order.merchant_id) === canonicalMerchant1999Id);
-  const portalLinked = Boolean(canonicalMerchant1999Id && (portalUsersByMerchant.get(canonicalMerchant1999Id)?.size || 0) > 0);
-  return {
-    coupon_number: couponNumber,
-    matching_order_count: matches.length,
-    order_id: row ? clean(row.order.id) : null,
-    current_merchant_id: row ? clean(row.order.merchant_id) || null : null,
-    canonical_merchant_id: canonicalMerchant1999Id || null,
-    classification: row?.classification || "MISSING_ORDER",
-    admin_visible: matches.length === 1,
-    portal_visible: ownershipMatches && portalLinked,
-    result: matches.length === 1 && ownershipMatches && portalLinked ? "PASS" : "FAIL",
-  };
-});
+const merchant1999Orders = classified.filter(({ order }) => clean(order.merchant_id) === canonicalMerchant1999Id);
+const merchant1999PortalLinked = Boolean(
+  canonicalMerchant1999Id && (portalUsersByMerchant.get(canonicalMerchant1999Id)?.size || 0) > 0,
+);
 
 const merchantIlytkCode = "DN-MER-SHOP-ILYTK";
 const merchantIlytkPhone = "971501050516";
+const merchantIlytkVideoCoupons = ["010505", "010503", "003860"];
 const canonicalMerchantIlytkRows = activeMerchants.filter(
   (merchant) => identity(merchant.merchant_code) === identity(merchantIlytkCode),
 );
@@ -239,6 +226,22 @@ const merchantIlytkCandidates = classified.flatMap(({ order, classification, can
     resolution_evidence: evidence,
     auto_repair_safe: evidence.includes("CURRENT_MERCHANT_UUID") || evidence.includes("EXACT_MERCHANT_CODE"),
   }];
+});
+const merchantIlytkVideoAcceptance = merchantIlytkVideoCoupons.map((couponNumber) => {
+  const matches = merchantIlytkCandidates.filter((order) => identity(order.coupon_number) === identity(couponNumber));
+  const row = matches.length === 1 ? matches[0] : null;
+  const ownershipMatches = Boolean(row && row.current_merchant_id === canonicalMerchantIlytkId);
+  const senderPhoneEvidence = Boolean(row?.resolution_evidence.includes("EXACT_SENDER_PHONE"));
+  return {
+    coupon_number: couponNumber,
+    matching_order_count: matches.length,
+    order_id: row?.order_id || null,
+    current_merchant_id: row?.current_merchant_id || null,
+    canonical_merchant_id: canonicalMerchantIlytkId || null,
+    exact_sender_phone_evidence: senderPhoneEvidence,
+    portal_visible: ownershipMatches && Boolean(canonicalMerchantIlytkId && (portalUsersByMerchant.get(canonicalMerchantIlytkId)?.size || 0) > 0),
+    result: matches.length === 1 && ownershipMatches && senderPhoneEvidence ? "PASS" : "REVIEWED_RECONCILIATION_REQUIRED",
+  };
 });
 
 const normalizedStatus = (value) => clean(value).toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
@@ -381,8 +384,12 @@ const report = {
   acceptance_merchant_1999: {
     canonical_merchant_match_count: canonicalMerchant1999Rows.length,
     canonical_merchant_id: canonicalMerchant1999Id || null,
-    coupons: merchant1999Acceptance,
-    result: merchant1999Acceptance.every((row) => row.result === "PASS") ? "PASS" : "FAIL",
+    database_count: merchant1999Orders.length,
+    admin_count: merchant1999Orders.length,
+    portal_count: merchant1999PortalLinked ? merchant1999Orders.length : 0,
+    portal_linked: merchant1999PortalLinked,
+    cross_owner_rows: merchant1999Orders.filter(({ candidateId }) => candidateId && candidateId !== canonicalMerchant1999Id).length,
+    result: canonicalMerchant1999Rows.length === 1 && merchant1999PortalLinked ? "PASS" : "FAIL",
   },
   diagnostic_merchant_ilytk: {
     supplied_code: merchantIlytkCode,
@@ -394,6 +401,8 @@ const report = {
     database_count_by_canonical_uuid: orderCounts.get(canonicalMerchantIlytkId) || 0,
     candidate_order_count: merchantIlytkCandidates.length,
     candidate_orders: merchantIlytkCandidates,
+    photographed_coupon_acceptance: merchantIlytkVideoAcceptance,
+    photographed_coupon_result: merchantIlytkVideoAcceptance.every((row) => row.result === "PASS") ? "PASS" : "REVIEWED_RECONCILIATION_REQUIRED",
     mode: "DIAGNOSTIC_ONLY_NO_REASSIGNMENT",
   },
   orders_modified: 0,

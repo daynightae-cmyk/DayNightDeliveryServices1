@@ -830,6 +830,18 @@ export default function AdminPanelLuxury() {
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  useEffect(() => {
+    const openMerchantOrders = (event: Event) => {
+      const merchantId = String((event as CustomEvent<{ merchantId?: unknown }>).detail?.merchantId || "").trim();
+      if (!merchantId) return;
+      setMerchantOrderScopeId(merchantId);
+      setActive("all_orders");
+      setMobileMenu(false);
+    };
+    window.addEventListener("dn-admin-open-merchant-orders", openMerchantOrders);
+    return () => window.removeEventListener("dn-admin-open-merchant-orders", openMerchantOrders);
+  }, []);
+
   const activeItem = menu.find((item) => item.id === active) || menu[0];
   const activeTitle = getMenuLabel(activeItem, isArabic);
   const metrics = useMemo(() => buildMetrics(orders), [orders]);

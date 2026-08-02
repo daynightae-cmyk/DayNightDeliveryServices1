@@ -18,6 +18,7 @@ import {
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { financialsFromOrder } from "../../lib/orderFinancials";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import {
   runTrack17Admin,
   type InternationalShipment,
@@ -38,6 +39,7 @@ type Props = {
   orders: Order[];
   merchants: Merchant[];
   onRefresh?: () => Promise<void>;
+  searchManaged?: boolean;
 };
 
 type TrackingCenterData = {
@@ -105,8 +107,8 @@ function merchantForOrder(order: Order, merchants: Merchant[]) {
   return null;
 }
 
-function searchText(order: Order, shipment?: InternationalShipment | null) {
-  return normalized([
+function searchValues(order: Order, shipment?: InternationalShipment | null) {
+  return [
     orderReference(order),
     order.coupon_number,
     order.merchant_name,
@@ -126,7 +128,7 @@ function searchText(order: Order, shipment?: InternationalShipment | null) {
     shipment?.latest_city,
     shipment?.latest_country,
     shipment?.normalized_status,
-  ].join(" "));
+  ];
 }
 
 function statusLabel(value: unknown, isArabic: boolean) {
@@ -196,6 +198,7 @@ export default function AdminInternationalOrdersWorkspace({
   orders,
   merchants,
   onRefresh,
+  searchManaged = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<WorkspaceFilter>("all");
@@ -246,10 +249,9 @@ export default function AdminInternationalOrdersWorkspace({
   }, [shipments]);
 
   const filteredOrders = useMemo(() => {
-    const needle = normalized(query);
     return internationalOrders.filter((order) => {
       const shipment = shipmentsByOrder.get(clean(order.id));
-      if (needle && !searchText(order, shipment).includes(needle)) return false;
+      if (!searchManaged && !matchesSearchQuery(searchValues(order, shipment), query)) return false;
       const trackingStatus = shipmentStatus(shipment);
       if (filter === "linked") return Boolean(shipment);
       if (filter === "awaiting") return !shipment;
@@ -258,7 +260,7 @@ export default function AdminInternationalOrdersWorkspace({
       if (filter === "exception") return /exception|delay|failed|return|cancel/.test(trackingStatus);
       return true;
     });
-  }, [filter, internationalOrders, query, shipmentsByOrder]);
+  }, [filter, internationalOrders, query, searchManaged, shipmentsByOrder]);
 
   useEffect(() => {
     if (!filteredOrders.length) {
@@ -364,12 +366,12 @@ export default function AdminInternationalOrdersWorkspace({
       </div>
 
       <div className="dn-intl-orders-toolbar">
-        <label className="dn-intl-orders-search">
+        {!searchManaged && <label className="dn-intl-orders-search">
           <Search />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "بحث بالطلب أو البوليصة أو التاجر أو العميل أو المدينة..." : "Search order, AWB, merchant, customer or city..."} />
-        </label>
+        </label>}
         <div className="dn-intl-orders-toolbar__result"><Route /><span>{isArabic ? "النتائج" : "Results"}</span><strong>{filteredOrders.length}</strong></div>
-        {(query || filter !== "all") && <button type="button" className="dn-intl-orders-clear" onClick={() => { setQuery(""); setFilter("all"); }}><RefreshCw />{isArabic ? "مسح الفلاتر" : "Clear filters"}</button>}
+        {((!searchManaged && query) || filter !== "all") && <button type="button" className="dn-intl-orders-clear" onClick={() => { setQuery(""); setFilter("all"); }}><RefreshCw />{isArabic ? "مسح الفلاتر" : "Clear filters"}</button>}
       </div>
 
       {notice && <p className="dn-intl-orders-notice">{notice}</p>}

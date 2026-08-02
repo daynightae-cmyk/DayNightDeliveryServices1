@@ -10,6 +10,7 @@ import { exportOrderPDF } from "../../lib/exportUtils";
 import { buildAdminCsv, buildAdminPdf } from "../../lib/adminPdfExport";
 import { fetchAllMerchantPortalOrders } from "../../lib/merchantPortalOrders";
 import { verifySavedOrderMerchant } from "../../lib/orderMerchantResolver";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "../../lib/exportLocalization";
 import {
   MerchantPortalShell,
@@ -555,7 +556,23 @@ export default function MerchantPortalCommandCenter() {
     onSaveTeamMember:async(input)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {data:r,error}=await supabase.rpc("merchant_save_team_member",{p_member:input});if(error)return{success:false,error:{code:"TEAM_SAVE_FAILED",message:errorMessage(error,isArabic)}};if(user)await loadData(user);return{success:true,member:mapTeamMember(recordFrom(recordFrom(r).member))}},
     onMarkNotificationRead:async(notificationId)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {error}=await supabase.rpc("merchant_mark_notification_read",{p_notification_id:notificationId});if(error)return{success:false,error:{code:"NOTIFICATION_UPDATE_FAILED",message:errorMessage(error,isArabic)}};if(user)await loadData(user);return{success:true}},
     onSubmitSupportRequest:async(input)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {data:r,error}=await supabase.rpc("merchant_create_support_ticket",{p_ticket:input});return error?{success:false,error:{code:"SUPPORT_FAILED",message:errorMessage(error,isArabic)}}:{success:true,ticket:recordFrom(r).ticket as MerchantSupportTicketViewModel}},
-    onGlobalSearch:async(query)=>{const q=query.trim().toLowerCase();const results=orders.filter(o=>[o.trackingNumber,o.invoiceNumber,o.couponNumber,o.merchantReference,o.recipientName,o.recipientPhone,o.deliveryCity,o.deliveryAddress].some(v=>clean(v).toLowerCase().includes(q))).slice(0,12).map(o=>({id:o.id,type:"order" as const,title:o.trackingNumber,subtitle:`${o.recipientName} · ${o.deliveryCity||""}`,section:"order_details"}));return{query,results}},
+    onGlobalSearch:async(query)=>{
+      const orderResults=orders
+        .filter((order)=>matchesSearchQuery([
+          order.id,order.trackingNumber,order.invoiceNumber,order.couponNumber,
+          order.merchantReference,order.recipientName,order.recipientPhone,
+          order.deliveryCity,order.deliveryAddress,order.pickupBranch,
+          order.pickupAddress,order.status,order.notes,
+        ],query))
+        .map((order)=>({id:order.id,type:"order" as const,title:order.trackingNumber,subtitle:`${order.recipientName} · ${order.deliveryCity||""}`,section:"order_details"}));
+      const invoiceResults=invoices
+        .filter((invoice)=>matchesSearchQuery([invoice.id,invoice.invoiceNumber,invoice.orderId,invoice.trackingNumber,invoice.date,invoice.amount,invoice.status],query))
+        .map((invoice)=>({id:invoice.id,type:"invoice" as const,title:invoice.invoiceNumber,subtitle:invoice.trackingNumber||invoice.status,section:"invoices"}));
+      const settlementResults=settlements
+        .filter((settlement)=>matchesSearchQuery([settlement.id,settlement.periodStart,settlement.periodEnd,settlement.paymentReference,settlement.status,settlement.netPayable],query))
+        .map((settlement)=>({id:settlement.id,type:"settlement" as const,title:settlement.paymentReference||settlement.id,subtitle:`${settlement.periodStart||""} · ${settlement.status}`,section:"settlements"}));
+      return{query,results:[...orderResults,...invoiceResults,...settlementResults].slice(0,30)};
+    },
     onToggleLanguage:toggleLanguage,onToggleTheme:toggleTheme,onLogout:async()=>{await supabase?.auth.signOut();setUser(null)}
   }),[user,merchant,orders,rawOrders,invoices,statements,isArabic,loadData,toggleLanguage,toggleTheme]);
 

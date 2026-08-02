@@ -5,6 +5,7 @@ import {
   type ComponentProps,
 } from "react";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import AdminOrderBulkOperations from "./AdminOrderBulkOperations";
 import AdminInternationalOrdersWorkspace from "./AdminInternationalOrdersWorkspace";
 import AdminSectionWorkspaceComplete from "./AdminSectionWorkspaceComplete";
@@ -34,17 +35,12 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function normalize(value: unknown) {
-  return clean(value).toLocaleLowerCase();
-}
-
 function orderId(order: WorkspaceProps["orders"][number]) {
   return clean(order.id || order.tracking_number || order.invoice_number || order.coupon_number);
 }
 
-function orderSearchText(order: WorkspaceProps["orders"][number]) {
-  return normalize(
-    [
+function orderSearchValues(order: WorkspaceProps["orders"][number]) {
+  return [
       order.id,
       order.tracking_number,
       order.invoice_number,
@@ -70,8 +66,7 @@ function orderSearchText(order: WorkspaceProps["orders"][number]) {
       order.cod_amount,
       order.delivery_price,
       order.notes,
-    ].join(" "),
-  );
+    ];
 }
 
 export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps) {
@@ -93,11 +88,10 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   );
 
   const filteredOrders = useMemo(() => {
-    const query = normalize(bulkQuery);
     if (merchantFilterId && !scopedMerchant) return [];
     return props.orders.filter((order) => {
       if (merchantFilterId && clean(order.merchant_id) !== merchantFilterId) return false;
-      if (query && !orderSearchText(order).includes(query)) return false;
+      if (!matchesSearchQuery(orderSearchValues(order), bulkQuery)) return false;
       return true;
     });
   }, [bulkQuery, merchantFilterId, props.orders, scopedMerchant]);
@@ -232,9 +226,10 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           orders={renderedWorkspaceOrders}
           merchants={props.merchants}
           onRefresh={props.onRefresh}
+          searchManaged
         />
       ) : (
-        <AdminSectionWorkspaceComplete {...props} orders={renderedWorkspaceOrders} />
+        <AdminSectionWorkspaceComplete {...props} orders={renderedWorkspaceOrders} searchManaged={showBulkConsole} />
       )}
     </>
   );

@@ -41,6 +41,7 @@ import AdminPdfExportButton from "./AdminPdfExportButton";
 import AdminMerchantStatementsCenter from "./AdminMerchantStatementsCenter";
 import AdminDriverStatementsCenter from "./AdminDriverStatementsCenter";
 import { addAdminNotification, playAdminAudioEvent } from "../../lib/adminAudio";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 export type FinanceArea =
   | "finance_dashboard"
@@ -233,8 +234,7 @@ export default function AdminFinanceOperationsCenter({
   }, [snapshot, view]);
 
   const visibleRows = useMemo(() => {
-    const needle = normalize(query);
-    return rows.filter((row) => !needle || normalize(Object.values(row).join(" ")).includes(needle)).slice(0, 500);
+    return rows.filter((row) => matchesSearchQuery(Object.values(row), query));
   }, [query, rows]);
 
   const summary = snapshot?.summary;

@@ -96,7 +96,7 @@ export type AdminOrderInput = {
 };
 
 export async function fetchMerchants(): Promise<Merchant[]> {
-  if (!supabase) return [];
+  if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from("merchants")
@@ -105,7 +105,7 @@ export async function fetchMerchants(): Promise<Merchant[]> {
 
   if (error) {
     console.warn("Failed to fetch merchants:", error.message);
-    return [];
+    throw new Error(`Merchants could not be loaded safely: ${error.message}`);
   }
 
   return (data || []) as Merchant[];
@@ -344,7 +344,7 @@ export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): P
   if (params.dateTo) query = query.lte("created_at", params.dateTo);
   if (params.search) {
     const term = safeLike(params.search);
-    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,receiver_name.ilike.%${term}%`);
+    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,coupon_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,sender_phone.ilike.%${term}%,receiver_name.ilike.%${term}%,customer_name.ilike.%${term}%,merchant_name.ilike.%${term}%,merchant_code.ilike.%${term}%`);
   }
   const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
   if (error) {
@@ -375,9 +375,7 @@ export async function fetchAdminOrders(): Promise<Order[]> {
 
 export async function fetchAdminStats(): Promise<AdminStats> {
   const fallback: AdminStats = { pending: 0, in_transit: 0, delivered: 0, cancelled: 0, total_orders: 0, today_orders: 0, active_merchants: 0, cod_total: 0, delivery_income: 0 };
-  const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const merchants = merchantsResult.status === "fulfilled" ? merchantsResult.value : [];
+  const [orders, merchants] = await Promise.all([fetchAdminOrders(), fetchMerchants()]);
   const today = new Date().toISOString().slice(0, 10);
   return orders.reduce<AdminStats>((stats, order) => {
     const status = orderStatus(order);
@@ -438,16 +436,12 @@ function normalizeFinanceSummary(row: Partial<FinanceSummary> | Record<string, u
 }
 
 async function deriveFinanceSummaryFromOrders(): Promise<FinanceSummary> {
-  const [ordersResult, expensesResult, adjustmentsResult, codResult] = await Promise.allSettled([
+  const [orders, expenses, adjustments, codRows] = await Promise.all([
     fetchAdminOrders(),
     fetchExpenses(),
     fetchAdjustments(),
     fetchCodCollections(),
   ]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const expenses = expensesResult.status === "fulfilled" ? expensesResult.value : [];
-  const adjustments = adjustmentsResult.status === "fulfilled" ? adjustmentsResult.value : [];
-  const codRows = codResult.status === "fulfilled" ? codResult.value : [];
   const delivered = orders.filter((order) => /deliver|complete/.test(orderStatus(order)));
   const cancelled = orders.filter((order) => /cancel|fail/.test(orderStatus(order)));
   const returned = orders.filter((order) => /return/.test(orderStatus(order)));
@@ -522,13 +516,21 @@ function applyAdminFilters(query: any, filters?: AdminDateFilters, dateColumn = 
 }
 
 async function fetchTableRows(table: string, filters?: AdminDateFilters, dateColumn = "created_at") {
-  if (!supabase) return [] as FinanceRow[];
-  const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn).order(dateColumn, { ascending: false }).limit(1000);
-  if (error) {
-    if (isMissingSchemaError(error)) return [] as FinanceRow[];
-    throw cleanAdminError(error);
+  if (!supabase) throw cleanAdminError(null, "Supabase is not configured.");
+  const pageSize = 1000;
+  const rows: FinanceRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn)
+      .order(dateColumn, { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      if (isMissingSchemaError(error)) return [] as FinanceRow[];
+      throw cleanAdminError(error);
+    }
+    const page = (data || []) as FinanceRow[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
   }
-  return (data || []) as FinanceRow[];
 }
 
 async function insertTableRow(table: string, payload: Record<string, unknown>) {

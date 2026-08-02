@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { AdminSectionId } from "../AdminSectionRegistry";
+import { matchesSearchQuery } from "../../../lib/searchNormalization";
 
 export type AdminCommandSectionId = AdminSectionId | "new_employee" | "employees" | "customer_experience";
 
@@ -35,10 +36,12 @@ export type AdminCommandMenuItem = {
 export type AdminCommandSearchItem = {
   key: string;
   sectionId: AdminCommandSectionId;
+  entityId?: string;
   labelAr: string;
   labelEn: string;
   secondaryAr?: string;
   secondaryEn?: string;
+  searchValues?: readonly unknown[];
   kind: "section" | "order" | "merchant";
 };
 
@@ -58,9 +61,12 @@ type AdminCommandCenterShellProps = {
   loading: boolean;
   error?: string;
   searchItems: AdminCommandSearchItem[];
+  searchLoading?: boolean;
+  searchError?: string;
   khalifaOpen: boolean;
   onNavigate: (id: AdminCommandSectionId) => void;
   onSearchSelect: (item: AdminCommandSearchItem) => void;
+  onRetrySearch?: () => void;
   onToggleLanguage: () => void;
   onToggleTheme: () => void;
   onToggleKhalifa: () => void;
@@ -95,9 +101,12 @@ export default function AdminCommandCenterShell({
   loading,
   error,
   searchItems,
+  searchLoading = false,
+  searchError = "",
   khalifaOpen,
   onNavigate,
   onSearchSelect,
+  onRetrySearch,
   onToggleLanguage,
   onToggleTheme,
   onToggleKhalifa,
@@ -124,13 +133,11 @@ export default function AdminCommandCenterShell({
   );
 
   const filteredSearch = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const source = normalized
-      ? searchItems.filter((item) =>
-          [item.labelAr, item.labelEn, item.secondaryAr, item.secondaryEn]
-            .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(normalized)),
-        )
+    const source = query.trim()
+      ? searchItems.filter((item) => matchesSearchQuery(
+          item.searchValues || [item.labelAr, item.labelEn, item.secondaryAr, item.secondaryEn],
+          query,
+        ))
       : searchItems;
     return source.slice(0, 12);
   }, [query, searchItems]);
@@ -318,10 +325,19 @@ export default function AdminCommandCenterShell({
               placeholder={isArabic ? "ابحث عن طلب أو تاجر أو قسم..." : "Search orders, merchants, or sections..."}
               aria-label={isArabic ? "البحث العام" : "Global search"}
             />
-            <kbd>⌘K</kbd>
+            {query ? (
+              <button type="button" className="dncc-search-clear" onClick={() => setQuery("")} aria-label={isArabic ? "مسح البحث العام" : "Clear global search"}><X /></button>
+            ) : <kbd>⌘K</kbd>}
             {searchOpen && (
               <div className="dncc-search-results">
-                {filteredSearch.length === 0 ? (
+                {searchError ? (
+                  <div className="dncc-search-error" role="alert">
+                    <p>{isArabic ? "تعذر تحميل فهرس البحث كاملًا. لا تعتبر عدم ظهور نتيجة دليلاً على عدم وجودها." : "The complete search index could not be loaded. A missing result does not mean the record does not exist."}</p>
+                    {onRetrySearch && <button type="button" onClick={onRetrySearch}><RefreshCw />{isArabic ? "إعادة المحاولة" : "Retry"}</button>}
+                  </div>
+                ) : searchLoading ? (
+                  <p>{isArabic ? "جاري تحميل جميع الطلبات والتجار..." : "Loading every order and merchant..."}</p>
+                ) : filteredSearch.length === 0 ? (
                   <p>{isArabic ? "لا توجد نتائج مطابقة" : "No matching results"}</p>
                 ) : (
                   filteredSearch.map((item) => (

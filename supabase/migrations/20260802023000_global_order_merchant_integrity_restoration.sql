@@ -1339,7 +1339,7 @@ begin
         order by category_code
       ) x
     ), '{}'::jsonb),
-    'acceptance_merchant_1999', coalesce((
+    'photographed_coupon_diagnostic', coalesce((
       select jsonb_agg(jsonb_build_object(
         'order_id', order_id,
         'coupon_number', coupon_number,

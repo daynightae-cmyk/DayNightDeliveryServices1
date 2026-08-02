@@ -26,13 +26,22 @@ export function MerchantCommandPalette({ open, isArabic, onClose, onSearch, onOp
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
-    setTimeout(() => inputRef.current?.focus(), 0);
+    if (!open) {
+      setQuery("");
+      setResults([]);
+      setError("");
+      setBusy(false);
+      return;
+    }
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, onClose]);
 
   useEffect(() => {

@@ -120,7 +120,7 @@ export default function AdminOrderBulkOperations({ sectionId, isArabic, orders, 
 
       <div className="dn-admin-bulk-filter-grid">
         {personal ? <div className="flex min-h-11 items-center gap-2 rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-4 text-xs font-black text-brand-gold"><UserRound className="h-4 w-4" />{isArabic ? "طلبيات شخصية بدون تاجر" : "Personal orders without merchant"}</div> : <label><span><Store className="inline h-4 w-4" /> {isArabic ? "التاجر" : "Merchant"}</span><select value={merchantId} onChange={(event) => onMerchantChange(event.target.value)}><option value="">{isArabic ? "كل التجار" : "All merchants"}</option>{merchants.map((merchant) => <option value={clean(merchant.id)} key={clean(merchant.id)}>{merchantName(merchant)}{merchant.merchant_code ? ` · ${merchant.merchant_code}` : ""}</option>)}</select></label>}
-        <label><span><Search className="inline h-4 w-4" /> {isArabic ? "بحث داخل الطلبات" : "Search orders"}</span><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={isArabic ? "تتبع، كوبون، اسم، هاتف، مدينة، حالة..." : "Tracking, coupon, name, phone, city, status..."} /></label>
+        <label><span><Search className="inline h-4 w-4" /> {isArabic ? "بحث داخل كل الطلبات" : "Search all orders"}</span><input data-admin-order-search="true" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={isArabic ? "تتبع، كوبون، اسم، هاتف، تاجر، مدينة، حالة..." : "Tracking, coupon, name, phone, merchant, city, status..."} /></label>
       </div>
 
       <div className="dn-admin-bulk-console-actions">

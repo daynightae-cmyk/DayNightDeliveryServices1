@@ -172,7 +172,7 @@ function orderReference(order: Order) {
 
 function applyWorkspaceSearch(value: string) {
   const run = () => {
-    const input = document.querySelector<HTMLInputElement>(".dn-admin-workspace-host .dn-section-form input");
+    const input = document.querySelector<HTMLInputElement>('[data-admin-order-search="true"]');
     if (!input) return false;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     setter?.call(input, value);
@@ -198,6 +198,8 @@ export default function AdminPanelCommandCenter() {
   const [khalifaOpen, setKhalifaOpen] = useState(false);
   const [searchOrders, setSearchOrders] = useState<Order[]>([]);
   const [searchMerchants, setSearchMerchants] = useState<Merchant[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   const activeItem = menu.find((item) => item.id === active) ?? menu[0];
   const searchItems = useMemo<AdminCommandSearchItem[]>(() => {
@@ -208,9 +210,10 @@ export default function AdminPanelCommandCenter() {
       labelEn: item.en,
       secondaryAr: item.groupAr,
       secondaryEn: item.groupEn,
+      searchValues: [item.ar, item.en, item.groupAr, item.groupEn],
       kind: "section" as const,
     }));
-    const orders = searchOrders.slice(0, 120).map((order) => {
+    const orders = searchOrders.map((order) => {
       const reference = orderReference(order) || (isArabic ? "طلب بدون مرجع" : "Order without reference");
       const secondary = [order.merchant_name || order.sender_name, order.receiver_name || order.customer_name, order.receiver_phone]
         .filter(Boolean)
@@ -218,23 +221,34 @@ export default function AdminPanelCommandCenter() {
       return {
         key: `order:${String(order.id || reference)}`,
         sectionId: "all_orders" as const,
+        entityId: String(order.id || ""),
         labelAr: reference,
         labelEn: reference,
         secondaryAr: secondary,
         secondaryEn: secondary,
+        searchValues: [
+          order.id, order.tracking_number, order.invoice_number, order.coupon_number,
+          order.merchant_id, order.merchant_code, order.merchant_name,
+          order.sender_name, order.sender_phone, order.receiver_name,
+          order.customer_name, order.receiver_phone, order.customer_phone,
+          order.sender_city, order.receiver_city, order.sender_address,
+          order.receiver_address, order.status, order.notes,
+        ],
         kind: "order" as const,
       };
     });
-    const merchants = searchMerchants.slice(0, 100).map((merchant) => {
+    const merchants = searchMerchants.map((merchant) => {
       const name = String(merchant.trade_name || merchant.owner_name || merchant.merchant_code || merchant.id);
       const secondary = [merchant.merchant_code, merchant.phone, merchant.city || merchant.emirate].filter(Boolean).join(" · ");
       return {
         key: `merchant:${merchant.id}`,
         sectionId: "merchants" as const,
+        entityId: String(merchant.id || ""),
         labelAr: name,
         labelEn: name,
         secondaryAr: secondary,
         secondaryEn: secondary,
+        searchValues: [merchant.id, merchant.trade_name, merchant.owner_name, merchant.merchant_code, merchant.phone, merchant.alt_phone, merchant.email, merchant.city, merchant.emirate],
         kind: "merchant" as const,
       };
     });
@@ -242,9 +256,16 @@ export default function AdminPanelCommandCenter() {
   }, [isArabic, searchMerchants, searchOrders]);
 
   async function loadSearchData() {
+    setSearchLoading(true);
+    setSearchError("");
     const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
     if (ordersResult.status === "fulfilled") setSearchOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
     if (merchantsResult.status === "fulfilled") setSearchMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
+    const failures = [ordersResult, merchantsResult]
+      .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+      .map((result) => result.reason instanceof Error ? result.reason.message : String(result.reason));
+    if (failures.length) setSearchError(failures.join(" · "));
+    setSearchLoading(false);
   }
 
   useEffect(() => {
@@ -332,6 +353,10 @@ useEffect(() => {
 };
 
 const selectSearchItem = (item: AdminCommandSearchItem) => {
+    if (item.kind === "merchant" && item.entityId) {
+      window.dispatchEvent(new CustomEvent("dn-admin-open-merchant-orders", { detail: { merchantId: item.entityId } }));
+      return;
+    }
     navigate(item.sectionId);
     if (item.kind === "order") applyWorkspaceSearch(item.labelEn);
   };
@@ -379,6 +404,9 @@ const selectSearchItem = (item: AdminCommandSearchItem) => {
       loading={loading}
       error={error}
       searchItems={searchItems}
+      searchLoading={searchLoading}
+      searchError={searchError}
+      onRetrySearch={() => void loadSearchData()}
       khalifaOpen={khalifaOpen}
       onNavigate={navigate}
       onSearchSelect={selectSearchItem}

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../supabase";
 import { useAppContext } from "../../lib/AppContext";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import companyMeta from "../../data/companyMeta";
 import { UAE_LOCATIONS, getAreasForEmirate } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
@@ -559,13 +560,17 @@ export default function MerchantPortal() {
   const profileAreas = getAreasForEmirate(profileForm.emirate);
 
   const filteredOrders = useMemo(() => {
-    const query = clean(orderSearch).toLowerCase();
     return orders.filter((order) => {
       const status = normalizeStatus(order.status);
       if (orderStatusFilter !== "all" && status !== orderStatusFilter) return false;
-      if (!query) return true;
-      return [orderReference(order), order.sender_name, order.receiver_name, order.sender_city, order.receiver_city, order.driver_name]
-        .some((value) => clean(value).toLowerCase().includes(query));
+      return matchesSearchQuery([
+        order.id, orderReference(order), order.coupon_number, order.invoice_number,
+        order.merchant_id, order.merchant_code, order.merchant_name,
+        order.sender_name, order.sender_phone, order.receiver_name,
+        order.receiver_phone, order.customer_name, order.customer_phone,
+        order.sender_city, order.receiver_city, order.sender_address,
+        order.receiver_address, order.driver_name, order.driver_phone, order.status,
+      ], orderSearch);
     });
   }, [orders, orderSearch, orderStatusFilter]);
 

@@ -33,6 +33,7 @@ import type {
   DriverAssignmentHistory,
   DriverOrder,
 } from "../../types/driver";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import "../../styles/dn-order-dispatch.css";
 
 type Props = {
@@ -74,8 +75,7 @@ const tracking = (order: DriverOrder) =>
 const currentDriverId = (order: DriverOrder) =>
   order.assigned_driver_id || order.driver_id || null;
 
-const orderSearchText = (order: DriverOrder) =>
-  [
+const orderSearchValues = (order: DriverOrder) => [
     tracking(order),
     order.merchant_name,
     order.sender_name,
@@ -89,10 +89,7 @@ const orderSearchText = (order: DriverOrder) =>
     order.customer_name,
     order.customer_phone,
     order.status,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  ];
 
 function numberOrNull(value: unknown): number | null {
   const parsed = Number(value);
@@ -217,7 +214,6 @@ export default function DriverDispatchCenter({
   );
 
   const queue = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
     return openOrders
       .filter((order) => {
         const assigned = Boolean(currentDriverId(order));
@@ -227,7 +223,7 @@ export default function DriverDispatchCenter({
           (filter === "unassigned" && !assigned) ||
           (filter === "assigned" && assigned) ||
           (filter === "in_progress" && inProgress);
-        return matchesFilter && (!normalized || orderSearchText(order).includes(normalized));
+        return matchesFilter && matchesSearchQuery(orderSearchValues(order), query);
       })
       .sort((a, b) => {
         const aUrgent = statusKey(a.priority) === "urgent" ? 1 : 0;
@@ -465,7 +461,7 @@ export default function DriverDispatchCenter({
       <div className="dn-dispatch-layout">
         <aside className="dn-dispatch-orders">
           {queue.length === 0 && <div className="dn-dispatch-empty"><CheckCircle2 /><strong>{isArabic ? "لا توجد طلبات مطابقة" : "No matching orders"}</strong></div>}
-          {queue.slice(0, 200).map((order) => {
+          {queue.map((order) => {
             const driverId = currentDriverId(order);
             const driver = drivers.find((item) => item.id === driverId);
             const selected = selectedOrder?.id === order.id;

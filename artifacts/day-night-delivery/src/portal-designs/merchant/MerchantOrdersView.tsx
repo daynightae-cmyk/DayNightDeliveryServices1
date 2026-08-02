@@ -4,6 +4,7 @@ import type { MerchantPortalCallbacks } from "./merchantCallbacks";
 import { merchantDate, merchantMoney } from "./merchantFormatters";
 import { normalizeMerchantStatus } from "./merchantStatusMapping";
 import type { MerchantOrderViewModel } from "./merchantViewModels";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import { MerchantButton, MerchantCard, MerchantSectionHeader, MerchantStatePanel, MerchantStatusBadge } from "./MerchantUi";
 
 export interface MerchantOrdersViewProps {
@@ -58,14 +59,13 @@ export function MerchantOrdersView({ orders, callbacks, isArabic, initialStatus 
   const cities = useMemo(() => Array.from(new Set(orders.map((order) => order.deliveryCity).filter(Boolean) as string[])), [orders]);
 
   const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
     return orders.filter((order) => {
       if (!matchesStatus(order, status)) return false;
       if (branch !== "all" && order.pickupBranch !== branch) return false;
       if (city !== "all" && order.deliveryCity !== city) return false;
       if (codOnly && Number(order.codAmount || 0) <= 0) return false;
-      if (!normalizedQuery) return true;
-      return [
+      return matchesSearchQuery([
+        order.id,
         order.trackingNumber,
         order.invoiceNumber,
         order.couponNumber,
@@ -74,7 +74,12 @@ export function MerchantOrdersView({ orders, callbacks, isArabic, initialStatus 
         order.recipientPhone,
         order.deliveryCity,
         order.deliveryAddress,
-      ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+        order.pickupBranch,
+        order.pickupAddress,
+        order.serviceType,
+        order.status,
+        order.notes,
+      ], query);
     });
   }, [branch, city, codOnly, orders, query, status]);
 
