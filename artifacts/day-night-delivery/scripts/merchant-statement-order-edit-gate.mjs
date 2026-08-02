@@ -74,6 +74,14 @@ expect(statement, /data-merchant-dispatch-resend-reason="true"/, "Resending requ
 expect(statement, /data-merchant-dispatch-confirm="true"/, "Opening WhatsApp does not mark orders sent without explicit confirmation");
 expect(statement, /confirmMerchantStatementDispatch/, "Confirmed transfers persist through the protected database client");
 expect(statement, /dispatchReady/, "Sending fails closed while transfer history cannot be verified");
+expect(
+  statement,
+  /const whatsappUrl = `https:\/\/wa\.me\/\$\{merchantPhone\}\?text=\$\{encodeURIComponent\(merchantWhatsAppMessage\(targetOrders\)\)\}`;/,
+  "Selected merchant orders keep a prefilled WhatsApp statement URL",
+);
+expect(statement, /window\.open\(whatsappUrl,\s*"_blank"\)/, "WhatsApp opens through a verifiable window handoff");
+expect(statement, /opened\.opener = null/, "Opened WhatsApp window is detached from the admin page");
+reject(statement, /"noopener,noreferrer"/, "No false blocked-window result is caused by noopener return semantics");
 reject(statement, /localStorage|sessionStorage/, "Merchant transfer history is never stored only in the browser");
 
 expect(dispatchClient, /admin_get_merchant_statement_dispatch_status/, "Dispatch client reads authoritative per-order transfer history");
