@@ -33,7 +33,6 @@ export type ConfirmMerchantStatementDispatchResult = {
 type DispatchSourceRow = Record<string, unknown>;
 
 const DIRECT_HISTORY_PAGE_SIZE = 1000;
-const SESSION_TIMEOUT_MS = 12_000;
 const STATUS_RPC_TIMEOUT_MS = 12_000;
 const STATUS_TABLE_TIMEOUT_MS = 15_000;
 const CONFIRM_TIMEOUT_MS = 30_000;
@@ -52,31 +51,9 @@ function wait(milliseconds: number) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }
 
-function withTimeout<T>(operation: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(
-      () => reject(new Error(`${label}_timeout_${timeoutMs}ms`)),
-      timeoutMs,
-    );
-
-    Promise.resolve(operation).then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (cause) => {
-        globalThis.clearTimeout(timer);
-        reject(cause);
-      },
-    );
-  });
-}
-
 /**
- * A normal Promise timeout stops only the caller's wait. PostgREST would keep
- * the original HTTP request alive, which can leave the phone runtime with two
- * competing authenticated reads. Abort the request itself before starting the
- * protected fallback.
+ * Abort the actual PostgREST request. Merely rejecting a wrapper promise leaves
+ * the network request alive and can block a second protected request on mobile.
  */
 function withAbortTimeout<T>(
   createOperation: (signal: AbortSignal) => PromiseLike<T>,
@@ -171,29 +148,6 @@ function normalizeDirectStatusRows(rows: DispatchSourceRow[]): MerchantStatement
     .filter((row) => row.latestSentAt);
 }
 
-async function ensureAuthenticatedDispatchSession() {
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
-
-  const current = await withTimeout(
-    supabase.auth.getSession(),
-    "merchant_statement_dispatch_get_session",
-    SESSION_TIMEOUT_MS,
-  );
-  if (current.error) throw new Error(`merchant_statement_dispatch_session_failed | ${current.error.message}`);
-  if (current.data.session?.access_token) return;
-
-  const refreshed = await withTimeout(
-    supabase.auth.refreshSession(),
-    "merchant_statement_dispatch_refresh_session",
-    SESSION_TIMEOUT_MS,
-  );
-  if (refreshed.error || !refreshed.data.session?.access_token) {
-    throw new Error(
-      `merchant_statement_dispatch_session_missing | ${refreshed.error?.message || "authenticated session unavailable"}`,
-    );
-  }
-}
-
 async function fetchDispatchStatusDirectly(merchantId: string) {
   const client = supabase;
   if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
@@ -235,9 +189,10 @@ export function merchantStatementDispatchErrorCode(error: unknown) {
   if (message.includes("merchant_statement_resend_reason_required")) return "resend_reason_required";
   if (message.includes("merchant_statement_dispatch_order_ownership_mismatch")) return "ownership_mismatch";
   if (message.includes("merchant_statement_dispatch_not_authorized")) return "not_authorized";
+  if (message.includes("permission denied") || message.includes("row-level security")) return "not_authorized";
+  if (message.includes("jwt expired") || message.includes("invalid jwt") || message.includes("not authenticated")) return "not_authorized";
   if (message.includes("merchant_statement_dispatch_merchant_not_found")) return "merchant_not_found";
   if (message.includes("merchant_statement_dispatch_orders_required")) return "orders_required";
-  if (message.includes("merchant_statement_dispatch_session")) return "not_authorized";
   if (message.includes("could not find the function") || message.includes("schema cache")) return "runtime_missing";
   return "unknown";
 }
@@ -250,8 +205,10 @@ export async function fetchMerchantStatementDispatchStatus(
   const normalizedMerchantId = clean(merchantId);
   if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
 
-  await ensureAuthenticatedDispatchSession();
-
+  // Do not call auth.getSession() here. This screen is already protected and
+  // the same client has just loaded the merchant/order data. An extra auth-lock
+  // preflight can stall on mobile while the protected PostgREST request itself
+  // would succeed and enforce authorization at the database boundary.
   let rpcDetail = "merchant_statement_dispatch_status_failed";
   try {
     const result = await withAbortTimeout(
@@ -279,10 +236,7 @@ export async function fetchMerchantStatementDispatchStatus(
   let fallbackDetail = "protected history read was not attempted";
   for (let attempt = 1; attempt <= PROTECTED_HISTORY_ATTEMPTS; attempt += 1) {
     try {
-      if (attempt > 1) {
-        await wait(600);
-        await ensureAuthenticatedDispatchSession();
-      }
+      if (attempt > 1) await wait(700);
       return await fetchDispatchStatusDirectly(normalizedMerchantId);
     } catch (fallbackError) {
       fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
@@ -309,8 +263,9 @@ export async function confirmMerchantStatementDispatch(
   if (!merchantId) throw new Error("merchant_statement_dispatch_merchant_required");
   if (!orderIds.length) throw new Error("merchant_statement_dispatch_orders_required");
 
-  await ensureAuthenticatedDispatchSession();
-
+  // No client-side auth preflight and no write retry. The security-definer RPC
+  // checks the current JWT and either commits the complete batch once or writes
+  // nothing. Retrying an ambiguous write automatically could duplicate a batch.
   const result = await withAbortTimeout(
     (signal) =>
       client
