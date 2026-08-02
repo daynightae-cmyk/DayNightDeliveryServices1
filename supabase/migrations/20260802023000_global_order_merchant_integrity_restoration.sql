@@ -1741,13 +1741,15 @@ begin
 
     if cardinality(v_candidate_ids) <> 1
        or v_candidate_ids[1] is distinct from v_snapshot.candidate_portal_user_id
-       or v_snapshot.resolution_evidence is distinct from case
-         when cardinality(v_email_candidate_ids) = 1
-           then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
-         when cardinality(v_phone_candidate_ids) = 1
-           then 'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
-         else null
-       end then
+       or v_snapshot.resolution_evidence is distinct from (
+         case
+           when cardinality(v_email_candidate_ids) = 1
+             then 'EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL'
+           when cardinality(v_phone_candidate_ids) = 1
+             then 'EXACT_UNIQUE_CONFIRMED_AUTH_PHONE'
+           else null
+         end
+       ) then
       raise exception using
         errcode = '23514',
         message = 'auth_identity_evidence_changed_or_ambiguous',
@@ -2186,10 +2188,12 @@ begin
         (to_jsonb(o) - 'merchant_id' - 'merchant_code' - 'merchant_name' - 'updated_at')
           is distinct from
         (s.order_before - 'merchant_id' - 'merchant_code' - 'merchant_name' - 'updated_at')
-        or o.merchant_id is distinct from case
-          when s.classification = 'AUTO_REPAIR_SAFE' then s.candidate_canonical_merchant_id
-          else s.current_merchant_id
-        end
+        or o.merchant_id is distinct from (
+          case
+            when s.classification = 'AUTO_REPAIR_SAFE' then s.candidate_canonical_merchant_id
+            else s.current_merchant_id
+          end
+        )
         or o.status is distinct from s.status
         or coalesce((s.dependency_ownership ->> 'total_conflicts')::integer, 0) <> 0
       )
