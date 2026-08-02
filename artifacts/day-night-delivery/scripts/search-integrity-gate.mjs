@@ -9,13 +9,15 @@ const normalization = read("src/lib/searchNormalization.ts");
 const adminWorkspace = read("src/components/admin/AdminSectionWorkspace.tsx");
 const adminPanel = read("src/components/AdminPanelLuxury.tsx");
 const adminBulk = read("src/components/admin/AdminOrderBulkOperations.tsx");
-const adminComplete = read("src/components/admin/AdminSectionWorkspaceComplete.tsx");
+const adminComplete = read("src/components/admin/AdminSectionWorkspaceCompleteLegacy.tsx");
+const adminCompleteRouter = read("src/components/admin/AdminSectionWorkspaceComplete.tsx");
 const international = read("src/components/admin/AdminInternationalOrdersWorkspace.tsx");
 const commandPanel = read("src/components/admin/command-center/AdminPanelCommandCenter.tsx");
 const commandShell = read("src/components/admin/command-center/AdminCommandCenterShell.tsx");
 const merchantPortal = read("src/components/merchant/MerchantPortalCommandCenter.tsx");
 const merchantOrders = read("src/portal-designs/merchant/MerchantOrdersView.tsx");
-const merchantStatements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
+const merchantStatements = read("src/components/admin/AdminMerchantStatementsCenterPdf.tsx");
+const merchantAccounts = read("src/components/admin/AdminMerchantAccountsCenter.tsx");
 const liveMap = read("src/components/admin/AdminLiveOperationsMap.tsx");
 const adminData = read("src/lib/adminData.ts");
 
@@ -28,6 +30,8 @@ assert.match(normalization, /replaceAll\(" ", ""\)/);
 assert.match(adminWorkspace, /matchesSearchQuery\(orderSearchValues\(order\), bulkQuery\)/);
 assert.match(adminBulk, /data-admin-order-search="true"/);
 assert.match(adminComplete, /searchManaged \? baseRows/);
+assert.match(adminCompleteRouter, /props\.id === "accounts"/);
+assert.match(adminCompleteRouter, /AdminMerchantAccountsRoute/);
 assert.match(adminWorkspace, /searchManaged=\{showBulkConsole\}/);
 assert.match(adminWorkspace, /<AdminInternationalOrdersWorkspace[\s\S]*?searchManaged/);
 assert.doesNotMatch(adminComplete, /\.slice\(0,\s*200\)/);
@@ -54,9 +58,15 @@ assert.match(merchantPortal, /const resultGroups=/);
 assert.match(merchantPortal, /resultGroups\.some/);
 assert.match(merchantPortal, /fetchAllMerchantPortalOrders/);
 
-const ownershipMatcher = merchantStatements.match(/function merchantOrderMatches[\s\S]*?\n}/)?.[0] || "";
-assert.match(ownershipMatcher, /order\.merchant_id/);
-assert.doesNotMatch(ownershipMatcher, /order\.merchant_(code|name)/);
+const statementOwnership = merchantStatements.match(/function merchantOwnsOrder[\s\S]*?\n}/)?.[0] || "";
+assert.match(statementOwnership, /order\.merchant_id/);
+assert.doesNotMatch(statementOwnership, /order\.merchant_(code|name)/);
+
+const accountOwnership = merchantAccounts.match(/function ownsOrder[\s\S]*?\n}/)?.[0] || "";
+assert.match(accountOwnership, /order\.merchant_id/);
+assert.doesNotMatch(accountOwnership, /order\.merchant_(code|name)/);
+assert.match(merchantAccounts, /matchesSearchQuery/);
+assert.match(merchantAccounts, /بحث داخل حساب التاجر فقط|Search this merchant only/);
 
 assert.match(liveMap, /const visibleOrders = filteredOrders;/);
 assert.doesNotMatch(liveMap, /filteredOrders\.length \? filteredOrders : sortedOrders/);

@@ -95,12 +95,14 @@ expect(statusMigration, /financial_posted_at = coalesce\(financial_posted_at, \$
 expect(statusMigration, /deferred_zero_merchant/, "Intentional zero-value merchant accounting remains deferred");
 expect(statusMigration, /admin_order_status_persistence_health/, "Migration publishes a production health RPC");
 
-const statements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
+const statements = read("src/components/admin/AdminMerchantStatementsCenterPdf.tsx");
 expect(statements, /merchants\.map/, "Merchant statements list every registered merchant");
 expect(statements, /selectedOrderIds/, "Merchant statements support exact multi-order selection");
-expect(statements, /AdminPdfExportButton|MerchantStatementExportButton/, "Selected merchant orders use a real production export flow");
-expect(statements, /wa\.me\/[\s\S]*merchantWhatsAppMessage/, "Selected merchant orders have a prefilled merchant WhatsApp statement");
+expect(statements, /MerchantStatementExportButton/, "Selected merchant orders use a real production PDF flow");
+expect(statements, /wa\.me\/[\s\S]*whatsappMessage/, "Selected merchant orders have a prefilled merchant WhatsApp summary");
 expect(statements, /allTime/, "Merchant statement can show the merchant's complete order history");
+expect(statements, /onPdfCreated=\{\(\) => recordPdfExport/, "Statement status is recorded only after successful PDF creation");
+expect(statements, /فتح واتساب — بدون تغيير الحالة|Open WhatsApp — no status change/, "WhatsApp explicitly leaves PDF statement status unchanged");
 
 const portalRuntime = read("src/components/portals/PortalRuntimeOverlay.tsx");
 expect(portalRuntime, /dn-portal-mobile-scroll-fix\.css/, "Portal runtime imports the final mobile scroll contract last");

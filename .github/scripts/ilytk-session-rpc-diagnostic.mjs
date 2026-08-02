@@ -9,6 +9,8 @@ const { createClient } = require(
 const supabaseUrl = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const anonKey = String(process.env.VITE_SUPABASE_ANON_KEY || '');
 const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+const runtimeAdminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || '').trim().toLowerCase();
+const runtimeAdminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || '').trim();
 const ilytkId = '325bb302-75c3-48cc-84ba-e58817d6d148';
 const reviewedCoupons = new Set(['003860', '010503', '010505']);
 const excludedCoupon = '010504';
@@ -20,6 +22,72 @@ function assert(condition, message) {
 const adminClient = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
 });
+
+const adminSessionClient = createClient(supabaseUrl, anonKey, {
+  auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+});
+
+let adminReadDiagnostic = null;
+try {
+  assert(runtimeAdminEmail && runtimeAdminPassword, 'runtime_admin_credentials_missing');
+  const { data: adminLogin, error: adminLoginError } = await adminSessionClient.auth.signInWithPassword({
+    email: runtimeAdminEmail,
+    password: runtimeAdminPassword,
+  });
+  if (adminLoginError) throw new Error(`runtime_admin_login_failed_${adminLoginError.message}`);
+  assert(adminLogin?.user?.id, 'runtime_admin_user_missing');
+
+  const { data: adminProfile, error: adminProfileError } = await adminSessionClient
+    .from('profiles')
+    .select('role')
+    .eq('id', adminLogin.user.id)
+    .single();
+  if (adminProfileError) throw new Error(`runtime_admin_profile_failed_${adminProfileError.message}`);
+  assert(String(adminProfile?.role || '').toLowerCase() === 'admin', `runtime_admin_role_${adminProfile?.role || 'null'}`);
+
+  const startedMinimal = Date.now();
+  const minimal = await adminSessionClient
+    .from('orders')
+    .select('id,merchant_id,coupon_number,created_at', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(0, 24);
+  const minimalDurationMs = Date.now() - startedMinimal;
+
+  const startedFull = Date.now();
+  const full = await adminSessionClient
+    .from('orders')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(0, 24);
+  const fullDurationMs = Date.now() - startedFull;
+
+  adminReadDiagnostic = {
+    user_id: adminLogin.user.id,
+    role: adminProfile.role,
+    minimal: {
+      ok: !minimal.error,
+      message: minimal.error?.message || null,
+      code: minimal.error?.code || null,
+      count: minimal.count,
+      rows: Array.isArray(minimal.data) ? minimal.data.length : 0,
+      duration_ms: minimalDurationMs,
+    },
+    full: {
+      ok: !full.error,
+      message: full.error?.message || null,
+      code: full.error?.code || null,
+      count: full.count,
+      rows: Array.isArray(full.data) ? full.data.length : 0,
+      duration_ms: fullDurationMs,
+    },
+  };
+
+  console.log('ADMIN_ORDER_READ_DIAGNOSTIC');
+  console.log(JSON.stringify(adminReadDiagnostic, null, 2));
+} finally {
+  const { error: adminSignOutError } = await adminSessionClient.auth.signOut({ scope: 'local' });
+  if (adminSignOutError) throw new Error(`runtime_admin_cleanup_failed_${adminSignOutError.message}`);
+}
 
 const { data: links, error: linkError } = await adminClient
   .from('merchant_user_links')
@@ -114,6 +182,7 @@ try {
 
   console.log(JSON.stringify({
     result: 'PASS',
+    admin_order_read: adminReadDiagnostic,
     merchant_session_id: merchantSessionId,
     profile_merchant_count: merchants.length,
     orders_total_count: Number(ordersPage.total_count),

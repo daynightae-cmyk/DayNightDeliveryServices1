@@ -136,11 +136,14 @@ const deliveredAdjustment = read("src/lib/adminDeliveredFinancialAdjustment.ts")
 expect(deliveredAdjustment, /AUDITED_ZERO_MANUAL_DELIVERY_FEE\s*=\s*25/, "delivered adjustment resolves zero to 25");
 expect(deliveredAdjustment, /p_delivery_fee:\s*enteredDeliveryFee/, "RPC receives the raw zero marker");
 
-const plugin = read("scripts/precise-financial-rule-plugin.ts");
-expect(plugin, /day-night-precise-financial-rule-v4/, "production build uses pricing rule v4");
-expect(plugin, /smart chat keeps Al Ain at 25 AED/, "smart chat receives the Al Ain policy");
-expect(plugin, /public order uses 25\/50 route pricing/, "public request uses authoritative route pricing");
-reject(plugin, /goodsAreZero\s*&&\s*hasExplicitZeroManualDelivery/, "UI does not restrict zero intent by goods value");
+const pluginRouter = read("scripts/precise-financial-rule-plugin.ts");
+const pluginLegacy = read("scripts/precise-financial-rule-plugin-legacy.ts");
+expect(pluginRouter, /day-night-precise-financial-rule-v4-routed/, "production build uses routed pricing rule v4");
+expect(pluginRouter, /legacyPreciseFinancialRulePlugin/, "routed pricing plugin delegates all non-statement transforms to the audited legacy implementation");
+expect(pluginRouter, /AdminMerchantStatementsCenter\.tsx[\s\S]*return null/, "pricing plugin skips only the statement routing wrapper");
+expect(pluginLegacy, /smart chat keeps Al Ain at 25 AED/, "smart chat receives the Al Ain policy");
+expect(pluginLegacy, /public order uses 25\/50 route pricing/, "public request uses authoritative route pricing");
+reject(`${pluginRouter}\n${pluginLegacy}`, /goodsAreZero\s*&&\s*hasExplicitZeroManualDelivery/, "UI does not restrict zero intent by goods value");
 
 const migration = read("../../supabase/migrations/20260729010000_al_ain_25_manual_delivery_final.sql");
 expect(migration, /daynight_official_local_delivery_fee/, "database has authoritative local pricing function");

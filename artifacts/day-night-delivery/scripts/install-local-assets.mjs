@@ -1,4 +1,10 @@
-import { createWriteStream, existsSync, mkdirSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  statSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pipeline } from "node:stream/promises";
@@ -9,7 +15,13 @@ const force = process.argv.includes("--force");
 
 const assets = [
   { name: "logo", url: "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png", output: "public/assets/daynight/logo.png", minBytes: 2048 },
-  { name: "merchant-statement-logo", url: "https://i.postimg.cc/XqnP282D/cropped-circle-image-(9).png", output: "public/assets/daynight/merchant-statement-logo.png", minBytes: 1024 },
+  {
+    name: "merchant-statement-logo",
+    url: "https://i.postimg.cc/XqnP282D/cropped-circle-image-(9).png",
+    output: "public/assets/daynight/merchant-statement-logo.png",
+    minBytes: 1024,
+    fallbackOutput: "public/assets/daynight/logo.png",
+  },
   { name: "hero", url: "https://i.postimg.cc/cJ7MbD6R/Chat-GPT-Image-22-ywnyw-2026-04-52-05-m-(10).png", output: "public/assets/daynight/hero-uae-delivery.png", minBytes: 8192 },
   { name: "uae-map", url: "https://i.postimg.cc/GhGvg7Bw/Chat-GPT-Image-27-ywnyw-2026-04-49-00-s.png", output: "public/assets/daynight/uae-live-map.png", minBytes: 8192 },
   { name: "admin-auth-intro-gateway", url: "https://i.postimg.cc/657vswy0/Chat-GPT-Image-Jul-6-2026-05-50-16-PM-(10).png", output: "public/assets/daynight/admin-auth-v3/intro-gateway.png", minBytes: 8192 },
@@ -22,10 +34,31 @@ const assets = [
   { name: "admin-auth-extra-login-reference", url: "https://i.postimg.cc/FKQM6Xr4/Chat-GPT-Image-Jul-6-2026-02-01-26-AM-(2).png", output: "public/assets/daynight/admin-auth-v3/login-extra-reference.png", minBytes: 8192 },
 ];
 
+function validAsset(filePath, minBytes) {
+  return existsSync(filePath) && statSync(filePath).size >= minBytes;
+}
+
+function installLocalFallback(asset) {
+  if (!asset.fallbackOutput) return false;
+
+  const fallbackPath = resolve(root, asset.fallbackOutput);
+  const outputPath = resolve(root, asset.output);
+  if (!validAsset(fallbackPath, asset.minBytes)) return false;
+
+  mkdirSync(dirname(outputPath), { recursive: true });
+  copyFileSync(fallbackPath, outputPath);
+  if (!validAsset(outputPath, asset.minBytes)) return false;
+
+  console.warn(
+    `[assets] ${asset.name} remote source was unavailable; installed deterministic local fallback from ${asset.fallbackOutput}.`,
+  );
+  return true;
+}
+
 async function downloadAsset(asset) {
   const outputPath = resolve(root, asset.output);
   mkdirSync(dirname(outputPath), { recursive: true });
-  if (!force && existsSync(outputPath) && statSync(outputPath).size >= asset.minBytes) {
+  if (!force && validAsset(outputPath, asset.minBytes)) {
     console.log(`[assets] ${asset.name} already installed: ${asset.output}`);
     return;
   }
@@ -61,10 +94,13 @@ for (const asset of assets) {
   try {
     await downloadAsset(asset);
   } catch (error) {
+    const fallbackInstalled = installLocalFallback(asset);
     const optional = asset.output.includes("/admin-auth-v3/");
-    if (!optional) failures.push(asset.name);
+    if (!fallbackInstalled && !optional) failures.push(asset.name);
     console.warn(
-      `[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`,
+      fallbackInstalled
+        ? `[assets] ${asset.name} is available through its local fallback.`
+        : `[assets] ${asset.name} was not installed. Runtime remote fallback remains available.`,
     );
     console.warn(error instanceof Error ? error.message : error);
   }
