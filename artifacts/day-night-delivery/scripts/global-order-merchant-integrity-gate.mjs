@@ -151,6 +151,8 @@ assert.doesNotMatch(
 assert.match(reviewedReconciliationMigration, /37348f9e-60d8-4f6b-8cdf-b9181464f2b7/);
 assert.match(reviewedReconciliationMigration, /set local statement_timeout = '10min'/);
 assert.match(reviewedReconciliationMigration, /request\.jwt\.claim\.role.*service_role/);
+assert.match(reviewedReconciliationMigration, /request\.jwt\.claims.*service_role/);
+assert.match(reviewedReconciliationMigration, /migration_service_role_claim_not_effective/);
 assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_expected_3/);
 assert.match(reviewedReconciliationMigration, /merchant_statement_rows_inserted'[\s\S]*<> 43/);
 assert.match(reviewedReconciliationMigration, /cod_rows_inserted'[\s\S]*<> 21/);

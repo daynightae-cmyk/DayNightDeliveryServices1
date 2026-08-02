@@ -7,6 +7,7 @@ begin;
 set local statement_timeout = '10min';
 set local lock_timeout = '60s';
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 do $migration$
 declare
@@ -17,6 +18,10 @@ declare
   v_health jsonb;
   v_repair_audit_count integer;
 begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'migration_service_role_claim_not_effective_%', coalesce(auth.role(), 'NULL');
+  end if;
+
   select status into v_status
   from public.order_merchant_audit_runs
   where id = v_run_id;
