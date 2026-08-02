@@ -38,6 +38,8 @@ console.log("\n--- DAY NIGHT merchant statement & order edit gate ---");
 const statement = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
 const exporter = read("src/lib/merchantStatementExport.ts");
 const exportButton = read("src/components/admin/MerchantStatementExportButton.tsx");
+const dispatchClient = read("src/lib/merchantStatementDispatch.ts");
+const dispatchMigration = read("../../supabase/migrations/20260802110000_merchant_statement_dispatch_tracking.sql");
 const editModal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
 const editModalBoundary = read("src/components/admin/AdminOrderEditModal.tsx");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
@@ -62,6 +64,32 @@ reject(exportButton, /DEFAULT_ZERO_ORDER_DELIVERY_FEE\s*=\s*180/, "Statement exp
 expect(migration, /manual_delivery_price[\s\S]*resolved_mode/, "Database migration resolves explicit zero and positive manual delivery separately");
 reject(migration, /if\s+v_goods\s*=\s*0\s+and\s+v_fee\s*>\s*0/i, "Database function does not force all zero-goods orders onto merchant");
 expect(precisePlugin, /manual !== null && manual > 0/, "Manual zero uses official pricing while retaining merchant liability intent");
+
+expect(statement, /تم تحويلها للتاجر|Sent to merchant/, "Every transferred order has a clear persistent badge");
+expect(statement, /لم يتم تحويلها|Not sent/, "Unsent orders remain visibly distinguished");
+expect(statement, /data-merchant-dispatch-filter="true"/, "Accounting view can filter sent and unsent merchant orders");
+expect(statement, /unsentTransferOrders/, "Normal WhatsApp transfer excludes previously sent orders");
+expect(statement, /data-merchant-dispatch-resend="true"/, "Previously sent orders have a separate explicit resend action");
+expect(statement, /data-merchant-dispatch-resend-reason="true"/, "Resending requires an operator-entered reason");
+expect(statement, /data-merchant-dispatch-confirm="true"/, "Opening WhatsApp does not mark orders sent without explicit confirmation");
+expect(statement, /confirmMerchantStatementDispatch/, "Confirmed transfers persist through the protected database client");
+expect(statement, /dispatchReady/, "Sending fails closed while transfer history cannot be verified");
+reject(statement, /localStorage|sessionStorage/, "Merchant transfer history is never stored only in the browser");
+
+expect(dispatchClient, /admin_get_merchant_statement_dispatch_status/, "Dispatch client reads authoritative per-order transfer history");
+expect(dispatchClient, /admin_confirm_merchant_statement_dispatch/, "Dispatch client records confirmed transfer batches");
+expect(dispatchClient, /p_resend_reason/, "Dispatch client passes the audited resend reason");
+expect(dispatchClient, /ui_confirmation:\s*true/, "Dispatch writes record explicit UI confirmation");
+
+expect(dispatchMigration, /create table if not exists public\.merchant_statement_dispatch_log/, "Database keeps a permanent merchant transfer log");
+expect(dispatchMigration, /unique index[\s\S]*batch_id, order_id/i, "One order is recorded once per transfer batch");
+expect(dispatchMigration, /order_row\.merchant_id = p_merchant_id/, "Database verifies every transferred order belongs to the selected merchant");
+expect(dispatchMigration, /merchant_statement_resend_reason_required/, "Database blocks duplicate sending without an explicit reason");
+expect(dispatchMigration, /admin_audit_events/, "Every confirmed transfer is written to the admin audit trail");
+expect(dispatchMigration, /p_dry_run boolean default false/, "Production transfer RPC supports a no-write verification mode");
+expect(dispatchMigration, /enable row level security/, "Merchant transfer history is protected by RLS");
+reject(dispatchMigration, /alter table public\.orders\s+add column/i, "Transfer tracking does not pollute or rewrite the canonical orders table");
+reject(dispatchMigration, /truncate\s+table|delete\s+from\s+public\.(orders|merchants)/i, "Transfer migration never deletes business records");
 
 expect(
   editModal,
