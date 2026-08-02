@@ -15,7 +15,8 @@ const commandPanel = read("src/components/admin/command-center/AdminPanelCommand
 const commandShell = read("src/components/admin/command-center/AdminCommandCenterShell.tsx");
 const merchantPortal = read("src/components/merchant/MerchantPortalCommandCenter.tsx");
 const merchantOrders = read("src/portal-designs/merchant/MerchantOrdersView.tsx");
-const merchantStatements = read("src/components/admin/AdminMerchantStatementsCenter.tsx");
+const merchantStatements = read("src/components/admin/AdminMerchantStatementsCenterPdf.tsx");
+const merchantAccounts = read("src/components/admin/AdminMerchantAccountsCenter.tsx");
 const liveMap = read("src/components/admin/AdminLiveOperationsMap.tsx");
 const adminData = read("src/lib/adminData.ts");
 
@@ -54,9 +55,15 @@ assert.match(merchantPortal, /const resultGroups=/);
 assert.match(merchantPortal, /resultGroups\.some/);
 assert.match(merchantPortal, /fetchAllMerchantPortalOrders/);
 
-const ownershipMatcher = merchantStatements.match(/function merchantOrderMatches[\s\S]*?\n}/)?.[0] || "";
-assert.match(ownershipMatcher, /order\.merchant_id/);
-assert.doesNotMatch(ownershipMatcher, /order\.merchant_(code|name)/);
+const statementOwnership = merchantStatements.match(/function merchantOwnsOrder[\s\S]*?\n}/)?.[0] || "";
+assert.match(statementOwnership, /order\.merchant_id/);
+assert.doesNotMatch(statementOwnership, /order\.merchant_(code|name)/);
+
+const accountOwnership = merchantAccounts.match(/function ownsOrder[\s\S]*?\n}/)?.[0] || "";
+assert.match(accountOwnership, /order\.merchant_id/);
+assert.doesNotMatch(accountOwnership, /order\.merchant_(code|name)/);
+assert.match(merchantAccounts, /matchesSearchQuery/);
+assert.match(merchantAccounts, /بحث داخل حساب التاجر فقط|Search this merchant only/);
 
 assert.match(liveMap, /const visibleOrders = filteredOrders;/);
 assert.doesNotMatch(liveMap, /filteredOrders\.length \? filteredOrders : sortedOrders/);
