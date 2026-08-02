@@ -12,6 +12,7 @@ on:
       - "artifacts/day-night-delivery/src/components/admin/AdminMerchantStatementsCenterPdf.tsx"
       - "artifacts/day-night-delivery/src/components/admin/MerchantStatementExportButton.tsx"
       - "artifacts/day-night-delivery/src/lib/merchantStatementDispatch.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-merchant-finance-files.css"
       - "supabase/migrations/20260802110000_merchant_statement_dispatch_tracking.sql"
   workflow_dispatch:
 
