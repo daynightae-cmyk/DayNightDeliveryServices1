@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/20260803011500_restore_admin_personal_order_rpc.sql"
+      - "supabase/migrations/20260803012500_personal_order_financial_isolation.sql"
       - ".github/workflows/restore-personal-order-rpc-production.yml"
       - ".github/scripts/personal-order-rpc-diagnostic.mjs"
   workflow_dispatch:
@@ -62,11 +63,10 @@ jobs:
           test "$project_ref" = "ngdwybpgacauorygoedi"
           echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
 
-      - name: Apply only the reviewed personal-order RPC migration
+      - name: Apply only the reviewed personal-order migrations
         shell: bash
         run: |
           set -euo pipefail
-          target="20260803011500_restore_admin_personal_order_rpc.sql"
           release_dir="$RUNNER_TEMP/daynight-personal-order-rpc"
           rm -rf "$release_dir"
           mkdir -p "$release_dir/supabase/migrations"
@@ -77,11 +77,21 @@ jobs:
             --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$release_dir" migration fetch --linked
 
-          if [ -f "$release_dir/supabase/migrations/$target" ]; then
-            echo "$target is already recorded in production; verifying final state."
-          else
-            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
-            supabase --workdir "$release_dir" db push --dry-run
+          pending=false
+          for target in \
+            20260803011500_restore_admin_personal_order_rpc.sql \
+            20260803012500_personal_order_financial_isolation.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              echo "$target is already recorded in production."
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              pending=true
+            fi
+          done
+
+          supabase --workdir "$release_dir" db push --dry-run
+          if [ "$pending" = "true" ]; then
             supabase --workdir "$release_dir" db push --yes
           fi
 
