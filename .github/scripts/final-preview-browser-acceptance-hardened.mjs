@@ -50,26 +50,28 @@ replaceRequired(
   `async function testAdmin(page, label) {
   try {
     await openAdminFromInjectedSession(page);
-    await openAllOrders(page);
+    const shell = page.locator('.dncc-shell');
+    await shell.waitFor({ state: 'visible', timeout: 90000 });
 
-    const search = page.locator('[data-admin-order-search="true"]');
-    const list = page.locator('.dn-admin-bulk-selector-list');
-    await search.waitFor({ state: 'visible', timeout: 90000 });
-    await list.waitFor({ state: 'visible', timeout: 90000 });
+    const accountsControl = page.locator('[data-dn-command-section="accounts"]');
+    const statementsControl = page.locator('[data-dn-command-section="merchant_statements"]');
+    assert((await accountsControl.count()) > 0, \`${'${label}'}: accounts navigation control is missing.\`);
+    assert((await statementsControl.count()) > 0, \`${'${label}'}: merchant PDF statements navigation control is missing.\`);
 
-    let ready = false;
-    for (let attempt = 0; attempt < 180; attempt += 1) {
-      const editCount = await page.getByRole('button', { name: /تعديل|Edit/ }).count();
-      const text = await list.innerText().catch(() => '');
-      if (editCount > 0 && text.trim() && !/جاري التحميل|Loading/i.test(text)) {
-        ready = true;
-        break;
-      }
-      await page.waitForTimeout(500);
-    }
+    await openSection(page, 'accounts', 'Accounts');
+    await page
+      .locator('[data-admin-merchant-accounts-ready]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 90000 });
 
-    assert(ready, \`${'${label}'}: authenticated admin order list did not render operational rows.\`);
-    await page.screenshot({ path: \`preview-browser-evidence/${'${label}'}-admin-orders.png\`, fullPage: true });
+    await openSection(page, 'merchant_statements', 'Merchant statements');
+    await page
+      .locator('section')
+      .filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ })
+      .first()
+      .waitFor({ state: 'visible', timeout: 90000 });
+
+    await page.screenshot({ path: \`preview-browser-evidence/${'${label}'}-admin-accounts-pdf-routes.png\`, fullPage: true });
   } catch (error) {
     await page.screenshot({ path: \`preview-browser-evidence/${'${label}'}-admin-failure.png\`, fullPage: true }).catch(() => {});
     await fs.promises.writeFile(
