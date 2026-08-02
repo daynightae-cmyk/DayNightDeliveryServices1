@@ -1,0 +1,71 @@
+name: Finalize Unified Personal Order Entry
+
+on:
+  push:
+    branches: [feat/unify-personal-order-entry-20260803]
+    paths:
+      - ".github/scripts/unify-personal-order-entry.py"
+      - ".github/workflows/unify-personal-order-entry-finalizer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-unified-personal-order-entry
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/unify-personal-order-entry-20260803
+          fetch-depth: 0
+
+      - name: Apply guarded source patches
+        run: python .github/scripts/unify-personal-order-entry.py
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate unified personal order contract
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run personal-orders:gate
+
+      - name: TypeScript
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run typecheck
+
+      - name: Production build
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: https://ngdwybpgacauorygoedi.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-build-key
+        run: pnpm run build
+
+      - name: Remove one-time finalizer and commit validated source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/unify-personal-order-entry.py
+          rm -f .github/workflows/unify-personal-order-entry-finalizer.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No validated source changes were produced." >&2; exit 1; }
+          git commit -m "feat(admin): unify personal orders inside new order flow"
+          git push origin HEAD:feat/unify-personal-order-entry-20260803
