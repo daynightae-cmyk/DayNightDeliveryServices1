@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -11,7 +12,11 @@ const anonKey = String(process.env.VITE_SUPABASE_ANON_KEY || '');
 const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
 const adminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || '').trim().toLowerCase();
 const adminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || '').trim();
-const merchantCode = 'DN-MER-SHOP-ILYTK';
+const merchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+const evidencePath = path.resolve(
+  process.cwd(),
+  'merchant-accounts-pdf-evidence/history-production-diagnostic.json',
+);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -24,7 +29,16 @@ function errorDetail(error) {
     .join(' | ');
 }
 
-assert(supabaseUrl && anonKey && serviceRoleKey && adminEmail && adminPassword, 'statement_history_diagnostic_missing_secrets');
+function saveResult(result) {
+  fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+  fs.writeFileSync(evidencePath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+  console.log(JSON.stringify(result, null, 2));
+}
+
+assert(
+  supabaseUrl && anonKey && serviceRoleKey && adminEmail && adminPassword,
+  'statement_history_diagnostic_missing_secrets',
+);
 
 const admin = createClient(supabaseUrl, anonKey, {
   auth: {
@@ -43,16 +57,18 @@ const service = createClient(supabaseUrl, serviceRoleKey, {
 
 const result = {
   result: 'FAIL',
+  fatalError: null,
   adminLogin: false,
   adminUserId: null,
   profileRole: null,
-  merchantId: null,
+  merchantId,
   rpc: { ok: false, rows: null, error: null },
   adminTable: { ok: false, rows: null, error: null },
   serviceTable: { ok: false, rows: null, error: null },
   health: { ok: false, data: null, error: null },
 };
 
+let failure = null;
 try {
   const { data: authData, error: authError } = await admin.auth.signInWithPassword({
     email: adminEmail,
@@ -71,16 +87,6 @@ try {
   result.profileRole = profile?.role ?? null;
   if (profileError) throw new Error(`statement_history_profile_failed: ${errorDetail(profileError)}`);
 
-  const { data: merchant, error: merchantError } = await service
-    .from('merchants')
-    .select('id,merchant_code,name')
-    .eq('merchant_code', merchantCode)
-    .limit(1)
-    .single();
-  if (merchantError) throw new Error(`statement_history_merchant_lookup_failed: ${errorDetail(merchantError)}`);
-  assert(merchant?.id, 'statement_history_merchant_missing');
-  result.merchantId = merchant.id;
-
   const healthResponse = await admin.rpc('admin_merchant_statement_dispatch_health');
   result.health = {
     ok: !healthResponse.error,
@@ -89,7 +95,7 @@ try {
   };
 
   const rpcResponse = await admin.rpc('admin_get_merchant_statement_dispatch_status', {
-    p_merchant_id: merchant.id,
+    p_merchant_id: merchantId,
   });
   result.rpc = {
     ok: !rpcResponse.error,
@@ -100,7 +106,7 @@ try {
   const adminTableResponse = await admin
     .from('merchant_statement_dispatch_log')
     .select('order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id')
-    .eq('merchant_id', merchant.id)
+    .eq('merchant_id', merchantId)
     .order('sent_at', { ascending: false })
     .limit(10);
   result.adminTable = {
@@ -112,7 +118,7 @@ try {
   const serviceTableResponse = await service
     .from('merchant_statement_dispatch_log')
     .select('order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id')
-    .eq('merchant_id', merchant.id)
+    .eq('merchant_id', merchantId)
     .order('sent_at', { ascending: false })
     .limit(10);
   result.serviceTable = {
@@ -126,13 +132,17 @@ try {
     ? 'PASS'
     : 'FAIL';
 
-  console.log(JSON.stringify(result, null, 2));
-
   if (result.result !== 'PASS') {
     throw new Error(
       `statement_history_protected_reads_failed: role=${result.profileRole}; health=${result.health.error || result.health.ok}; rpc=${result.rpc.error || result.rpc.ok}; admin_table=${result.adminTable.error || result.adminTable.ok}; service_table=${result.serviceTable.error || result.serviceTable.ok}`,
     );
   }
+} catch (cause) {
+  failure = cause instanceof Error ? cause : new Error(String(cause || 'statement_history_diagnostic_failed'));
+  result.fatalError = failure.message;
 } finally {
+  saveResult(result);
   await admin.auth.signOut({ scope: 'local' }).catch(() => {});
 }
+
+if (failure) throw failure;
