@@ -1,0 +1,100 @@
+name: ILYTK Reviewed Reconciliation Once
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/production-reconciliation/20260802060000_reconcile_reviewed_ilytk_three_orders.sql"
+      - ".github/workflows/ilytk-reviewed-reconciliation-once.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ilytk-reviewed-reconciliation-once
+  cancel-in-progress: false
+
+jobs:
+  apply-exact-reviewed-set:
+    if: >-
+      github.repository == 'daynightae-cmyk/DayNightDeliveryServices1' &&
+      github.event.pull_request.head.ref == 'fix/global-order-merchant-integrity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify protected base and production target
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor d9e18be5ebee6767d41b7cbb0e6a4d30e1435d44 HEAD
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply exact idempotent production reconciliation
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/daynight-ilytk-reviewed-reconciliation"
+          target="20260802060000_reconcile_reviewed_ilytk_three_orders.sql"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          if [ -f "$release_dir/supabase/migrations/$target" ]; then
+            echo "$target already recorded; verifying final state only"
+          else
+            cp "supabase/production-reconciliation/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Verify ILYTK ownership, portal linkage, and excluded order
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/global-order-merchant-production-readonly-audit.mjs | tee "$RUNNER_TEMP/ilytk-post-apply-audit.json"
+          AUDIT_PATH="$RUNNER_TEMP/ilytk-post-apply-audit.json" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const audit = JSON.parse(fs.readFileSync(process.env.AUDIT_PATH, 'utf8'));
+          const ilytk = audit.diagnostic_merchant_ilytk;
+          if (!ilytk) throw new Error('ilytk_audit_missing');
+          if (ilytk.canonical_merchant_id !== '325bb302-75c3-48cc-84ba-e58817d6d148') throw new Error('ilytk_uuid_mismatch');
+          if (ilytk.portal_linked !== true) throw new Error('ilytk_portal_not_linked');
+          if (Number(ilytk.database_count_by_canonical_uuid) !== 3) throw new Error(`ilytk_count_${ilytk.database_count_by_canonical_uuid}_expected_3`);
+          if (ilytk.photographed_coupon_result !== 'PASS') throw new Error(`ilytk_coupon_result_${ilytk.photographed_coupon_result}`);
+          const expected = new Set(['003860', '010503', '010505']);
+          for (const row of ilytk.photographed_coupon_acceptance || []) {
+            if (!expected.has(String(row.coupon_number))) throw new Error(`unexpected_acceptance_coupon_${row.coupon_number}`);
+            if (row.result !== 'PASS' || row.portal_visible !== true) throw new Error(`ilytk_coupon_not_visible_${row.coupon_number}`);
+            expected.delete(String(row.coupon_number));
+          }
+          if (expected.size) throw new Error(`missing_ilytk_coupons_${[...expected].join(',')}`);
+          const excluded = (ilytk.candidate_orders || []).find((row) => String(row.coupon_number) === '010504');
+          if (!excluded) throw new Error('excluded_coupon_010504_missing');
+          if (excluded.current_merchant_id !== 'b0da2d6d-2fc9-43b3-9e38-260ff2dbd68e') throw new Error('excluded_coupon_010504_owner_changed');
+          if (excluded.auto_repair_safe !== false) throw new Error('excluded_coupon_010504_became_auto_repairable');
+          if (audit.orders_modified !== 0) throw new Error('readonly_audit_modified_orders');
+          console.log(JSON.stringify({
+            result: 'PASS',
+            ilytk_merchant_id: ilytk.canonical_merchant_id,
+            ilytk_order_count: ilytk.database_count_by_canonical_uuid,
+            accepted_coupons: ['003860', '010503', '010505'],
+            excluded_coupon_010504_owner_preserved: true,
+          }, null, 2));
+          NODE
