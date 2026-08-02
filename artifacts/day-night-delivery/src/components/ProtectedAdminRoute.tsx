@@ -4,6 +4,10 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
 import { clearAdminStepUp } from "../lib/adminStepUp";
+import {
+  cacheAuthenticatedAccessToken,
+  clearAuthenticatedAccessToken,
+} from "../lib/authenticatedAccessToken";
 import AdminSecuritySettings from "./admin/AdminSecuritySettings";
 import AdminStepUpProvider from "./admin/AdminStepUpProvider";
 
@@ -54,6 +58,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
 
       try {
         if (!supabase) {
+          clearAuthenticatedAccessToken();
           if (active) setStatus("denied");
           return;
         }
@@ -69,6 +74,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
             "admin_refresh_session",
           );
           if (!refreshed.error) {
+            cacheAuthenticatedAccessToken(refreshed.data.session);
             const retried = await withAdminAuthTimeout(
               supabase.auth.getUser(),
               "admin_get_user_retry",
@@ -79,6 +85,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         }
 
         if (error || !data.user?.id) {
+          clearAuthenticatedAccessToken();
           clearAdminStepUp();
           if (active) setStatus("denied");
           return;
@@ -94,11 +101,15 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         const allowed = profileAllowed && !databaseRole.error && databaseRole.data === true;
 
         if (active) {
-          if (!allowed) clearAdminStepUp(data.user.id);
+          if (!allowed) {
+            clearAuthenticatedAccessToken();
+            clearAdminStepUp(data.user.id);
+          }
           setStatus(allowed ? "allowed" : "denied");
         }
       } catch (cause) {
         console.error("Administrator access verification failed.", cause);
+        clearAuthenticatedAccessToken();
         clearAdminStepUp();
         if (active) setStatus("denied");
       } finally {
@@ -119,8 +130,17 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
     }
 
     scheduleVerification();
-    const { data } = supabase?.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" || event === "USER_UPDATED") clearAdminStepUp();
+    const { data } = supabase?.auth.onAuthStateChange((event, session) => {
+      // Capture the session token synchronously while Supabase provides it.
+      // Protected feature reads can then authenticate without re-entering the
+      // auth mutex that is active during this callback on some mobile engines.
+      if (session?.access_token) cacheAuthenticatedAccessToken(session);
+      if (event === "SIGNED_OUT") {
+        clearAuthenticatedAccessToken();
+        clearAdminStepUp();
+      } else if (event === "USER_UPDATED") {
+        clearAdminStepUp();
+      }
       scheduleVerification();
     }) || { data: null };
 
