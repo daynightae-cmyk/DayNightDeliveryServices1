@@ -158,6 +158,50 @@ replaceRequired(
   'verify_pdf',
 );
 
+replaceRequired(
+  `        const page = await context.newPage();
+        await openAdmin(page);`,
+  `        const page = await context.newPage();
+        const diagnosticFile = 'merchant-accounts-pdf-evidence/' + scenario.label + '-pdf-network.jsonl';
+        fs.writeFileSync(diagnosticFile, '');
+        const recordDiagnostic = (entry) => {
+          fs.appendFileSync(diagnosticFile, JSON.stringify({ at: new Date().toISOString(), ...entry }) + '\\n');
+        };
+        const relevantTarget = (rawUrl) => {
+          try {
+            const parsed = new URL(rawUrl);
+            return /merchant_statement_dispatch|admin_get_merchant_statement_dispatch_status/.test(parsed.pathname)
+              ? parsed.pathname + parsed.search
+              : '';
+          } catch {
+            return '';
+          }
+        };
+        page.on('requestfailed', (request) => {
+          const target = relevantTarget(request.url());
+          if (target) recordDiagnostic({ type: 'requestfailed', method: request.method(), target, error: request.failure()?.errorText || '' });
+        });
+        page.on('response', (response) => {
+          const target = relevantTarget(response.url());
+          if (!target) return;
+          recordDiagnostic({ type: 'response', method: response.request().method(), target, status: response.status() });
+          void response.text()
+            .then((body) => recordDiagnostic({ type: 'response-body', target, status: response.status(), body: body.slice(0, 3000) }))
+            .catch((error) => recordDiagnostic({ type: 'response-body-error', target, error: String(error?.message || error) }));
+        });
+        page.on('console', (message) => {
+          const text = message.text();
+          if (/Merchant PDF history|merchant_statement_dispatch/i.test(text)) {
+            recordDiagnostic({ type: 'console', level: message.type(), text: text.slice(0, 4000) });
+          }
+        });
+        page.on('pageerror', (error) => {
+          recordDiagnostic({ type: 'pageerror', text: String(error?.stack || error).slice(0, 4000) });
+        });
+        await openAdmin(page);`,
+  'browser_diagnostics',
+);
+
 source = source.replace(
   "      reviewedOrdersVisible: 'PASS',",
   "      merchantOrderRowsVisible: 'PASS',",
