@@ -86,18 +86,28 @@ async function withOperationalRetry<T>(task: () => Promise<T>, label: string): P
 }
 
 export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps) {
+  const showBulkConsole = ORDER_SECTIONS.has(props.id);
   const [merchantFilterId, setMerchantFilterId] = useState(() => clean(props.initialMerchantId));
   const [bulkQuery, setBulkQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [orderPage, setOrderPage] = useState(0);
   const [recoveredOrders, setRecoveredOrders] = useState<WorkspaceProps["orders"]>([]);
   const [recoveredMerchants, setRecoveredMerchants] = useState<WorkspaceProps["merchants"]>([]);
-  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [authoritativeReady, setAuthoritativeReady] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(showBulkConsole);
   const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryNonce, setRecoveryNonce] = useState(0);
 
-  const showBulkConsole = ORDER_SECTIONS.has(props.id);
-  const effectiveOrders = props.orders.length ? props.orders : recoveredOrders;
-  const effectiveMerchants = props.merchants.length ? props.merchants : recoveredMerchants;
+  const effectiveOrders = showBulkConsole
+    ? authoritativeReady
+      ? recoveredOrders
+      : []
+    : props.orders;
+  const effectiveMerchants = showBulkConsole
+    ? authoritativeReady
+      ? recoveredMerchants
+      : []
+    : props.merchants;
 
   useEffect(() => {
     setMerchantFilterId(props.id === "all_orders" ? clean(props.initialMerchantId) : "");
@@ -107,26 +117,21 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   }, [props.id, props.initialMerchantId]);
 
   useEffect(() => {
-    if (!showBulkConsole) return;
-    const needOrders = !props.orders.length;
-    const needMerchants = !props.merchants.length;
-    if (!needOrders && !needMerchants) {
-      setRecoveryError("");
+    if (!showBulkConsole) {
+      setAuthoritativeReady(false);
       setRecoveryLoading(false);
+      setRecoveryError("");
       return;
     }
 
     let active = true;
+    setAuthoritativeReady(false);
     setRecoveryLoading(true);
     setRecoveryError("");
 
     void Promise.allSettled([
-      needOrders
-        ? withOperationalRetry(fetchAdminOrders, "orders recovery failed")
-        : Promise.resolve(props.orders),
-      needMerchants
-        ? withOperationalRetry(fetchMerchants, "merchants recovery failed")
-        : Promise.resolve(props.merchants),
+      withOperationalRetry(fetchAdminOrders, "orders recovery failed"),
+      withOperationalRetry(fetchMerchants, "merchants recovery failed"),
     ]).then(([ordersResult, merchantsResult]) => {
       if (!active) return;
       const failures: string[] = [];
@@ -143,7 +148,12 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
         failures.push(merchantsResult.reason instanceof Error ? merchantsResult.reason.message : String(merchantsResult.reason));
       }
 
-      if (failures.length) {
+      if (failures.length === 0) {
+        setAuthoritativeReady(true);
+      } else {
+        setRecoveredOrders([]);
+        setRecoveredMerchants([]);
+        setAuthoritativeReady(false);
         setRecoveryError(
           props.isArabic
             ? "تعذر استكمال تحميل الطلبات أو التجار بعد إعادة المحاولة. لم يتم عرض بيانات مختلطة."
@@ -156,7 +166,14 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     return () => {
       active = false;
     };
-  }, [props.id, props.isArabic, props.orders.length, props.merchants.length, showBulkConsole]);
+  }, [
+    props.id,
+    props.isArabic,
+    props.orders.length,
+    props.merchants.length,
+    recoveryNonce,
+    showBulkConsole,
+  ]);
 
   const scopedMerchant = useMemo(
     () => effectiveMerchants.find((merchant) => clean(merchant.id) === merchantFilterId) || null,
@@ -217,13 +234,20 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
       )}
 
       {recoveryError && showBulkConsole && (
-        <p
+        <div
           role="alert"
-          className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-200"
+          className="mb-4 flex flex-col gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-200 sm:flex-row sm:items-center sm:justify-between"
           dir={props.isArabic ? "rtl" : "ltr"}
         >
-          {recoveryError}
-        </p>
+          <span>{recoveryError}</span>
+          <button
+            type="button"
+            onClick={() => setRecoveryNonce((value) => value + 1)}
+            className="rounded-lg border border-rose-200/30 bg-rose-100/10 px-3 py-2 font-black text-rose-100"
+          >
+            {props.isArabic ? "إعادة المحاولة" : "Retry"}
+          </button>
+        </div>
       )}
 
       {props.id === "all_orders" && merchantFilterId && (
