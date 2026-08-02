@@ -23,18 +23,37 @@ const source = fs
     `async function openAdmin(page) {
   const target = \`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`;
   const shell = page.locator('.dncc-shell');
+  const ilytkCard = () => page
+    .locator('[data-admin-merchant-accounts-directory="true"] article')
+    .filter({ hasText: /استبي ما عرفنالك|DN-MER-SHOP-ILYTK/ })
+    .first();
+
+  async function hasOperationalMerchantData(timeout = 25000) {
+    try {
+      await openSection(page, 'accounts', 'Accounts preload');
+      await ilytkCard().waitFor({ state: 'visible', timeout });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  if (await shell.waitFor({ state: 'visible', timeout: 45000 }).then(() => true).catch(() => false)) return;
+  const shellReady = await shell
+    .waitFor({ state: 'visible', timeout: 45000 })
+    .then(() => true)
+    .catch(() => false);
+  if (shellReady && await hasOperationalMerchantData()) return;
 
-  // A serialized Supabase session can occasionally be read while the auth lock
-  // is still hydrating. Fall back to the real administrator login screen rather
-  // than repeatedly reloading a permanently checking protected route.
-  await page.evaluate((key) => window.localStorage.removeItem(key), storageKey);
+  // A serialized Supabase session can hydrate the shell while its protected
+  // data calls still fail on a mobile browser. Reauthenticate through the real
+  // administrator login, then require the canonical ILYTK row before the test
+  // continues. This prevents an empty or mixed fallback directory from passing.
   await page.goto(\`${'${base}'}/auth?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf_login\`, {
     waitUntil: 'domcontentloaded',
     timeout: 90000,
   });
+  await page.evaluate((key) => window.localStorage.removeItem(key), storageKey);
 
   const intro = page.locator('.auth-clean__intro-cta');
   if (await intro.isVisible().catch(() => false)) await intro.click();
@@ -48,6 +67,8 @@ const source = fs
   await page.locator('button[type="submit"]').click();
 
   await shell.waitFor({ state: 'visible', timeout: 90000 });
+  const recovered = await hasOperationalMerchantData(90000);
+  assert(recovered, 'merchant_accounts_operational_data_missing_after_real_login');
 }`,
   )
   .replace(
