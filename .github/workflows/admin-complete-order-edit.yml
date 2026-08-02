@@ -7,6 +7,7 @@ on:
       - ".github/workflows/admin-complete-order-edit.yml"
       - ".github/scripts/admin-complete-order-editor-browser.mjs"
       - ".github/scripts/admin-complete-order-save-production-probe.mjs"
+      - ".github/scripts/admin-complete-order-save-production-probe-live-schema.mjs"
       - "artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx"
       - "artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
@@ -63,7 +64,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Execute real edited-value save matrix with automatic rollback
-        run: node .github/scripts/admin-complete-order-save-production-probe.mjs
+        run: node .github/scripts/admin-complete-order-save-production-probe-live-schema.mjs
 
       - name: Verify complete order edit contract
         working-directory: artifacts/day-night-delivery
