@@ -108,6 +108,14 @@ begin
     raise exception 'excluded_coupon_010504_state_rejected';
   end if;
 
+  -- Lock the exact target rows first. PostgreSQL does not allow FOR UPDATE on
+  -- the aggregate snapshot query itself.
+  perform 1
+  from public.orders o
+  where o.id = any(v_target_ids)
+  order by o.id
+  for update;
+
   select count(*) into v_total_before from public.orders;
 
   select jsonb_object_agg(
@@ -116,8 +124,7 @@ begin
     order by o.id
   ) into v_before
   from public.orders o
-  where o.id = any(v_target_ids)
-  for update;
+  where o.id = any(v_target_ids);
 
   select count(*)::integer into v_dependency_conflicts
   from public.orders o
