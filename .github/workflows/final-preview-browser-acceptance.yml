@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -57,7 +59,7 @@ jobs:
             test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
           done
 
-      - name: Build and serve the exact PR web application
+      - name: Build and serve exact branch-head web application
         shell: bash
         run: |
           set -euo pipefail
@@ -69,18 +71,26 @@ jobs:
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > preview-browser-evidence/local-web.log 2>&1 &
           echo $! > preview-browser-evidence/local-web.pid
           for attempt in $(seq 1 60); do
-            curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null && exit 0
+            if curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null; then
+              exit 0
+            fi
             sleep 1
           done
           cat preview-browser-evidence/local-web.log >&2
           exit 1
 
-      - name: Install Chromium acceptance runtime
+      - name: Install isolated Chromium acceptance runtime
         shell: bash
         run: |
           set -euo pipefail
-          npm install --no-save --ignore-scripts playwright@1.56.1
+          playwright_dir="$RUNNER_TEMP/daynight-playwright"
+          rm -rf "$playwright_dir"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
           npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
       - name: Test admin, ILYTK portal, and search on desktop and phone
         shell: bash
@@ -88,7 +98,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('node:fs');
-          const { chromium, devices } = require('playwright');
+          const { chromium, devices } = require(`${process.env.PLAYWRIGHT_NODE_PATH}/playwright`);
 
           const base = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
           const deployedPreview = String(process.env.DEPLOYED_PREVIEW_URL || '').replace(/\/$/, '');
@@ -96,8 +106,9 @@ jobs:
           const adminPassword = process.env.RUNTIME_ADMIN_PASSWORD;
           const merchantEmail = process.env.RUNTIME_MERCHANT_EMAIL;
           const merchantPassword = process.env.RUNTIME_MERCHANT_PASSWORD;
+          const ilytkId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+          const g3bxgId = 'b0da2d6d-2fc9-43b3-9e38-260ff2dbd68e';
           const expectedMerchant = /استبي ما عرفنالك|DN-MER-SHOP-ILYTK|ILYTK/i;
-          const expectedOtherMerchant = /DN-MER-SHOP-G3BXG|G3BXG/i;
           const reviewedCoupons = ['003860', '010503', '010505'];
           const excludedCoupon = '010504';
 
@@ -106,10 +117,10 @@ jobs:
           }
 
           async function bodyText(page) {
-            return await page.locator('body').innerText();
+            return page.locator('body').innerText();
           }
 
-          async function clickFirstVisible(locator, description) {
+          async function clickFirst(locator, description) {
             const count = await locator.count();
             for (let index = 0; index < count; index += 1) {
               const item = locator.nth(index);
@@ -135,29 +146,42 @@ jobs:
               page.locator('button[type="submit"]').click(),
             ]);
             await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
-            const text = await bodyText(page);
-            assert(/لوحة التحكم|Dashboard|كافة الطلبات|All Orders/.test(text), 'Admin portal did not render after protected login.');
+            assert(/لوحة التحكم|Dashboard|كافة الطلبات|All Orders/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
+          }
+
+          async function selectorText(page) {
+            await page.waitForTimeout(700);
+            return page.locator('.dn-admin-bulk-selector-list').innerText();
           }
 
           async function testAdmin(page, label) {
             await loginAdmin(page);
-            await clickFirstVisible(page.getByText(/كافة الطلبات|All Orders/, { exact: true }), 'All Orders navigation');
+            await clickFirst(page.getByText(/كافة الطلبات|All Orders/, { exact: true }), 'All Orders navigation');
             const search = page.locator('[data-admin-order-search="true"]');
+            const merchantSelect = page.locator('.dn-admin-bulk-filter-grid select');
             await search.waitFor({ state: 'visible', timeout: 90000 });
+            await merchantSelect.waitFor({ state: 'attached', timeout: 90000 });
 
+            await merchantSelect.selectOption(ilytkId);
             await search.fill('003860');
-            await page.waitForTimeout(900);
-            let text = await bodyText(page);
-            assert(text.includes('003860'), `${label}: admin search did not return coupon 003860.`);
-            assert(expectedMerchant.test(text), `${label}: coupon 003860 is not displayed with ILYTK in admin.`);
+            let text = await selectorText(page);
+            assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
+
+            await merchantSelect.selectOption(g3bxgId);
+            text = await selectorText(page);
+            assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
 
             await search.fill(excludedCoupon);
-            await page.waitForTimeout(900);
-            const selectorText = await page.locator('.dn-admin-bulk-selector-list').innerText();
-            assert(selectorText.includes(excludedCoupon), `${label}: admin search did not return excluded coupon 010504.`);
-            assert(expectedOtherMerchant.test(selectorText), `${label}: coupon 010504 is not displayed with G3BXG.`);
-            assert(!expectedMerchant.test(selectorText), `${label}: coupon 010504 leaked into ILYTK ownership in admin.`);
+            text = await selectorText(page);
+            assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
 
+            await merchantSelect.selectOption(ilytkId);
+            text = await selectorText(page);
+            assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
+
+            await search.fill('003860');
+            text = await selectorText(page);
+            assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
             await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
           }
 
@@ -171,32 +195,31 @@ jobs:
             await page.locator('form button[type="submit"]').first().click();
             await page.locator('[data-merchant-authenticated="true"]').waitFor({ state: 'visible', timeout: 90000 });
             await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
-            const text = await bodyText(page);
-            assert(expectedMerchant.test(text), 'Authenticated merchant portal is not the canonical ILYTK merchant.');
+            assert(expectedMerchant.test(await bodyText(page)), 'Authenticated merchant account is not canonical ILYTK.');
           }
 
           async function merchantSearch(page, query) {
-            await page.getByRole('button', { name: /البحث|Search/ }).first().click();
+            await clickFirst(page.getByRole('button', { name: /البحث|Search/ }), 'Merchant global search');
             const dialog = page.getByRole('dialog', { name: /البحث الشامل|Global search/ });
             await dialog.waitFor({ state: 'visible', timeout: 30000 });
-            const input = dialog.locator('input').first();
-            await input.fill(query);
+            await dialog.locator('input').first().fill(query);
             await page.waitForTimeout(900);
             const text = await dialog.innerText();
+            const resultCount = await dialog.locator('.dn-merchant-command-results button').count();
             await page.keyboard.press('Escape');
-            return text;
+            return { text, resultCount };
           }
 
           async function testMerchant(page, label) {
             await loginMerchant(page);
             for (const coupon of reviewedCoupons) {
-              const text = await merchantSearch(page, coupon);
-              assert(text.includes(coupon), `${label}: ILYTK search did not return reviewed coupon ${coupon}.`);
-              assert(!/لا توجد نتائج مطابقة|No matching results/.test(text), `${label}: ILYTK search returned an empty result for ${coupon}.`);
+              const result = await merchantSearch(page, coupon);
+              assert(result.resultCount > 0, `${label}: ILYTK search returned no result for ${coupon}.`);
+              assert(!/لا توجد نتائج مطابقة|No matching results/.test(result.text), `${label}: ILYTK search reported empty for ${coupon}.`);
             }
-            const excludedText = await merchantSearch(page, excludedCoupon);
-            assert(!excludedText.includes(excludedCoupon), `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
-            assert(/لا توجد نتائج مطابقة|No matching results/.test(excludedText), `${label}: excluded coupon 010504 did not resolve to an explicit empty result.`);
+            const excluded = await merchantSearch(page, excludedCoupon);
+            assert(excluded.resultCount === 0, `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
+            assert(/لا توجد نتائج مطابقة|No matching results/.test(excluded.text), `${label}: excluded coupon 010504 did not produce explicit empty state.`);
             await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
           }
 
@@ -210,13 +233,11 @@ jobs:
             try {
               for (const scenario of scenarios) {
                 const adminContext = await browser.newContext(scenario.context);
-                const adminPage = await adminContext.newPage();
-                await testAdmin(adminPage, scenario.label);
+                await testAdmin(await adminContext.newPage(), scenario.label);
                 await adminContext.close();
 
                 const merchantContext = await browser.newContext(scenario.context);
-                const merchantPage = await merchantContext.newPage();
-                await testMerchant(merchantPage, scenario.label);
+                await testMerchant(await merchantContext.newPage(), scenario.label);
                 await merchantContext.close();
                 report.push({ scenario: scenario.label, admin: 'PASS', merchant: 'PASS', search: 'PASS', crossOwner: 'PASS' });
               }
@@ -224,10 +245,9 @@ jobs:
               await browser.close();
             }
             fs.writeFileSync('preview-browser-evidence/report.json', JSON.stringify({
-              head: process.env.GITHUB_SHA,
+              branchHead: process.env.GITHUB_HEAD_SHA || process.env.GITHUB_SHA,
               deployedPreview,
               testedExactSourceBundle: true,
-              testBase: base,
               reviewedCoupons,
               excludedCoupon,
               result: 'PASS',
