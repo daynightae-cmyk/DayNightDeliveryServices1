@@ -120,7 +120,7 @@ jobs:
             return page.locator('body').innerText();
           }
 
-          async function clickFirst(locator, description) {
+          async function clickFirstVisible(locator, description) {
             const count = await locator.count();
             for (let index = 0; index < count; index += 1) {
               const item = locator.nth(index);
@@ -129,25 +129,29 @@ jobs:
                 return;
               }
             }
-            if (count > 0) {
-              await locator.first().click({ force: true });
-              return;
-            }
-            throw new Error(`Missing control: ${description}`);
+            throw new Error(`Missing visible control: ${description}`);
           }
 
           async function openAllOrders(page) {
+            const shell = page.locator('.dncc-shell');
+            await shell.waitFor({ state: 'visible', timeout: 90000 });
+
             const section = page.locator('[data-dn-command-section="all_orders"]');
-            const count = await section.count();
-            for (let index = 0; index < count; index += 1) {
-              if (await section.nth(index).isVisible().catch(() => false)) {
-                await section.nth(index).click();
+            await section.first().waitFor({ state: 'attached', timeout: 90000 });
+            const sectionCount = await section.count();
+            for (let index = 0; index < sectionCount; index += 1) {
+              const item = section.nth(index);
+              if (await item.isVisible().catch(() => false)) {
+                await item.click();
                 return;
               }
             }
-            await clickFirst(page.getByRole('button', { name: /فتح القائمة|Open navigation/ }), 'Admin mobile navigation');
-            await page.waitForTimeout(250);
-            await clickFirst(section, 'All Orders command section');
+
+            const mobileMenu = page.locator('.dncc-mobile-menu');
+            await mobileMenu.waitFor({ state: 'visible', timeout: 30000 });
+            await mobileMenu.click();
+            await page.locator('.dncc-mobile-layer').waitFor({ state: 'visible', timeout: 30000 });
+            await clickFirstVisible(section, 'All Orders command section in mobile drawer');
           }
 
           async function loginAdmin(page) {
@@ -159,7 +163,7 @@ jobs:
               page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 }),
               page.locator('button[type="submit"]').click(),
             ]);
-            await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
+            await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
             assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
           }
 
@@ -169,34 +173,41 @@ jobs:
           }
 
           async function testAdmin(page, label) {
-            await loginAdmin(page);
-            await openAllOrders(page);
-            const search = page.locator('[data-admin-order-search="true"]');
-            const merchantSelect = page.locator('.dn-admin-bulk-filter-grid select');
-            await search.waitFor({ state: 'visible', timeout: 90000 });
-            await merchantSelect.waitFor({ state: 'attached', timeout: 90000 });
+            try {
+              await loginAdmin(page);
+              await openAllOrders(page);
+              const search = page.locator('[data-admin-order-search="true"]');
+              const merchantSelect = page.locator('.dn-admin-bulk-filter-grid select').filter({
+                has: page.locator(`option[value="${ilytkId}"]`),
+              }).first();
+              await search.waitFor({ state: 'visible', timeout: 90000 });
+              await merchantSelect.waitFor({ state: 'visible', timeout: 90000 });
 
-            await merchantSelect.selectOption(ilytkId);
-            await search.fill('003860');
-            let text = await selectorText(page);
-            assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
+              await merchantSelect.selectOption(ilytkId);
+              await search.fill('003860');
+              let text = await selectorText(page);
+              assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
 
-            await merchantSelect.selectOption(g3bxgId);
-            text = await selectorText(page);
-            assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
+              await merchantSelect.selectOption(g3bxgId);
+              text = await selectorText(page);
+              assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
 
-            await search.fill(excludedCoupon);
-            text = await selectorText(page);
-            assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
+              await search.fill(excludedCoupon);
+              text = await selectorText(page);
+              assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
 
-            await merchantSelect.selectOption(ilytkId);
-            text = await selectorText(page);
-            assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
+              await merchantSelect.selectOption(ilytkId);
+              text = await selectorText(page);
+              assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
 
-            await search.fill('003860');
-            text = await selectorText(page);
-            assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
-            await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
+              await search.fill('003860');
+              text = await selectorText(page);
+              assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
+              await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
+            } catch (error) {
+              await page.screenshot({ path: `preview-browser-evidence/${label}-admin-failure.png`, fullPage: true }).catch(() => {});
+              throw error;
+            }
           }
 
           async function loginMerchant(page) {
@@ -213,7 +224,7 @@ jobs:
           }
 
           async function merchantSearch(page, query) {
-            await clickFirst(page.getByRole('button', { name: /البحث|Search/ }), 'Merchant global search');
+            await clickFirstVisible(page.getByRole('button', { name: /البحث|Search/ }), 'Merchant global search');
             const dialog = page.getByRole('dialog', { name: /البحث الشامل|Global search/ });
             await dialog.waitFor({ state: 'visible', timeout: 30000 });
             await dialog.locator('input').first().fill(query);
@@ -225,16 +236,21 @@ jobs:
           }
 
           async function testMerchant(page, label) {
-            await loginMerchant(page);
-            for (const coupon of reviewedCoupons) {
-              const result = await merchantSearch(page, coupon);
-              assert(result.resultCount > 0, `${label}: ILYTK search returned no result for ${coupon}.`);
-              assert(!/لا توجد نتائج مطابقة|No matching results/.test(result.text), `${label}: ILYTK search reported empty for ${coupon}.`);
+            try {
+              await loginMerchant(page);
+              for (const coupon of reviewedCoupons) {
+                const result = await merchantSearch(page, coupon);
+                assert(result.resultCount > 0, `${label}: ILYTK search returned no result for ${coupon}.`);
+                assert(!/لا توجد نتائج مطابقة|No matching results/.test(result.text), `${label}: ILYTK search reported empty for ${coupon}.`);
+              }
+              const excluded = await merchantSearch(page, excludedCoupon);
+              assert(excluded.resultCount === 0, `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
+              assert(/لا توجد نتائج مطابقة|No matching results/.test(excluded.text), `${label}: excluded coupon 010504 did not produce explicit empty state.`);
+              await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
+            } catch (error) {
+              await page.screenshot({ path: `preview-browser-evidence/${label}-merchant-failure.png`, fullPage: true }).catch(() => {});
+              throw error;
             }
-            const excluded = await merchantSearch(page, excludedCoupon);
-            assert(excluded.resultCount === 0, `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
-            assert(/لا توجد نتائج مطابقة|No matching results/.test(excluded.text), `${label}: excluded coupon 010504 did not produce explicit empty state.`);
-            await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
           }
 
           (async () => {
