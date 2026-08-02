@@ -1,0 +1,178 @@
+name: Admin Financial Order Runtime Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-admin-financial-order-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-production-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Reproduce screenshot order and print raw database response
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const base = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const anon = process.env.VITE_SUPABASE_ANON_KEY;
+          const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          for (const name of ['VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','RUNTIME_ADMIN_EMAIL','RUNTIME_ADMIN_PASSWORD']) {
+            if (!process.env[name]) throw new Error(`missing ${name}`);
+          }
+
+          async function call(path, options = {}) {
+            const token = options.token || anon;
+            const key = options.key || anon;
+            const response = await fetch(base + path, {
+              method: options.method || 'GET',
+              headers: {
+                apikey: key,
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                ...(options.prefer ? { Prefer: options.prefer } : {}),
+              },
+              body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            });
+            const text = await response.text();
+            let value = text;
+            try { value = text ? JSON.parse(text) : null; } catch {}
+            return { ok: response.ok, status: response.status, value };
+          }
+
+          const auth = await call('/auth/v1/token?grant_type=password', {
+            method: 'POST',
+            body: { email: process.env.RUNTIME_ADMIN_EMAIL, password: process.env.RUNTIME_ADMIN_PASSWORD },
+          });
+          if (!auth.ok || !auth.value?.access_token) throw new Error(`auth failed ${JSON.stringify(auth.value)}`);
+          const access = auth.value.access_token;
+
+          const merchants = await call('/rest/v1/merchants?select=id,trade_name,owner_name,merchant_code,phone,emirate,city,address,pickup_address,status&limit=1000', { token: access });
+          if (!merchants.ok || !Array.isArray(merchants.value)) throw new Error(`merchant read failed ${JSON.stringify(merchants.value)}`);
+
+          const norm = (value) => String(value || '')
+            .normalize('NFKD')
+            .replace(/[\u064B-\u065F\u0670]/g, '')
+            .replace(/[أإآ]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي')
+            .replace(/[^\p{L}\p{N}]+/gu, '')
+            .toLowerCase();
+          const needles = ['موزه','لين','اكواب','رسي40','rsi40','rsky40'];
+          const ranked = merchants.value.map((merchant) => {
+            const text = norm(`${merchant.owner_name} ${merchant.trade_name} ${merchant.merchant_code}`);
+            return { merchant, score: needles.filter((needle) => text.includes(norm(needle))).length };
+          }).sort((a, b) => b.score - a.score);
+          console.log('MERCHANT_CANDIDATES', JSON.stringify(ranked.slice(0, 6).map(({ merchant, score }) => ({
+            score,
+            id: merchant.id,
+            owner_name: merchant.owner_name,
+            trade_name: merchant.trade_name,
+            merchant_code: merchant.merchant_code,
+            status: merchant.status,
+          })), null, 2));
+          const selected = ranked[0]?.merchant;
+          if (!selected || ranked[0].score < 2) throw new Error('screenshot merchant not found');
+
+          const conflict = await call('/rest/v1/rpc/admin_find_coupon_conflict', {
+            method: 'POST', token: access, body: { p_coupon: '009050', p_exclude_order_id: null },
+          });
+          console.log('COUPON_009050', JSON.stringify(conflict, null, 2));
+
+          const resolution = await call('/rest/v1/rpc/admin_resolve_order_merchant', {
+            method: 'POST', token: access, body: { p_merchant_id: selected.id },
+          });
+          console.log('MERCHANT_RESOLUTION', JSON.stringify(resolution, null, 2));
+
+          const now = new Date().toISOString();
+          const suffix = Date.now().toString(36).toUpperCase();
+          const ref = `DN-DIAG-${suffix}`;
+          const senderCity = String(selected.emirate || 'Abu Dhabi').trim();
+          const senderAddress = [selected.city, selected.pickup_address || selected.address || senderCity]
+            .map((value) => String(value || '').trim()).filter(Boolean).join(' - ');
+          const payload = {
+            tracking_number: ref,
+            tracking_code: ref,
+            invoice_number: ref,
+            coupon_number: `DIAG-009050-${suffix}`,
+            merchant_id: selected.id,
+            merchant_name: selected.trade_name,
+            merchant_code: selected.merchant_code || '',
+            order_count: 1,
+            shipping_scope: 'international',
+            destination_country: 'KW',
+            source_channel: 'admin_financial_order',
+            source_domain: 'daynightae.com',
+            sender_name: selected.trade_name,
+            sender_phone: String(selected.phone || '971568757331').trim(),
+            sender_city: senderCity,
+            sender_address: senderAddress,
+            receiver_name: 'عميل',
+            receiver_phone: '96562221989',
+            receiver_city: 'KW',
+            receiver_address: 'العدان',
+            package_type: 'Shipment',
+            package_description: 'Shipment',
+            weight: 1,
+            pieces: 1,
+            service_type: 'international',
+            payment_method: 'cod',
+            cod_amount: 95,
+            goods_value: 0,
+            delivery_fee: 95,
+            discount_amount: 0,
+            delivery_fee_mode: 'customer_pays',
+            customer_total: 95,
+            merchant_due: 0,
+            company_revenue: 95,
+            collected_amount: 0,
+            financial_version: 2,
+            delivery_price: 95,
+            base_price: 95,
+            subtotal: 95,
+            total: 95,
+            total_price: 95,
+            amount: 95,
+            price: 95,
+            manual_delivery_price: null,
+            price_source: 'system',
+            currency: 'AED',
+            notes: 'Exact runtime diagnostic for failed admin order',
+            status: 'pending',
+            status_history: [{ status: 'pending', date: now, created_at: now, note: 'runtime diagnostic' }],
+            created_at: now,
+            updated_at: now,
+          };
+
+          const created = await call('/rest/v1/rpc/admin_create_canonical_merchant_order', {
+            method: 'POST', token: access, body: { p_order: payload },
+          });
+          console.log('CREATE_RAW', JSON.stringify(created, null, 2));
+          if (!created.ok) throw new Error(`production create failed ${JSON.stringify(created.value)}`);
+
+          const row = Array.isArray(created.value) ? created.value[0] : created.value;
+          const id = row?.id;
+          if (!id) throw new Error('created row has no id');
+          await call(`/rest/v1/order_status_history?order_id=eq.${encodeURIComponent(id)}`, {
+            method: 'DELETE', token: service, key: service, prefer: 'return=minimal',
+          });
+          const removed = await call(`/rest/v1/orders?id=eq.${encodeURIComponent(id)}`, {
+            method: 'DELETE', token: service, key: service, prefer: 'return=minimal',
+          });
+          console.log('CLEANUP', JSON.stringify(removed, null, 2));
+          if (!removed.ok) throw new Error(`cleanup failed ${JSON.stringify(removed.value)}`);
+          console.log('EXACT_SAVE_PASS_AND_CLEANED', id);
+          NODE
