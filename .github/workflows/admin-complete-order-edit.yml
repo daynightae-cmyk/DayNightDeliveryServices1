@@ -6,11 +6,13 @@ on:
     paths:
       - ".github/workflows/admin-complete-order-edit.yml"
       - ".github/scripts/admin-complete-order-editor-browser.mjs"
+      - ".github/scripts/admin-complete-order-save-production-probe.mjs"
       - "artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx"
       - "artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
       - "artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs"
       - "supabase/migrations/20260802084500_admin_complete_order_edit.sql"
+      - "supabase/migrations/20260802094000_admin_complete_order_save_probe.sql"
   workflow_dispatch:
 
 permissions:
@@ -48,7 +50,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Verify protected browser credentials
+      - name: Verify protected admin credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -103,6 +105,9 @@ jobs:
 
       - name: Verify merchant editing on desktop and phone without saving
         run: node .github/scripts/admin-complete-order-editor-browser.mjs
+
+      - name: Execute real production save RPC with automatic rollback
+        run: node .github/scripts/admin-complete-order-save-production-probe.mjs
 
       - name: Stop local application
         if: always()
