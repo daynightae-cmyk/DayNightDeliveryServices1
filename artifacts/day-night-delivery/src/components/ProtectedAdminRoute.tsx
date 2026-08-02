@@ -11,25 +11,68 @@ type ProtectedAdminRouteProps = {
   children: React.ReactNode;
 };
 
+const ADMIN_AUTH_TIMEOUT_MS = 25_000;
+
+function withAdminAuthTimeout<T>(promise: PromiseLike<T>, operation: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(`${operation}_timeout`)),
+      ADMIN_AUTH_TIMEOUT_MS,
+    );
+
+    Promise.resolve(promise).then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        window.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
+
 export default function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
   const [status, setStatus] = useState<"checking" | "allowed" | "denied">("checking");
 
   useEffect(() => {
     let active = true;
+    let verificationRunning = false;
+    let verificationRequested = false;
+    let scheduledVerification: number | null = null;
 
     async function verifyAdminAccess() {
+      if (!active) return;
+      if (verificationRunning) {
+        verificationRequested = true;
+        return;
+      }
+
+      verificationRunning = true;
+      verificationRequested = false;
+
       try {
         if (!supabase) {
           if (active) setStatus("denied");
           return;
         }
 
-        let { data, error } = await supabase.auth.getUser();
+        let { data, error } = await withAdminAuthTimeout(
+          supabase.auth.getUser(),
+          "admin_get_user",
+        );
 
         if (error || !data.user?.id) {
-          const refreshed = await supabase.auth.refreshSession();
+          const refreshed = await withAdminAuthTimeout(
+            supabase.auth.refreshSession(),
+            "admin_refresh_session",
+          );
           if (!refreshed.error) {
-            const retried = await supabase.auth.getUser();
+            const retried = await withAdminAuthTimeout(
+              supabase.auth.getUser(),
+              "admin_get_user_retry",
+            );
             data = retried.data;
             error = retried.error;
           }
@@ -41,30 +84,49 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
           return;
         }
 
-        const [profileAllowed, databaseRole] = await Promise.all([
-          isAdminUser(data.user.id),
-          supabase.rpc("is_admin_or_support"),
-        ]);
+        const [profileAllowed, databaseRole] = await withAdminAuthTimeout(
+          Promise.all([
+            isAdminUser(data.user.id),
+            supabase.rpc("is_admin_or_support"),
+          ]),
+          "admin_role_verification",
+        );
         const allowed = profileAllowed && !databaseRole.error && databaseRole.data === true;
 
         if (active) {
           if (!allowed) clearAdminStepUp(data.user.id);
           setStatus(allowed ? "allowed" : "denied");
         }
-      } catch {
+      } catch (cause) {
+        console.error("Administrator access verification failed.", cause);
         clearAdminStepUp();
         if (active) setStatus("denied");
+      } finally {
+        verificationRunning = false;
+        if (active && verificationRequested) scheduleVerification();
       }
     }
 
-    void verifyAdminAccess();
+    function scheduleVerification() {
+      if (!active || scheduledVerification !== null) return;
+      // Supabase explicitly dispatches auth events while its auth lock is held.
+      // Defer all follow-up Supabase calls until the callback has returned to
+      // prevent the protected route from remaining permanently in "checking".
+      scheduledVerification = window.setTimeout(() => {
+        scheduledVerification = null;
+        void verifyAdminAccess();
+      }, 0);
+    }
+
+    scheduleVerification();
     const { data } = supabase?.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" || event === "USER_UPDATED") clearAdminStepUp();
-      void verifyAdminAccess();
+      scheduleVerification();
     }) || { data: null };
 
     return () => {
       active = false;
+      if (scheduledVerification !== null) window.clearTimeout(scheduledVerification);
       data?.subscription.unsubscribe();
     };
   }, []);
