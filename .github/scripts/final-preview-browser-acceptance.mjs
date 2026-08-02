@@ -219,7 +219,7 @@ async function openAdminFromInjectedSession(page) {
   });
   await page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 });
   await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
-  assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render from the verified admin session.');
+  await page.locator('[data-dn-command-section="all_orders"]').first().waitFor({ state: 'attached', timeout: 90000 });
 }
 
 async function selectorText(page) {
