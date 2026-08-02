@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { getCachedAuthenticatedAccessToken } from "./authenticatedAccessToken";
 
 export type MerchantStatementDispatchStatus = {
   orderId: string;
@@ -185,6 +186,9 @@ function withPromiseTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs
 }
 
 async function resolveAccessToken() {
+  const cached = getCachedAuthenticatedAccessToken();
+  if (cached) return cached;
+
   const persisted = readPersistedSession();
   if (tokenIsUsable(persisted)) return persisted!.accessToken;
   if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
