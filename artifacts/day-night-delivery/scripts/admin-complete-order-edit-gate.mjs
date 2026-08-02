@@ -31,6 +31,16 @@ assert(
   "delivered financial adjustment integration missing",
 );
 assert(
+  migration.includes("v_financial_changed") &&
+    migration.includes("if v_posted and v_financial_changed then"),
+  "core-only delivered edits can create a no-op financial adjustment",
+);
+assert(
+  migration.includes("price_source = v_price_source") &&
+    migration.includes("manual_delivery_price = v_desired_manual_delivery"),
+  "final system/manual price-source choice is not preserved",
+);
+assert(
   migration.includes("for update"),
   "order row is not locked before complete edit",
 );
@@ -117,6 +127,8 @@ console.log(
       completeRpc: true,
       canonicalMerchant: true,
       deliveredFinancialAudit: true,
+      noOpFinancialAdjustmentPrevented: true,
+      priceSourcePreserved: true,
       merchantEditableWhenPosted: true,
       completeBusinessFields: true,
       immutableIdentityProtected: true,
