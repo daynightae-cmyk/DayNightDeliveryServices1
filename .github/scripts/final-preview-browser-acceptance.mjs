@@ -93,11 +93,28 @@ async function createTemporaryIlytkSession() {
   assert(tokenHash, 'ilytk_magic_link_hash_missing');
   assert(verificationType === 'magiclink', `ilytk_unexpected_verification_type_${verificationType}`);
 
+  // Let the exact installed auth-js version serialize the session itself. This
+  // avoids guessing the browser storage envelope or future storage migrations.
+  const memoryStorage = new Map();
+  const authStorage = {
+    getItem(key) {
+      return memoryStorage.get(key) ?? null;
+    },
+    setItem(key, value) {
+      memoryStorage.set(key, value);
+    },
+    removeItem(key) {
+      memoryStorage.delete(key);
+    },
+  };
+
   const sessionClient = createClient(supabaseUrl, anonKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false,
+      persistSession: true,
       detectSessionInUrl: false,
+      storage: authStorage,
+      storageKey,
     },
   });
   const { data: verified, error: verifyError } = await sessionClient.auth.verifyOtp({
@@ -110,16 +127,27 @@ async function createTemporaryIlytkSession() {
   assert(session?.access_token && session?.refresh_token, 'ilytk_temporary_session_missing');
   assert(String(session.user?.id || '') === String(linkedUser.id), 'ilytk_temporary_session_user_mismatch');
 
-  return { session, sessionClient };
+  const serializedSession = memoryStorage.get(storageKey);
+  assert(typeof serializedSession === 'string' && serializedSession.length > 100, 'ilytk_serialized_session_missing');
+  assert(serializedSession.includes(session.access_token), 'ilytk_serialized_session_access_token_missing');
+
+  // Prove that the generated JWT resolves to ILYTK before opening a browser.
+  const { data: resolvedMerchantId, error: merchantSessionError } = await sessionClient.rpc('merchant_session_id');
+  if (merchantSessionError) {
+    throw new Error(`ilytk_session_rpc_failed_${merchantSessionError.message}`);
+  }
+  assert(String(resolvedMerchantId || '') === ilytkId, `ilytk_session_rpc_resolved_${resolvedMerchantId || 'null'}`);
+
+  return { serializedSession, sessionClient };
 }
 
-async function createIlytkContext(browser, contextOptions, session) {
+async function createIlytkContext(browser, contextOptions, serializedSession) {
   const context = await browser.newContext(contextOptions);
   await context.addInitScript(
     ({ key, value }) => {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      window.localStorage.setItem(key, value);
     },
-    { key: storageKey, value: session },
+    { key: storageKey, value: serializedSession },
   );
   return context;
 }
@@ -202,6 +230,10 @@ async function testAdmin(page, label) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
   } catch (error) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-failure.png`, fullPage: true }).catch(() => {});
+    await fs.promises.writeFile(
+      `preview-browser-evidence/${label}-admin-failure.txt`,
+      await bodyText(page).catch(() => 'body unavailable'),
+    ).catch(() => {});
     throw error;
   }
 }
@@ -247,11 +279,15 @@ async function testMerchant(page, label) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
   } catch (error) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-merchant-failure.png`, fullPage: true }).catch(() => {});
+    await fs.promises.writeFile(
+      `preview-browser-evidence/${label}-merchant-failure.txt`,
+      await bodyText(page).catch(() => 'body unavailable'),
+    ).catch(() => {});
     throw error;
   }
 }
 
-const { session, sessionClient } = await createTemporaryIlytkSession();
+const { serializedSession, sessionClient } = await createTemporaryIlytkSession();
 const browser = await chromium.launch({ headless: true });
 const scenarios = [
   { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
@@ -265,7 +301,7 @@ try {
     await testAdmin(await adminContext.newPage(), scenario.label);
     await adminContext.close();
 
-    const merchantContext = await createIlytkContext(browser, scenario.context, session);
+    const merchantContext = await createIlytkContext(browser, scenario.context, serializedSession);
     await testMerchant(await merchantContext.newPage(), scenario.label);
     await merchantContext.close();
     report.push({
@@ -294,6 +330,7 @@ fs.writeFileSync(
       merchantIdentity: {
         merchantId: ilytkId,
         portalLinkResolvedByUuid: true,
+        authStorageSerializedByInstalledSupabaseClient: true,
         temporarySessionRevokedLocally: true,
       },
       reviewedCoupons,
