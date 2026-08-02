@@ -20,7 +20,7 @@ function addImport(source: string, marker: string, statement: string, label: str
 
 export function friendlyErrorMessagePlugin(): Plugin {
   return {
-    name: "day-night-friendly-error-messages-v1",
+    name: "day-night-friendly-error-messages-v2",
     enforce: "pre",
     transform(source, id) {
       const normalized = id.replace(/\\/g, "/").split("?")[0];
@@ -73,6 +73,64 @@ function operationsError(error: unknown, fallback: string) {
 
 async function rpcOne`,
           "admin operations technical-to-friendly error conversion",
+        );
+        return { code, map: null };
+      }
+
+      if (normalized.endsWith("/src/components/admin/AdminOrderEditModalComplete.tsx")) {
+        const code = replaceRequired(
+          source,
+          /    \} catch \(cause\) \{\n      const detail = opsErrorDetail\(cause\);\n      setError\(\n        isArabic\n          \? `تعذر تحديث الطلب\. العملية اتلغت بالكامل ومفيش تعديل جزئي\.\$\{detail \? ` السبب: \$\{detail\}` : ""\}`\n          : `The order update failed\. The transaction was fully rolled back with no partial edit\.\$\{detail \? ` Reason: \$\{detail\}` : ""\}`,\n      \);\n    \} finally \{/,
+          `    } catch (cause) {
+      const detail = opsErrorDetail(cause);
+      const reason = clean(detail).toLowerCase();
+      let saveError = "";
+
+      if (/not_authenticated|jwt expired|invalid jwt|refresh_token|session/.test(reason)) {
+        saveError = isArabic
+          ? "انتهت جلسة الإدارة. سجّل الدخول مرة أخرى ثم افتح الطلب واضغط حفظ. لم يحدث أي تعديل جزئي."
+          : "The admin session expired. Sign in again, reopen the order, and save. No partial change was made.";
+      } else if (/not_authorized|permission denied|row-level security|rls/.test(reason)) {
+        saveError = isArabic
+          ? "حسابك لا يملك صلاحية تعديل هذا الطلب. استخدم حساب مدير أو دعم معتمد. لم يحدث أي تعديل جزئي."
+          : "Your account is not authorized to edit this order. Use an approved admin or support account. No partial change was made.";
+      } else if (/23505|duplicate key|unique constraint|coupon.*duplicate|duplicate.*coupon|already exists/.test(reason)) {
+        saveError = isArabic
+          ? "رقم الكوبون مستخدم بالفعل على طلب آخر. افتح الطلب الموجود أو اكتب رقم كوبون مختلفًا. لم يحدث أي تعديل جزئي."
+          : "The coupon number is already used by another order. Open the existing order or enter a different coupon. No partial change was made.";
+      } else if (/canonical_merchant_not_found|merchant_required|merchant.*portal|portal.*merchant|merchant_not_found/.test(reason)) {
+        saveError = isArabic
+          ? "التاجر المختار غير مرتبط بحساب بوابة قانوني. اربط حساب التاجر أولًا أو اختر تاجرًا مرتبطًا، ثم احفظ. لم يحدث أي تعديل جزئي."
+          : "The selected merchant is not linked to a canonical portal account. Link the merchant first or select a linked merchant, then save. No partial change was made.";
+      } else if (/ownership.*conflict|dependency.*conflict|merchant.*mismatch|readback_mismatch/.test(reason)) {
+        saveError = isArabic
+          ? "يوجد تعارض في ملكية الطلب أو قيوده التابعة. راجع التاجر الحالي وكشف COD ثم أعد الحفظ. لم يحدث أي تعديل جزئي."
+          : "There is an ownership conflict in the order or its dependent ledgers. Review the current merchant and COD statement, then save again. No partial change was made.";
+      } else if (/invalid_delivery_fee|negative_financial_value|invalid_price_source|invalid_payment_method|invalid_delivery_fee_mode/.test(reason)) {
+        saveError = isArabic
+          ? "القيم المالية غير صالحة. راجع قيمة البضاعة والتوصيل والخصم وطريقة التحصيل، ثم اضغط حفظ. لم يحدث أي تعديل جزئي."
+          : "The financial values are invalid. Review goods, delivery, discount, and payment method, then save. No partial change was made.";
+      } else if (/admin_edit_reason_required_min_6/.test(reason)) {
+        saveError = isArabic
+          ? "اكتب سببًا واضحًا للتعديل لا يقل عن 6 أحرف، ثم اضغط حفظ."
+          : "Enter a clear edit reason of at least 6 characters, then save.";
+      } else if (/order_not_found/.test(reason)) {
+        saveError = isArabic
+          ? "الطلب لم يعد موجودًا في قاعدة البيانات. حدّث قائمة الطلبات وابحث عنه من جديد."
+          : "The order no longer exists in the database. Refresh the order list and search again.";
+      } else if (/pgrst202|schema cache|could not find the function|runtime_missing|does not exist/.test(reason)) {
+        saveError = isArabic
+          ? "خدمة حفظ التعديلات الكاملة غير متاحة في نسخة قاعدة البيانات الحالية. حدّث الصفحة بعد اكتمال نشر قاعدة البيانات. لم يحدث أي تعديل جزئي."
+          : "The complete-save service is not available in the current database version. Refresh after the database deployment completes. No partial change was made.";
+      } else {
+        saveError = isArabic
+          ? `لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية. لم يحدث أي تعديل جزئي.${detail ? ` السبب الفني: ${detail}` : " راجع اتصال الإنترنت ثم أعد المحاولة."}`
+          : `The database rejected the save. No partial change was made.${detail ? ` Technical reason: ${detail}` : " Check the connection and try again."}`;
+      }
+
+      setError(saveError);
+    } finally {`,
+          "complete order save exact rejection messages",
         );
         return { code, map: null };
       }
