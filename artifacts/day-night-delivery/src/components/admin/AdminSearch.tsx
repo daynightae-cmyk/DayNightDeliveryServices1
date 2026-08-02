@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Order } from "../../types";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 interface AdminSearchProps {
   orders: Order[];
@@ -11,10 +12,15 @@ export default function AdminSearch({ orders, onFiltered }: AdminSearchProps) {
   const [status, setStatus] = useState("all");
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     const result = orders.filter((o) => {
-      const matchesQuery = !q || [o.id, o.sender_name, o.receiver_name, o.sender_phone, o.receiver_phone, o.sender_city, o.receiver_city].some((v) => String(v || "").toLowerCase().includes(q));
-      const matchesStatus = status === "all" || o.status.toLowerCase() === status.toLowerCase();
+      const matchesQuery = matchesSearchQuery([
+        o.id, o.tracking_number, o.invoice_number, o.coupon_number,
+        o.merchant_id, o.merchant_code, o.merchant_name,
+        o.sender_name, o.receiver_name, o.customer_name,
+        o.sender_phone, o.receiver_phone, o.customer_phone,
+        o.sender_city, o.receiver_city, o.sender_address, o.receiver_address,
+      ], query);
+      const matchesStatus = status === "all" || String(o.status || "").toLowerCase() === status.toLowerCase();
       return matchesQuery && matchesStatus;
     });
     onFiltered(result);

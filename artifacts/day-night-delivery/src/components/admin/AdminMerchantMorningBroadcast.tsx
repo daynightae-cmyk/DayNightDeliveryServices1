@@ -35,6 +35,7 @@ import {
   markOutboundMessageStatus,
   prepareWhatsAppMessage,
 } from "../../services/whatsappMessageService";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 const EMPTY_AUDIENCE: MerchantMorningAudience = {
   all: [],
@@ -173,12 +174,8 @@ export default function AdminMerchantMorningBroadcast({ isArabic }: { isArabic: 
   }, []);
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return audience.eligible;
     return audience.eligible.filter((merchant) =>
-      [merchantName(merchant), merchant.phone, merchant.merchant_code]
-        .map((value) => String(value || "").toLowerCase())
-        .some((value) => value.includes(query)),
+      matchesSearchQuery([merchantName(merchant), merchant.phone, merchant.merchant_code], search),
     );
   }, [audience.eligible, search]);
 

@@ -21,6 +21,7 @@ import type { Merchant, Order } from "../../types";
 import type { MerchantStatementPayload } from "../../lib/merchantStatementExport";
 import { localizeExportText, localizedOrderDestination } from "../../lib/exportLocalization";
 import MerchantStatementExportButton from "./MerchantStatementExportButton";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 type Props = {
   isArabic: boolean;
@@ -46,13 +47,7 @@ const normalize = (value: unknown) => clean(value).toLowerCase().replace(/[\s_-]
 
 function merchantOrderMatches(order: Order, merchant: Merchant) {
   const merchantId = normalize(merchant.id);
-  const merchantCode = normalize(merchant.merchant_code);
-  const merchantName = normalize(merchant.trade_name);
-  return (
-    (merchantId && normalize(order.merchant_id) === merchantId) ||
-    (merchantCode && normalize(order.merchant_code) === merchantCode) ||
-    (merchantName && normalize(order.merchant_name) === merchantName)
-  );
+  return Boolean(merchantId && normalize(order.merchant_id) === merchantId);
 }
 
 function orderReference(order: Order) {
@@ -190,21 +185,17 @@ export default function AdminMerchantStatementsCenter({
   );
 
   const visibleMerchants = useMemo(() => {
-    const needle = normalize(`${query} ${merchantQuery}`);
     return merchantRows
       .filter(
         ({ merchant }) =>
-          !needle ||
-          normalize(
-            [
+          matchesSearchQuery([
               merchant.trade_name,
               merchant.owner_name,
               merchant.merchant_code,
               merchant.phone,
               merchant.city,
               merchant.emirate,
-            ].join(" "),
-          ).includes(needle),
+            ], `${query} ${merchantQuery}`),
       )
       .sort((a, b) => {
         const bDate = new Date(b.orders[0]?.created_at || b.merchant.updated_at || b.merchant.created_at || 0).getTime();
@@ -217,16 +208,12 @@ export default function AdminMerchantStatementsCenter({
 
   const visibleOrders = useMemo(() => {
     if (!selectedRow) return [];
-    const needle = normalize(orderQuery);
     return selectedRow.orders
       .filter((order) => {
         const date = clean(order.created_at).slice(0, 10);
         const inRange = allTime || ((!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo));
         const statusMatches = statusFilter === "all" || clean(order.status).toLowerCase() === statusFilter;
-        const searchMatches =
-          !needle ||
-          normalize(
-            [
+        const searchMatches = matchesSearchQuery([
               orderReference(order),
               order.coupon_number,
               order.receiver_name,
@@ -235,8 +222,7 @@ export default function AdminMerchantStatementsCenter({
               order.receiver_address,
               order.sender_city,
               order.status,
-            ].join(" "),
-          ).includes(needle);
+            ], orderQuery);
         return inRange && statusMatches && searchMatches;
       })
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());

@@ -8,6 +8,9 @@ import type { Merchant, Order, OrderStatusHistoryItem } from "../../types";
 import TrackingMap from "../tracking/TrackingMap";
 import { exportOrderPDF } from "../../lib/exportUtils";
 import { buildAdminCsv, buildAdminPdf } from "../../lib/adminPdfExport";
+import { fetchAllMerchantPortalOrders } from "../../lib/merchantPortalOrders";
+import { verifySavedOrderMerchant } from "../../lib/orderMerchantResolver";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import { localizeExportText, localizedOrderAddress, localizedOrderCity, localizedPackageType, localizedPaymentMethod, localizedServiceType } from "../../lib/exportLocalization";
 import {
   MerchantPortalShell,
@@ -358,20 +361,26 @@ export default function MerchantPortalCommandCenter() {
     if (!supabase) return; setLoading(true); setRefreshing(true); setDataError("");
     try {
       let profile = await supabase.rpc("merchant_get_session_profile");
-      let p = recordFrom(profile.data); let merchants = arrayFrom<MerchantRecord>(p.merchants);
-      if (!merchants.length) { const claim=await supabase.rpc("merchant_claim_approved_account"); if (claim.error && !/not_approved/i.test(claim.error.message)) throw claim.error; profile=await supabase.rpc("merchant_get_session_profile"); p=recordFrom(profile.data); merchants=arrayFrom<MerchantRecord>(p.merchants); }
       if (profile.error) throw profile.error;
+      let p = recordFrom(profile.data); let merchants = arrayFrom<MerchantRecord>(p.merchants);
+      if (!merchants.length) { const claim=await supabase.rpc("merchant_claim_approved_account"); if (claim.error && !/not_approved/i.test(claim.error.message)) throw claim.error; profile=await supabase.rpc("merchant_get_session_profile"); if(profile.error)throw profile.error;p=recordFrom(profile.data); merchants=arrayFrom<MerchantRecord>(p.merchants); }
+      if (merchants.length > 1) throw new Error("merchant_identity_ambiguous_multiple_uuid");
+      if (!merchants.length) throw new Error("merchant_profile_not_found");
+      const ordersResult=await fetchAllMerchantPortalOrders();
+      if (!merchants.some((item) => clean(item.id) === ordersResult.merchantId)) throw new Error("merchant_profile_order_owner_mismatch");
+      const center=await supabase.rpc("merchant_portal_business_center"); if(center.error) throw center.error;
+      // Commit one complete owner-scoped snapshot. Never combine a newly resolved
+      // merchant/profile with COD or statement data left from a previous owner.
       setMerchantRows(merchants);
-      if (!merchants.length) { setRawOrders([]); return; }
-      const ordersResult=await supabase.rpc("merchant_portal_orders",{p_limit:250}); if(ordersResult.error) throw ordersResult.error; const op=recordFrom(ordersResult.data); const orders=arrayFrom<OrderRecord>(op.orders); setRawOrders(orders);
-      const center=await supabase.rpc("merchant_portal_business_center"); if(!center.error) setBusiness(recordFrom(center.data) as BusinessCenterPayload); else setBusiness({});
+      setRawOrders(ordersResult.orders as OrderRecord[]);
+      setBusiness(recordFrom(center.data) as BusinessCenterPayload);
       const now=new Date().toISOString(); setLastSync(now); setRealtime({state:"connected",lastSuccessfulSyncAt:now});
-    } catch(error){setDataError(errorMessage(error,isArabic));setRealtime(current=>({state:navigator.onLine?"stale":"offline",lastSuccessfulSyncAt:current.lastSuccessfulSyncAt,messageAr:"تعذر تحديث البيانات الحية.",messageEn:"Live data refresh failed."}))}
+    } catch(error){setMerchantRows([]);setRawOrders([]);setBusiness({});setLastSync(null);setSelectedOrderId(null);setDataError(errorMessage(error,isArabic));setRealtime(current=>({state:navigator.onLine?"stale":"offline",lastSuccessfulSyncAt:current.lastSuccessfulSyncAt,messageAr:"تعذر تحديث البيانات الحية.",messageEn:"Live data refresh failed."}))}
     finally{setLoading(false);setRefreshing(false)}
   },[isArabic]);
 
   useEffect(()=>{if(user)void loadData(user);else{setMerchantRows([]);setRawOrders([]);setBusiness({});}},[user,loadData]);
-  useEffect(()=>{if(!supabase||!user||!merchantRows.length)return;const channel=supabase.channel(`merchant-command-${user.id}`).on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>void loadData(user)).on("postgres_changes",{event:"UPDATE",schema:"public",table:"merchants"},()=>void loadData(user)).subscribe(status=>setRealtime(current=>({state:status==="SUBSCRIBED"?"connected":status==="CHANNEL_ERROR"?"reconnecting":current.state,lastSuccessfulSyncAt:current.lastSuccessfulSyncAt})));return()=>{void supabase?.removeChannel(channel)}},[user,merchantRows.length,loadData]);
+  useEffect(()=>{const merchantId=clean(merchantRows[0]?.id);if(!supabase||!user||!merchantId)return;const channel=supabase.channel(`merchant-command-${user.id}`).on("postgres_changes",{event:"*",schema:"public",table:"orders",filter:`merchant_id=eq.${merchantId}`},()=>void loadData(user)).on("postgres_changes",{event:"UPDATE",schema:"public",table:"merchants",filter:`id=eq.${merchantId}`},()=>void loadData(user)).subscribe(status=>setRealtime(current=>({state:status==="SUBSCRIBED"?"connected":status==="CHANNEL_ERROR"?"reconnecting":current.state,lastSuccessfulSyncAt:current.lastSuccessfulSyncAt})));return()=>{void supabase?.removeChannel(channel)}},[user,merchantRows,loadData]);
   useEffect(()=>{const offline=()=>setRealtime(current=>({...current,state:"offline"}));const online=()=>{setRealtime(current=>({...current,state:"reconnecting"}));if(user)void loadData(user)};window.addEventListener("offline",offline);window.addEventListener("online",online);return()=>{window.removeEventListener("offline",offline);window.removeEventListener("online",online)}},[user,loadData]);
 
   async function passwordSignIn(event:FormEvent){event.preventDefault();if(!supabase)return;setAuthBusy(true);setAuthError("");const {error}=await supabase.auth.signInWithPassword({email:email.trim().toLowerCase(),password});if(error)setAuthError(errorMessage(error,isArabic));setAuthBusy(false)}
@@ -456,6 +465,7 @@ export default function MerchantPortalCommandCenter() {
       const row=recordFrom(created) as OrderRecord;
       const tracking=reference(row);
       if(!tracking)return{success:false,error:{code:"CREATE_UNCONFIRMED",message:isArabic?"أُرسل الطلب لكن لم يرجع النظام رقم تتبع موثوقاً.":"The order was submitted but no authoritative tracking number was returned."}};
+      try { await verifySavedOrderMerchant(row, merchant.id); } catch (ownershipError) { return{success:false,error:{code:"CREATE_OWNERSHIP_UNCONFIRMED",message:errorMessage(ownershipError,isArabic)}}; }
       await loadData(user);
       return{success:true,orderId:clean(row.id)||tracking,trackingNumber:tracking,invoiceNumber:clean(row.invoice_number),amount:orderAmount(row),currency:"AED",createdAt:clean(row.created_at)||new Date().toISOString()};
     },
@@ -546,7 +556,31 @@ export default function MerchantPortalCommandCenter() {
     onSaveTeamMember:async(input)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {data:r,error}=await supabase.rpc("merchant_save_team_member",{p_member:input});if(error)return{success:false,error:{code:"TEAM_SAVE_FAILED",message:errorMessage(error,isArabic)}};if(user)await loadData(user);return{success:true,member:mapTeamMember(recordFrom(recordFrom(r).member))}},
     onMarkNotificationRead:async(notificationId)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {error}=await supabase.rpc("merchant_mark_notification_read",{p_notification_id:notificationId});if(error)return{success:false,error:{code:"NOTIFICATION_UPDATE_FAILED",message:errorMessage(error,isArabic)}};if(user)await loadData(user);return{success:true}},
     onSubmitSupportRequest:async(input)=>{if(!supabase)return{success:false,error:{code:"NO_BACKEND",message:"Supabase unavailable."}};const {data:r,error}=await supabase.rpc("merchant_create_support_ticket",{p_ticket:input});return error?{success:false,error:{code:"SUPPORT_FAILED",message:errorMessage(error,isArabic)}}:{success:true,ticket:recordFrom(r).ticket as MerchantSupportTicketViewModel}},
-    onGlobalSearch:async(query)=>{const q=query.trim().toLowerCase();const results=orders.filter(o=>[o.trackingNumber,o.invoiceNumber,o.couponNumber,o.merchantReference,o.recipientName,o.recipientPhone,o.deliveryCity,o.deliveryAddress].some(v=>clean(v).toLowerCase().includes(q))).slice(0,12).map(o=>({id:o.id,type:"order" as const,title:o.trackingNumber,subtitle:`${o.recipientName} · ${o.deliveryCity||""}`,section:"order_details"}));return{query,results}},
+    onGlobalSearch:async(query)=>{
+      const orderResults=orders
+        .filter((order)=>matchesSearchQuery([
+          order.id,order.trackingNumber,order.invoiceNumber,order.couponNumber,
+          order.merchantReference,order.recipientName,order.recipientPhone,
+          order.deliveryCity,order.deliveryAddress,order.pickupBranch,
+          order.pickupAddress,order.status,order.notes,
+        ],query))
+        .map((order)=>({id:order.id,type:"order" as const,title:order.trackingNumber,subtitle:`${order.recipientName} · ${order.deliveryCity||""}`,section:"order_details"}));
+      const invoiceResults=invoices
+        .filter((invoice)=>matchesSearchQuery([invoice.id,invoice.invoiceNumber,invoice.orderId,invoice.trackingNumber,invoice.date,invoice.amount,invoice.status],query))
+        .map((invoice)=>({id:invoice.id,type:"invoice" as const,title:invoice.invoiceNumber,subtitle:invoice.trackingNumber||invoice.status,section:"invoices"}));
+      const settlementResults=settlements
+        .filter((settlement)=>matchesSearchQuery([settlement.id,settlement.periodStart,settlement.periodEnd,settlement.paymentReference,settlement.status,settlement.netPayable],query))
+        .map((settlement)=>({id:settlement.id,type:"settlement" as const,title:settlement.paymentReference||settlement.id,subtitle:`${settlement.periodStart||""} · ${settlement.status}`,section:"settlements"}));
+      const resultGroups=[orderResults,invoiceResults,settlementResults];
+      const results:Array<{id:string;type:"order"|"invoice"|"settlement";title:string;subtitle:string;section:string}>=[];
+      for(let index=0;results.length<30&&resultGroups.some((group)=>index<group.length);index+=1){
+        for(const group of resultGroups){
+          if(index<group.length)results.push(group[index]);
+          if(results.length===30)break;
+        }
+      }
+      return{query,results};
+    },
     onToggleLanguage:toggleLanguage,onToggleTheme:toggleTheme,onLogout:async()=>{await supabase?.auth.signOut();setUser(null)}
   }),[user,merchant,orders,rawOrders,invoices,statements,isArabic,loadData,toggleLanguage,toggleTheme]);
 
@@ -554,5 +588,6 @@ export default function MerchantPortalCommandCenter() {
   if(!user)return <section className="dn-merchant-login-v3" dir={isArabic?"rtl":"ltr"}><div className="dn-merchant-login-visual-v3"><div className="dn-merchant-login-brand-v3"><img src={companyMeta.logoUrl} alt="DAY NIGHT"/><div><small>DAY NIGHT DELIVERY SERVICES</small><h1>{isArabic?"بوابة التاجر الذكية":"Smart Merchant Portal"}</h1></div></div><p>{isArabic?"طلبات، تتبع، COD، تسويات، تقارير وإدارة كاملة للنشاط.":"Orders, tracking, COD, settlements, reports, and complete business control."}</p><div className="dn-merchant-login-services-v3"><article><Store/><strong>{isArabic?"إدارة المتجر":"Store control"}</strong></article><article><ShieldCheck/><strong>{isArabic?"دخول آمن":"Secure access"}</strong></article><article><Building2/><strong>{isArabic?"كل الفروع":"All branches"}</strong></article></div><footer><span>{companyMeta.sloganAr}</span><span>{companyMeta.sloganEn}</span></footer></div><div className="dn-merchant-login-card-v3"><header><span><Building2/></span><div><h2>{isArabic?"دخول التاجر":"Merchant sign in"}</h2><p>{isArabic?"استخدم بيانات الحساب المعتمد لدى DAY NIGHT.":"Use the account approved by DAY NIGHT."}</p></div></header><form onSubmit={passwordSignIn}><label><span>{isArabic?"البريد":"Email"}</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/></label><label><span>{isArabic?"كلمة المرور":"Password"}</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label><button type="submit" disabled={authBusy||!email||!password}>{authBusy?<Loader2 className="dn-spin"/>:<LockKeyhole/>}{isArabic?"دخول آمن":"Secure sign in"}</button></form><div className="dn-merchant-auth-alternatives-v3"><button type="button" onClick={()=>void oauth()} disabled={authBusy}><Globe2/>Google</button><button type="button" onClick={()=>void magic()} disabled={authBusy||!email}><Mail/>{isArabic?"رابط بالبريد":"Email link"}</button></div><div className="dn-merchant-phone-auth-v3"><label><span>{isArabic?"الهاتف":"Phone"}</span><input dir="ltr" value={phone} onChange={e=>setPhone(e.target.value)}/></label><div><input dir="ltr" value={otp} onChange={e=>setOtp(e.target.value)} placeholder={isArabic?"رمز التحقق":"Verification code"}/><button type="button" onClick={()=>void sendOtp()} disabled={authBusy||!phone}><Phone/>{isArabic?"إرسال":"Send"}</button></div><button type="button" onClick={()=>void verifyOtp()} disabled={authBusy||!otp}>{isArabic?"تأكيد الرمز":"Verify code"}</button></div>{authError?<p className="dn-merchant-message-v3 is-error">{authError}</p>:null}{authNotice?<p className="dn-merchant-message-v3 is-success">{authNotice}</p>:null}<a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle/>{isArabic?"دعم التاجر":"Merchant support"}</a></div></section>;
   if(loading&&!merchant)return <section className="dn-merchant-state-v3"><Loader2 className="dn-spin"/><strong>{isArabic?"جاري تحميل مركز أعمال التاجر...":"Loading Merchant Business Center..."}</strong></section>;
   if(!merchant)return <section className="dn-merchant-state-v3 is-warning" dir={isArabic?"rtl":"ltr"}><ShieldCheck/><h1>{isArabic?"الحساب بانتظار الربط":"Account awaiting linkage"}</h1><p>{dataError|| (isArabic?"لا يوجد ملف تاجر مرتبط بالجلسة الحالية.":"No merchant profile is linked to the current session.")}</p><a href={companyMeta.whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle/>{isArabic?"تواصل مع الدعم":"Contact support"}</a></section>;
+  if(dataError&&!lastSync)return <section className="dn-merchant-state-v3 is-warning" dir={isArabic?"rtl":"ltr"}><ShieldCheck/><h1>{isArabic?"تعذر تحميل بيانات الطلبات":"Order data could not be loaded"}</h1><p>{dataError}</p><button type="button" onClick={()=>{if(user)void loadData(user)}} disabled={loading}>{loading?<Loader2 className="dn-spin"/>:null}{isArabic?"إعادة المحاولة":"Retry"}</button></section>;
   return <MerchantPortalShell currentSection={section} data={data} callbacks={callbacks} isArabic={isArabic} isDark={isDark} companyLogoUrl={companyMeta.logoUrl} refreshing={refreshing}><MerchantSectionRenderer section={section} data={data} callbacks={callbacks} isArabic={isArabic} isDark={isDark}/></MerchantPortalShell>;
 }

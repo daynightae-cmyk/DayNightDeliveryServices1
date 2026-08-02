@@ -35,6 +35,7 @@ const requiredFiles = [
 ];
 const contents = new Map(requiredFiles.map((file) => [file, read(file)]));
 const controller = contents.get("src/components/merchant/MerchantPortalCommandCenter.tsx") || "";
+const portalPagination = read("src/lib/merchantPortalOrders.ts");
 const renderer = contents.get("src/portal-designs/merchant/MerchantSectionRenderer.tsx") || "";
 const viewModels = contents.get("src/portal-designs/merchant/merchantViewModels.ts") || "";
 const callbacks = contents.get("src/portal-designs/merchant/merchantCallbacks.ts") || "";
@@ -64,13 +65,15 @@ assert(renderer.includes("const exhaustive: never = section"), "section renderer
 assert(!renderer.includes("../demo/"), "production renderer does not import Demo fixtures");
 
 for (const token of [
-  "merchant_get_session_profile", "merchant_claim_approved_account", "merchant_portal_orders",
+  "merchant_get_session_profile", "merchant_claim_approved_account", "fetchAllMerchantPortalOrders",
   "merchant_portal_business_center", "merchant_create_order", "merchant_create_pickup_request",
   "merchant_create_support_ticket", "merchant_request_order_action", "merchant_update_bank_details",
   "merchant_save_branch", "merchant_save_address_book_entry", "merchant_save_team_member",
   "merchant_create_import_preview", "merchant_commit_import", "merchant_mark_notification_read",
   "TrackingMap", "postgres_changes", "merchant-coupon-images", "merchant-assets", "merchant-documents",
 ]) assert(controller.includes(token), `controller integrates ${token}`);
+assert(portalPagination.includes("merchant_portal_orders_page"), "portal loads every order through the paginated exact-UUID RPC");
+assert(portalPagination.includes("collected.length !== expectedTotal"), "portal rejects incomplete pagination instead of showing a false count");
 assert(controller.includes("calculateDeliveryPrice"), "controller uses the existing pricing client");
 assert(controller.includes("buildAdminPdf") && controller.includes("buildAdminCsv"), "controller uses existing PDF and CSV export infrastructure");
 assert(app.includes('import("./components/merchant/MerchantPortalCommandCenter")'), "production /merchant route loads the new Merchant Command Center");

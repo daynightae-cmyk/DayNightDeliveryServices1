@@ -52,6 +52,7 @@ type Props = {
   financeWarning?: string;
   onNavigate?: (id: AdminSectionId) => void;
   onRefresh?: () => Promise<void>;
+  searchManaged?: boolean;
 };
 
 type ExtendedOrder = Order & {
@@ -229,6 +230,7 @@ export default function AdminSectionWorkspaceComplete({
   financeWarning,
   onNavigate,
   onRefresh,
+  searchManaged = false,
 }: Props) {
   const config = adminSectionById[id];
   const [query, setQuery] = useState("");
@@ -268,11 +270,8 @@ export default function AdminSectionWorkspaceComplete({
   );
 
   const rows = useMemo(
-    () =>
-      baseRows
-        .filter((order) => !query || orderSearchText(order).includes(normalize(query)))
-        .slice(0, 200),
-    [baseRows, query],
+    () => searchManaged ? baseRows : baseRows.filter((order) => !query || orderSearchText(order).includes(normalize(query))),
+    [baseRows, query, searchManaged],
   );
 
   const couponCounts = useMemo(() => {
@@ -488,7 +487,7 @@ export default function AdminSectionWorkspaceComplete({
       </div>
 
       <div className="dn-section-panels">
-        <article>
+        {!searchManaged && <article>
           <h3>
             <AdminIconBadge name="filters" />
             {isArabic ? "البحث" : "Search"}
@@ -503,7 +502,7 @@ export default function AdminSectionWorkspaceComplete({
               />
             </label>
           </div>
-        </article>
+        </article>}
         <article>
           <h3>
             <CircleDollarSign className="h-5 w-5 text-brand-gold" />
@@ -694,12 +693,12 @@ export default function AdminSectionWorkspaceComplete({
                   ? "غيّر البحث أو أضف طلباً جديداً."
                   : "Change the search or add a new order."
               }
-              action={
+              action={!searchManaged ? (
                 <button type="button" onClick={() => setQuery("")}>
                   <RefreshCw className="h-4 w-4" />
                   {isArabic ? "مسح البحث" : "Clear search"}
                 </button>
-              }
+              ) : undefined}
             />
           )}
         </div>

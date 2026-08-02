@@ -507,6 +507,32 @@ body:has(.dncc-shell) .dn-public-shell-spacer {
   transform: translateY(-50%);
 }
 
+.dncc-search-clear {
+  position: absolute;
+  inset-inline-end: 0.62rem;
+  inset-block-start: 50%;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7789;
+  transform: translateY(-50%);
+}
+
+.dncc-search-clear:hover,
+.dncc-search-clear:focus-visible {
+  background: rgba(7, 26, 51, 0.08);
+  outline: none;
+}
+
+.dncc-search-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
 .dncc-search-results {
   position: absolute;
   inset-inline: 0;
@@ -527,6 +553,27 @@ body:has(.dncc-shell) .dn-public-shell-spacer {
   text-align: center;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.dncc-search-error {
+  padding: 0.75rem;
+  color: #991b1b;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.dncc-search-error p {
+  margin: 0 0 0.55rem;
+}
+
+.dncc-search-error button {
+  display: inline-flex;
+  width: auto;
+  grid-template-columns: none;
+  gap: 0.4rem;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  background: rgba(254, 226, 226, 0.72);
+  color: #991b1b;
 }
 
 .dncc-search-results button {

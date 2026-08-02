@@ -70,12 +70,6 @@ export function calculatePersonalOrderFinancials(input: {
   };
 }
 
-function isMissingPersonalRuntime(error: unknown) {
-  return /admin_create_personal_order|pgrst202|schema cache|could not find the function|function .* does not exist/i.test(
-    opsErrorDetail(error),
-  );
-}
-
 export async function createPersonalOpsOrder(
   input: PersonalOrderInput,
 ): Promise<OpsCreateResult<Order>> {
@@ -155,15 +149,10 @@ export async function createPersonalOpsOrder(
     if (row?.id) return { row, source: "rpc" };
     throw new Error("personal_order_creation_returned_no_row");
   }
-  if (!isMissingPersonalRuntime(rpc.error)) {
-    throw new Error(opsErrorDetail(rpc.error) || "personal_order_creation_failed");
-  }
-
-  const fallback = await supabase.from("orders").insert(payload).select("*").single();
-  if (fallback.error || !fallback.data?.id) {
-    throw new Error(
-      [opsErrorDetail(rpc.error), opsErrorDetail(fallback.error), "Apply the personal-orders migration."].filter(Boolean).join(" | "),
-    );
-  }
-  return { row: fallback.data as Order, source: "db" };
+  throw new Error(
+    [
+      opsErrorDetail(rpc.error) || "personal_order_creation_failed",
+      "تعذر حفظ الطلب الشخصي عبر المسار الآمن. أعد المحاولة بعد التحقق من اتصال قاعدة البيانات.",
+    ].join(" | "),
+  );
 }

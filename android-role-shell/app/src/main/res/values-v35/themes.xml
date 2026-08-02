@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 15+ enforces edge-to-edge for apps targeting API 35+. The status
+      bar is therefore transparent and the page's light top surface is visible
+      behind it. Use dark status-bar icons on API 35+ for deterministic contrast
+      while keeping the pre-35 navy status bar and white icons unchanged.
+    -->
+    <style name="Theme.DayNight" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/deep_navy</item>
+        <item name="android:navigationBarColor">@color/deep_navy</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">@color/luxury_gold</item>
+        <item name="android:windowSplashScreenBackground">@color/deep_navy</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/app_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/transparent</item>
+    </style>
+</resources>

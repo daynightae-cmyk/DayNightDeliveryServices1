@@ -1,7 +1,11 @@
-import { createPublicOrder, supabase } from "../supabase";
+import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import {
+  resolveCanonicalMerchantForOrder,
+  verifySavedOrderMerchant,
+} from "./orderMerchantResolver";
 
 export type OpsDataSource = "rpc" | "db";
 export type OpsPriceMode = "system" | "manual";
@@ -184,56 +188,6 @@ export function getOpsOrderReference(order: Order) {
       order.invoice_number ||
       order.coupon_number,
   );
-}
-
-async function findCreatedOrder(reference: string): Promise<Order | null> {
-  if (!supabase || !reference) return null;
-  for (const column of [
-    "tracking_number",
-    "invoice_number",
-    "coupon_number",
-    "id",
-  ]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq(column, reference)
-      .limit(1);
-    if (!error && data?.[0]) return data[0] as Order;
-  }
-  return null;
-}
-
-async function attachMerchantToCreatedOrder(
-  reference: string,
-  merchant: Merchant | null,
-  input: OpsOrderInput,
-) {
-  if (!supabase || !reference) return;
-  const patch = removeEmptyUndefined({
-    merchant_id: merchant?.id || clean(input.merchant_id) || undefined,
-    merchant_name:
-      clean(merchant?.trade_name || input.merchant_name) || undefined,
-    merchant_code:
-      clean(merchant?.merchant_code || input.merchant_code) || undefined,
-    updated_at: new Date().toISOString(),
-  });
-  if (!Object.keys(patch).some((key) => key !== "updated_at")) return;
-
-  for (const column of [
-    "tracking_number",
-    "invoice_number",
-    "coupon_number",
-    "id",
-  ]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .update(patch)
-      .eq(column, reference)
-      .select("*")
-      .limit(1);
-    if (!error && data?.[0]) return;
-  }
 }
 
 function normalizeInitialOrderStatus(status: unknown) {
@@ -743,7 +697,9 @@ export async function createOpsOrder(
       null,
       "Supabase is not configured for order operations.",
     );
-  const merchant = input.merchant || null;
+  const selectedMerchant = input.merchant || ({ id: clean(input.merchant_id) } as Merchant);
+  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
+  const merchant = resolution.merchant;
   const createdAt = new Date().toISOString();
   const trackingSeed =
     clean(input.coupon_number) ||
@@ -761,48 +717,13 @@ export async function createOpsOrder(
     createdAt,
   );
 
-  const rpcOrder = await rpcOne<Order>(
-    "admin_create_coupon_order",
+  const rpcOrder = await rpcRequired<Order>(
+    "admin_create_canonical_merchant_order",
     { p_order: payload },
+    "تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.",
   );
-  if (
-    rpcOrder?.id ||
-    rpcOrder?.tracking_number ||
-    rpcOrder?.invoice_number
-  )
-    return { row: rpcOrder, source: "rpc" };
-
-  const publicReference = await createPublicOrder(payload);
-  if (publicReference) {
-    await attachMerchantToCreatedOrder(
-      publicReference,
-      merchant,
-      input,
-    );
-    const created = await findCreatedOrder(publicReference);
-    if (created) return { row: created, source: "rpc" };
-    return {
-      row: {
-        ...(payload as Record<string, unknown>),
-        id: publicReference,
-        tracking_number: publicReference,
-        invoice_number: trackingNumber,
-      } as Order,
-      source: "rpc",
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .insert(payload)
-    .select("*")
-    .single();
-  if (error)
-    throw operationsError(
-      error,
-      "Could not create order through the admin or public production routes.",
-    );
-  return { row: data as Order, source: "db" };
+  const verified = await verifySavedOrderMerchant(rpcOrder, resolution.merchantId);
+  return { row: verified, source: "rpc" };
 }
 
 export async function updateOpsOrder(
@@ -812,7 +733,7 @@ export async function updateOpsOrder(
   if (!reference)
     throw operationsError(null, "Order reference is missing.");
 
-  const merchant =
+  const selectedMerchant =
     input.merchant ||
     ({
       id: input.merchant_id || input.order.merchant_id || "",
@@ -829,6 +750,10 @@ export async function updateOpsOrder(
       address: input.order.sender_address,
       pickup_address: input.pickup_street,
     } as Merchant);
+  const merchantChanged = clean(selectedMerchant.id) !== clean(input.order.merchant_id);
+  const merchant = merchantChanged
+    ? (await resolveCanonicalMerchantForOrder(selectedMerchant)).merchant
+    : selectedMerchant;
 
   const patch = buildOrderPayload(
     input,

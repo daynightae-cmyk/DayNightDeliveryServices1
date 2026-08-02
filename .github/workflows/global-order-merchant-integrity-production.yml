@@ -1,0 +1,272 @@
+name: Global Order Merchant Integrity Production
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
+      - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
+      - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
+      - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
+      - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
+      - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
+      - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
+      - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
+      - "supabase/migrations/20260802035500_delivered_statement_entry_type_integrity.sql"
+      - "supabase/production-reconciliation/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
+      - "artifacts/day-night-delivery/src/**"
+      - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
+      - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
+      - "artifacts/day-night-delivery/package.json"
+      - ".github/workflows/global-order-merchant-integrity-production.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
+      - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
+      - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
+      - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
+      - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
+      - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
+      - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
+      - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
+      - "supabase/migrations/20260802035500_delivered_statement_entry_type_integrity.sql"
+      - "supabase/production-reconciliation/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
+      - "artifacts/day-night-delivery/src/**"
+      - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
+      - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
+      - "artifacts/day-night-delivery/package.json"
+      - ".github/workflows/global-order-merchant-integrity-production.yml"
+  workflow_dispatch:
+    inputs:
+      reconciliation_action:
+        description: "Audit is read-only for orders; review/apply require a captured run ID"
+        required: true
+        default: audit
+        type: choice
+        options: [audit, review, link_apply, apply, finance_apply]
+      audit_run_id:
+        description: "Required only for review/apply"
+        required: false
+        type: string
+      confirm_safe_backfill:
+        description: "Must be true for apply; only AUTO_REPAIR_SAFE rows are eligible"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-order-merchant-integrity-production
+  cancel-in-progress: false
+
+jobs:
+  code-and-regression-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Canonical merchant regression gate
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run order-merchant-integrity:gate
+      - name: TypeScript
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run typecheck
+      - name: Production build
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: pnpm run build
+
+  production-readonly-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory and classify production without writes
+        working-directory: artifacts/day-night-delivery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/global-order-merchant-production-readonly-audit.mjs
+
+  linked-sql-dry-run:
+    if: github.event_name == 'pull_request'
+    needs: production-readonly-inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Validate migration against linked production schema without applying it
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          release_dir="$RUNNER_TEMP/daynight-order-merchant-sql-dry-run"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          for target in \
+            20260802023000_global_order_merchant_integrity_restoration.sql \
+            20260802031500_personal_order_optional_coupon_policy.sql \
+            20260802033000_order_merchant_dry_run_timeout.sql \
+            20260802034000_financial_reconciliation_without_portal_link.sql \
+            20260802034500_customer_e2e_dependency_cleanup.sql \
+            20260802034700_defer_projection_during_merchant_backfill.sql \
+            20260802034800_order_status_snapshot_type_compat.sql \
+            20260802034900_privileged_db_reconciliation_executor.sql \
+            20260802035500_delivered_statement_entry_type_integrity.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              echo "$target: already_recorded; preserving the production copy"
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            fi
+          done
+          supabase --workdir "$release_dir" db push --dry-run
+
+  install-schema-only:
+    if: github.event_name == 'push'
+    needs: [code-and-regression-gates, production-readonly-inventory]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Validate production target
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+      - name: Build isolated schema release and validate SQL
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/daynight-order-merchant-integrity"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          schema_pending=false
+          for target in \
+            20260802023000_global_order_merchant_integrity_restoration.sql \
+            20260802031500_personal_order_optional_coupon_policy.sql \
+            20260802033000_order_merchant_dry_run_timeout.sql \
+            20260802034000_financial_reconciliation_without_portal_link.sql \
+            20260802034500_customer_e2e_dependency_cleanup.sql \
+            20260802034700_defer_projection_during_merchant_backfill.sql \
+            20260802034800_order_status_snapshot_type_compat.sql \
+            20260802034900_privileged_db_reconciliation_executor.sql \
+            20260802035500_delivered_statement_entry_type_integrity.sql
+          do
+            if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              schema_pending=true
+            else
+              echo "$target: already_recorded; preserving the production copy"
+            fi
+          done
+          echo "SCHEMA_PENDING=$schema_pending" >> "$GITHUB_ENV"
+          supabase --workdir "$release_dir" db push --dry-run
+          echo "SCHEMA_RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
+      - name: Install schema contracts only (no historical backfill)
+        if: env.SCHEMA_PENDING == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase --workdir "$SCHEMA_RELEASE_DIR" db push --yes
+
+  production-dry-run-and-rls:
+    if: github.event_name == 'push'
+    needs: install-schema-only
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    steps:
+      - name: Capture protected Dry Run; do not update orders
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+          RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          const root=process.env.VITE_SUPABASE_URL.replace(/\/$/,'');
+          const service=process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const anon=process.env.VITE_SUPABASE_ANON_KEY;
+          const rpc=async(name,body={},token=service)=>{const r=await fetch(`${root}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:anon||service,Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(`${name}_${r.status}_${JSON.stringify(p)}`);return p};
+          const health=await rpc('admin_order_merchant_integrity_health');
+          if(health?.ok!==true)throw new Error(`integrity_health_failed_${JSON.stringify(health)}`);
+          const dryRun=await rpc('admin_run_order_merchant_dry_run');
+          if(dryRun?.ok!==true||dryRun?.orders_modified!==0)throw new Error(`dry_run_contract_failed_${JSON.stringify(dryRun)}`);
+
+          const login=await fetch(`${root}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:anon,'Content-Type':'application/json'},body:JSON.stringify({email:process.env.RUNTIME_MERCHANT_EMAIL,password:process.env.RUNTIME_MERCHANT_PASSWORD})});
+          const session=await login.json().catch(()=>({}));if(!login.ok||!session.access_token)throw new Error(`merchant_login_failed_${login.status}`);
+          const profile=await rpc('merchant_get_session_profile',{},session.access_token);
+          const merchantId=profile?.merchant_id||profile?.merchant?.id;if(!merchantId)throw new Error('merchant_profile_uuid_missing');
+          let page=1,total=-1,seen=0;
+          do{const result=await rpc('merchant_portal_orders_page',{p_page:page,p_page_size:200},session.access_token);if(result.merchant_id!==merchantId)throw new Error('portal_owner_mismatch');if(total<0)total=Number(result.total_count);if(Number(result.total_count)!==total)throw new Error('portal_count_changed');for(const order of result.orders||[]){if(order.merchant_id!==merchantId)throw new Error('cross_merchant_order_exposed');seen+=1}if(page>=Number(result.total_pages||1))break;page+=1}while(page<10000);
+          if(seen!==total)throw new Error(`portal_incomplete_${seen}_of_${total}`);
+          console.log(JSON.stringify({health,dry_run:dryRun,merchant_rls:{merchant_id:merchantId,database_count:total,portal_count:seen,result:'PASS'}},null,2));
+          NODE
+
+  manual-reviewed-reconciliation:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [code-and-regression-gates, production-readonly-inventory]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    steps:
+      - name: Audit, review, or apply only the captured safe set
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ACTION: ${{ inputs.reconciliation_action }}
+          RUN_ID: ${{ inputs.audit_run_id }}
+          CONFIRM: ${{ inputs.confirm_safe_backfill }}
+        run: |
+          node --input-type=module <<'NODE'
+          const root=process.env.VITE_SUPABASE_URL.replace(/\/$/,'');const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const rpc=async(name,body={})=>{const r=await fetch(`${root}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(`${name}_${r.status}_${JSON.stringify(p)}`);return p};
+          let result;
+          if(process.env.ACTION==='audit') result=await rpc('admin_run_order_merchant_dry_run');
+          else if(process.env.ACTION==='review'){if(!process.env.RUN_ID)throw new Error('audit_run_id_required');result=await rpc('admin_review_order_merchant_dry_run',{p_run_id:process.env.RUN_ID});}
+          else {
+            if(!process.env.RUN_ID||process.env.CONFIRM!=='true')throw new Error('reviewed_run_and_explicit_confirmation_required');
+            if(process.env.ACTION==='link_apply') result=await rpc('admin_apply_safe_merchant_portal_links',{p_run_id:process.env.RUN_ID,p_confirm:true});
+            else if(process.env.ACTION==='apply') result=await rpc('admin_apply_order_merchant_safe_backfill',{p_run_id:process.env.RUN_ID,p_confirm:true});
+            else if(process.env.ACTION==='finance_apply') result=await rpc('admin_apply_safe_missing_financial_dependencies',{p_run_id:process.env.RUN_ID,p_confirm:true});
+            else throw new Error('unsupported_reconciliation_action');
+          }
+          console.log(JSON.stringify(result,null,2));
+          NODE

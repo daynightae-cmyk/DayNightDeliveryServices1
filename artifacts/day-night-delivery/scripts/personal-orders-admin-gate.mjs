@@ -52,6 +52,7 @@ expect(operations, /PERSONAL_ORDER_DELIVERY_FEE = 25/, "personal order runtime f
 expect(operations, /merchant_id: null/, "personal order has no merchant linkage");
 expect(operations, /coupon_number: clean\(input\.reference\) \|\| null/, "personal coupon is stored in coupon_number");
 expect(operations, /admin_create_personal_order/, "personal order uses protected RPC");
+reject(operations, /\.from\(["']orders["']\)\.insert/, "personal order has no direct insert fallback");
 const logic = read("src/lib/adminOrderLogic.ts");
 expect(logic, /isPersonalAdminOrder/, "personal orders have explicit detection");
 expect(logic, /sectionId === "personal_orders"/, "personal section filters only personal rows");
@@ -66,5 +67,9 @@ expect(migration, /'merchant_id', null/, "database enforces null merchant");
 const compatibilityMigration = read("supabase/migrations/20260725054500_orders_edit_schema_cache_compat.sql", true);
 expect(compatibilityMigration, /add column if not exists manual_delivery_price/, "missing manual delivery column is restored");
 expect(compatibilityMigration, /pg_notify\('pgrst', 'reload schema'\)/, "PostgREST schema cache is reloaded");
+const couponPolicyMigration = read("supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql", true);
+expect(couponPolicyMigration, /v_personal_order/, "coupon policy explicitly identifies true personal orders");
+expect(couponPolicyMigration, /not v_personal_order/, "coupon-required rule exempts true personal orders only");
+expect(couponPolicyMigration, /pg_advisory_xact_lock/, "optional personal coupons remain globally duplicate protected");
 if (failed) process.exit(1);
 console.log("DAY NIGHT personal orders and admin controls gate PASSED");

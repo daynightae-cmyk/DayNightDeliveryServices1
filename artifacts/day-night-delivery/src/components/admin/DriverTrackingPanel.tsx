@@ -41,6 +41,7 @@ import {
 } from "../../lib/driverData";
 import type { AdminDriverRow } from "../../hooks/useAdminDrivers";
 import type { DriverEvent } from "../../types/driver";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import "../../styles/dn-driver-operations.css";
 import "../../styles/dn-driver-profiles.css";
 import "../../styles/dn-driver-flex.css";
@@ -131,7 +132,6 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const filteredDrivers = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
     return drivers.filter((driver) => {
       const matchesPresence = presenceFilter === "all" || driver.presence === presenceFilter;
       const matchesOperations =
@@ -140,7 +140,7 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         (operationsFilter === "active" && driver.active_orders > 0) ||
         (operationsFilter === "no_gps" && !driver.location) ||
         (operationsFilter === "ready" && !requiresAttention(driver));
-      const haystack = [
+      const searchMatches = matchesSearchQuery([
         driver.full_name,
         driver.name,
         driver.phone,
@@ -148,11 +148,8 @@ export default function DriverTrackingPanel({ isArabic }: { isArabic: boolean })
         driver.vehicle_type,
         driver.emirate,
         driver.work_area,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return matchesPresence && matchesOperations && (!normalizedQuery || haystack.includes(normalizedQuery));
+      ], query);
+      return matchesPresence && matchesOperations && searchMatches;
     });
   }, [drivers, operationsFilter, presenceFilter, query]);
 

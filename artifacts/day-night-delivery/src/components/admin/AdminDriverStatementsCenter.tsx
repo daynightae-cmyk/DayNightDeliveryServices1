@@ -25,6 +25,7 @@ import { useAdminDrivers } from "../../hooks/useAdminDrivers";
 import { updateOrderStatus } from "../../lib/adminData";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import AdminPdfExportButton from "./AdminPdfExportButton";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 type Props = {
   isArabic: boolean;
@@ -121,10 +122,8 @@ export default function AdminDriverStatementsCenter({
   const driver = drivers.find((item) => item.id === driverId) || null;
 
   const visibleDrivers = useMemo(() => {
-    const needle = normalize(`${query} ${driverQuery}`);
     return drivers.filter((item) =>
-      !needle ||
-      normalize([
+      matchesSearchQuery([
         item.full_name,
         item.name,
         item.phone,
@@ -132,27 +131,26 @@ export default function AdminDriverStatementsCenter({
         item.vehicle_type,
         item.emirate,
         item.work_area,
-      ].join(" ")).includes(needle),
+      ], `${query} ${driverQuery}`),
     );
   }, [driverQuery, drivers, query]);
 
   const visibleOrders = useMemo(() => {
     if (!driver) return [];
-    const needle = normalize(orderQuery);
     return driver.orders
       .filter((order) => {
         const date = orderDate(order);
         const insidePeriod = (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
-        const matches =
-          !needle ||
-          normalize([
+        const matches = matchesSearchQuery([
             orderReference(order),
+            order.coupon_number,
+            order.invoice_number,
             order.receiver_name,
             order.receiver_phone,
             order.receiver_city,
             order.sender_city,
             order.status,
-          ].join(" ")).includes(needle);
+          ], orderQuery);
         return insidePeriod && matches;
       })
       .sort((left, right) =>

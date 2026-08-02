@@ -2,6 +2,10 @@ import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import {
+  resolveCanonicalMerchantForOrder,
+  verifySavedOrderMerchant,
+} from "./orderMerchantResolver";
 
 function clean(value?: unknown) {
   return String(value ?? "").trim();
@@ -92,7 +96,7 @@ export type AdminOrderInput = {
 };
 
 export async function fetchMerchants(): Promise<Merchant[]> {
-  if (!supabase) return [];
+  if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from("merchants")
@@ -101,7 +105,7 @@ export async function fetchMerchants(): Promise<Merchant[]> {
 
   if (error) {
     console.warn("Failed to fetch merchants:", error.message);
-    return [];
+    throw new Error(`Merchants could not be loaded safely: ${error.message}`);
   }
 
   return (data || []) as Merchant[];
@@ -171,38 +175,12 @@ export function calculateAdminOrderPrice(input: AdminOrderInput) {
   };
 }
 
-function buildLegacyAdminOrderPayload(payload: Record<string, unknown>) {
-  const legacy = { ...payload };
-  for (const key of [
-    "invoice_number",
-    "coupon_number",
-    "merchant_id",
-    "merchant_name",
-    "merchant_code",
-    "order_count",
-    "shipping_scope",
-    "destination_country",
-    "source_channel",
-    "package_description",
-    "source_domain",
-    "subtotal",
-    "base_price",
-    "total",
-    "total_price",
-    "amount",
-    "price",
-    "currency",
-    "status_history",
-  ]) {
-    delete legacy[key];
-  }
-  return legacy;
-}
-
 export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const merchant = input.merchant || null;
+  const selectedMerchant = input.merchant || ({ id: clean(input.merchant_id) } as Merchant);
+  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
+  const merchant = resolution.merchant;
   const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));
   const pricing = calculateAdminOrderPrice({ ...input, order_count: count });
   const createdAt = new Date().toISOString();
@@ -261,22 +239,13 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<Order> {
     status_history: [{ status: clean(input.status || "pending"), date: createdAt, note: "Created from DAY NIGHT admin merchant operations hub" }],
   });
 
-  const rpcOrder = await callRpc<Order>("admin_create_coupon_order", { p_order: payload });
-  if (rpcOrder?.id || rpcOrder?.invoice_number) return rpcOrder;
-
-  for (const candidate of [payload, buildLegacyAdminOrderPayload(payload)]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(candidate)
-      .select("*")
-      .single();
-
-    if (!error && data) return data as Order;
-    if (error && !isMissingSchemaError(error)) throw new Error(error.message);
-    if (error) console.warn("Admin order insert fallback failed:", error.message);
-  }
-
-  throw new Error("Order could not be created. Confirm the admin SQL migration was applied and the signed-in user has admin/support role.");
+  const { data, error } = await supabase.rpc("admin_create_canonical_merchant_order", {
+    p_order: payload,
+  });
+  if (error) throw new Error(error.message);
+  const rpcOrder = (Array.isArray(data) ? data[0] : data) as Order | null;
+  if (!rpcOrder?.id) throw new Error("canonical_merchant_order_creation_returned_no_row");
+  return verifySavedOrderMerchant(rpcOrder, resolution.merchantId);
 }
 
 export type AdminStats = {
@@ -375,7 +344,7 @@ export async function fetchAdminOrdersPage(params: AdminOrderPageParams = {}): P
   if (params.dateTo) query = query.lte("created_at", params.dateTo);
   if (params.search) {
     const term = safeLike(params.search);
-    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,receiver_name.ilike.%${term}%`);
+    query = query.or(`tracking_number.ilike.%${term}%,invoice_number.ilike.%${term}%,coupon_number.ilike.%${term}%,receiver_phone.ilike.%${term}%,sender_phone.ilike.%${term}%,receiver_name.ilike.%${term}%,customer_name.ilike.%${term}%,merchant_name.ilike.%${term}%,merchant_code.ilike.%${term}%`);
   }
   const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
   if (error) {
@@ -406,9 +375,7 @@ export async function fetchAdminOrders(): Promise<Order[]> {
 
 export async function fetchAdminStats(): Promise<AdminStats> {
   const fallback: AdminStats = { pending: 0, in_transit: 0, delivered: 0, cancelled: 0, total_orders: 0, today_orders: 0, active_merchants: 0, cod_total: 0, delivery_income: 0 };
-  const [ordersResult, merchantsResult] = await Promise.allSettled([fetchAdminOrders(), fetchMerchants()]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const merchants = merchantsResult.status === "fulfilled" ? merchantsResult.value : [];
+  const [orders, merchants] = await Promise.all([fetchAdminOrders(), fetchMerchants()]);
   const today = new Date().toISOString().slice(0, 10);
   return orders.reduce<AdminStats>((stats, order) => {
     const status = orderStatus(order);
@@ -469,16 +436,12 @@ function normalizeFinanceSummary(row: Partial<FinanceSummary> | Record<string, u
 }
 
 async function deriveFinanceSummaryFromOrders(): Promise<FinanceSummary> {
-  const [ordersResult, expensesResult, adjustmentsResult, codResult] = await Promise.allSettled([
+  const [orders, expenses, adjustments, codRows] = await Promise.all([
     fetchAdminOrders(),
     fetchExpenses(),
     fetchAdjustments(),
     fetchCodCollections(),
   ]);
-  const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
-  const expenses = expensesResult.status === "fulfilled" ? expensesResult.value : [];
-  const adjustments = adjustmentsResult.status === "fulfilled" ? adjustmentsResult.value : [];
-  const codRows = codResult.status === "fulfilled" ? codResult.value : [];
   const delivered = orders.filter((order) => /deliver|complete/.test(orderStatus(order)));
   const cancelled = orders.filter((order) => /cancel|fail/.test(orderStatus(order)));
   const returned = orders.filter((order) => /return/.test(orderStatus(order)));
@@ -553,13 +516,22 @@ function applyAdminFilters(query: any, filters?: AdminDateFilters, dateColumn = 
 }
 
 async function fetchTableRows(table: string, filters?: AdminDateFilters, dateColumn = "created_at") {
-  if (!supabase) return [] as FinanceRow[];
-  const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn).order(dateColumn, { ascending: false }).limit(1000);
-  if (error) {
-    if (isMissingSchemaError(error)) return [] as FinanceRow[];
-    throw cleanAdminError(error);
+  if (!supabase) throw cleanAdminError(null, "Supabase is not configured.");
+  const pageSize = 1000;
+  const rows: FinanceRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn)
+      .order(dateColumn, { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      if (isMissingSchemaError(error)) return [] as FinanceRow[];
+      throw cleanAdminError(error);
+    }
+    const page = (data || []) as FinanceRow[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
   }
-  return (data || []) as FinanceRow[];
 }
 
 async function insertTableRow(table: string, payload: Record<string, unknown>) {

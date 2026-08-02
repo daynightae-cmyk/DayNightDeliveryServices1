@@ -10,6 +10,7 @@ import { defaultLocations } from "../../data/defaultLocations";
 import { adminMapRegions, orderRegionId } from "../../data/adminCommandExpansion";
 import { addAdminNotification, playAdminAudioEvent, unlockAdminAudio } from "../../lib/adminAudio";
 import { getOrderNumber, getOrderReference, getOrderRouteCities, getOrderString, interpolatePoint, progressFromStatus, resolveUaePoint, type LatLngTuple } from "../../lib/mapUtils";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 
 type MapMode = "standard" | "satellite" | "terrain";
 type FocusCommandType = "fit" | "driver" | "region" | "refresh";
@@ -86,10 +87,6 @@ function orderTitle(order: any, isArabic: boolean) {
   const ref = getOrderReference(order);
   const city = label(order?.receiver_city || order?.delivery_city || order?.receiver_name, isArabic ? "بدون مدينة" : "No city");
   return `${ref} — ${city}`;
-}
-
-function includesCity(order: any, query: string) {
-  return `${order?.sender_city || ""} ${order?.receiver_city || ""} ${order?.pickup_city || ""} ${order?.delivery_city || ""} ${order?.destination_country || ""}`.toLowerCase().includes(query.toLowerCase());
 }
 
 function isStatusMatch(order: any, filter: string) {
@@ -174,10 +171,17 @@ export default function AdminLiveOperationsMap({ isArabic, orders, selectedOrder
 
   const sortedOrders = useMemo(() => [...(orders || [])].sort((a, b) => new Date(b?.created_at || b?.updated_at || 0).getTime() - new Date(a?.created_at || a?.updated_at || 0).getTime()), [orders]);
   const filteredOrders = useMemo(() => sortedOrders.filter((order) => {
-    const searchText = [getOrderReference(order), order?.sender_name, order?.receiver_name, order?.merchant_name, order?.receiver_phone, order?.sender_phone].join(" ").toLowerCase();
-    return (regionFilter === "all" || orderRegionId(order) === regionFilter) && isStatusMatch(order, statusFilter) && (!searchQuery.trim() || searchText.includes(searchQuery.toLowerCase()) || includesCity(order, searchQuery));
+    const searchMatches = matchesSearchQuery([
+      order?.id, getOrderReference(order), order?.coupon_number, order?.invoice_number,
+      order?.merchant_id, order?.merchant_code, order?.merchant_name,
+      order?.sender_name, order?.receiver_name, order?.customer_name,
+      order?.receiver_phone, order?.sender_phone, order?.customer_phone,
+      order?.sender_city, order?.receiver_city, order?.pickup_city,
+      order?.delivery_city, order?.destination_country,
+    ], searchQuery);
+    return (regionFilter === "all" || orderRegionId(order) === regionFilter) && isStatusMatch(order, statusFilter) && searchMatches;
   }), [sortedOrders, regionFilter, statusFilter, searchQuery]);
-  const visibleOrders = filteredOrders.length ? filteredOrders : sortedOrders;
+  const visibleOrders = filteredOrders;
   const activeOrder = selectedOrder || visibleOrders.find((order) => orderKey(order) === selectedOrderId) || visibleOrders.find(isActiveOrder) || visibleOrders[0] || null;
 
   useEffect(() => {
@@ -299,7 +303,7 @@ export default function AdminLiveOperationsMap({ isArabic, orders, selectedOrder
             <span>{isArabic ? "اختيار الشحنة" : "Select shipment"}</span>
             <select value={selectedOrderId} onChange={(event) => selectShipment(event.target.value)} disabled={!visibleOrders.length}>
               {!visibleOrders.length && <option value="">{isArabic ? "لا توجد شحنات مطابقة" : "No matching shipments"}</option>}
-              {visibleOrders.slice(0, 120).map((order) => (
+              {visibleOrders.map((order) => (
                 <option key={orderKey(order)} value={orderKey(order)}>{orderTitle(order, isArabic)}</option>
               ))}
             </select>

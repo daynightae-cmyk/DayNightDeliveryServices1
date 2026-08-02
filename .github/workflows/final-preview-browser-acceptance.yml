@@ -1,0 +1,123 @@
+name: Final Preview Browser Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/final-preview-browser-acceptance.yml"
+      - ".github/scripts/final-preview-browser-acceptance.mjs"
+      - ".github/scripts/ilytk-session-rpc-diagnostic.mjs"
+      - "artifacts/day-night-delivery/**"
+      - "android-role-shell/**"
+      - "supabase/migrations/**"
+      - "supabase/production-reconciliation/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-preview-browser-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-preview-source:
+    name: Admin and ILYTK browser acceptance
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    env:
+      DEPLOYED_PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
+      TEST_BASE_URL: http://127.0.0.1:4173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Verify protected browser credentials and backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Build and serve exact branch-head web application
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm run web:typecheck
+          pnpm run web:build
+          test -s artifacts/day-night-delivery/dist/public/index.html
+          mkdir -p preview-browser-evidence
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > preview-browser-evidence/local-web.log 2>&1 &
+          echo $! > preview-browser-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat preview-browser-evidence/local-web.log >&2
+          exit 1
+
+      - name: Diagnose canonical ILYTK RPC chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/ilytk-session-rpc-diagnostic.mjs
+
+      - name: Install isolated Chromium acceptance runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-playwright"
+          rm -rf "$playwright_dir"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Test admin, canonical ILYTK portal, and search on desktop and phone
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/final-preview-browser-acceptance.mjs
+
+      - name: Stop local application
+        if: always()
+        shell: bash
+        run: |
+          if [ -f preview-browser-evidence/local-web.pid ]; then
+            kill "$(cat preview-browser-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Final-Preview-Browser-Evidence
+          path: preview-browser-evidence/
+          if-no-files-found: warn
+          retention-days: 30

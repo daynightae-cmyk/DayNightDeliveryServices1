@@ -17,6 +17,10 @@ import {
   type DeliveryFeeMode,
   type OrderFinancialBreakdown,
 } from "./orderFinancials";
+import {
+  resolveCanonicalMerchantForOrder,
+  verifySavedOrderMerchant,
+} from "./orderMerchantResolver";
 
 export type FinancialOpsOrderInput = OpsOrderInput & {
   goods_value: number | string;
@@ -34,16 +38,6 @@ export type CouponConflict = {
   merchant_name: string;
   receiver_name: string;
   receiver_phone: string;
-};
-
-export type MerchantPortalResolution = {
-  ok: boolean;
-  selected_merchant_id: string;
-  canonical_merchant_id: string;
-  canonicalized: boolean;
-  portal_link_count: number;
-  merchant: Merchant;
-  ownership_rule: string;
 };
 
 export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;
@@ -161,41 +155,6 @@ export async function findCouponConflict(
 
   if (!conflict.order_id && !conflict.tracking_number) return null;
   return conflict;
-}
-
-function merchantPortalLinkError(error: unknown, merchant: Merchant) {
-  const detail = opsErrorDetail(error);
-  const normalized = detail.toLowerCase();
-  let message = detail;
-
-  if (normalized.includes("merchant_portal_account_not_linked")) {
-    message = `التاجر «${clean(merchant.trade_name) || clean(merchant.merchant_code) || "غير محدد"}» غير مرتبط بحساب دخول في بوابة التاجر. لم يتم حفظ الطلب حتى لا يختفي من حساب التاجر. اربط حساب التاجر أولًا ثم أعد الحفظ.`;
-  } else if (normalized.includes("merchant_portal_link_ambiguous")) {
-    message = `يوجد أكثر من حساب بوابة مطابق للتاجر «${clean(merchant.trade_name) || "غير محدد"}». لم يتم حفظ الطلب. وحّد سجل التاجر واربط حسابًا واحدًا فقط.`;
-  } else if (normalized.includes("merchant_inactive_for_order")) {
-    message = `حساب التاجر «${clean(merchant.trade_name) || "غير محدد"}» غير نشط ولا يمكن إنشاء طلب عليه.`;
-  }
-
-  const wrapped = new Error(message || "تعذر التحقق من ربط الطلب بحساب التاجر. لم يتم حفظ الطلب.") as Error & { code?: string };
-  wrapped.name = "MerchantPortalLinkError";
-  wrapped.code = "merchant_portal_link_required";
-  return wrapped;
-}
-
-export async function resolveOrderMerchant(merchant: Merchant): Promise<Merchant> {
-  if (!supabase || !merchant?.id) throw merchantPortalLinkError(null, merchant);
-
-  const { data, error } = await supabase.rpc("admin_resolve_order_merchant", {
-    p_merchant_id: merchant.id,
-  });
-  if (error) throw merchantPortalLinkError(error, merchant);
-
-  const value = (Array.isArray(data) ? data[0] : data) as MerchantPortalResolution | null;
-  const resolved = value?.merchant;
-  if (!value?.ok || !resolved?.id || Number(value.portal_link_count || 0) < 1) {
-    throw merchantPortalLinkError(null, merchant);
-  }
-  return resolved;
 }
 
 async function recoverCouponConflict(
@@ -365,7 +324,8 @@ export async function createFinancialOpsOrder(
   if (!supabase) throw operationError(null, "Supabase is not configured.");
   const selectedMerchant = input.merchant;
   if (!selectedMerchant?.id) throw operationError(null, "merchant_required");
-  const merchant = await resolveOrderMerchant(selectedMerchant);
+  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
+  const merchant = resolution.merchant;
 
   const existingConflict = await findCouponConflict(input.coupon_number);
   if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
@@ -376,7 +336,7 @@ export async function createFinancialOpsOrder(
   const trackingNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
   const payload = buildFinancialOrderPayload(input, merchant, financials, trackingNumber, createdAt);
 
-  const { data, error } = await supabase.rpc("admin_create_coupon_order", { p_order: payload });
+  const { data, error } = await supabase.rpc("admin_create_canonical_merchant_order", { p_order: payload });
   if (error) {
     const conflict = await recoverCouponConflict(input.coupon_number);
     if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
@@ -389,10 +349,8 @@ export async function createFinancialOpsOrder(
   if (!row?.id && !row?.tracking_number && !row?.invoice_number) {
     throw operationError(null, "financial_order_creation_returned_no_row");
   }
-  if (clean(row.merchant_id) !== clean(merchant.id)) {
-    throw operationError(null, "saved_order_merchant_portal_link_mismatch");
-  }
-  return { row, source: "rpc" };
+  const verified = await verifySavedOrderMerchant(row, resolution.merchantId);
+  return { row: verified, source: "rpc" };
 }
 
 function buildCorePatch(
@@ -455,7 +413,7 @@ export async function updateFinancialOpsOrder(
   if (!selectedMerchant?.id) throw operationError(null, "merchant_required");
   const merchantChanged = clean(selectedMerchant.id) !== clean(input.order.merchant_id);
   const merchant = merchantChanged
-    ? await resolveOrderMerchant(selectedMerchant)
+    ? (await resolveCanonicalMerchantForOrder(selectedMerchant)).merchant
     : selectedMerchant;
 
   const excludeOrderId = clean(input.order.id) || null;

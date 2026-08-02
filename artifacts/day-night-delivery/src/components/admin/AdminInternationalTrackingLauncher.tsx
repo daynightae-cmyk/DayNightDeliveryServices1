@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchAdminOrders } from "../../lib/adminData";
+import { matchesSearchQuery } from "../../lib/searchNormalization";
 import {
   internationalTrackingUrl,
   registerAramexShipment,
@@ -42,6 +43,12 @@ type OrderOption = {
   shipping_scope?: string | null;
   service_type?: string | null;
   receiver_name?: string | null;
+  receiver_phone?: string | null;
+  sender_name?: string | null;
+  sender_phone?: string | null;
+  merchant_id?: string | null;
+  merchant_code?: string | null;
+  merchant_name?: string | null;
 };
 
 type WebhookLog = {
@@ -226,20 +233,25 @@ export default function AdminInternationalTrackingLauncher() {
   const [center, setCenter] = useState<TrackingCenterData>({ ok: true, shipments: [], webhook_logs: [], quota: null });
 
   const matchingOrders = useMemo(() => {
-    const query = orderSearch.trim().toLowerCase();
-    if (!query) return orders;
-    return orders.filter((order) => [orderReference(order), order.sender_city, order.receiver_city, order.destination_country, order.receiver_name]
-      .some((value) => String(value || "").toLowerCase().includes(query)));
+    return orders.filter((order) => matchesSearchQuery([
+      order.id, orderReference(order), order.coupon_number, order.invoice_number,
+      order.merchant_id, order.merchant_code, order.merchant_name,
+      order.sender_name, order.sender_phone, order.receiver_name,
+      order.receiver_phone, order.sender_city, order.receiver_city,
+      order.destination_country,
+    ], orderSearch));
   }, [orders, orderSearch]);
 
   const internationalOrders = useMemo(() => matchingOrders.filter(isInternational), [matchingOrders]);
   const otherOrders = useMemo(() => matchingOrders.filter((order) => !isInternational(order)), [matchingOrders]);
 
   const visibleShipments = useMemo(() => {
-    const query = shipmentSearch.trim().toLowerCase();
-    if (!query) return center.shipments;
-    return center.shipments.filter((shipment) => [shipment.tracking_number, shipment.public_tracking_number, shipment.latest_location, shipment.destination_city]
-      .some((value) => String(value || "").toLowerCase().includes(query)));
+    return center.shipments.filter((shipment) => matchesSearchQuery([
+      shipment.tracking_number, shipment.public_tracking_number,
+      shipment.carrier_tracking_number, shipment.carrier_tracking_number_full,
+      shipment.latest_location, shipment.latest_city, shipment.latest_country,
+      shipment.destination_city, shipment.normalized_status,
+    ], shipmentSearch));
   }, [center.shipments, shipmentSearch]);
 
   async function loadCenter(refreshQuota = false) {
