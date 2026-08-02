@@ -74,12 +74,16 @@ export async function createPersonalOpsOrder(
   input: PersonalOrderInput,
 ): Promise<OpsCreateResult<Order>> {
   if (!supabase) throw new Error("Supabase is not configured.");
+  const couponNumber = clean(input.reference);
   const senderName = clean(input.sender_name);
   const senderPhone = clean(input.sender_phone);
   const receiverName = clean(input.receiver_name);
   const receiverPhone = clean(input.receiver_phone);
-  if (!senderName || !senderPhone || !receiverName || !receiverPhone) {
-    throw new Error("personal_order_contact_fields_required");
+  if (!couponNumber) {
+    throw new Error("coupon_number_required_for_personal_order");
+  }
+  if (!senderName || !receiverName || !receiverPhone) {
+    throw new Error("personal_order_required_contact_fields_missing");
   }
 
   const financials = calculatePersonalOrderFinancials({
@@ -88,15 +92,14 @@ export async function createPersonalOpsOrder(
   });
   const now = new Date();
   const createdAt = now.toISOString();
-  const seed = clean(input.reference) || `PERSONAL-${Date.now().toString(36)}`;
-  const trackingNumber = createDayNightInvoiceNumber(seed, now);
+  const trackingNumber = createDayNightInvoiceNumber(couponNumber, now);
   const paymentMethod = normalizedPaymentMethod(input.payment_method);
   const packageValue = clean(input.package_type) || "Personal shipment";
   const payload = {
     tracking_number: trackingNumber,
     tracking_code: trackingNumber,
     invoice_number: trackingNumber,
-    coupon_number: clean(input.reference) || null,
+    coupon_number: couponNumber,
     merchant_id: null,
     merchant_name: null,
     merchant_code: null,
