@@ -1,4 +1,5 @@
 name: Unified Personal Order Browser Save
+# Persists one real test order, verifies it, then removes it from production.
 
 on:
   pull_request:
