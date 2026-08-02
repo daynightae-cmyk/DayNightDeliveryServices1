@@ -476,12 +476,8 @@ export default function AdminMerchantStatementsCenter({
 
   function openWhatsApp(targetOrders: Order[], resend: boolean) {
     if (!merchantPhone || !targetOrders.length) return;
-    const message = merchantWhatsAppMessage(targetOrders);
-    const opened = window.open(
-      `https://wa.me/${merchantPhone}?text=${encodeURIComponent(message)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    const whatsappUrl = `https://wa.me/${merchantPhone}?text=${encodeURIComponent(merchantWhatsAppMessage(targetOrders))}`;
+    const opened = window.open(whatsappUrl, "_blank");
     if (!opened) {
       setDispatchError(
         isArabic
@@ -489,6 +485,11 @@ export default function AdminMerchantStatementsCenter({
           : "The browser blocked WhatsApp. Allow pop-ups and try again. No order was marked as sent.",
       );
       return;
+    }
+    try {
+      opened.opener = null;
+    } catch {
+      // Cross-origin WindowProxy restrictions are harmless here.
     }
     setPendingTransfer({ orders: targetOrders, resend, whatsappOpened: true });
   }
