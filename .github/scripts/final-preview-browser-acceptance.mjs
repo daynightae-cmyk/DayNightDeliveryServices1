@@ -218,12 +218,33 @@ async function openAllOrders(page) {
 }
 
 async function openAdminFromInjectedSession(page) {
-  await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=admin`, {
+  const target = `${base}/admin?nosplash=1&lang=ar&__dn_acceptance=admin`;
+  const shell = page.locator('.dncc-shell');
+
+  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  if (await shell.waitFor({ state: 'visible', timeout: 45000 }).then(() => true).catch(() => false)) {
+    await page.locator('[data-dn-command-section="all_orders"]').first().waitFor({ state: 'attached', timeout: 90000 });
+    return;
+  }
+
+  await page.evaluate((key) => window.localStorage.removeItem(key), storageKey);
+  await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=final_preview_login`, {
     waitUntil: 'domcontentloaded',
     timeout: 90000,
   });
-  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 });
-  await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
+
+  const intro = page.locator('.auth-clean__intro-cta');
+  if (await intro.isVisible().catch(() => false)) await intro.click();
+
+  const email = page.locator('#dn-admin-email');
+  const password = page.locator('#dn-admin-password');
+  await email.waitFor({ state: 'visible', timeout: 30000 });
+  await password.waitFor({ state: 'visible', timeout: 30000 });
+  await email.fill(String(adminEmail || ''));
+  await password.fill(String(adminPassword || ''));
+  await page.locator('button[type="submit"]').click();
+
+  await shell.waitFor({ state: 'visible', timeout: 90000 });
   await page.locator('[data-dn-command-section="all_orders"]').first().waitFor({ state: 'attached', timeout: 90000 });
 }
 
