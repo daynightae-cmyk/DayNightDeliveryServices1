@@ -1,0 +1,54 @@
+name: Admin Complete Order Edit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/admin-complete-order-edit.yml"
+      - "artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx"
+      - "artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts"
+      - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
+      - "artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs"
+      - "supabase/migrations/20260802084500_admin_complete_order_edit.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-complete-order-edit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  complete-order-edit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify complete order edit contract
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/admin-complete-order-edit-gate.mjs
+
+      - name: TypeScript
+        run: pnpm run web:typecheck
+
+      - name: Production gate
+        run: pnpm run web:gate
+
+      - name: Production build
+        run: pnpm run web:build
