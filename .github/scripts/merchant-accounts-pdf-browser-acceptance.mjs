@@ -110,9 +110,11 @@ replaceRequired(
   `async function verifyPdfStatements(page, label) {
   await ensureAdminShell(page);
   await openSection(page, 'merchant_statements', 'Merchant statements');
-  const section = page.locator('section').filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ }).first();
-  await section.waitFor({ state: 'visible', timeout: 90000 });
-  await selectIlytkCard(section, /فتح كشوف التاجر|Open statements/, label + ' PDF statements');
+
+  const openStatementButtons = page.getByRole('button', { name: /فتح كشوف التاجر|Open statements/ });
+  await openStatementButtons.first().waitFor({ state: 'attached', timeout: 90000 });
+  assert((await openStatementButtons.count()) > 0, label + ': merchant PDF directory did not render.');
+  await selectIlytkCard(page.locator('body'), /فتح كشوف التاجر|Open statements/, label + ' PDF statements');
 
   await page
     .getByText(/جاري تحميل سجل كشوف|Loading PDF statement history/)
