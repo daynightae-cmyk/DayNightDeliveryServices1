@@ -59,6 +59,8 @@ for (const token of [
   "admin_apply_order_merchant_safe_backfill",
   "admin_apply_safe_missing_financial_dependencies",
   "dn_project_delivered_order_dependencies",
+  "dn_safe_uuid",
+  "dn_safe_numeric",
   "trg_dn_project_delivered_order_dependencies",
   "AUTO_REPAIR_SAFE",
   "MANUAL_REVIEW",

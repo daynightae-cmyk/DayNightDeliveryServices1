@@ -13,6 +13,36 @@ begin;
 
 create extension if not exists pgcrypto with schema extensions;
 
+-- This release is installed against a production history that predates one
+-- legacy helper migration. Keep every conversion used below self-contained.
+create or replace function public.dn_safe_uuid(value text)
+returns uuid
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+begin
+  if value is null or btrim(value) = '' then return null; end if;
+  return value::uuid;
+exception when others then
+  return null;
+end;
+$$;
+
+create or replace function public.dn_safe_numeric(value text, fallback numeric default 0)
+returns numeric
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+begin
+  if value is null or btrim(value) = '' then return fallback; end if;
+  return value::numeric;
+exception when others then
+  return fallback;
+end;
+$$;
+
 -- Preserve historical rows while enforcing referential integrity for every future
 -- merchant_id write. NOT VALID deliberately avoids rewriting or hiding old rows.
 do $constraint$
@@ -2574,6 +2604,8 @@ end;
 $$;
 
 revoke all on function public.dn_effective_portal_user_ids(uuid) from public, anon, authenticated;
+revoke all on function public.dn_safe_uuid(text) from public, anon, authenticated;
+revoke all on function public.dn_safe_numeric(text,numeric) from public, anon, authenticated;
 revoke all on function public.dn_merchant_portal_link_count(uuid) from public, anon, authenticated;
 revoke all on function public.dn_resolve_portal_merchant_uuid(uuid) from public, anon, authenticated;
 revoke all on function public.dn_financial_dependency_integrity_snapshot() from public, anon, authenticated;
@@ -2620,6 +2652,8 @@ grant all on public.merchant_link_repair_audit to service_role;
 grant all on public.order_merchant_financial_repair_audit to service_role;
 
 grant execute on function public.dn_effective_portal_user_ids(uuid) to service_role;
+grant execute on function public.dn_safe_uuid(text) to service_role;
+grant execute on function public.dn_safe_numeric(text,numeric) to service_role;
 grant execute on function public.dn_merchant_portal_link_count(uuid) to service_role;
 grant execute on function public.dn_resolve_portal_merchant_uuid(uuid) to service_role;
 grant execute on function public.dn_financial_dependency_integrity_snapshot() to service_role;
