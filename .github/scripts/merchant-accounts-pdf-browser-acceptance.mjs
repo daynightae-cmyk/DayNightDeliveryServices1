@@ -22,10 +22,11 @@ replaceRequired(
   await page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 });
   await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
 }`,
-  `async function openAdmin(page) {
-  const target = \`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`;
+  `async function ensureAdminShell(page) {
   const shell = page.locator('.dncc-shell');
+  if (await shell.isVisible().catch(() => false)) return shell;
 
+  const target = \`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`;
   await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
   const shellReady = await shell
     .waitFor({ state: 'visible', timeout: 60000 })
@@ -46,6 +47,11 @@ replaceRequired(
     await shell.waitFor({ state: 'visible', timeout: 90000 });
   }
 
+  return shell;
+}
+
+async function openAdmin(page) {
+  await ensureAdminShell(page);
   await openSection(page, 'accounts', 'Accounts preload');
   const ready = page.locator('[data-admin-merchant-accounts-ready="true"]');
   if (!(await ready.waitFor({ state: 'attached', timeout: 90000 }).then(() => true).catch(() => false))) {
@@ -102,7 +108,7 @@ replaceRequired(
 replaceRequired(
   /async function verifyPdfStatements\(page, label\) \{[\s\S]*?^\}/m,
   `async function verifyPdfStatements(page, label) {
-  await openAdmin(page);
+  await ensureAdminShell(page);
   await openSection(page, 'merchant_statements', 'Merchant statements');
   const section = page.locator('section').filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ }).first();
   await section.waitFor({ state: 'visible', timeout: 90000 });
