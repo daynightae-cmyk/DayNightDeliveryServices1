@@ -12,6 +12,33 @@ const source = fs
     '/عزل البيانات|Data isolation|merchant_id مطابق فقط|ميرتشانت_يد مطابق فقط|Exact merchant_id only/.test(ledgerText)',
   )
   .replace(
+    `async function openAdmin(page) {
+  await page.goto(\`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
+  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 });
+  await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
+}`,
+    `async function openAdmin(page) {
+  const target = \`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`;
+  let latestUrl = '';
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto(target, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90000,
+    });
+    latestUrl = page.url();
+    const shell = page.locator('.dncc-shell');
+    if (await shell.isVisible().catch(() => false)) return;
+    await page.waitForTimeout(1200 * (attempt + 1));
+    if (attempt < 2) await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
+    if (await shell.isVisible().catch(() => false)) return;
+  }
+  throw new Error(\`merchant_accounts_admin_shell_missing_after_session_retry: ${'${latestUrl}'}\`);
+}`,
+  )
+  .replace(
     `  const newPdfButton = page.getByRole('button', { name: /إنشاء PDF جديد|Create new PDF/ }).first();
   const reexportButton = page.getByRole('button', { name: /إعادة PDF|Re-export PDF/ }).first();
   assert((await newPdfButton.count()) + (await reexportButton.count()) > 0, \`\${label}: PDF export control is missing.\`);`,
