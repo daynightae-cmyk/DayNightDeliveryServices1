@@ -4,7 +4,8 @@ import {
   useState,
   type ComponentProps,
 } from "react";
-import { fetchAdminOrders, fetchMerchants } from "../../lib/adminData";
+import { fetchMerchants } from "../../lib/adminData";
+import { fetchAdminOrdersResilient } from "../../lib/adminOrderRecovery";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { matchesSearchQuery } from "../../lib/searchNormalization";
 import AdminOrderBulkOperations from "./AdminOrderBulkOperations";
@@ -145,7 +146,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     setRecoveryError("");
 
     void Promise.allSettled([
-      withOperationalRetry(fetchAdminOrders, "orders recovery failed"),
+      fetchAdminOrdersResilient(),
       withOperationalRetry(fetchMerchants, "merchants recovery failed"),
     ]).then(([ordersResult, merchantsResult]) => {
       if (!active) return;
