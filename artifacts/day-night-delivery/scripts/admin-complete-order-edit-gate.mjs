@@ -11,8 +11,12 @@ const assert = (condition, message) => {
 const migration = read(
   "../../supabase/migrations/20260802084500_admin_complete_order_edit.sql",
 );
+const probeMigration = read(
+  "../../supabase/migrations/20260802094000_admin_complete_order_save_probe.sql",
+);
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
 const modal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
+const friendlyPlugin = read("scripts/friendly-error-message-plugin.ts");
 
 assert(
   migration.includes("create or replace function public.admin_update_order_complete_verified"),
@@ -55,6 +59,17 @@ assert(
 assert(
   migration.includes("grant execute on function public.admin_update_order_complete_verified(jsonb) to authenticated"),
   "authenticated admin RPC grant missing",
+);
+
+assert(
+  probeMigration.includes("public.admin_probe_order_complete_save") &&
+    probeMigration.includes("public.admin_update_order_complete_verified(p_payload)"),
+  "rollback-safe real-save probe is missing",
+);
+assert(
+  probeMigration.includes("complete_save_probe_order_rollback_failed") &&
+    probeMigration.includes("complete_save_probe_audit_rollback_failed"),
+  "save probe does not prove order and audit rollback",
 );
 
 assert(
@@ -117,7 +132,25 @@ assert(
 );
 assert(
   modal.includes("العملية اتلغت بالكامل ومفيش تعديل جزئي"),
-  "atomic rollback failure messaging missing",
+  "atomic rollback failure messaging source contract missing",
+);
+
+assert(
+  friendlyPlugin.includes("complete order save exact rejection messages"),
+  "complete editor is not converted to exact save rejection messages at build time",
+);
+assert(
+  friendlyPlugin.includes("انتهت جلسة الإدارة") &&
+    friendlyPlugin.includes("رقم الكوبون مستخدم بالفعل") &&
+    friendlyPlugin.includes("التاجر المختار غير مرتبط") &&
+    friendlyPlugin.includes("القيم المالية غير صالحة") &&
+    friendlyPlugin.includes("يوجد تعارض في ملكية الطلب"),
+  "specific Arabic save rejection categories are incomplete",
+);
+assert(
+  friendlyPlugin.includes("لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية") &&
+    friendlyPlugin.includes("لم يحدث أي تعديل جزئي"),
+  "unknown save rejection does not give a truthful non-generic fallback",
 );
 
 console.log(
@@ -133,7 +166,8 @@ console.log(
       completeBusinessFields: true,
       immutableIdentityProtected: true,
       beforeAfterAudit: true,
-      atomicFailureMessage: true,
+      rollbackSafeRealSaveProbe: true,
+      exactSaveRejectionMessages: true,
     },
     null,
     2,
