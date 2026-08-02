@@ -8,6 +8,7 @@ on:
       - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
       - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
+      - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
       - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
@@ -21,6 +22,7 @@ on:
       - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
       - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
+      - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
       - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
@@ -122,6 +124,7 @@ jobs:
             20260802031500_personal_order_optional_coupon_policy.sql \
             20260802033000_order_merchant_dry_run_timeout.sql \
             20260802034000_financial_reconciliation_without_portal_link.sql \
+            20260802034500_customer_e2e_dependency_cleanup.sql \
             20260802035000_apply_reviewed_order_merchant_reconciliation.sql
           do
             if [ -f "$release_dir/supabase/migrations/$target" ]; then
@@ -171,6 +174,7 @@ jobs:
             20260802031500_personal_order_optional_coupon_policy.sql \
             20260802033000_order_merchant_dry_run_timeout.sql \
             20260802034000_financial_reconciliation_without_portal_link.sql \
+            20260802034500_customer_e2e_dependency_cleanup.sql \
             20260802035000_apply_reviewed_order_merchant_reconciliation.sql
           do
             if [ ! -f "$release_dir/supabase/migrations/$target" ]; then

@@ -98,8 +98,25 @@ async function cleanup() {
     if (error) console.warn(`Storage cleanup warning: ${error.message}`);
   }
   if (created.orderId) {
+    const dependencyDeletes = [
+      ["financial_account_entries", "order_id", created.orderId],
+      ["cod_collections", "order_id", created.orderId],
+      ["merchant_statement_entries", "order_id", created.orderId],
+      ["driver_statement_entries", "order_id", created.orderId],
+      ["order_financial_settlements", "order_id", created.orderId],
+      ["outbound_message_logs", "order_id", created.orderId],
+    ];
+    for (const [table, column, value] of dependencyDeletes) {
+      const { error } = await service.from(table).delete().eq(column, value);
+      if (error) throw new Error(`${table} cleanup failed: ${error.message}`);
+    }
+    const { error: notificationError } = await service
+      .from("notifications")
+      .delete()
+      .contains("metadata", { order_id: created.orderId });
+    if (notificationError) throw new Error(`Notification cleanup failed: ${notificationError.message}`);
     const { error } = await service.from("orders").delete().eq("id", created.orderId);
-    if (error) console.warn(`Order cleanup warning: ${error.message}`);
+    if (error) throw new Error(`Order cleanup failed: ${error.message}`);
   }
   console.log("Temporary Customer Experience E2E records cleaned up.");
 }
