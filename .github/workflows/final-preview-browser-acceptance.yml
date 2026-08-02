@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/final-preview-browser-acceptance.yml"
+      - ".github/scripts/final-preview-browser-acceptance.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -30,10 +31,9 @@ jobs:
       TEST_BASE_URL: http://127.0.0.1:4173
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
       RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
-      RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
-      RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD; do
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
             test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
           done
 
@@ -92,203 +92,11 @@ jobs:
           npx playwright install --with-deps chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Test admin, ILYTK portal, and search on desktop and phone
+      - name: Test admin, canonical ILYTK portal, and search on desktop and phone
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { chromium, devices } = require(`${process.env.PLAYWRIGHT_NODE_PATH}/playwright`);
-
-          const base = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
-          const deployedPreview = String(process.env.DEPLOYED_PREVIEW_URL || '').replace(/\/$/, '');
-          const adminEmail = process.env.RUNTIME_ADMIN_EMAIL;
-          const adminPassword = process.env.RUNTIME_ADMIN_PASSWORD;
-          const merchantEmail = process.env.RUNTIME_MERCHANT_EMAIL;
-          const merchantPassword = process.env.RUNTIME_MERCHANT_PASSWORD;
-          const ilytkId = '325bb302-75c3-48cc-84ba-e58817d6d148';
-          const g3bxgId = 'b0da2d6d-2fc9-43b3-9e38-260ff2dbd68e';
-          const expectedMerchant = /استبي ما عرفنالك|DN-MER-SHOP-ILYTK|ILYTK/i;
-          const reviewedCoupons = ['003860', '010503', '010505'];
-          const excludedCoupon = '010504';
-
-          function assert(condition, message) {
-            if (!condition) throw new Error(message);
-          }
-
-          async function bodyText(page) {
-            return page.locator('body').innerText();
-          }
-
-          async function clickFirstVisible(locator, description) {
-            const count = await locator.count();
-            for (let index = 0; index < count; index += 1) {
-              const item = locator.nth(index);
-              if (await item.isVisible().catch(() => false)) {
-                await item.click();
-                return;
-              }
-            }
-            throw new Error(`Missing visible control: ${description}`);
-          }
-
-          async function openAllOrders(page) {
-            const shell = page.locator('.dncc-shell');
-            await shell.waitFor({ state: 'visible', timeout: 90000 });
-
-            const section = page.locator('[data-dn-command-section="all_orders"]');
-            await section.first().waitFor({ state: 'attached', timeout: 90000 });
-            const sectionCount = await section.count();
-            for (let index = 0; index < sectionCount; index += 1) {
-              const item = section.nth(index);
-              if (await item.isVisible().catch(() => false)) {
-                await item.click();
-                return;
-              }
-            }
-
-            const mobileMenu = page.locator('.dncc-mobile-menu');
-            await mobileMenu.waitFor({ state: 'visible', timeout: 30000 });
-            await mobileMenu.click();
-            await page.locator('.dncc-mobile-layer').waitFor({ state: 'visible', timeout: 30000 });
-            await clickFirstVisible(section, 'All Orders command section in mobile drawer');
-          }
-
-          async function loginAdmin(page) {
-            await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=admin`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-            await page.locator('.auth-clean__intro-cta').click();
-            await page.locator('#dn-admin-email').fill(adminEmail);
-            await page.locator('#dn-admin-password').fill(adminPassword);
-            await Promise.all([
-              page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 }),
-              page.locator('button[type="submit"]').click(),
-            ]);
-            await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
-            assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
-          }
-
-          async function selectorText(page) {
-            await page.waitForTimeout(700);
-            return page.locator('.dn-admin-bulk-selector-list').innerText();
-          }
-
-          async function testAdmin(page, label) {
-            try {
-              await loginAdmin(page);
-              await openAllOrders(page);
-              const search = page.locator('[data-admin-order-search="true"]');
-              const merchantSelect = page.locator('.dn-admin-bulk-filter-grid select').filter({
-                has: page.locator(`option[value="${ilytkId}"]`),
-              }).first();
-              await search.waitFor({ state: 'visible', timeout: 90000 });
-              await merchantSelect.waitFor({ state: 'visible', timeout: 90000 });
-
-              await merchantSelect.selectOption(ilytkId);
-              await search.fill('003860');
-              let text = await selectorText(page);
-              assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
-
-              await merchantSelect.selectOption(g3bxgId);
-              text = await selectorText(page);
-              assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
-
-              await search.fill(excludedCoupon);
-              text = await selectorText(page);
-              assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
-
-              await merchantSelect.selectOption(ilytkId);
-              text = await selectorText(page);
-              assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
-
-              await search.fill('003860');
-              text = await selectorText(page);
-              assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
-              await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
-            } catch (error) {
-              await page.screenshot({ path: `preview-browser-evidence/${label}-admin-failure.png`, fullPage: true }).catch(() => {});
-              throw error;
-            }
-          }
-
-          async function loginMerchant(page) {
-            await page.goto(`${base}/merchant?nosplash=1&lang=ar&__dn_acceptance=merchant`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-            const email = page.locator('input[type="email"]').first();
-            const password = page.locator('input[type="password"]').first();
-            await email.waitFor({ state: 'visible', timeout: 90000 });
-            await email.fill(merchantEmail);
-            await password.fill(merchantPassword);
-            await page.locator('form button[type="submit"]').first().click();
-            await page.locator('[data-merchant-authenticated="true"]').waitFor({ state: 'visible', timeout: 90000 });
-            await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
-            assert(expectedMerchant.test(await bodyText(page)), 'Authenticated merchant account is not canonical ILYTK.');
-          }
-
-          async function merchantSearch(page, query) {
-            await clickFirstVisible(page.getByRole('button', { name: /البحث|Search/ }), 'Merchant global search');
-            const dialog = page.getByRole('dialog', { name: /البحث الشامل|Global search/ });
-            await dialog.waitFor({ state: 'visible', timeout: 30000 });
-            await dialog.locator('input').first().fill(query);
-            await page.waitForTimeout(900);
-            const text = await dialog.innerText();
-            const resultCount = await dialog.locator('.dn-merchant-command-results button').count();
-            await page.keyboard.press('Escape');
-            return { text, resultCount };
-          }
-
-          async function testMerchant(page, label) {
-            try {
-              await loginMerchant(page);
-              for (const coupon of reviewedCoupons) {
-                const result = await merchantSearch(page, coupon);
-                assert(result.resultCount > 0, `${label}: ILYTK search returned no result for ${coupon}.`);
-                assert(!/لا توجد نتائج مطابقة|No matching results/.test(result.text), `${label}: ILYTK search reported empty for ${coupon}.`);
-              }
-              const excluded = await merchantSearch(page, excludedCoupon);
-              assert(excluded.resultCount === 0, `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
-              assert(/لا توجد نتائج مطابقة|No matching results/.test(excluded.text), `${label}: excluded coupon 010504 did not produce explicit empty state.`);
-              await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
-            } catch (error) {
-              await page.screenshot({ path: `preview-browser-evidence/${label}-merchant-failure.png`, fullPage: true }).catch(() => {});
-              throw error;
-            }
-          }
-
-          (async () => {
-            const browser = await chromium.launch({ headless: true });
-            const scenarios = [
-              { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
-              { label: 'phone', context: { ...devices['Pixel 7'], locale: 'ar-AE' } },
-            ];
-            const report = [];
-            try {
-              for (const scenario of scenarios) {
-                const adminContext = await browser.newContext(scenario.context);
-                await testAdmin(await adminContext.newPage(), scenario.label);
-                await adminContext.close();
-
-                const merchantContext = await browser.newContext(scenario.context);
-                await testMerchant(await merchantContext.newPage(), scenario.label);
-                await merchantContext.close();
-                report.push({ scenario: scenario.label, admin: 'PASS', merchant: 'PASS', search: 'PASS', crossOwner: 'PASS' });
-              }
-            } finally {
-              await browser.close();
-            }
-            fs.writeFileSync('preview-browser-evidence/report.json', JSON.stringify({
-              branchHead: process.env.GITHUB_HEAD_SHA || process.env.GITHUB_SHA,
-              deployedPreview,
-              testedExactSourceBundle: true,
-              reviewedCoupons,
-              excludedCoupon,
-              result: 'PASS',
-              scenarios: report,
-            }, null, 2));
-            console.log(JSON.stringify(report, null, 2));
-          })().catch((error) => {
-            console.error(error?.stack || error);
-            process.exit(1);
-          });
-          NODE
+          node .github/scripts/final-preview-browser-acceptance.mjs
 
       - name: Stop local application
         if: always()
