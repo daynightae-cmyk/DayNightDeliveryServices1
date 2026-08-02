@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Loader2, RefreshCw, Search } from "lucide-react";
 import type { Merchant, Order } from "../../types";
 import { fetchMerchants } from "../../lib/adminData";
-import { fetchAdminOrdersResilient } from "../../lib/adminOrderRecovery";
+import {
+  fetchAdminOrdersResilient,
+  waitForAdminOperationalSession,
+} from "../../lib/adminOrderRecovery";
 import {
   fetchFinanceLedgerSnapshot,
   type FinanceLedgerSnapshot,
@@ -19,7 +22,7 @@ type Props = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
-const OPERATIONAL_REQUEST_TIMEOUT_MS = 8_000;
+const OPERATIONAL_REQUEST_TIMEOUT_MS = 30_000;
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 function withOperationalTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -48,16 +51,16 @@ async function withOperationalRetry<T>(task: () => Promise<T>, label: string): P
       return await withOperationalTimeout(task(), label);
     } catch (cause) {
       latest = cause;
-      if (attempt < 2) await wait(500 * (attempt + 1));
+      if (attempt < 2) await wait(700 * (attempt + 1));
     }
   }
   throw new Error(`${label}: ${latest instanceof Error ? latest.message : String(latest || "unknown failure")}`);
 }
 
 /**
- * Merchant ownership is exposed only after both the complete protected order
- * set and merchant directory have been verified. Finance remains an independent
- * fail-closed layer and can never replace or fabricate operational ownership.
+ * Merchant ownership is exposed only after the authenticated browser session,
+ * complete protected order set, and merchant directory have all been verified.
+ * Finance remains independent and can never fabricate operational ownership.
  */
 export default function AdminMerchantAccountsRoute({
   isArabic,
@@ -78,6 +81,7 @@ export default function AdminMerchantAccountsRoute({
   const [operationalBusy, setOperationalBusy] = useState(() => !orders.length || !merchants.length);
   const [financeError, setFinanceError] = useState("");
   const [operationalError, setOperationalError] = useState("");
+  const [operationalDiagnostic, setOperationalDiagnostic] = useState("");
   const financeRequest = useRef(0);
   const operationalRequest = useRef(0);
 
@@ -106,6 +110,24 @@ export default function AdminMerchantAccountsRoute({
 
     setOperationalBusy(true);
     setOperationalError("");
+    setOperationalDiagnostic("");
+
+    try {
+      await waitForAdminOperationalSession();
+    } catch (cause) {
+      if (requestId !== operationalRequest.current) return;
+      const detail = cause instanceof Error ? cause.message : String(cause || "admin session unavailable");
+      console.error("Merchant accounts authenticated session recovery failed.", cause);
+      setOperationalDiagnostic(detail);
+      setOperationalError(
+        isArabic
+          ? "لم تكتمل جلسة الإدارة الموثقة بعد. لم يتم عرض أي حسابات ناقصة؛ اضغط تحديث لإعادة المحاولة."
+          : "The authenticated admin session is not ready yet. No incomplete account data was shown; press Refresh to retry.",
+      );
+      setOperationalBusy(false);
+      return;
+    }
+
     const [ordersResult, merchantsResult] = await Promise.allSettled([
       needOrders ? fetchAdminOrdersResilient() : Promise.resolve(authoritativeOrders),
       needMerchants
@@ -116,23 +138,38 @@ export default function AdminMerchantAccountsRoute({
     if (requestId !== operationalRequest.current) return;
 
     const failures: string[] = [];
-    if (ordersResult.status === "fulfilled") {
-      setAuthoritativeOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+    if (ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) && ordersResult.value.length > 0) {
+      setAuthoritativeOrders(ordersResult.value);
       setOrdersVerified(true);
     } else {
       if (!ordersVerified) setOrdersVerified(false);
-      failures.push(ordersResult.reason instanceof Error ? ordersResult.reason.message : String(ordersResult.reason));
+      failures.push(
+        ordersResult.status === "rejected"
+          ? ordersResult.reason instanceof Error
+            ? ordersResult.reason.message
+            : String(ordersResult.reason)
+          : "protected orders query returned an empty set",
+      );
     }
 
-    if (merchantsResult.status === "fulfilled") {
-      setAuthoritativeMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
+    if (merchantsResult.status === "fulfilled" && Array.isArray(merchantsResult.value) && merchantsResult.value.length > 0) {
+      setAuthoritativeMerchants(merchantsResult.value);
       setMerchantsVerified(true);
     } else {
       if (!merchantsVerified) setMerchantsVerified(false);
-      failures.push(merchantsResult.reason instanceof Error ? merchantsResult.reason.message : String(merchantsResult.reason));
+      failures.push(
+        merchantsResult.status === "rejected"
+          ? merchantsResult.reason instanceof Error
+            ? merchantsResult.reason.message
+            : String(merchantsResult.reason)
+          : "protected merchants query returned an empty set",
+      );
     }
 
     if (failures.length) {
+      const diagnostic = failures.join(" | ");
+      console.error("Merchant accounts protected operational recovery failed:", diagnostic);
+      setOperationalDiagnostic(diagnostic);
       setOperationalError(
         isArabic
           ? "تعذر التحقق الكامل من الطلبات أو التجار بعد إعادة المحاولة. لم يتم فتح أي ملف تاجر ببيانات ناقصة أو مختلطة."
@@ -195,6 +232,8 @@ export default function AdminMerchantAccountsRoute({
       data-authoritative-order-count={operationalReady ? authoritativeOrders.length : 0}
       data-authoritative-merchant-count={visibleMerchants.length}
       data-admin-merchant-accounts-ready={operationalReady ? "true" : "false"}
+      data-admin-merchant-accounts-error={operationalError ? "true" : "false"}
+      data-admin-merchant-accounts-diagnostic={operationalDiagnostic}
     >
       <section className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-[1fr_1fr_minmax(260px,1.3fr)_auto]">
         <label className="block">
