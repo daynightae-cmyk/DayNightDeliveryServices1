@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/admin-complete-order-legacy-validation-hotfix-once.yml"
       - "supabase/migrations/20260802102000_admin_complete_order_legacy_validation_hotfix.sql"
+      - "supabase/migrations/20260802103000_admin_complete_order_sender_identity_fallback.sql"
 
 permissions:
   contents: read
@@ -36,7 +37,7 @@ jobs:
         with:
           version: latest
 
-      - name: Verify exact guarded hotfix
+      - name: Verify exact guarded hotfixes
         shell: bash
         run: |
           set -euo pipefail
@@ -47,16 +48,27 @@ jobs:
           test "$project_ref" = "ngdwybpgacauorygoedi"
           echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
 
-          target="supabase/migrations/20260802102000_admin_complete_order_legacy_validation_hotfix.sql"
-          test -s "$target"
-          grep -F "admin_update_order_complete_verified_v2" "$target" >/dev/null
-          grep -F "daynight.complete_order_edit" "$target" >/dev/null
-          grep -F "complete_order_edit_created_invalid_fields" "$target" >/dev/null
-          grep -F "admin_probe_order_complete_save" "$target" >/dev/null
-          grep -F "new_invalid_fields_rejected" "$target" >/dev/null
-          ! grep -Eiq 'truncate[[:space:]]+table|drop[[:space:]]+table|delete[[:space:]]+from[[:space:]]+public\.(orders|merchants)' "$target"
+          first="supabase/migrations/20260802102000_admin_complete_order_legacy_validation_hotfix.sql"
+          second="supabase/migrations/20260802103000_admin_complete_order_sender_identity_fallback.sql"
+          test -s "$first"
+          test -s "$second"
 
-      - name: Apply only the exact hotfix migration
+          grep -F "admin_update_order_complete_verified_v2" "$first" >/dev/null
+          grep -F "daynight.complete_order_edit" "$first" >/dev/null
+          grep -F "complete_order_edit_created_invalid_fields" "$first" >/dev/null
+          grep -F "admin_probe_order_complete_save" "$first" >/dev/null
+          grep -F "new_invalid_fields_rejected" "$first" >/dev/null
+
+          grep -F "sender_identity_resolved" "$second" >/dev/null
+          grep -F "merchant_owner_name" "$second" >/dev/null
+          grep -F "existing_order_sender_name" "$second" >/dev/null
+          grep -F "day night merchant" "$second" >/dev/null
+
+          for target in "$first" "$second"; do
+            ! grep -Eiq 'truncate[[:space:]]+table|drop[[:space:]]+table|delete[[:space:]]+from[[:space:]]+public\.(orders|merchants)' "$target"
+          done
+
+      - name: Apply only the exact hotfix migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -67,7 +79,6 @@ jobs:
           test -n "${SUPABASE_DB_PASSWORD:-}" || { echo "Missing SUPABASE_DB_PASSWORD" >&2; exit 2; }
 
           release_dir="$RUNNER_TEMP/daynight-admin-order-save-hotfix"
-          target="20260802102000_admin_complete_order_legacy_validation_hotfix.sql"
           rm -rf "$release_dir"
           mkdir -p "$release_dir/supabase/migrations"
           cp supabase/config.toml "$release_dir/supabase/config.toml"
@@ -77,10 +88,20 @@ jobs:
             --password "$SUPABASE_DB_PASSWORD"
           supabase --workdir "$release_dir" migration fetch --linked
 
-          if [ -f "$release_dir/supabase/migrations/$target" ]; then
-            echo "$target already recorded; verifying live RPC exposure"
-          else
-            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+          changed=0
+          for target in \
+            20260802102000_admin_complete_order_legacy_validation_hotfix.sql \
+            20260802103000_admin_complete_order_sender_identity_fallback.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              echo "$target already recorded"
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              changed=1
+            fi
+          done
+
+          if [ "$changed" -eq 1 ]; then
             supabase --workdir "$release_dir" db push --dry-run
             supabase --workdir "$release_dir" db push --yes
           fi
@@ -107,11 +128,12 @@ jobs:
             '/rpc/admin_update_order_complete_verified_v2',
             '/rpc/admin_probe_order_complete_save',
             '/rpc/admin_complete_order_legacy_validation_hotfix_health',
+            '/rpc/admin_complete_order_sender_identity_health',
           ];
           process.exit(required.every((path) => paths[path]) ? 0 : 1);
           NODE
             then
-              echo "Corrected complete-order save runtime is exposed"
+              echo "Corrected complete-order save and sender fallback are exposed"
               exit 0
             fi
             sleep 2
