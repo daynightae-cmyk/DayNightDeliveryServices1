@@ -227,6 +227,35 @@ async function selectorText(page) {
   return page.locator('.dn-admin-bulk-selector-list').innerText();
 }
 
+async function verifyCompleteOrderEditor(page, label) {
+  const editButtons = page.getByRole('button', { name: /تعديل|Edit/ });
+  await clickFirstVisible(editButtons, `${label} order edit button`);
+
+  const dialog = page.getByRole('dialog');
+  await dialog.waitFor({ state: 'visible', timeout: 30000 });
+
+  const merchantEditor = dialog.locator('[data-admin-complete-order-merchant="true"]');
+  const couponEditor = dialog.locator('[data-admin-complete-order-coupon="true"]');
+  const reasonEditor = dialog.locator('[data-admin-complete-order-reason="true"]');
+  const confirmEditor = dialog.locator('[data-admin-complete-order-confirm="true"]');
+
+  await merchantEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await couponEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await reasonEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await confirmEditor.waitFor({ state: 'visible', timeout: 30000 });
+
+  assert(!(await merchantEditor.isDisabled()), `${label}: merchant selector is still disabled in complete editor.`);
+  assert((await merchantEditor.inputValue()) === ilytkId, `${label}: complete editor did not load canonical ILYTK UUID.`);
+  assert((await couponEditor.inputValue()).trim() === '003860', `${label}: complete editor did not load coupon 003860.`);
+  assert(!(await reasonEditor.isDisabled()), `${label}: audited edit reason is disabled.`);
+  assert(!(await confirmEditor.isDisabled()), `${label}: edit impact confirmation is disabled.`);
+  assert((await dialog.getByText(/رقم التتبع والفاتورة لا بيتغيروش|Tracking and invoice identifiers are immutable/).count()) > 0, `${label}: immutable identity guidance is missing.`);
+
+  await page.screenshot({ path: `preview-browser-evidence/${label}-admin-complete-order-editor.png`, fullPage: true });
+  await clickFirstVisible(dialog.getByRole('button', { name: /إلغاء|Cancel/ }), `${label} complete editor cancel`);
+  await dialog.waitFor({ state: 'hidden', timeout: 30000 });
+}
+
 async function testAdmin(page, label) {
   try {
     await openAdminFromInjectedSession(page);
@@ -259,6 +288,7 @@ async function testAdmin(page, label) {
     await search.fill('003860');
     text = await selectorText(page);
     assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
+    await verifyCompleteOrderEditor(page, label);
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
   } catch (error) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-failure.png`, fullPage: true }).catch(() => {});
@@ -341,6 +371,7 @@ try {
     report.push({
       scenario: scenario.label,
       admin: 'PASS',
+      completeOrderEditor: 'PASS',
       merchant: 'PASS',
       search: 'PASS',
       crossOwner: 'PASS',
