@@ -11,6 +11,7 @@ on:
       - "artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts"
       - "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts"
       - "artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs"
+      - "artifacts/day-night-delivery/scripts/friendly-error-message-plugin.ts"
       - "supabase/migrations/20260802084500_admin_complete_order_edit.sql"
       - "supabase/migrations/20260802094000_admin_complete_order_save_probe.sql"
   workflow_dispatch:
