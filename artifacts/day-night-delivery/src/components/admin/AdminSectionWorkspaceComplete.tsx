@@ -4,6 +4,12 @@ import AdminSectionWorkspaceCompleteLegacy from "./AdminSectionWorkspaceComplete
 
 type Props = ComponentProps<typeof AdminSectionWorkspaceCompleteLegacy>;
 
+/**
+ * The accounts section is intentionally intercepted before the legacy finance
+ * workspace so merchant rows can never be mixed in the generic ledger table.
+ * Every other admin section remains byte-for-byte compatible through the
+ * preserved legacy component.
+ */
 export default function AdminSectionWorkspaceComplete(props: Props) {
   if (props.id === "accounts") {
     return (
