@@ -22,6 +22,10 @@ const migration = read(
   "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql",
   repoRoot,
 );
+const dryRunTimeoutMigration = read(
+  "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql",
+  repoRoot,
+);
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 
 assert.match(resolver, /resolveCanonicalMerchantForOrder/);
@@ -99,6 +103,10 @@ assert.doesNotMatch(
   migration,
   /is\s+distinct\s+from\s+case\b/i,
   "PL/pgSQL CASE operands for IS DISTINCT FROM must be parenthesized",
+);
+assert.match(
+  dryRunTimeoutMigration,
+  /alter\s+function\s+public\.admin_run_order_merchant_dry_run\(\)\s+set\s+statement_timeout\s*=\s*'120s'/i,
 );
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
 assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || []).length, "balanced SQL parentheses");
