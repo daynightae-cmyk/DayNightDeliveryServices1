@@ -1,5 +1,8 @@
-import { supabase } from "../supabase";
-import { getCachedAuthenticatedAccessToken } from "./authenticatedAccessToken";
+import {
+  clearAuthenticatedAccessToken,
+  getCachedAuthenticatedAccessToken,
+  waitForAuthenticatedAccessToken,
+} from "./authenticatedAccessToken";
 
 export type MerchantStatementDispatchStatus = {
   orderId: string;
@@ -47,7 +50,8 @@ const SUPABASE_ANON_KEY = String((import.meta as any).env?.VITE_SUPABASE_ANON_KE
 const DIRECT_HISTORY_PAGE_SIZE = 1000;
 const READ_TIMEOUT_MS = 18_000;
 const WRITE_TIMEOUT_MS = 30_000;
-const SESSION_FALLBACK_TIMEOUT_MS = 8_000;
+const TOKEN_READY_TIMEOUT_MS = 12_000;
+const READ_ATTEMPTS = 2;
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -56,6 +60,10 @@ function clean(value: unknown) {
 function numeric(value: unknown) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sleep(milliseconds: number) {
+  return new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }
 
 function rpcErrorMessage(error: unknown) {
@@ -166,48 +174,20 @@ function tokenIsUsable(session: { accessToken: string; expiresAt: number } | nul
   return session.expiresAt * 1000 > Date.now() + 30_000;
 }
 
-function withPromiseTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(
-      () => reject(new Error(`${label}_timeout_${timeoutMs}ms`)),
-      timeoutMs,
-    );
-    Promise.resolve(promise).then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (cause) => {
-        globalThis.clearTimeout(timer);
-        reject(cause);
-      },
-    );
-  });
-}
-
 async function resolveAccessToken() {
   const cached = getCachedAuthenticatedAccessToken();
   if (cached) return cached;
 
   const persisted = readPersistedSession();
   if (tokenIsUsable(persisted)) return persisted!.accessToken;
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
 
-  const sessionResult = await withPromiseTimeout<{
-    data: { session: { access_token?: string | null } | null };
-    error: unknown;
-  }>(
-    supabase.auth.getSession(),
-    "merchant_statement_dispatch_get_session",
-    SESSION_FALLBACK_TIMEOUT_MS,
-  );
-  if (sessionResult.error) {
-    throw new Error(rpcErrorMessage(sessionResult.error) || "merchant_statement_dispatch_session_failed");
-  }
-
-  const accessToken = clean(sessionResult.data.session?.access_token);
-  if (!accessToken) throw new Error("merchant_statement_dispatch_not_authenticated");
-  return accessToken;
+  // Never re-enter Supabase auth.getSession from a feature read. Some browser
+  // engines dispatch auth callbacks while the client auth mutex is held, which
+  // can leave a nested getSession call waiting indefinitely. The protected
+  // route and persisted storage are the authoritative token sources here.
+  const readyToken = await waitForAuthenticatedAccessToken(TOKEN_READY_TIMEOUT_MS);
+  if (readyToken) return readyToken;
+  throw new Error("merchant_statement_dispatch_not_authenticated");
 }
 
 async function protectedRestRequest(
@@ -248,6 +228,7 @@ async function protectedRestRequest(
     }
 
     if (!response.ok) {
+      if (response.status === 401) clearAuthenticatedAccessToken();
       const detail = rpcErrorMessage(payload) || clean(payload) || response.statusText;
       throw new Error(`${label}_http_${response.status}${detail ? ` | ${detail}` : ""}`);
     }
@@ -307,29 +288,42 @@ export async function fetchMerchantStatementDispatchStatus(
   if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
 
   let rpcDetail = "merchant_statement_dispatch_status_failed";
-  try {
-    const payload = await protectedRestRequest(
-      "rpc/admin_get_merchant_statement_dispatch_status",
-      {
-        method: "POST",
-        body: JSON.stringify({ p_merchant_id: normalizedMerchantId }),
-      },
-      "merchant_statement_dispatch_status_rpc",
-      READ_TIMEOUT_MS,
-    );
-    return normalizeRpcStatusRows(payload);
-  } catch (rpcFailure) {
-    rpcDetail = rpcErrorMessage(rpcFailure) || clean(rpcFailure) || rpcDetail;
+  let fallbackDetail = "merchant_statement_dispatch_direct_status_failed";
+
+  for (let attempt = 1; attempt <= READ_ATTEMPTS; attempt += 1) {
+    try {
+      const payload = await protectedRestRequest(
+        "rpc/admin_get_merchant_statement_dispatch_status",
+        {
+          method: "POST",
+          body: JSON.stringify({ p_merchant_id: normalizedMerchantId }),
+        },
+        `merchant_statement_dispatch_status_rpc_attempt_${attempt}`,
+        READ_TIMEOUT_MS,
+      );
+      return normalizeRpcStatusRows(payload);
+    } catch (rpcFailure) {
+      rpcDetail = rpcErrorMessage(rpcFailure) || clean(rpcFailure) || rpcDetail;
+    }
+
+    try {
+      return await fetchDispatchStatusDirectly(normalizedMerchantId);
+    } catch (fallbackError) {
+      fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError) || fallbackDetail;
+    }
+
+    if (attempt < READ_ATTEMPTS) await sleep(400 * attempt);
   }
 
-  try {
-    return await fetchDispatchStatusDirectly(normalizedMerchantId);
-  } catch (fallbackError) {
-    const fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
-    throw new Error(
-      `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
-    );
-  }
+  const finalError = new Error(
+    `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
+  );
+  console.error("Merchant PDF history verification failed.", {
+    merchantId: normalizedMerchantId,
+    rpc: rpcDetail,
+    protectedTable: fallbackDetail,
+  });
+  throw finalError;
 }
 
 export async function confirmMerchantStatementDispatch(
