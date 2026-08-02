@@ -277,6 +277,7 @@ const financialGapRows = deliveredOrders.flatMap((order) => {
   const missing_dependencies = missingTypesForOrder(order);
   if (!missing_dependencies.length) return [];
   const merchant = merchantById.get(clean(order.merchant_id));
+  const ownershipAudit = classified.find((row) => clean(row.order.id) === clean(order.id));
   return [{
     order_id: clean(order.id),
     coupon_number: clean(order.coupon_number) || null,
@@ -296,6 +297,8 @@ const financialGapRows = deliveredOrders.flatMap((order) => {
       collected_amount: num(order.collected_amount),
     },
     created_at: order.created_at || null,
+    ownership_classification: ownershipAudit?.classification || null,
+    candidate_canonical_merchant_id: ownershipAudit?.candidateId || null,
     missing_dependencies,
     proposed_action: "INSERT_MISSING_DEPENDENCY_FROM_UNCHANGED_ORDER_SNAPSHOT",
     order_values_will_change: false,

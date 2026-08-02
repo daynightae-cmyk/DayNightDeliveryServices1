@@ -168,6 +168,8 @@ jobs:
             20260730135000_anon_storage_policy_helper_grant.sql
             20260730136000_complaint_attachment_folder_depth_fix.sql
             20260730137000_customer_experience_notification_schema_compat.sql
+            20260802023000_global_order_merchant_integrity_restoration.sql
+            20260802031500_personal_order_optional_coupon_policy.sql
           )
 
           for target in "${targets[@]}"; do
@@ -227,7 +229,8 @@ jobs:
           for version in \
             20260730094500 20260730095500 20260730100500 20260730101500 \
             20260730114000 20260730130000 20260730133000 20260730134000 \
-            20260730135000 20260730136000 20260730137000
+            20260730135000 20260730136000 20260730137000 \
+            20260802023000 20260802031500
           do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2
@@ -327,8 +330,19 @@ jobs:
 
           const finance = await post('/rest/v1/rpc/admin_finance_reconciliation_health', {});
           fs.writeFileSync(`${root}/finance-reconciliation.json`, JSON.stringify(finance.payload, null, 2));
+          let reviewedDryRun = null;
           if (!finance.response.ok || finance.payload?.ok !== true) {
-            throw new Error(`finance_authority_http_${finance.response.status}`);
+            const dryRun = await post('/rest/v1/rpc/admin_run_order_merchant_dry_run', {});
+            fs.writeFileSync(`${root}/order-merchant-finance-dry-run.json`, JSON.stringify(dryRun.payload, null, 2));
+            if (!dryRun.response.ok || dryRun.payload?.ok !== true || !dryRun.payload?.run_id || dryRun.payload?.orders_modified !== 0) {
+              throw new Error(`finance_dry_run_capture_http_${dryRun.response.status}`);
+            }
+            const review = await post('/rest/v1/rpc/admin_review_order_merchant_dry_run', { p_run_id: dryRun.payload.run_id });
+            fs.writeFileSync(`${root}/order-merchant-finance-dry-run-review.json`, JSON.stringify(review.payload, null, 2));
+            if (!review.response.ok || review.payload?.ok !== true || review.payload?.orders_modified !== 0) {
+              throw new Error(`finance_dry_run_review_http_${review.response.status}`);
+            }
+            reviewedDryRun = review.payload;
           }
 
           const quota = await post('/functions/v1/track17-admin', { action: 'quota', force: true });
@@ -382,6 +396,10 @@ jobs:
           fs.writeFileSync(`${root}/track17-recovery-sync.json`, JSON.stringify(recoveryProof, null, 2));
           if (recoveryProof.failed_syncs > 0) {
             throw new Error(`track17_recovery_failures_${recoveryProof.failed_syncs}`);
+          }
+
+          if (reviewedDryRun) {
+            throw new Error(`finance_authority_requires_explicit_reviewed_apply_${reviewedDryRun.run_id}`);
           }
 
           console.log('Finance authority verified; 17TRACK quota and active shipments refreshed.');

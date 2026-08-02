@@ -89,6 +89,8 @@ assert.match(migration, /future_financial_projection_ready/);
 assert.match(migration, /Authoritative merchant statement projected from delivered order snapshot/);
 assert.match(productionAudit, /financial_dependency_gap_rows/);
 assert.match(productionAudit, /INSERT_MISSING_DEPENDENCY_FROM_UNCHANGED_ORDER_SNAPSHOT/);
+assert.match(productionAudit, /ownership_classification/);
+assert.match(migration, /'ALREADY_CORRECT','AUTO_REPAIR_SAFE','MISSING_PORTAL_LINK'/);
 assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/gim);
 assert.doesNotMatch(migration, /\bon delete cascade\b/i);
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");

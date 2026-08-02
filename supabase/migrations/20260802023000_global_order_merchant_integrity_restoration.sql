@@ -2151,17 +2151,7 @@ begin
     where s.run_id = p_run_id
       and lower(replace(replace(coalesce(s.status::text, ''), '-', '_'), ' ', '_'))
           in ('delivered','completed','complete')
-      and (
-        s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE')
-        or (
-          s.classification = 'MISSING_PORTAL_LINK'
-          and exists (
-            select 1 from public.merchant_link_repair_audit a
-            where a.run_id = p_run_id
-              and a.merchant_id = s.current_merchant_id
-          )
-        )
-      )
+      and s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE','MISSING_PORTAL_LINK')
       and (
         (to_jsonb(o) - 'merchant_id' - 'merchant_code' - 'merchant_name' - 'updated_at')
           is distinct from
@@ -2188,17 +2178,7 @@ begin
   where s.run_id = p_run_id
     and lower(replace(replace(coalesce(o.status::text, ''), '-', '_'), ' ', '_'))
         in ('delivered','completed','complete')
-    and (
-      s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE')
-      or (
-        s.classification = 'MISSING_PORTAL_LINK'
-        and exists (
-          select 1 from public.merchant_link_repair_audit a
-          where a.run_id = p_run_id
-            and a.merchant_id = s.current_merchant_id
-        )
-      )
-    )
+    and s.classification in ('ALREADY_CORRECT','AUTO_REPAIR_SAFE','MISSING_PORTAL_LINK')
     and (
       o.merchant_id is null
       or (
