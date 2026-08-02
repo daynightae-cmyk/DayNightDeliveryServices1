@@ -43,6 +43,10 @@ const projectionBackfillGuardMigration = read(
   "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql",
   repoRoot,
 );
+const orderStatusCompatMigration = read(
+  "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql",
+  repoRoot,
+);
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 const p1Workflow = read(".github/workflows/p1-runtime-evidence.yml", repoRoot);
 const integrityWorkflow = read(
@@ -135,6 +139,7 @@ for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802034000_financial_reconciliation_without_portal_link\.sql/);
   assert.match(workflow, /20260802034500_customer_e2e_dependency_cleanup\.sql/);
   assert.match(workflow, /20260802034700_defer_projection_during_merchant_backfill\.sql/);
+  assert.match(workflow, /20260802034800_order_status_snapshot_type_compat\.sql/);
   assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
 }
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
@@ -159,6 +164,10 @@ assert.match(customerE2eCleanupMigration, /missing_dependencies/);
 assert.match(projectionBackfillGuardMigration, /pg_get_functiondef/);
 assert.match(projectionBackfillGuardMigration, /daynight\.order_merchant_reconciliation/);
 assert.match(projectionBackfillGuardMigration, /delivered_projection_backfill_guard_contract_not_found/);
+assert.match(orderStatusCompatMigration, /v_order\.status::text is distinct from v_snapshot\.status::text/);
+assert.match(orderStatusCompatMigration, /o\.status::text is distinct from s\.status::text/);
+assert.match(orderStatusCompatMigration, /order_backfill_status_guard_contract_not_found/);
+assert.match(orderStatusCompatMigration, /finance_backfill_status_guard_contract_not_found/);
 for (const table of [
   "financial_account_entries",
   "cod_collections",
