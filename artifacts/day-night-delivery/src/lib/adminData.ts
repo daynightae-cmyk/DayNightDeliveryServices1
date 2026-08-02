@@ -522,6 +522,7 @@ async function fetchTableRows(table: string, filters?: AdminDateFilters, dateCol
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await applyAdminFilters(supabase.from(table).select("*"), filters, dateColumn)
       .order(dateColumn, { ascending: false })
+      .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) {
       if (isMissingSchemaError(error)) return [] as FinanceRow[];

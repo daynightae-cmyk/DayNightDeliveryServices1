@@ -32,5 +32,8 @@ export function matchesSearchQuery(values: readonly unknown[], query: unknown): 
   const tokens = searchTokens(query);
   if (!tokens.length) return true;
   const haystack = normalizeSearchText(values.filter((value) => value != null).join(" "));
-  return tokens.every((token) => haystack.includes(token));
+  const compactHaystack = haystack.replaceAll(" ", "");
+  return tokens.every((token) =>
+    haystack.includes(token) || compactHaystack.includes(token.replaceAll(" ", "")),
+  );
 }

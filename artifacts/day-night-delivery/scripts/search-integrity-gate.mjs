@@ -22,6 +22,8 @@ const adminData = read("src/lib/adminData.ts");
 for (const token of ["٠-٩۰-۹", "normalize(\"NFKC\")", "searchTokens", "tokens.every", "\\p{L}", "\\p{N}"]) {
   assert.ok(normalization.includes(token), `search normalization contains ${token}`);
 }
+assert.match(normalization, /compactHaystack/);
+assert.match(normalization, /replaceAll\(" ", ""\)/);
 
 assert.match(adminWorkspace, /matchesSearchQuery\(orderSearchValues\(order\), bulkQuery\)/);
 assert.match(adminBulk, /data-admin-order-search="true"/);
@@ -48,6 +50,8 @@ assert.doesNotMatch(adminData, /ordersResult\.status === "fulfilled" \? ordersRe
 assert.match(merchantOrders, /matchesSearchQuery/);
 assert.match(merchantPortal, /const invoiceResults=/);
 assert.match(merchantPortal, /const settlementResults=/);
+assert.match(merchantPortal, /const resultGroups=/);
+assert.match(merchantPortal, /resultGroups\.some/);
 assert.match(merchantPortal, /fetchAllMerchantPortalOrders/);
 
 const ownershipMatcher = merchantStatements.match(/function merchantOrderMatches[\s\S]*?\n}/)?.[0] || "";
@@ -58,5 +62,6 @@ assert.match(liveMap, /const visibleOrders = filteredOrders;/);
 assert.doesNotMatch(liveMap, /filteredOrders\.length \? filteredOrders : sortedOrders/);
 assert.doesNotMatch(liveMap, /visibleOrders\.slice\(0,\s*120\)/);
 assert.doesNotMatch(international, /searchText\(order, shipment\)\.includes/);
+assert.match(adminData, /\.order\("id", \{ ascending: true \}\)/);
 
 console.log("PASS system-wide admin and merchant search integrity gate");

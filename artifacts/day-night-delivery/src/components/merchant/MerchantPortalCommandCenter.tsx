@@ -571,7 +571,15 @@ export default function MerchantPortalCommandCenter() {
       const settlementResults=settlements
         .filter((settlement)=>matchesSearchQuery([settlement.id,settlement.periodStart,settlement.periodEnd,settlement.paymentReference,settlement.status,settlement.netPayable],query))
         .map((settlement)=>({id:settlement.id,type:"settlement" as const,title:settlement.paymentReference||settlement.id,subtitle:`${settlement.periodStart||""} · ${settlement.status}`,section:"settlements"}));
-      return{query,results:[...orderResults,...invoiceResults,...settlementResults].slice(0,30)};
+      const resultGroups=[orderResults,invoiceResults,settlementResults];
+      const results:Array<{id:string;type:"order"|"invoice"|"settlement";title:string;subtitle:string;section:string}>=[];
+      for(let index=0;results.length<30&&resultGroups.some((group)=>index<group.length);index+=1){
+        for(const group of resultGroups){
+          if(index<group.length)results.push(group[index]);
+          if(results.length===30)break;
+        }
+      }
+      return{query,results};
     },
     onToggleLanguage:toggleLanguage,onToggleTheme:toggleTheme,onLogout:async()=>{await supabase?.auth.signOut();setUser(null)}
   }),[user,merchant,orders,rawOrders,invoices,statements,isArabic,loadData,toggleLanguage,toggleTheme]);
