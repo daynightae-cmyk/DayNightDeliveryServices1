@@ -62,6 +62,9 @@ expect(personal, /data-admin-next-order-focus="true"/, "personal coupon uses glo
 expect(personal, /data-admin-personal-order-save="true"/, "personal save action is browser-testable");
 expect(personal, /value: "Al Ain"[\s\S]*areas: AL_AIN_AREAS/, "Al Ain is a standalone top-level location");
 expect(personal, /Al Jimi[\s\S]*Al Hili[\s\S]*Al Yahar[\s\S]*Al Wagan/, "Al Ain operational area list is populated");
+const orderFinancials = read("src/lib/orderFinancials.ts");
+expect(orderFinancials, /source_channel.*admin_personal_order/s, "personal financial display detects true personal orders");
+expect(orderFinancials, /merchantDue: 0/, "personal financial display never creates merchant due");
 const operations = read("src/lib/personalOrderOperations.ts");
 expect(operations, /PERSONAL_ORDER_DELIVERY_FEE = 25/, "personal order runtime fixes fee at 25");
 expect(operations, /merchant_id: null/, "personal order has no merchant linkage");

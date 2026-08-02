@@ -234,14 +234,13 @@ try {
   await search.fill(coupon);
   const list = page.locator('.dn-admin-bulk-selector-list');
   await list.waitFor({ state: 'visible', timeout: 90000 });
-  let listText = '';
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    listText = await list.innerText().catch(() => '');
-    if (listText.includes(coupon)) break;
-    await page.waitForTimeout(500);
-  }
-  assert(listText.includes(coupon), 'saved_personal_order_not_visible_in_all_orders');
-  assert(listText.includes(senderName), 'saved_personal_order_sender_not_visible_in_all_orders');
+  const orderRow = page.locator('tr').filter({ hasText: coupon }).first();
+  await orderRow.waitFor({ state: 'visible', timeout: 90000 });
+  const rowText = await orderRow.innerText();
+  assert(rowText.includes(coupon), 'saved_personal_order_not_visible_in_all_orders');
+  assert(rowText.includes(senderName), 'saved_personal_order_sender_not_visible_in_all_orders');
+  assert(/مستحق التاجر\s*0\.00|Merchant due\s*0\.00/i.test(rowText), 'personal_order_ui_merchant_due_is_not_zero');
+  assert(!/مستحق التاجر\s*125\.00|Merchant due\s*125\.00/i.test(rowText), 'personal_order_goods_leaked_into_merchant_due');
   await page.screenshot({ path: path.join(evidenceDir, 'personal-order-visible-in-all-orders.png'), fullPage: true });
 
   fs.writeFileSync(
