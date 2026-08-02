@@ -30,55 +30,29 @@ function normalizedPayment(value) {
   const normalized = text(value, 'cod').toLowerCase().replace(/[\s-]+/g, '_');
   if (normalized === 'merchant_pays') return 'sender_pays';
   if (normalized === 'cash') return 'cod';
-  if (['card', 'bank_transfer'].includes(normalized)) return 'prepaid';
+  if (['card', 'bank_transfer', 'wallet'].includes(normalized)) return 'prepaid';
   return ['cod', 'receiver_pays', 'sender_pays', 'prepaid'].includes(normalized)
     ? normalized
     : 'cod';
 }
 
-const supabase = createClient(supabaseUrl, anonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-});
+function errorDetail(error) {
+  return [error?.code, error?.message, error?.details, error?.hint]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' | ');
+}
 
-const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-  email: adminEmail,
-  password: adminPassword,
-});
-if (authError) throw new Error(`production_save_probe_admin_login_failed: ${authError.message}`);
-assert(authData?.user?.id && authData?.session?.access_token, 'production_save_probe_admin_session_missing');
-
-try {
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', authData.user.id)
-    .single();
-  if (profileError) throw new Error(`production_save_probe_profile_failed: ${profileError.message}`);
-  assert(['admin', 'support'].includes(text(profile?.role).toLowerCase()), 'production_save_probe_user_not_admin');
-
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('coupon_number', reviewedCoupon)
-    .limit(1)
-    .single();
-  if (orderError) throw new Error(`production_save_probe_order_lookup_failed: ${orderError.message}`);
-  assert(order?.id, 'production_save_probe_order_missing');
-  assert(order?.merchant_id, 'production_save_probe_requires_merchant_order');
-
-  const beforeUpdatedAt = order.updated_at ?? null;
-  const beforeFinancialVersion = order.financial_version ?? null;
-  const beforeMerchantId = String(order.merchant_id);
-
+function basePayload(order) {
   const deliveryFee = numberValue(
     order.delivery_fee ?? order.delivery_price ?? order.base_price ?? order.manual_delivery_price,
     0,
   );
-  const payload = {
+  const priceSource = text(order.price_source, 'system').toLowerCase() === 'manual'
+    ? 'manual'
+    : 'system';
+
+  return {
     order_id: order.id,
     patch: {
       merchant_id: order.merchant_id,
@@ -104,9 +78,9 @@ try {
       currency: text(order.currency, 'AED'),
       notes: order.notes,
       payment_method: normalizedPayment(order.payment_method),
-      price_source: text(order.price_source, 'system').toLowerCase() === 'manual' ? 'manual' : 'system',
+      price_source: priceSource,
       manual_delivery_price:
-        text(order.price_source, 'system').toLowerCase() === 'manual'
+        priceSource === 'manual'
           ? numberValue(order.manual_delivery_price ?? deliveryFee, deliveryFee)
           : null,
     },
@@ -116,75 +90,225 @@ try {
       discount_amount: numberValue(order.discount_amount, 0),
       delivery_fee_mode: text(order.delivery_fee_mode, 'customer_pays'),
     },
-    reason: 'Automated production rollback verification for complete admin order save',
+    reason: 'Automated production rollback verification for a real edited value',
   };
+}
 
-  let probeData = null;
-  let lastProbeError = null;
-  for (let attempt = 1; attempt <= 60; attempt += 1) {
-    const { data, error } = await supabase.rpc('admin_probe_order_complete_save', {
-      p_payload: payload,
-    });
-    if (!error) {
-      probeData = data;
-      lastProbeError = null;
-      break;
-    }
-    lastProbeError = error;
-    const detail = [error.code, error.message, error.details, error.hint]
-      .filter(Boolean)
-      .join(' | ');
-    if (!/PGRST202|schema cache|Could not find the function|does not exist/i.test(detail)) {
-      throw new Error(`production_save_probe_rpc_failed: ${detail}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
-  if (lastProbeError || !probeData) {
-    throw new Error(
-      `production_save_probe_rpc_unavailable: ${[
-        lastProbeError?.code,
-        lastProbeError?.message,
-        lastProbeError?.details,
-        lastProbeError?.hint,
-      ]
-        .filter(Boolean)
-        .join(' | ')}`,
-    );
-  }
+const supabase = createClient(supabaseUrl, anonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+  },
+});
 
-  assert(probeData.ok === true, 'production_save_probe_not_ok');
-  assert(probeData.real_save_rpc_executed === true, 'production_save_probe_real_rpc_not_executed');
-  assert(probeData.rollback_verified === true, 'production_save_probe_rollback_not_verified');
-  assert(probeData.order_unchanged === true, 'production_save_probe_order_changed');
-  assert(probeData.audit_unchanged === true, 'production_save_probe_audit_changed');
+const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  email: adminEmail,
+  password: adminPassword,
+});
+if (authError) throw new Error(`production_save_probe_admin_login_failed: ${authError.message}`);
+assert(authData?.user?.id && authData?.session?.access_token, 'production_save_probe_admin_session_missing');
 
-  const { data: after, error: afterError } = await supabase
-    .from('orders')
-    .select('id,merchant_id,updated_at,financial_version')
-    .eq('id', order.id)
+try {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
     .single();
-  if (afterError) throw new Error(`production_save_probe_readback_failed: ${afterError.message}`);
-
-  assert(String(after.merchant_id) === beforeMerchantId, 'production_save_probe_merchant_persisted_change');
-  assert((after.updated_at ?? null) === beforeUpdatedAt, 'production_save_probe_updated_at_persisted_change');
+  if (profileError) throw new Error(`production_save_probe_profile_failed: ${profileError.message}`);
   assert(
-    (after.financial_version ?? null) === beforeFinancialVersion,
-    'production_save_probe_financial_version_persisted_change',
+    ['admin', 'support', 'owner', 'super_admin'].includes(text(profile?.role).toLowerCase()),
+    'production_save_probe_user_not_admin',
   );
+
+  const { data: reviewedOrder, error: reviewedError } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('coupon_number', reviewedCoupon)
+    .limit(1)
+    .single();
+  if (reviewedError) {
+    throw new Error(`production_save_probe_order_lookup_failed: ${errorDetail(reviewedError)}`);
+  }
+  assert(reviewedOrder?.id, 'production_save_probe_order_missing');
+  assert(reviewedOrder?.merchant_id, 'production_save_probe_requires_merchant_order');
+
+  const { data: orderCandidates, error: candidatesError } = await supabase
+    .from('orders')
+    .select('*')
+    .not('merchant_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(250);
+  if (candidatesError) {
+    throw new Error(`production_save_probe_candidates_failed: ${errorDetail(candidatesError)}`);
+  }
+
+  const nonPostedOrder = (orderCandidates || []).find((row) => {
+    const status = text(row.status).toLowerCase().replace(/[\s-]+/g, '_');
+    return (
+      row.id &&
+      row.merchant_id &&
+      !row.financial_posted_at &&
+      !['delivered', 'completed', 'complete'].includes(status) &&
+      text(row.sender_name) &&
+      text(row.sender_phone) &&
+      text(row.receiver_name ?? row.customer_name) &&
+      text(row.receiver_phone ?? row.customer_phone) &&
+      text(row.package_type ?? row.package_description)
+    );
+  }) || reviewedOrder;
+
+  const { data: links, error: linksError } = await supabase
+    .from('merchant_user_links')
+    .select('merchant_id,is_active')
+    .eq('is_active', true)
+    .limit(500);
+  if (linksError) {
+    throw new Error(`production_save_probe_merchant_links_failed: ${errorDetail(linksError)}`);
+  }
+  const linkedIds = Array.from(
+    new Set((links || []).map((row) => text(row.merchant_id)).filter(Boolean)),
+  );
+  const { data: merchants, error: merchantsError } = await supabase
+    .from('merchants')
+    .select('id,trade_name,merchant_code,phone,emirate,pickup_address,address,status')
+    .in('id', linkedIds.length ? linkedIds : ['00000000-0000-0000-0000-000000000000'])
+    .limit(500);
+  if (merchantsError) {
+    throw new Error(`production_save_probe_merchants_failed: ${errorDetail(merchantsError)}`);
+  }
+  const alternateMerchant = (merchants || []).find(
+    (merchant) =>
+      merchant.id !== reviewedOrder.merchant_id &&
+      !['deleted', 'archived', 'blocked', 'suspended'].includes(text(merchant.status, 'active').toLowerCase()),
+  );
+  assert(alternateMerchant?.id, 'production_save_probe_no_alternate_linked_merchant');
+
+  const cases = [];
+
+  cases.push({
+    name: 'baseline_same_values',
+    order: reviewedOrder,
+    payload: basePayload(reviewedOrder),
+  });
+
+  {
+    const payload = clone(basePayload(nonPostedOrder));
+    payload.patch.receiver_address = `${text(payload.patch.receiver_address, 'Address')} [ROLLBACK-PROBE]`;
+    payload.reason = 'Rollback probe: edit customer address';
+    cases.push({ name: 'real_core_customer_edit', order: nonPostedOrder, payload });
+  }
+
+  {
+    const payload = clone(basePayload(nonPostedOrder));
+    payload.financials.goods_value = numberValue(payload.financials.goods_value, 0) + 1;
+    if (payload.patch.price_source === 'manual') {
+      payload.patch.manual_delivery_price = numberValue(payload.patch.manual_delivery_price, 0) + 1;
+      payload.financials.delivery_fee = payload.patch.manual_delivery_price;
+    } else {
+      payload.financials.delivery_fee = numberValue(payload.financials.delivery_fee, 0) + 1;
+    }
+    payload.reason = 'Rollback probe: edit goods and delivery values';
+    cases.push({ name: 'real_financial_edit', order: nonPostedOrder, payload });
+  }
+
+  {
+    const payload = clone(basePayload(nonPostedOrder));
+    const current = normalizedPayment(payload.patch.payment_method);
+    payload.patch.payment_method = current === 'prepaid' ? 'cod' : 'prepaid';
+    payload.financials.delivery_fee_mode = 'customer_pays';
+    payload.reason = 'Rollback probe: edit payment method';
+    cases.push({ name: 'real_payment_edit', order: nonPostedOrder, payload });
+  }
+
+  {
+    const payload = clone(basePayload(reviewedOrder));
+    payload.patch.merchant_id = alternateMerchant.id;
+    payload.patch.merchant_name = alternateMerchant.trade_name;
+    payload.patch.merchant_code = alternateMerchant.merchant_code;
+    payload.patch.sender_name = alternateMerchant.trade_name;
+    payload.patch.sender_phone = alternateMerchant.phone;
+    payload.patch.sender_city = alternateMerchant.emirate;
+    payload.patch.sender_address = alternateMerchant.pickup_address || alternateMerchant.address;
+    payload.reason = 'Rollback probe: change canonical merchant ownership';
+    cases.push({ name: 'real_canonical_merchant_edit', order: reviewedOrder, payload });
+  }
+
+  const results = [];
+  for (const testCase of cases) {
+    const before = {
+      merchant_id: testCase.order.merchant_id ?? null,
+      updated_at: testCase.order.updated_at ?? null,
+      financial_version: testCase.order.financial_version ?? null,
+    };
+
+    const { data, error } = await supabase.rpc('admin_probe_order_complete_save', {
+      p_payload: testCase.payload,
+    });
+
+    if (error) {
+      const failure = {
+        result: 'FAIL',
+        case: testCase.name,
+        coupon: testCase.order.coupon_number,
+        orderId: testCase.order.id,
+        status: testCase.order.status,
+        financialPostedAt: testCase.order.financial_posted_at,
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        },
+      };
+      console.error(JSON.stringify(failure, null, 2));
+      throw new Error(`production_real_edit_save_probe_failed: ${testCase.name}: ${errorDetail(error)}`);
+    }
+
+    assert(data?.ok === true, `${testCase.name}: probe_not_ok`);
+    assert(data?.real_save_rpc_executed === true, `${testCase.name}: real_rpc_not_executed`);
+    assert(data?.rollback_verified === true, `${testCase.name}: rollback_not_verified`);
+    assert(data?.order_unchanged === true, `${testCase.name}: order_changed`);
+    assert(data?.audit_unchanged === true, `${testCase.name}: audit_changed`);
+
+    const { data: after, error: afterError } = await supabase
+      .from('orders')
+      .select('id,merchant_id,updated_at,financial_version')
+      .eq('id', testCase.order.id)
+      .single();
+    if (afterError) {
+      throw new Error(`${testCase.name}: readback_failed: ${errorDetail(afterError)}`);
+    }
+    assert((after.merchant_id ?? null) === before.merchant_id, `${testCase.name}: merchant_persisted_change`);
+    assert((after.updated_at ?? null) === before.updated_at, `${testCase.name}: updated_at_persisted_change`);
+    assert(
+      (after.financial_version ?? null) === before.financial_version,
+      `${testCase.name}: financial_version_persisted_change`,
+    );
+
+    results.push({
+      case: testCase.name,
+      orderId: testCase.order.id,
+      coupon: testCase.order.coupon_number,
+      status: testCase.order.status,
+      realSaveRpcExecuted: true,
+      rollbackVerified: true,
+    });
+  }
 
   console.log(
     JSON.stringify(
       {
         result: 'PASS',
-        coupon: reviewedCoupon,
-        orderId: order.id,
-        merchantId: beforeMerchantId,
-        realSaveRpcExecuted: true,
-        rollbackVerified: true,
-        orderUnchanged: true,
-        auditUnchanged: true,
         userRole: profile.role,
+        reviewedOrderId: reviewedOrder.id,
+        nonPostedOrderId: nonPostedOrder.id,
+        alternateMerchantId: alternateMerchant.id,
+        cases: results,
       },
       null,
       2,
