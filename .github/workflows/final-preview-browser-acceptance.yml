@@ -1,0 +1,238 @@
+name: Final Preview Browser Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/final-preview-browser-acceptance.yml"
+      - "artifacts/day-night-delivery/**"
+      - "android-role-shell/**"
+      - "supabase/migrations/**"
+      - "supabase/production-reconciliation/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-preview-browser-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-preview:
+    name: Admin and ILYTK browser acceptance
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-runtime-tests
+    env:
+      PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+      RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+      RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify protected browser credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Wait for the exact branch preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            status="$(curl -L -sS -o /tmp/daynight-preview.html -w '%{http_code}' "$PREVIEW_URL/?nosplash=1&__dn_acceptance=bdf406f" || true)"
+            if [ "$status" = "200" ] && grep -F 'id="root"' /tmp/daynight-preview.html >/dev/null; then
+              echo "Preview is serving the DAY NIGHT application."
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "Preview did not become publicly readable." >&2
+          exit 1
+
+      - name: Install Chromium acceptance runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Test admin, ILYTK portal, and search on desktop and phone
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p preview-browser-evidence
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { chromium, devices } = require('playwright');
+
+          const base = String(process.env.PREVIEW_URL || '').replace(/\/$/, '');
+          const adminEmail = process.env.RUNTIME_ADMIN_EMAIL;
+          const adminPassword = process.env.RUNTIME_ADMIN_PASSWORD;
+          const merchantEmail = process.env.RUNTIME_MERCHANT_EMAIL;
+          const merchantPassword = process.env.RUNTIME_MERCHANT_PASSWORD;
+          const expectedMerchant = /استبي ما عرفنالك|DN-MER-SHOP-ILYTK|ILYTK/i;
+          const expectedOtherMerchant = /DN-MER-SHOP-G3BXG|G3BXG/i;
+          const reviewedCoupons = ['003860', '010503', '010505'];
+          const excludedCoupon = '010504';
+
+          function assert(condition, message) {
+            if (!condition) throw new Error(message);
+          }
+
+          async function bodyText(page) {
+            return await page.locator('body').innerText();
+          }
+
+          async function clickFirstVisible(locator, description) {
+            const count = await locator.count();
+            for (let index = 0; index < count; index += 1) {
+              const item = locator.nth(index);
+              if (await item.isVisible().catch(() => false)) {
+                await item.click();
+                return;
+              }
+            }
+            if (count > 0) {
+              await locator.first().click({ force: true });
+              return;
+            }
+            throw new Error(`Missing control: ${description}`);
+          }
+
+          async function loginAdmin(page) {
+            await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=admin`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            await page.locator('.auth-clean__intro-cta').click();
+            await page.locator('#dn-admin-email').fill(adminEmail);
+            await page.locator('#dn-admin-password').fill(adminPassword);
+            await Promise.all([
+              page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 }),
+              page.locator('button[type="submit"]').click(),
+            ]);
+            await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
+            const text = await bodyText(page);
+            assert(/لوحة التحكم|Dashboard|كافة الطلبات|All Orders/.test(text), 'Admin portal did not render after protected login.');
+          }
+
+          async function testAdmin(page, label) {
+            await loginAdmin(page);
+            await clickFirstVisible(
+              page.getByText(/كافة الطلبات|All Orders/, { exact: true }),
+              'All Orders navigation',
+            );
+            const search = page.locator('[data-admin-order-search="true"]');
+            await search.waitFor({ state: 'visible', timeout: 90000 });
+
+            await search.fill('003860');
+            await page.waitForTimeout(900);
+            let text = await bodyText(page);
+            assert(text.includes('003860'), `${label}: admin search did not return coupon 003860.`);
+            assert(expectedMerchant.test(text), `${label}: coupon 003860 is not displayed with ILYTK in admin.`);
+
+            await search.fill(excludedCoupon);
+            await page.waitForTimeout(900);
+            const selectorText = await page.locator('.dn-admin-bulk-selector-list').innerText();
+            assert(selectorText.includes(excludedCoupon), `${label}: admin search did not return excluded coupon 010504.`);
+            assert(expectedOtherMerchant.test(selectorText), `${label}: coupon 010504 is not displayed with G3BXG.`);
+            assert(!expectedMerchant.test(selectorText), `${label}: coupon 010504 leaked into ILYTK ownership in admin.`);
+
+            await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
+          }
+
+          async function loginMerchant(page) {
+            await page.goto(`${base}/merchant?nosplash=1&lang=ar&__dn_acceptance=merchant`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+            const email = page.locator('input[type="email"]').first();
+            const password = page.locator('input[type="password"]').first();
+            await email.waitFor({ state: 'visible', timeout: 90000 });
+            await email.fill(merchantEmail);
+            await password.fill(merchantPassword);
+            await page.locator('form button[type="submit"]').first().click();
+            await page.locator('[data-merchant-authenticated="true"]').waitFor({ state: 'visible', timeout: 90000 });
+            await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
+            const text = await bodyText(page);
+            assert(expectedMerchant.test(text), 'Authenticated merchant portal is not the canonical ILYTK merchant.');
+          }
+
+          async function merchantSearch(page, query) {
+            await page.getByRole('button', { name: /البحث|Search/ }).first().click();
+            const dialog = page.getByRole('dialog', { name: /البحث الشامل|Global search/ });
+            await dialog.waitFor({ state: 'visible', timeout: 30000 });
+            const input = dialog.locator('input').first();
+            await input.fill(query);
+            await page.waitForTimeout(900);
+            const text = await dialog.innerText();
+            await page.keyboard.press('Escape');
+            return text;
+          }
+
+          async function testMerchant(page, label) {
+            await loginMerchant(page);
+            for (const coupon of reviewedCoupons) {
+              const text = await merchantSearch(page, coupon);
+              assert(text.includes(coupon), `${label}: ILYTK search did not return reviewed coupon ${coupon}.`);
+              assert(!/لا توجد نتائج مطابقة|No matching results/.test(text), `${label}: ILYTK search returned an empty result for ${coupon}.`);
+            }
+            const excludedText = await merchantSearch(page, excludedCoupon);
+            assert(!excludedText.includes(excludedCoupon), `${label}: excluded coupon 010504 appeared in ILYTK portal search.`);
+            assert(/لا توجد نتائج مطابقة|No matching results/.test(excludedText), `${label}: excluded coupon 010504 did not resolve to an explicit empty result.`);
+            await page.screenshot({ path: `preview-browser-evidence/${label}-merchant.png`, fullPage: true });
+          }
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const scenarios = [
+              { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
+              { label: 'phone', context: { ...devices['Pixel 7'], locale: 'ar-AE' } },
+            ];
+            const report = [];
+            try {
+              for (const scenario of scenarios) {
+                const adminContext = await browser.newContext(scenario.context);
+                const adminPage = await adminContext.newPage();
+                await testAdmin(adminPage, scenario.label);
+                await adminContext.close();
+
+                const merchantContext = await browser.newContext(scenario.context);
+                const merchantPage = await merchantContext.newPage();
+                await testMerchant(merchantPage, scenario.label);
+                await merchantContext.close();
+                report.push({ scenario: scenario.label, admin: 'PASS', merchant: 'PASS', search: 'PASS', crossOwner: 'PASS' });
+              }
+            } finally {
+              await browser.close();
+            }
+            fs.writeFileSync('preview-browser-evidence/report.json', JSON.stringify({
+              head: process.env.GITHUB_SHA,
+              preview: base,
+              reviewedCoupons,
+              excludedCoupon,
+              result: 'PASS',
+              scenarios: report,
+            }, null, 2));
+            console.log(JSON.stringify(report, null, 2));
+          })().catch((error) => {
+            console.error(error?.stack || error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Upload preview browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Final-Preview-Browser-Evidence
+          path: preview-browser-evidence/
+          if-no-files-found: warn
+          retention-days: 30
