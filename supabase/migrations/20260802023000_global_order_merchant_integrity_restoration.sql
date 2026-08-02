@@ -655,10 +655,18 @@ as $$
     ),
     'missing_driver_statements', (
       select count(*) from delivered o
-      where public.dn_safe_uuid(coalesce(
-        nullif(to_jsonb(o)->>'assigned_driver_id', ''),
-        nullif(to_jsonb(o)->>'driver_id', '')
-      )) is not null
+      where exists (
+        select 1
+        from public.driver_profiles dp
+        where dp.id = public.dn_safe_uuid(coalesce(
+                nullif(to_jsonb(o)->>'assigned_driver_id', ''),
+                nullif(to_jsonb(o)->>'driver_id', '')
+              ))
+           or dp.user_id = public.dn_safe_uuid(coalesce(
+                nullif(to_jsonb(o)->>'assigned_driver_id', ''),
+                nullif(to_jsonb(o)->>'driver_id', '')
+              ))
+      )
         and not exists (select 1 from public.driver_statement_entries d where d.order_id = o.id)
     )
   );
@@ -2370,7 +2378,7 @@ begin
       driver_id, order_id, tracking_number, entry_date, entry_type,
       debit, credit, balance, status, notes, created_by, created_at, updated_at
     )
-    select public.dn_safe_uuid(coalesce(nullif(to_jsonb(o)->>'assigned_driver_id', ''), nullif(to_jsonb(o)->>'driver_id', ''))),
+    select resolved_driver.id,
       o.id,
       coalesce(nullif(o.tracking_number, ''), nullif(o.invoice_number, ''), nullif(o.coupon_number, ''), o.id::text),
       coalesce(nullif(to_jsonb(o)->>'delivered_at', '')::timestamptz, o.updated_at, o.created_at, v_now)::date,
@@ -2379,9 +2387,23 @@ begin
       greatest(public.dn_safe_numeric(to_jsonb(o)->>'driver_earning', 0), 0),
       'posted', 'Authoritative driver statement restored from reviewed order snapshot',
       auth.uid(), v_now, v_now
-    from dn_finance_eligible_orders e join public.orders o on o.id = e.order_id
-    where public.dn_safe_uuid(coalesce(nullif(to_jsonb(o)->>'assigned_driver_id', ''), nullif(to_jsonb(o)->>'driver_id', ''))) is not null
-      and not exists (select 1 from public.driver_statement_entries d where d.order_id = o.id)
+    from dn_finance_eligible_orders e
+    join public.orders o on o.id = e.order_id
+    cross join lateral (
+      select public.dn_safe_uuid(coalesce(
+        nullif(to_jsonb(o)->>'assigned_driver_id', ''),
+        nullif(to_jsonb(o)->>'driver_id', '')
+      )) as raw_driver_id
+    ) raw_driver
+    join lateral (
+      select dp.id
+      from public.driver_profiles dp
+      where dp.id = raw_driver.raw_driver_id
+         or dp.user_id = raw_driver.raw_driver_id
+      order by case when dp.id = raw_driver.raw_driver_id then 0 else 1 end
+      limit 1
+    ) resolved_driver on true
+    where not exists (select 1 from public.driver_statement_entries d where d.order_id = o.id)
     returning id, order_id
   )
   insert into public.order_merchant_financial_repair_audit (
@@ -2424,6 +2446,105 @@ begin
 end;
 $$;
 
+-- The latest legacy financial trigger posts the settlement and account ledger but
+-- no longer creates the COD, merchant-statement, and driver-statement projections.
+-- Keep those dependent views complete for every future delivered order without
+-- changing any value on orders or updating an existing dependent row.
+create or replace function public.dn_project_delivered_order_dependencies()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_status text := lower(replace(replace(coalesce(new.status::text, ''), '-', '_'), ' ', '_'));
+  v_reference text := coalesce(
+    nullif(new.tracking_number, ''), nullif(new.invoice_number, ''),
+    nullif(new.coupon_number, ''), new.id::text
+  );
+  v_posted_at timestamptz := coalesce(
+    new.financial_posted_at,
+    nullif(to_jsonb(new)->>'delivered_at', '')::timestamptz,
+    new.updated_at,
+    new.created_at,
+    now()
+  );
+  v_raw_driver_id uuid;
+  v_driver_id uuid;
+begin
+  if v_status not in ('delivered','completed','complete') then
+    return new;
+  end if;
+
+  v_raw_driver_id := public.dn_safe_uuid(coalesce(
+    nullif(to_jsonb(new)->>'assigned_driver_id', ''),
+    nullif(to_jsonb(new)->>'driver_id', '')
+  ));
+  if v_raw_driver_id is not null then
+    select dp.id into v_driver_id
+    from public.driver_profiles dp
+    where dp.id = v_raw_driver_id or dp.user_id = v_raw_driver_id
+    order by case when dp.id = v_raw_driver_id then 0 else 1 end
+    limit 1;
+  end if;
+
+  if lower(coalesce(new.payment_method::text, '')) = 'cod'
+     and coalesce(new.customer_total, 0) > 0
+     and not exists (select 1 from public.cod_collections c where c.order_id = new.id) then
+    insert into public.cod_collections (
+      order_id, tracking_number, merchant_id, driver_id, cod_amount,
+      collected_amount, reconciled_amount, collection_date, status,
+      payment_method, notes, created_by, created_at, updated_at
+    ) values (
+      new.id, v_reference, new.merchant_id, v_driver_id,
+      greatest(coalesce(new.customer_total, 0), 0),
+      greatest(coalesce(nullif(new.collected_amount, 0), new.customer_total, 0), 0),
+      0, v_posted_at::date, 'collected', 'cod',
+      'Authoritative COD projected from delivered order snapshot',
+      auth.uid(), now(), now()
+    ) on conflict do nothing;
+  end if;
+
+  if new.merchant_id is not null
+     and not exists (select 1 from public.merchant_statement_entries m where m.order_id = new.id) then
+    insert into public.merchant_statement_entries (
+      merchant_id, order_id, tracking_number, entry_date, entry_type,
+      debit, credit, balance, status, notes, created_by, created_at, updated_at
+    ) values (
+      new.merchant_id, new.id, v_reference, v_posted_at::date, 'order_cod',
+      case when coalesce(new.merchant_due, 0) < 0 then abs(new.merchant_due) else 0 end,
+      case when coalesce(new.merchant_due, 0) >= 0 then new.merchant_due else 0 end,
+      coalesce(new.merchant_due, 0), 'posted',
+      'Authoritative merchant statement projected from delivered order snapshot',
+      auth.uid(), now(), now()
+    ) on conflict do nothing;
+  end if;
+
+  if v_driver_id is not null
+     and not exists (select 1 from public.driver_statement_entries d where d.order_id = new.id) then
+    insert into public.driver_statement_entries (
+      driver_id, order_id, tracking_number, entry_date, entry_type,
+      debit, credit, balance, status, notes, created_by, created_at, updated_at
+    ) values (
+      v_driver_id, new.id, v_reference, v_posted_at::date, 'delivery_earning', 0,
+      greatest(public.dn_safe_numeric(to_jsonb(new)->>'driver_earning', 0), 0),
+      greatest(public.dn_safe_numeric(to_jsonb(new)->>'driver_earning', 0), 0),
+      'posted', 'Authoritative driver statement projected from delivered order snapshot',
+      auth.uid(), now(), now()
+    ) on conflict do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_dn_project_delivered_order_dependencies on public.orders;
+create trigger trg_dn_project_delivered_order_dependencies
+after insert or update of status, financial_posted_at, merchant_id, payment_method,
+  customer_total, collected_amount, assigned_driver_id, driver_id
+on public.orders
+for each row execute function public.dn_project_delivered_order_dependencies();
+
 create or replace function public.admin_order_merchant_integrity_health()
 returns jsonb
 language plpgsql
@@ -2447,6 +2568,12 @@ begin
         where tgrelid = 'public.orders'::regclass
           and tgname = 'trg_orders_canonical_merchant_link'
           and not tgisinternal and tgenabled <> 'D'
+      )
+      and exists (
+        select 1 from pg_trigger
+        where tgrelid = 'public.orders'::regclass
+          and tgname = 'trg_dn_project_delivered_order_dependencies'
+          and not tgisinternal and tgenabled <> 'D'
       ),
     'canonical_create_ready', to_regprocedure('public.admin_create_canonical_merchant_order(jsonb)') is not null,
     'portal_pagination_ready', to_regprocedure('public.merchant_portal_orders_page(integer,integer)') is not null,
@@ -2454,6 +2581,12 @@ begin
     'merchant_link_repair_ready', to_regprocedure('public.admin_apply_safe_merchant_portal_links(uuid,boolean)') is not null,
     'transactional_backfill_ready', to_regprocedure('public.admin_apply_order_merchant_safe_backfill(uuid,boolean)') is not null,
     'safe_financial_dependency_repair_ready', to_regprocedure('public.admin_apply_safe_missing_financial_dependencies(uuid,boolean)') is not null,
+    'future_financial_projection_ready', exists (
+      select 1 from pg_trigger
+      where tgrelid = 'public.orders'::regclass
+        and tgname = 'trg_dn_project_delivered_order_dependencies'
+        and not tgisinternal and tgenabled <> 'D'
+    ),
     'financial_snapshot', public.dn_financial_integrity_snapshot(),
     'checked_at', now()
   );
@@ -2469,6 +2602,7 @@ revoke all on function public.dn_financial_integrity_snapshot() from public, ano
 revoke all on function public.dn_order_dependency_ownership_snapshot(uuid,uuid,uuid) from public, anon, authenticated;
 revoke all on function public.dn_production_inventory_snapshot() from public, anon, authenticated;
 revoke all on function public.dn_apply_order_dependency_ownership(uuid,uuid,uuid) from public, anon, authenticated;
+revoke all on function public.dn_project_delivered_order_dependencies() from public, anon, authenticated;
 revoke all on function public.admin_resolve_order_merchant(uuid) from public, anon;
 revoke all on function public.admin_create_canonical_merchant_order(jsonb) from public, anon;
 revoke all on function public.merchant_portal_orders_page(integer,integer) from public, anon;

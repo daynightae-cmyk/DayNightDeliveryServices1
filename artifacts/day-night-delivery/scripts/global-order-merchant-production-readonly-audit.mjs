@@ -59,6 +59,7 @@ const [orders, merchants, links, users, profileRows] = await Promise.all([
   allRows("profiles", "id,role", true),
 ]);
 const profiles = profileRows || [];
+const driverProfiles = await allRows("driver_profiles", "id,user_id", true) || [];
 
 const dependencyTables = [
   ["cod_collections", "order_id,merchant_id"],
@@ -253,7 +254,53 @@ const merchantStatementIds = idsFor("merchant_statement_entries");
 const driverStatementIds = idsFor("driver_statement_entries");
 const financeAccountRows = dependencyRows.get("financial_account_entries") || [];
 const financeAccountKey = new Set(financeAccountRows.map((row) => `${clean(row.order_id)}:${clean(row.account_type)}:${clean(row.entry_type)}`));
-const driverId = (order) => clean(order.assigned_driver_id || order.driver_id);
+const driverProfileIdByIdentity = new Map();
+for (const profile of driverProfiles) {
+  const profileId = clean(profile.id);
+  const userId = clean(profile.user_id);
+  if (profileId) driverProfileIdByIdentity.set(profileId, profileId);
+  if (userId) driverProfileIdByIdentity.set(userId, profileId);
+}
+const driverId = (order) => driverProfileIdByIdentity.get(clean(order.assigned_driver_id || order.driver_id)) || "";
+const missingTypesForOrder = (order) => {
+  const orderId = clean(order.id);
+  const missing = [];
+  if (!settlementIds.has(orderId)) missing.push("order_financial_settlements");
+  if (clean(order.merchant_id) && !financeAccountKey.has(`${orderId}:merchant:delivered_order_settlement`)) missing.push("merchant_financial_account_entry");
+  if (!financeAccountKey.has(`${orderId}:company:delivered_order_settlement`)) missing.push("company_financial_account_entry");
+  if (clean(order.payment_method).toLowerCase() === "cod" && num(order.customer_total) > 0 && !codIds.has(orderId)) missing.push("cod_collections");
+  if (clean(order.merchant_id) && !merchantStatementIds.has(orderId)) missing.push("merchant_statement_entries");
+  if (driverId(order) && !driverStatementIds.has(orderId)) missing.push("driver_statement_entries");
+  return missing;
+};
+const financialGapRows = deliveredOrders.flatMap((order) => {
+  const missing_dependencies = missingTypesForOrder(order);
+  if (!missing_dependencies.length) return [];
+  const merchant = merchantById.get(clean(order.merchant_id));
+  return [{
+    order_id: clean(order.id),
+    coupon_number: clean(order.coupon_number) || null,
+    tracking_number: clean(order.tracking_number || order.invoice_number) || null,
+    merchant_id: clean(order.merchant_id) || null,
+    merchant_code: clean(order.merchant_code || merchant?.merchant_code) || null,
+    merchant_name: clean(order.merchant_name || merchant?.trade_name) || null,
+    status: clean(order.status) || null,
+    financial_values: {
+      cod_amount: num(order.cod_amount),
+      goods_value: num(order.goods_value),
+      delivery_fee: num(order.delivery_fee),
+      discount_amount: num(order.discount_amount),
+      customer_total: num(order.customer_total),
+      merchant_due: num(order.merchant_due),
+      company_revenue: num(order.company_revenue),
+      collected_amount: num(order.collected_amount),
+    },
+    created_at: order.created_at || null,
+    missing_dependencies,
+    proposed_action: "INSERT_MISSING_DEPENDENCY_FROM_UNCHANGED_ORDER_SNAPSHOT",
+    order_values_will_change: false,
+  }];
+});
 const financialGaps = {
   delivered_orders: deliveredOrders.length,
   missing_settlements: deliveredOrders.filter((order) => !settlementIds.has(clean(order.id))).length,
@@ -380,6 +427,7 @@ const report = {
     count_matrix: merchantMatrix,
   },
   financial_dependency_gaps: financialGaps,
+  financial_dependency_gap_rows: financialGapRows,
   financial_totals: sums,
   acceptance_merchant_1999: {
     canonical_merchant_match_count: canonicalMerchant1999Rows.length,

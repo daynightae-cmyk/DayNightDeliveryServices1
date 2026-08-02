@@ -58,6 +58,8 @@ for (const token of [
   "admin_apply_safe_merchant_portal_links",
   "admin_apply_order_merchant_safe_backfill",
   "admin_apply_safe_missing_financial_dependencies",
+  "dn_project_delivered_order_dependencies",
+  "trg_dn_project_delivered_order_dependencies",
   "AUTO_REPAIR_SAFE",
   "MANUAL_REVIEW",
   "SECURITY_CONFLICT",
@@ -83,6 +85,10 @@ assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL/);
 assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_PHONE/);
 assert.match(migration, /MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT/);
 assert.match(migration, /order_financial_values_changed_financial_repair_rolled_back/);
+assert.match(migration, /future_financial_projection_ready/);
+assert.match(migration, /Authoritative merchant statement projected from delivered order snapshot/);
+assert.match(productionAudit, /financial_dependency_gap_rows/);
+assert.match(productionAudit, /INSERT_MISSING_DEPENDENCY_FROM_UNCHANGED_ORDER_SNAPSHOT/);
 assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/gim);
 assert.doesNotMatch(migration, /\bon delete cascade\b/i);
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
