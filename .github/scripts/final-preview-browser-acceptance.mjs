@@ -190,6 +190,11 @@ async function createAuthenticatedContext(browser, contextOptions, serializedSes
   return context;
 }
 
+async function revokeLocalSession(label, client) {
+  const { error } = await client.auth.signOut({ scope: 'local' });
+  if (error) throw new Error(`${label}_temporary_session_cleanup_failed_${error.message}`);
+}
+
 async function openAllOrders(page) {
   const shell = page.locator('.dncc-shell');
   await shell.waitFor({ state: 'visible', timeout: 90000 });
@@ -251,7 +256,7 @@ async function verifyCompleteOrderEditor(page, label) {
   assert(!(await confirmEditor.isDisabled()), `${label}: edit impact confirmation is disabled.`);
   assert((await dialog.getByText(/رقم التتبع والفاتورة لا بيتغيروش|Tracking and invoice identifiers are immutable/).count()) > 0, `${label}: immutable identity guidance is missing.`);
 
-  await page.screenshot({ path: `preview-browser-evidence/${label}-admin-complete-order-editor.png`, fullPage: true });
+  await dialog.screenshot({ path: `preview-browser-evidence/${label}-admin-complete-order-editor.png` });
   await clickFirstVisible(dialog.getByRole('button', { name: /إلغاء|Cancel/ }), `${label} complete editor cancel`);
   await dialog.waitFor({ state: 'hidden', timeout: 30000 });
 }
@@ -349,8 +354,6 @@ async function testMerchant(page, label) {
   }
 }
 
-const adminAuth = await createAdminSession();
-const merchantAuth = await createTemporaryIlytkSession();
 const browser = await chromium.launch({ headless: true });
 const scenarios = [
   { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
@@ -361,13 +364,34 @@ let cleanupError = null;
 
 try {
   for (const scenario of scenarios) {
-    const adminContext = await createAuthenticatedContext(browser, scenario.context, adminAuth.serializedSession);
-    await testAdmin(await adminContext.newPage(), scenario.label);
-    await adminContext.close();
+    const adminAuth = await createAdminSession();
+    try {
+      const adminContext = await createAuthenticatedContext(browser, scenario.context, adminAuth.serializedSession);
+      try {
+        await testAdmin(await adminContext.newPage(), scenario.label);
+      } finally {
+        await adminContext.close();
+      }
+    } finally {
+      await revokeLocalSession(`${scenario.label}_admin`, adminAuth.sessionClient).catch((error) => {
+        cleanupError ||= error;
+      });
+    }
 
-    const merchantContext = await createAuthenticatedContext(browser, scenario.context, merchantAuth.serializedSession);
-    await testMerchant(await merchantContext.newPage(), scenario.label);
-    await merchantContext.close();
+    const merchantAuth = await createTemporaryIlytkSession();
+    try {
+      const merchantContext = await createAuthenticatedContext(browser, scenario.context, merchantAuth.serializedSession);
+      try {
+        await testMerchant(await merchantContext.newPage(), scenario.label);
+      } finally {
+        await merchantContext.close();
+      }
+    } finally {
+      await revokeLocalSession(`${scenario.label}_ilytk`, merchantAuth.sessionClient).catch((error) => {
+        cleanupError ||= error;
+      });
+    }
+
     report.push({
       scenario: scenario.label,
       admin: 'PASS',
@@ -379,13 +403,6 @@ try {
   }
 } finally {
   await browser.close();
-  for (const [label, client] of [
-    ['admin', adminAuth.sessionClient],
-    ['ilytk', merchantAuth.sessionClient],
-  ]) {
-    const { error } = await client.auth.signOut({ scope: 'local' });
-    if (error && !cleanupError) cleanupError = new Error(`${label}_temporary_session_cleanup_failed_${error.message}`);
-  }
 }
 
 if (cleanupError) throw cleanupError;
@@ -399,12 +416,14 @@ fs.writeFileSync(
       testedExactSourceBundle: true,
       adminIdentity: {
         roleVerifiedBeforeBrowser: true,
+        independentSessionPerViewport: true,
         authStorageSerializedByInstalledSupabaseClient: true,
         temporarySessionRevokedLocally: true,
       },
       merchantIdentity: {
         merchantId: ilytkId,
         portalLinkResolvedByUuid: true,
+        independentSessionPerViewport: true,
         authStorageSerializedByInstalledSupabaseClient: true,
         temporarySessionRevokedLocally: true,
       },
