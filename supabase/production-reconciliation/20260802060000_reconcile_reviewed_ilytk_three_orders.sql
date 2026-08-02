@@ -191,23 +191,22 @@ begin
     raise exception 'excluded_coupon_010504_was_modified';
   end if;
 
+  -- Reuse the production compatibility function. It normalizes order_id to
+  -- text for legacy finance tables and skips dependency tables/columns that do
+  -- not exist in the live schema.
   select count(*)::integer into v_dependency_mismatches
-  from (
-    select order_id, merchant_id from public.cod_collections where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.merchant_statement_entries where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.order_financial_settlements where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.financial_account_entries where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.merchant_invoices where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.invoices where order_id = any(v_target_ids)
-    union all
-    select order_id, merchant_id from public.notifications where order_id = any(v_target_ids)
-  ) dependencies
-  where dependencies.merchant_id is distinct from v_ilytk_id;
+  from public.orders o
+  where o.id = any(v_target_ids)
+    and (
+      coalesce((
+        public.dn_order_dependency_ownership_snapshot(o.id, v_g3bxg_id, v_ilytk_id)
+        ->> 'total_conflicts'
+      )::integer, 0) <> 0
+      or coalesce((
+        public.dn_order_dependency_ownership_snapshot(o.id, v_g3bxg_id, v_ilytk_id)
+        ->> 'total_repairable'
+      )::integer, 0) <> 0
+    );
 
   if v_dependency_mismatches <> 0 then
     raise exception 'ilytk_post_update_dependency_owner_mismatches_%', v_dependency_mismatches;
