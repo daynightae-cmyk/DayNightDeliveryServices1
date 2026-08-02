@@ -10,6 +10,8 @@ const supabaseUrl = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '
 const anonKey = String(process.env.VITE_SUPABASE_ANON_KEY || '');
 const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
 const ilytkId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+const reviewedCoupons = new Set(['003860', '010503', '010505']);
+const excludedCoupon = '010504';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -78,20 +80,47 @@ try {
   const ordersPage = Array.isArray(ordersData) ? ordersData[0] : ordersData;
   assert(ordersPage?.ok === true, 'merchant_orders_page_ok_false');
   assert(String(ordersPage?.merchant_id || '') === ilytkId, `merchant_orders_owner_${ordersPage?.merchant_id || 'null'}`);
+  assert(Number(ordersPage?.total_count) === 3, `merchant_orders_total_${ordersPage?.total_count}_expected_3`);
   const orders = Array.isArray(ordersPage?.orders) ? ordersPage.orders : [];
+  assert(orders.length === 3, `merchant_orders_page_count_${orders.length}_expected_3`);
   assert(orders.every((order) => String(order?.merchant_id || '') === ilytkId), 'merchant_orders_cross_owner_row');
+  const returnedCoupons = new Set(orders.map((order) => String(order?.coupon_number || '').trim()));
+  for (const coupon of reviewedCoupons) {
+    assert(returnedCoupons.has(coupon), `merchant_orders_missing_reviewed_coupon_${coupon}`);
+  }
+  assert(!returnedCoupons.has(excludedCoupon), 'merchant_orders_excluded_coupon_010504_visible');
 
   const { data: centerData, error: centerError } = await sessionClient.rpc('merchant_portal_business_center');
   if (centerError) throw new Error(`merchant_portal_business_center_failed_${centerError.message}`);
-  assert(centerData && typeof centerData === 'object', 'merchant_business_center_invalid_payload');
+  const center = Array.isArray(centerData) ? centerData[0] : centerData;
+  assert(center && typeof center === 'object', 'merchant_business_center_invalid_payload');
+  assert(center.ok === true, 'merchant_business_center_ok_false');
+  assert(String(center.merchant_id || '') === ilytkId, `merchant_business_center_owner_${center.merchant_id || 'null'}`);
+  const arrayKeys = [
+    'branches',
+    'pickup_requests',
+    'address_book',
+    'documents',
+    'team',
+    'support_tickets',
+    'notifications',
+    'cod_collections',
+    'statement_entries',
+    'import_batches',
+  ];
+  for (const key of arrayKeys) {
+    assert(Array.isArray(center[key]), `merchant_business_center_${key}_not_array`);
+  }
 
   console.log(JSON.stringify({
     result: 'PASS',
     merchant_session_id: merchantSessionId,
     profile_merchant_count: merchants.length,
-    orders_total_count: Number(ordersPage?.total_count || 0),
-    orders_first_page_count: orders.length,
-    business_center_payload: 'OBJECT',
+    orders_total_count: Number(ordersPage.total_count),
+    reviewed_coupons: [...reviewedCoupons],
+    excluded_coupon_visible: false,
+    business_center_owner: center.merchant_id,
+    business_center_arrays: Object.fromEntries(arrayKeys.map((key) => [key, center[key].length])),
   }, null, 2));
 } finally {
   const { error: signOutError } = await sessionClient.auth.signOut({ scope: 'local' });
