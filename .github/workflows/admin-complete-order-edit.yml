@@ -62,6 +62,9 @@ jobs:
       - name: Install exact dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Execute real edited-value save matrix with automatic rollback
+        run: node .github/scripts/admin-complete-order-save-production-probe.mjs
+
       - name: Verify complete order edit contract
         working-directory: artifacts/day-night-delivery
         run: node scripts/admin-complete-order-edit-gate.mjs
@@ -89,7 +92,7 @@ jobs:
           grep -R -F "رقم الكوبون مستخدم بالفعل" "$bundle" >/dev/null
           grep -R -F "التاجر المختار غير مرتبط" "$bundle" >/dev/null
           grep -R -F "القيم المالية غير صالحة" "$bundle" >/dev/null
-          grep -R -F "لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية" "$bundle" >/dev/null
+          grep -R -F "السبب الفني الأصلي" "$bundle" >/dev/null
 
       - name: Serve exact branch-head build
         shell: bash
@@ -122,9 +125,6 @@ jobs:
 
       - name: Verify merchant editing on desktop and phone without saving
         run: node .github/scripts/admin-complete-order-editor-browser.mjs
-
-      - name: Execute real production save RPC with automatic rollback
-        run: node .github/scripts/admin-complete-order-save-production-probe.mjs
 
       - name: Stop local application
         if: always()
