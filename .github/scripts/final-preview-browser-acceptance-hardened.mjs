@@ -48,6 +48,18 @@ replaceRequired(
 replaceRequired(
   /async function testAdmin\(page, label\) \{[\s\S]*?\n\}\n\nasync function openMerchantFromInjectedSession/,
   `async function testAdmin(page, label) {
+  async function clickVisibleSection(control, sectionLabel) {
+    const count = await control.count();
+    for (let index = 0; index < count; index += 1) {
+      const candidate = control.nth(index);
+      if (await candidate.isVisible().catch(() => false)) {
+        await candidate.click();
+        return;
+      }
+    }
+    throw new Error(label + ': no visible ' + sectionLabel + ' navigation control.');
+  }
+
   try {
     await openAdminFromInjectedSession(page);
     const shell = page.locator('.dncc-shell');
@@ -58,13 +70,13 @@ replaceRequired(
     assert((await accountsControl.count()) > 0, \`${'${label}'}: accounts navigation control is missing.\`);
     assert((await statementsControl.count()) > 0, \`${'${label}'}: merchant PDF statements navigation control is missing.\`);
 
-    await openSection(page, 'accounts', 'Accounts');
+    await clickVisibleSection(accountsControl, 'accounts');
     await page
       .locator('[data-admin-merchant-accounts-ready]')
       .first()
       .waitFor({ state: 'attached', timeout: 90000 });
 
-    await openSection(page, 'merchant_statements', 'Merchant statements');
+    await clickVisibleSection(statementsControl, 'merchant PDF statements');
     await page
       .locator('section')
       .filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ })
