@@ -12,8 +12,7 @@ const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
 const runtimeAdminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || '').trim().toLowerCase();
 const runtimeAdminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || '').trim();
 const ilytkId = '325bb302-75c3-48cc-84ba-e58817d6d148';
-const reviewedCoupons = new Set(['003860', '010503', '010505']);
-const excludedCoupon = '010504';
+const reviewedCoupons = new Set(['003860', '010503', '010504', '010505']);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -148,15 +147,14 @@ try {
   const ordersPage = Array.isArray(ordersData) ? ordersData[0] : ordersData;
   assert(ordersPage?.ok === true, 'merchant_orders_page_ok_false');
   assert(String(ordersPage?.merchant_id || '') === ilytkId, `merchant_orders_owner_${ordersPage?.merchant_id || 'null'}`);
-  assert(Number(ordersPage?.total_count) === 3, `merchant_orders_total_${ordersPage?.total_count}_expected_3`);
+  assert(Number(ordersPage?.total_count) === 4, `merchant_orders_total_${ordersPage?.total_count}_expected_4`);
   const orders = Array.isArray(ordersPage?.orders) ? ordersPage.orders : [];
-  assert(orders.length === 3, `merchant_orders_page_count_${orders.length}_expected_3`);
+  assert(orders.length === 4, `merchant_orders_page_count_${orders.length}_expected_4`);
   assert(orders.every((order) => String(order?.merchant_id || '') === ilytkId), 'merchant_orders_cross_owner_row');
   const returnedCoupons = new Set(orders.map((order) => String(order?.coupon_number || '').trim()));
   for (const coupon of reviewedCoupons) {
     assert(returnedCoupons.has(coupon), `merchant_orders_missing_reviewed_coupon_${coupon}`);
   }
-  assert(!returnedCoupons.has(excludedCoupon), 'merchant_orders_excluded_coupon_010504_visible');
 
   const { data: centerData, error: centerError } = await sessionClient.rpc('merchant_portal_business_center');
   if (centerError) throw new Error(`merchant_portal_business_center_failed_${centerError.message}`);
@@ -187,7 +185,7 @@ try {
     profile_merchant_count: merchants.length,
     orders_total_count: Number(ordersPage.total_count),
     reviewed_coupons: [...reviewedCoupons],
-    excluded_coupon_visible: false,
+    confirmed_coupon_010504_visible: returnedCoupons.has('010504'),
     business_center_owner: center.merchant_id,
     business_center_arrays: Object.fromEntries(arrayKeys.map((key) => [key, center[key].length])),
   }, null, 2));
