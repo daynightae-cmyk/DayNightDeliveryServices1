@@ -37,6 +37,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
+      - name: Correct focused database assertion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/apply-personal-order-field-policy.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''reject(fieldPolicyMigration, /sender_phone_required/, "database RPC does not require sender phone");'''
+          new = '''reject(fieldPolicyMigration, /message = 'sender_phone_required'/, "database RPC does not require sender phone");
+          expect(fieldPolicyMigration, /'sender_phone_required', false/, "runtime health marks sender phone optional");'''
+          if text.count(old) != 1:
+              raise SystemExit('focused sender-phone assertion was not found exactly once')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Apply guarded implementation patch
         run: python .github/scripts/apply-personal-order-field-policy.py
 
