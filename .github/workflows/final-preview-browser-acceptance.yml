@@ -136,6 +136,20 @@ jobs:
             throw new Error(`Missing control: ${description}`);
           }
 
+          async function openAllOrders(page) {
+            const section = page.locator('[data-dn-command-section="all_orders"]');
+            const count = await section.count();
+            for (let index = 0; index < count; index += 1) {
+              if (await section.nth(index).isVisible().catch(() => false)) {
+                await section.nth(index).click();
+                return;
+              }
+            }
+            await clickFirst(page.getByRole('button', { name: /فتح القائمة|Open navigation/ }), 'Admin mobile navigation');
+            await page.waitForTimeout(250);
+            await clickFirst(section, 'All Orders command section');
+          }
+
           async function loginAdmin(page) {
             await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=admin`, { waitUntil: 'domcontentloaded', timeout: 90000 });
             await page.locator('.auth-clean__intro-cta').click();
@@ -146,7 +160,7 @@ jobs:
               page.locator('button[type="submit"]').click(),
             ]);
             await page.waitForLoadState('networkidle', { timeout: 90000 }).catch(() => {});
-            assert(/لوحة التحكم|Dashboard|كافة الطلبات|All Orders/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
+            assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
           }
 
           async function selectorText(page) {
@@ -156,7 +170,7 @@ jobs:
 
           async function testAdmin(page, label) {
             await loginAdmin(page);
-            await clickFirst(page.getByText(/كافة الطلبات|All Orders/, { exact: true }), 'All Orders navigation');
+            await openAllOrders(page);
             const search = page.locator('[data-admin-order-search="true"]');
             const merchantSelect = page.locator('.dn-admin-bulk-filter-grid select');
             await search.waitFor({ state: 'visible', timeout: 90000 });
