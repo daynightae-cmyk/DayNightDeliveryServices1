@@ -9,6 +9,11 @@ function navigateAdminSection(target: string) {
   control?.click();
 }
 
+/**
+ * Secondary/fallback admin rendering also intercepts accounts before the
+ * generic finance layer. This keeps merchant ownership exact in every admin
+ * entry path rather than only in the primary command-center renderer.
+ */
 export default function AdminOperationsLayer(props: Props) {
   if (props.id === "accounts") {
     return (
