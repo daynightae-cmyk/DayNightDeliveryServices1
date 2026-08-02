@@ -6,6 +6,8 @@ export type CanonicalMerchantResolution = {
   merchantCode: string;
   merchantName: string;
   portalUserIds: string[];
+  portalReady: boolean;
+  actualPortalLinkCount: number;
   resolutionSource: string;
   merchant: Merchant;
 };
@@ -15,12 +17,15 @@ type ResolverPayload = {
   canonical_merchant_id?: unknown;
   portal_user_ids?: unknown;
   portal_link_count?: unknown;
+  actual_portal_link_count?: unknown;
+  portal_ready?: unknown;
+  order_write_allowed?: unknown;
   resolution_source?: unknown;
   merchant?: unknown;
 };
 
 const SAFE_LINK_MESSAGE =
-  "تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.";
+  "تعذر اعتماد التاجر المحدد لإنشاء الطلب. تأكد أن التاجر موجود ونشط ثم أعد المحاولة.";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -43,9 +48,11 @@ export class MerchantOwnershipError extends Error {
 }
 
 /**
- * The only client-side entrypoint for resolving a selected merchant before an
- * admin order create or ownership-changing update. Authorization and canonical
- * identity remain enforced by the matching database RPC and trigger.
+ * Resolve the exact active merchant selected by an authorized administrator.
+ *
+ * Portal readiness is metadata only. It must never block an admin order write:
+ * merchant portal visibility is enforced independently by merchant_session_id and
+ * effective merchant-user links in the database.
  */
 export async function resolveCanonicalMerchantForOrder(
   selectedMerchant: Merchant | null | undefined,
@@ -66,10 +73,24 @@ export async function resolveCanonicalMerchantForOrder(
   const portalUserIds = Array.isArray(payload?.portal_user_ids)
     ? payload.portal_user_ids.map(clean).filter(Boolean)
     : [];
-  const portalLinkCount = Number(payload?.portal_link_count || portalUserIds.length || 0);
+  const actualPortalLinkCount = Number(
+    payload?.actual_portal_link_count ?? portalUserIds.length ?? 0,
+  );
+  const portalReady =
+    typeof payload?.portal_ready === "boolean"
+      ? payload.portal_ready
+      : actualPortalLinkCount > 0;
+  const orderWriteAllowed = payload?.order_write_allowed !== false;
 
-  if (!payload?.ok || !merchant || !merchantId || merchantId !== clean(merchant.id) || portalLinkCount < 1) {
-    throw new MerchantOwnershipError("canonical_merchant_not_portal_linked");
+  if (
+    !payload?.ok ||
+    !orderWriteAllowed ||
+    !merchant ||
+    !merchantId ||
+    merchantId !== clean(merchant.id) ||
+    merchantId !== selectedId
+  ) {
+    throw new MerchantOwnershipError("active_selected_merchant_not_resolved");
   }
 
   return {
@@ -77,7 +98,11 @@ export async function resolveCanonicalMerchantForOrder(
     merchantCode,
     merchantName,
     portalUserIds,
-    resolutionSource: clean(payload.resolution_source) || "database_canonical_resolver",
+    portalReady,
+    actualPortalLinkCount: Number.isFinite(actualPortalLinkCount)
+      ? Math.max(0, actualPortalLinkCount)
+      : 0,
+    resolutionSource: clean(payload.resolution_source) || "database_admin_order_resolver",
     merchant,
   };
 }
