@@ -1,0 +1,113 @@
+name: Verify Personal Order Field Policy PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/scripts/apply-personal-order-field-policy.py"
+      - ".github/scripts/verify-personal-order-field-policy.mjs"
+      - ".github/workflows/apply-personal-order-field-policy.yml"
+      - ".github/workflows/verify-personal-order-field-policy-pr.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-personal-order-field-policy-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  patch-test-deploy-verify:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply guarded implementation patch
+        run: python .github/scripts/apply-personal-order-field-policy.py
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate source contract
+        run: pnpm --dir artifacts/day-night-delivery run personal-orders:gate
+
+      - name: Typecheck complete application
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate protected production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply reviewed field-policy migration once
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="20260803023500_personal_order_required_coupon_optional_details.sql"
+          release_dir="$RUNNER_TEMP/daynight-personal-order-field-policy"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          if [ -f "$release_dir/supabase/migrations/$target" ]; then
+            echo "$target already exists in production."
+          else
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Prove real save and rejection behavior
+        run: node .github/scripts/verify-personal-order-field-policy.mjs
+
+      - name: Commit only final implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/apply-personal-order-field-policy.py
+          rm -f .github/scripts/verify-personal-order-field-policy.mjs
+          rm -f .github/workflows/apply-personal-order-field-policy.yml
+          rm -f .github/workflows/verify-personal-order-field-policy-pr.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No final implementation changes produced." >&2; exit 1; }
+          git commit -m "fix(admin): require personal coupon and make sender details optional"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
