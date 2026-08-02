@@ -19,14 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  authenticated-preview:
+  authenticated-preview-source:
     name: Admin and ILYTK browser acceptance
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     environment: production-runtime-tests
     env:
-      PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
+      DEPLOYED_PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
+      TEST_BASE_URL: http://127.0.0.1:4173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
       RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
       RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
@@ -35,31 +38,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Verify protected browser credentials
+      - name: Verify protected browser credentials and backend
         shell: bash
         run: |
           set -euo pipefail
-          for name in RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD; do
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD; do
             test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
           done
 
-      - name: Wait for the exact branch preview
+      - name: Build and serve the exact PR web application
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 90); do
-            status="$(curl -L -sS -o /tmp/daynight-preview.html -w '%{http_code}' "$PREVIEW_URL/?nosplash=1&__dn_acceptance=bdf406f" || true)"
-            if [ "$status" = "200" ] && grep -F 'id="root"' /tmp/daynight-preview.html >/dev/null; then
-              echo "Preview is serving the DAY NIGHT application."
-              exit 0
-            fi
-            sleep 4
+          pnpm install --frozen-lockfile
+          pnpm run web:typecheck
+          pnpm run web:build
+          test -s artifacts/day-night-delivery/dist/public/index.html
+          mkdir -p preview-browser-evidence
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > preview-browser-evidence/local-web.log 2>&1 &
+          echo $! > preview-browser-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null && exit 0
+            sleep 1
           done
-          echo "Preview did not become publicly readable." >&2
+          cat preview-browser-evidence/local-web.log >&2
           exit 1
 
       - name: Install Chromium acceptance runtime
@@ -73,12 +86,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p preview-browser-evidence
           node <<'NODE'
           const fs = require('node:fs');
           const { chromium, devices } = require('playwright');
 
-          const base = String(process.env.PREVIEW_URL || '').replace(/\/$/, '');
+          const base = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
+          const deployedPreview = String(process.env.DEPLOYED_PREVIEW_URL || '').replace(/\/$/, '');
           const adminEmail = process.env.RUNTIME_ADMIN_EMAIL;
           const adminPassword = process.env.RUNTIME_ADMIN_PASSWORD;
           const merchantEmail = process.env.RUNTIME_MERCHANT_EMAIL;
@@ -128,10 +141,7 @@ jobs:
 
           async function testAdmin(page, label) {
             await loginAdmin(page);
-            await clickFirstVisible(
-              page.getByText(/كافة الطلبات|All Orders/, { exact: true }),
-              'All Orders navigation',
-            );
+            await clickFirstVisible(page.getByText(/كافة الطلبات|All Orders/, { exact: true }), 'All Orders navigation');
             const search = page.locator('[data-admin-order-search="true"]');
             await search.waitFor({ state: 'visible', timeout: 90000 });
 
@@ -215,7 +225,9 @@ jobs:
             }
             fs.writeFileSync('preview-browser-evidence/report.json', JSON.stringify({
               head: process.env.GITHUB_SHA,
-              preview: base,
+              deployedPreview,
+              testedExactSourceBundle: true,
+              testBase: base,
               reviewedCoupons,
               excludedCoupon,
               result: 'PASS',
@@ -228,7 +240,15 @@ jobs:
           });
           NODE
 
-      - name: Upload preview browser evidence
+      - name: Stop local application
+        if: always()
+        shell: bash
+        run: |
+          if [ -f preview-browser-evidence/local-web.pid ]; then
+            kill "$(cat preview-browser-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
