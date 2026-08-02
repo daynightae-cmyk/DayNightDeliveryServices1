@@ -18,13 +18,33 @@ type Props = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
+const OPERATIONAL_REQUEST_TIMEOUT_MS = 8_000;
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+function withOperationalTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(`${label}_timeout`)),
+      OPERATIONAL_REQUEST_TIMEOUT_MS,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        window.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
 
 async function withOperationalRetry<T>(task: () => Promise<T>, label: string): Promise<T> {
   let latest: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await task();
+      return await withOperationalTimeout(task(), label);
     } catch (cause) {
       latest = cause;
       if (attempt < 2) await wait(500 * (attempt + 1));
@@ -105,8 +125,8 @@ export default function AdminMerchantAccountsRoute({
     if (failures.length) {
       setOperationalError(
         isArabic
-          ? "تعذر استكمال تحميل الطلبات أو التجار بعد إعادة المحاولة. لم يتم عرض بيانات مختلطة، ويمكن الضغط على تحديث للمحاولة مجددًا."
-          : "Orders or merchants could not be fully loaded after retrying. No mixed data was shown; use Refresh to retry.",
+          ? "تعذر تحديث الطلبات أو التجار بعد إعادة المحاولة. استمر عرض البيانات المحمية المحملة مسبقاً، ولم يتم عرض بيانات مختلطة."
+          : "Orders or merchants could not be refreshed after retrying. Previously loaded protected data remains visible, and no mixed data was shown.",
       );
     }
     setOperationalBusy(false);
@@ -155,14 +175,13 @@ export default function AdminMerchantAccountsRoute({
   }
 
   const busy = operationalBusy || financeBusy;
-  const availableMerchants = operationalBusy ? [] : authoritativeMerchants;
 
   return (
     <section
       className="space-y-4"
       dir={isArabic ? "rtl" : "ltr"}
       data-authoritative-order-count={authoritativeOrders.length}
-      data-authoritative-merchant-count={availableMerchants.length}
+      data-authoritative-merchant-count={authoritativeMerchants.length}
     >
       <section className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-[1fr_1fr_minmax(260px,1.3fr)_auto]">
         <label className="block">
@@ -235,8 +254,8 @@ export default function AdminMerchantAccountsRoute({
           <Loader2 className="h-4 w-4 animate-spin" />
           {operationalBusy
             ? isArabic
-              ? "جاري استعادة الطلبات والتجار من المصادر المحمية..."
-              : "Recovering orders and merchants from protected sources..."
+              ? "جاري تحديث الطلبات والتجار من المصادر المحمية دون إخفاء الدليل الحالي..."
+              : "Refreshing orders and merchants from protected sources without hiding the current directory..."
             : isArabic
               ? "دليل التجار والطلبيات جاهز؛ يجري تحميل الحركات المالية في الخلفية..."
               : "Merchant directory and orders are ready; finance movements are loading in the background..."}
@@ -245,7 +264,7 @@ export default function AdminMerchantAccountsRoute({
 
       <AdminMerchantAccountsCenter
         isArabic={isArabic}
-        merchants={availableMerchants}
+        merchants={authoritativeMerchants}
         orders={authoritativeOrders}
         accountEntries={snapshot?.accountEntries || []}
         settlements={snapshot?.settlements || []}
