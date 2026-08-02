@@ -124,8 +124,10 @@ async function rpcOne`,
           : "The complete-save service is not available in the current database version. Refresh after the database deployment completes. No partial change was made.";
       } else {
         saveError = isArabic
-          ? `لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية. لم يحدث أي تعديل جزئي.${detail ? ` السبب الفني: ${detail}` : " راجع اتصال الإنترنت ثم أعد المحاولة."}`
-          : `The database rejected the save. No partial change was made.${detail ? ` Technical reason: ${detail}` : " Check the connection and try again."}`;
+          ? "لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية. لم يحدث أي تعديل جزئي." +
+            (detail ? " السبب الفني: " + detail : " راجع اتصال الإنترنت ثم أعد المحاولة.")
+          : "The database rejected the save. No partial change was made." +
+            (detail ? " Technical reason: " + detail : " Check the connection and try again.");
       }
 
       setError(saveError);
