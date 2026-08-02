@@ -27,6 +27,11 @@ const dryRunTimeoutMigration = read(
   repoRoot,
 );
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
+const p1Workflow = read(".github/workflows/p1-runtime-evidence.yml", repoRoot);
+const integrityWorkflow = read(
+  ".github/workflows/global-order-merchant-integrity-production.yml",
+  repoRoot,
+);
 
 assert.match(resolver, /resolveCanonicalMerchantForOrder/);
 assert.match(resolver, /admin_resolve_order_merchant/);
@@ -108,6 +113,9 @@ assert.match(
   dryRunTimeoutMigration,
   /alter\s+function\s+public\.admin_run_order_merchant_dry_run\(\)\s+set\s+statement_timeout\s*=\s*'120s'/i,
 );
+for (const workflow of [p1Workflow, integrityWorkflow]) {
+  assert.match(workflow, /20260802033000_order_merchant_dry_run_timeout\.sql/);
+}
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
 assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || []).length, "balanced SQL parentheses");
 assert.match(productionAudit, /order:\s*["']id\.asc["']/);
