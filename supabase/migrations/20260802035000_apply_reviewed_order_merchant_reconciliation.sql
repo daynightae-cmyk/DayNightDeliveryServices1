@@ -18,8 +18,8 @@ declare
   v_health jsonb;
   v_repair_audit_count integer;
 begin
-  if auth.role() is distinct from 'service_role' then
-    raise exception 'migration_service_role_claim_not_effective_%', coalesce(auth.role(), 'NULL');
+  if session_user not in ('postgres', 'supabase_admin') then
+    raise exception 'migration_privileged_session_required_%', session_user;
   end if;
 
   select status into v_status

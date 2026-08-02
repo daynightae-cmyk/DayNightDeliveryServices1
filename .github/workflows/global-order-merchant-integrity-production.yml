@@ -11,6 +11,7 @@ on:
       - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
       - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
       - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
+      - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
       - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
@@ -27,6 +28,7 @@ on:
       - "supabase/migrations/20260802034500_customer_e2e_dependency_cleanup.sql"
       - "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql"
       - "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql"
+      - "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql"
       - "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
@@ -131,6 +133,7 @@ jobs:
             20260802034500_customer_e2e_dependency_cleanup.sql \
             20260802034700_defer_projection_during_merchant_backfill.sql \
             20260802034800_order_status_snapshot_type_compat.sql \
+            20260802034900_privileged_db_reconciliation_executor.sql \
             20260802035000_apply_reviewed_order_merchant_reconciliation.sql
           do
             if [ -f "$release_dir/supabase/migrations/$target" ]; then
@@ -183,6 +186,7 @@ jobs:
             20260802034500_customer_e2e_dependency_cleanup.sql \
             20260802034700_defer_projection_during_merchant_backfill.sql \
             20260802034800_order_status_snapshot_type_compat.sql \
+            20260802034900_privileged_db_reconciliation_executor.sql \
             20260802035000_apply_reviewed_order_merchant_reconciliation.sql
           do
             if [ ! -f "$release_dir/supabase/migrations/$target" ]; then

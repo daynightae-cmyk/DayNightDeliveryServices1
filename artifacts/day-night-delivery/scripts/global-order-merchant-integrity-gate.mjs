@@ -47,6 +47,10 @@ const orderStatusCompatMigration = read(
   "supabase/migrations/20260802034800_order_status_snapshot_type_compat.sql",
   repoRoot,
 );
+const privilegedDbExecutorMigration = read(
+  "supabase/migrations/20260802034900_privileged_db_reconciliation_executor.sql",
+  repoRoot,
+);
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 const p1Workflow = read(".github/workflows/p1-runtime-evidence.yml", repoRoot);
 const integrityWorkflow = read(
@@ -140,6 +144,7 @@ for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802034500_customer_e2e_dependency_cleanup\.sql/);
   assert.match(workflow, /20260802034700_defer_projection_during_merchant_backfill\.sql/);
   assert.match(workflow, /20260802034800_order_status_snapshot_type_compat\.sql/);
+  assert.match(workflow, /20260802034900_privileged_db_reconciliation_executor\.sql/);
   assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
 }
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
@@ -152,7 +157,7 @@ assert.match(reviewedReconciliationMigration, /37348f9e-60d8-4f6b-8cdf-b9181464f
 assert.match(reviewedReconciliationMigration, /set local statement_timeout = '10min'/);
 assert.match(reviewedReconciliationMigration, /request\.jwt\.claim\.role.*service_role/);
 assert.match(reviewedReconciliationMigration, /request\.jwt\.claims.*service_role/);
-assert.match(reviewedReconciliationMigration, /migration_service_role_claim_not_effective/);
+assert.match(reviewedReconciliationMigration, /migration_privileged_session_required/);
 assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_expected_3/);
 assert.match(reviewedReconciliationMigration, /merchant_statement_rows_inserted'[\s\S]*<> 43/);
 assert.match(reviewedReconciliationMigration, /cod_rows_inserted'[\s\S]*<> 21/);
@@ -170,6 +175,10 @@ assert.match(orderStatusCompatMigration, /v_order\.status::text is distinct from
 assert.match(orderStatusCompatMigration, /o\.status::text is distinct from s\.status::text/);
 assert.match(orderStatusCompatMigration, /order_backfill_status_guard_contract_not_found/);
 assert.match(orderStatusCompatMigration, /finance_backfill_status_guard_contract_not_found/);
+assert.match(privilegedDbExecutorMigration, /session_user not in \('postgres', 'supabase_admin'\)/);
+assert.match(privilegedDbExecutorMigration, /privileged_db_reconciliation_executor_contract_not_found/);
+assert.match(privilegedDbExecutorMigration, /admin_apply_order_merchant_safe_backfill/);
+assert.match(privilegedDbExecutorMigration, /admin_apply_safe_missing_financial_dependencies/);
 for (const table of [
   "financial_account_entries",
   "cod_collections",
