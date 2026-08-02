@@ -22,20 +22,32 @@ const source = fs
 }`,
     `async function openAdmin(page) {
   const target = \`${'${base}'}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf\`;
-  let latestUrl = '';
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.goto(target, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90000,
-    });
-    latestUrl = page.url();
-    const shell = page.locator('.dncc-shell');
-    if (await shell.isVisible().catch(() => false)) return;
-    await page.waitForTimeout(1200 * (attempt + 1));
-    if (attempt < 2) await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
-    if (await shell.isVisible().catch(() => false)) return;
-  }
-  throw new Error(\`merchant_accounts_admin_shell_missing_after_session_retry: ${'${latestUrl}'}\`);
+  const shell = page.locator('.dncc-shell');
+
+  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  if (await shell.waitFor({ state: 'visible', timeout: 45000 }).then(() => true).catch(() => false)) return;
+
+  // A serialized Supabase session can occasionally be read while the auth lock
+  // is still hydrating. Fall back to the real administrator login screen rather
+  // than repeatedly reloading a permanently checking protected route.
+  await page.evaluate((key) => window.localStorage.removeItem(key), storageKey);
+  await page.goto(\`${'${base}'}/auth?nosplash=1&lang=ar&__dn_acceptance=merchant_accounts_pdf_login\`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
+
+  const intro = page.locator('.auth-clean__intro-cta');
+  if (await intro.isVisible().catch(() => false)) await intro.click();
+
+  const email = page.locator('#dn-admin-email');
+  const password = page.locator('#dn-admin-password');
+  await email.waitFor({ state: 'visible', timeout: 30000 });
+  await password.waitFor({ state: 'visible', timeout: 30000 });
+  await email.fill(adminEmail);
+  await password.fill(adminPassword);
+  await page.locator('button[type="submit"]').click();
+
+  await shell.waitFor({ state: 'visible', timeout: 90000 });
 }`,
   )
   .replace(
