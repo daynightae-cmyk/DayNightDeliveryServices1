@@ -162,7 +162,9 @@ assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_e
 assert.match(reviewedReconciliationMigration, /merchant_statement_rows_inserted'[\s\S]*<> 43/);
 assert.match(reviewedReconciliationMigration, /cod_rows_inserted'[\s\S]*<> 21/);
 assert.match(reviewedReconciliationMigration, /driver_statement_rows_inserted'[\s\S]*<> 1/);
-assert.match(reviewedReconciliationMigration, /post_reconciliation_financial_health_failed/);
+assert.match(reviewedReconciliationMigration, /post_reconciliation_missing_dependencies_failed/);
+assert.match(reviewedReconciliationMigration, /remaining_missing_dependencies/);
+assert.doesNotMatch(reviewedReconciliationMigration, /admin_finance_reconciliation_health/);
 assert.match(customerE2eCleanupMigration, /CUSTOMER_EXPERIENCE_E2E:%/);
 assert.match(customerE2eCleanupMigration, /production_test_dependency_cleanup_audit/);
 assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_changed_order_financial_integrity/);

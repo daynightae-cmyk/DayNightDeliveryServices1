@@ -15,7 +15,7 @@ declare
   v_status text;
   v_order_result jsonb;
   v_finance_result jsonb;
-  v_health jsonb;
+  v_missing jsonb;
   v_repair_audit_count integer;
 begin
   if session_user not in ('postgres', 'supabase_admin') then
@@ -64,7 +64,13 @@ begin
        or coalesce((v_finance_result ->> 'merchant_statement_rows_inserted')::integer, -1) <> 43
        or coalesce((v_finance_result ->> 'driver_statement_rows_inserted')::integer, -1) <> 1
        or v_finance_result -> 'order_financial_before'
-          is distinct from v_finance_result -> 'order_financial_after' then
+          is distinct from v_finance_result -> 'order_financial_after'
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_cod')::integer, -1) <> 0
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_settlements')::integer, -1) <> 0
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_merchant_accounts')::integer, -1) <> 0
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_company_accounts')::integer, -1) <> 0
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_merchant_statements')::integer, -1) <> 0
+       or coalesce((v_finance_result -> 'remaining_missing_dependencies' ->> 'missing_driver_statements')::integer, -1) <> 0 then
       raise exception 'safe_finance_repair_contract_failed: %', v_finance_result;
     end if;
   end if;
@@ -76,20 +82,17 @@ begin
     raise exception 'reviewed_reconciliation_final_status_%', v_status;
   end if;
 
-  v_health := public.admin_finance_reconciliation_health();
-  if coalesce((v_health ->> 'ok')::boolean, false) is not true
-     or coalesce((v_health -> 'variance' ->> 'merchant_due')::numeric, 1) <> 0
-     or coalesce((v_health -> 'variance' ->> 'customer_total')::numeric, 1) <> 0
-     or coalesce((v_health -> 'variance' ->> 'company_revenue')::numeric, 1) <> 0
-     or coalesce((v_health -> 'variance' ->> 'collected_amount')::numeric, 1) <> 0
-     or coalesce((v_health ->> 'missing_cod_rows')::integer, -1) <> 0
-     or coalesce((v_health ->> 'missing_settlement_rows')::integer, -1) <> 0
-     or coalesce((v_health ->> 'missing_merchant_statement_rows')::integer, -1) <> 0
-     or coalesce((v_health ->> 'missing_driver_statement_rows')::integer, -1) <> 0 then
-    raise exception 'post_reconciliation_financial_health_failed: %', v_health;
+  v_missing := public.dn_missing_financial_dependencies_snapshot();
+  if coalesce((v_missing ->> 'missing_cod')::integer, -1) <> 0
+     or coalesce((v_missing ->> 'missing_settlements')::integer, -1) <> 0
+     or coalesce((v_missing ->> 'missing_merchant_accounts')::integer, -1) <> 0
+     or coalesce((v_missing ->> 'missing_company_accounts')::integer, -1) <> 0
+     or coalesce((v_missing ->> 'missing_merchant_statements')::integer, -1) <> 0
+     or coalesce((v_missing ->> 'missing_driver_statements')::integer, -1) <> 0 then
+    raise exception 'post_reconciliation_missing_dependencies_failed: %', v_missing;
   end if;
 
-  raise notice 'Reviewed order/merchant reconciliation completed: run %, audit rows %, finance health OK',
+  raise notice 'Reviewed order/merchant reconciliation completed: run %, audit rows %, dependencies complete',
     v_run_id, v_repair_audit_count;
 end;
 $migration$;
