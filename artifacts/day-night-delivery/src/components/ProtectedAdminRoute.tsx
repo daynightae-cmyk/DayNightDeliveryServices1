@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { isAdminUser } from "../supabaseAdminOps";
@@ -39,27 +39,35 @@ function withAdminAuthTimeout<T>(promise: PromiseLike<T>, operation: string): Pr
 
 export default function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
   const [status, setStatus] = useState<"checking" | "allowed" | "denied">("checking");
+  const allowedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
     let verificationRunning = false;
-    let verificationRequested = false;
+    let verificationQueued = false;
     let scheduledVerification: number | null = null;
 
-    async function verifyAdminAccess() {
+    function applyDenied(userId?: string) {
+      allowedRef.current = false;
+      clearAuthenticatedAccessToken();
+      if (userId) clearAdminStepUp(userId);
+      else clearAdminStepUp();
+      if (active) setStatus("denied");
+    }
+
+    async function verifyAdminAccess(preserveAllowedOnTransientFailure = false) {
       if (!active) return;
       if (verificationRunning) {
-        verificationRequested = true;
+        verificationQueued = true;
         return;
       }
 
       verificationRunning = true;
-      verificationRequested = false;
+      verificationQueued = false;
 
       try {
         if (!supabase) {
-          clearAuthenticatedAccessToken();
-          if (active) setStatus("denied");
+          applyDenied();
           return;
         }
 
@@ -85,9 +93,7 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         }
 
         if (error || !data.user?.id) {
-          clearAuthenticatedAccessToken();
-          clearAdminStepUp();
-          if (active) setStatus("denied");
+          applyDenied();
           return;
         }
 
@@ -100,48 +106,56 @@ export default function ProtectedAdminRoute({ children }: ProtectedAdminRoutePro
         );
         const allowed = profileAllowed && !databaseRole.error && databaseRole.data === true;
 
-        if (active) {
-          if (!allowed) {
-            clearAuthenticatedAccessToken();
-            clearAdminStepUp(data.user.id);
-          }
-          setStatus(allowed ? "allowed" : "denied");
+        if (!active) return;
+        if (!allowed) {
+          applyDenied(data.user.id);
+          return;
         }
+
+        allowedRef.current = true;
+        setStatus("allowed");
       } catch (cause) {
         console.error("Administrator access verification failed.", cause);
-        clearAuthenticatedAccessToken();
-        clearAdminStepUp();
-        if (active) setStatus("denied");
+        // Once the administrator has been positively verified, a transient
+        // revalidation timeout must not eject the whole admin workspace. Every
+        // protected read/write remains fail-closed through PostgREST/RLS.
+        if (!(preserveAllowedOnTransientFailure && allowedRef.current)) applyDenied();
       } finally {
         verificationRunning = false;
-        if (active && verificationRequested) scheduleVerification();
+        if (active && verificationQueued) scheduleVerification(true);
       }
     }
 
-    function scheduleVerification() {
+    function scheduleVerification(preserveAllowedOnTransientFailure = false) {
       if (!active || scheduledVerification !== null) return;
-      // Supabase explicitly dispatches auth events while its auth lock is held.
-      // Defer all follow-up Supabase calls until the callback has returned to
-      // prevent the protected route from remaining permanently in "checking".
       scheduledVerification = window.setTimeout(() => {
         scheduledVerification = null;
-        void verifyAdminAccess();
+        void verifyAdminAccess(preserveAllowedOnTransientFailure);
       }, 0);
     }
 
-    scheduleVerification();
+    // Perform exactly one authoritative verification on mount. INITIAL_SESSION
+    // and TOKEN_REFRESHED events only update the cached token; re-running
+    // getUser for each event created competing auth calls and could redirect a
+    // valid administrator while a protected PDF request was still in flight.
+    scheduleVerification(false);
     const { data } = supabase?.auth.onAuthStateChange((event, session) => {
-      // Capture the session token synchronously while Supabase provides it.
-      // Protected feature reads can then authenticate without re-entering the
-      // auth mutex that is active during this callback on some mobile engines.
       if (session?.access_token) cacheAuthenticatedAccessToken(session);
+
       if (event === "SIGNED_OUT") {
-        clearAuthenticatedAccessToken();
-        clearAdminStepUp();
-      } else if (event === "USER_UPDATED") {
-        clearAdminStepUp();
+        applyDenied(session?.user?.id);
+        return;
       }
-      scheduleVerification();
+
+      if (event === "USER_UPDATED") {
+        clearAdminStepUp(session?.user?.id);
+        scheduleVerification(true);
+        return;
+      }
+
+      // SIGNED_IN can recover a route that was previously denied. Do not
+      // revalidate an already allowed route for INITIAL_SESSION/TOKEN_REFRESHED.
+      if (event === "SIGNED_IN" && !allowedRef.current) scheduleVerification(false);
     }) || { data: null };
 
     return () => {
