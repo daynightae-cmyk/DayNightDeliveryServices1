@@ -1,0 +1,67 @@
+name: Finalize Personal Order UI Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/scripts/finalize-personal-order-ui-acceptance.py"
+      - ".github/workflows/finalize-personal-order-ui-acceptance.yml"
+  push:
+    branches: [feat/unify-personal-order-entry-20260803]
+    paths:
+      - ".github/scripts/finalize-personal-order-ui-acceptance.py"
+      - ".github/workflows/finalize-personal-order-ui-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-personal-order-ui-acceptance
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/unify-personal-order-entry-20260803
+          fetch-depth: 0
+
+      - name: Apply guarded personal-order UI patches
+        run: python .github/scripts/finalize-personal-order-ui-acceptance.py
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Validate source contract and TypeScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm --dir artifacts/day-night-delivery run personal-orders:gate
+          pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - name: Remove one-time finalizer and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/finalize-personal-order-ui-acceptance.py
+          rm -f .github/workflows/finalize-personal-order-ui-acceptance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No final source changes were produced." >&2; exit 1; }
+          git commit -m "fix(admin): keep personal orders out of merchant balances"
+          git push origin HEAD:feat/unify-personal-order-entry-20260803
