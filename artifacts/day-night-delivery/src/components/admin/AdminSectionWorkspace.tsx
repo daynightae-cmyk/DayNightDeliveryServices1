@@ -4,6 +4,7 @@ import {
   useState,
   type ComponentProps,
 } from "react";
+import { fetchAdminOrders, fetchMerchants } from "../../lib/adminData";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { matchesSearchQuery } from "../../lib/searchNormalization";
 import AdminOrderBulkOperations from "./AdminOrderBulkOperations";
@@ -41,32 +42,47 @@ function orderId(order: WorkspaceProps["orders"][number]) {
 
 function orderSearchValues(order: WorkspaceProps["orders"][number]) {
   return [
-      order.id,
-      order.tracking_number,
-      order.invoice_number,
-      order.coupon_number,
-      order.merchant_id,
-      order.merchant_code,
-      order.merchant_name,
-      order.sender_name,
-      order.sender_phone,
-      order.receiver_name,
-      order.customer_name,
-      order.receiver_phone,
-      order.customer_phone,
-      order.sender_city,
-      order.receiver_city,
-      order.destination_country,
-      order.sender_address,
-      order.receiver_address,
-      order.driver_name,
-      order.driver_phone,
-      order.status,
-      normalizeOrderStatus(order),
-      order.cod_amount,
-      order.delivery_price,
-      order.notes,
-    ];
+    order.id,
+    order.tracking_number,
+    order.invoice_number,
+    order.coupon_number,
+    order.merchant_id,
+    order.merchant_code,
+    order.merchant_name,
+    order.sender_name,
+    order.sender_phone,
+    order.receiver_name,
+    order.customer_name,
+    order.receiver_phone,
+    order.customer_phone,
+    order.sender_city,
+    order.receiver_city,
+    order.destination_country,
+    order.sender_address,
+    order.receiver_address,
+    order.driver_name,
+    order.driver_phone,
+    order.status,
+    normalizeOrderStatus(order),
+    order.cod_amount,
+    order.delivery_price,
+    order.notes,
+  ];
+}
+
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+async function withOperationalRetry<T>(task: () => Promise<T>, label: string): Promise<T> {
+  let latest: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await task();
+    } catch (cause) {
+      latest = cause;
+      if (attempt < 2) await wait(500 * (attempt + 1));
+    }
+  }
+  throw new Error(`${label}: ${latest instanceof Error ? latest.message : String(latest || "unknown failure")}`);
 }
 
 export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps) {
@@ -74,6 +90,14 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const [bulkQuery, setBulkQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [orderPage, setOrderPage] = useState(0);
+  const [recoveredOrders, setRecoveredOrders] = useState<WorkspaceProps["orders"]>([]);
+  const [recoveredMerchants, setRecoveredMerchants] = useState<WorkspaceProps["merchants"]>([]);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+
+  const showBulkConsole = ORDER_SECTIONS.has(props.id);
+  const effectiveOrders = props.orders.length ? props.orders : recoveredOrders;
+  const effectiveMerchants = props.merchants.length ? props.merchants : recoveredMerchants;
 
   useEffect(() => {
     setMerchantFilterId(props.id === "all_orders" ? clean(props.initialMerchantId) : "");
@@ -82,26 +106,77 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     setOrderPage(0);
   }, [props.id, props.initialMerchantId]);
 
+  useEffect(() => {
+    if (!showBulkConsole) return;
+    const needOrders = !props.orders.length;
+    const needMerchants = !props.merchants.length;
+    if (!needOrders && !needMerchants) {
+      setRecoveryError("");
+      setRecoveryLoading(false);
+      return;
+    }
+
+    let active = true;
+    setRecoveryLoading(true);
+    setRecoveryError("");
+
+    void Promise.allSettled([
+      needOrders
+        ? withOperationalRetry(fetchAdminOrders, "orders recovery failed")
+        : Promise.resolve(props.orders),
+      needMerchants
+        ? withOperationalRetry(fetchMerchants, "merchants recovery failed")
+        : Promise.resolve(props.merchants),
+    ]).then(([ordersResult, merchantsResult]) => {
+      if (!active) return;
+      const failures: string[] = [];
+
+      if (ordersResult.status === "fulfilled") {
+        setRecoveredOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+      } else {
+        failures.push(ordersResult.reason instanceof Error ? ordersResult.reason.message : String(ordersResult.reason));
+      }
+
+      if (merchantsResult.status === "fulfilled") {
+        setRecoveredMerchants(Array.isArray(merchantsResult.value) ? merchantsResult.value : []);
+      } else {
+        failures.push(merchantsResult.reason instanceof Error ? merchantsResult.reason.message : String(merchantsResult.reason));
+      }
+
+      if (failures.length) {
+        setRecoveryError(
+          props.isArabic
+            ? "تعذر استكمال تحميل الطلبات أو التجار بعد إعادة المحاولة. لم يتم عرض بيانات مختلطة."
+            : "Orders or merchants could not be fully loaded after retrying. No mixed data was shown.",
+        );
+      }
+      setRecoveryLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [props.id, props.isArabic, props.orders.length, props.merchants.length, showBulkConsole]);
+
   const scopedMerchant = useMemo(
-    () => props.merchants.find((merchant) => clean(merchant.id) === merchantFilterId) || null,
-    [merchantFilterId, props.merchants],
+    () => effectiveMerchants.find((merchant) => clean(merchant.id) === merchantFilterId) || null,
+    [effectiveMerchants, merchantFilterId],
   );
 
   const filteredOrders = useMemo(() => {
     if (merchantFilterId && !scopedMerchant) return [];
-    return props.orders.filter((order) => {
+    return effectiveOrders.filter((order) => {
       if (merchantFilterId && clean(order.merchant_id) !== merchantFilterId) return false;
       if (!matchesSearchQuery(orderSearchValues(order), bulkQuery)) return false;
       return true;
     });
-  }, [bulkQuery, merchantFilterId, props.orders, scopedMerchant]);
+  }, [bulkQuery, effectiveOrders, merchantFilterId, scopedMerchant]);
 
   const visibleSectionOrders = useMemo(
     () => filteredOrders.filter((order) => matchesAdminSection(order, props.id)),
     [filteredOrders, props.id],
   );
 
-  const showBulkConsole = ORDER_SECTIONS.has(props.id);
   const shouldPageWorkspace = showBulkConsole && props.id !== "external";
   const pageCount = Math.max(1, Math.ceil(visibleSectionOrders.length / ORDER_PAGE_SIZE));
   const safePage = Math.min(orderPage, pageCount - 1);
@@ -124,17 +199,33 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     });
   }, [visibleSectionOrders]);
 
-  const selectedOrders = useMemo(() => {
-    if (!selectedOrderIds.length) return [];
-    const selected = new Set(selectedOrderIds);
-    return visibleSectionOrders.filter((order) => selected.has(orderId(order)));
-  }, [selectedOrderIds, visibleSectionOrders]);
-
   const workspaceOrders = filteredOrders;
   const renderedWorkspaceOrders = shouldPageWorkspace ? pagedSectionOrders : workspaceOrders;
 
   return (
     <>
+      {recoveryLoading && showBulkConsole && (
+        <p
+          data-admin-order-operational-recovery="true"
+          className="mb-4 rounded-xl border border-brand-sky/25 bg-brand-sky/10 px-4 py-3 text-xs font-black text-brand-sky"
+          dir={props.isArabic ? "rtl" : "ltr"}
+        >
+          {props.isArabic
+            ? "جاري تحميل الطلبات والتجار مباشرة من المصادر المحمية دون انتظار ملخص المالية..."
+            : "Loading orders and merchants directly from protected sources without waiting for the finance summary..."}
+        </p>
+      )}
+
+      {recoveryError && showBulkConsole && (
+        <p
+          role="alert"
+          className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-200"
+          dir={props.isArabic ? "rtl" : "ltr"}
+        >
+          {recoveryError}
+        </p>
+      )}
+
       {props.id === "all_orders" && merchantFilterId && (
         <div
           className="mb-4 flex flex-col gap-3 rounded-2xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3 text-sm font-black text-white sm:flex-row sm:items-center sm:justify-between"
@@ -183,7 +274,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
             sectionId={props.id}
             isArabic={props.isArabic}
             orders={visibleSectionOrders}
-            merchants={props.merchants}
+            merchants={effectiveMerchants}
             merchantId={merchantFilterId}
             query={bulkQuery}
             selectedIds={selectedOrderIds}
@@ -224,12 +315,17 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
         <AdminInternationalOrdersWorkspace
           isArabic={props.isArabic}
           orders={renderedWorkspaceOrders}
-          merchants={props.merchants}
+          merchants={effectiveMerchants}
           onRefresh={props.onRefresh}
           searchManaged
         />
       ) : (
-        <AdminSectionWorkspaceComplete {...props} orders={renderedWorkspaceOrders} searchManaged={showBulkConsole} />
+        <AdminSectionWorkspaceComplete
+          {...props}
+          orders={renderedWorkspaceOrders}
+          merchants={effectiveMerchants}
+          searchManaged={showBulkConsole}
+        />
       )}
     </>
   );
