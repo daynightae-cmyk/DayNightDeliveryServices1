@@ -30,6 +30,10 @@ const unlinkedMerchantFinanceMigration = read(
   "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql",
   repoRoot,
 );
+const reviewedReconciliationMigration = read(
+  "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql",
+  repoRoot,
+);
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 const p1Workflow = read(".github/workflows/p1-runtime-evidence.yml", repoRoot);
 const integrityWorkflow = read(
@@ -120,6 +124,7 @@ assert.match(
 for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802033000_order_merchant_dry_run_timeout\.sql/);
   assert.match(workflow, /20260802034000_financial_reconciliation_without_portal_link\.sql/);
+  assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
 }
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
 assert.match(unlinkedMerchantFinanceMigration, /financial_reconciliation_eligibility_contract_not_found/);
@@ -127,9 +132,14 @@ assert.doesNotMatch(
   unlinkedMerchantFinanceMigration.match(/v_new text := \$new\$([\s\S]*?)\$new\$/)?.[1] || "",
   /dn_merchant_portal_link_count/,
 );
-assert.match(p1Workflow, /0b5e4b66-587c-4923-a372-9758a11578d4/);
-assert.match(p1Workflow, /safe_order_repair_financial_integrity_changed/);
-assert.match(p1Workflow, /safe_finance_repair_order_values_changed/);
+assert.match(reviewedReconciliationMigration, /0b5e4b66-587c-4923-a372-9758a11578d4/);
+assert.match(reviewedReconciliationMigration, /set local statement_timeout = '10min'/);
+assert.match(reviewedReconciliationMigration, /request\.jwt\.claim\.role.*service_role/);
+assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_expected_3/);
+assert.match(reviewedReconciliationMigration, /merchant_statement_rows_inserted'[\s\S]*<> 43/);
+assert.match(reviewedReconciliationMigration, /cod_rows_inserted'[\s\S]*<> 21/);
+assert.match(reviewedReconciliationMigration, /driver_statement_rows_inserted'[\s\S]*<> 1/);
+assert.match(reviewedReconciliationMigration, /post_reconciliation_financial_health_failed/);
 assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
 assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || []).length, "balanced SQL parentheses");
 assert.match(productionAudit, /order:\s*["']id\.asc["']/);
