@@ -69,7 +69,7 @@ function readPersistedSupabaseSession() {
     }
   } catch {
     // The in-memory auth callback remains the primary source. Storage parsing
-    // is only a compatibility fallback for a newly mounted mobile context.
+    // is only a compatibility fallback for a newly mounted browser context.
   }
   return null;
 }
@@ -78,6 +78,10 @@ function tokenIsUsable(token: string, tokenExpiresAt: number) {
   if (!token) return false;
   if (!tokenExpiresAt) return true;
   return tokenExpiresAt * 1000 > Date.now() + 30_000;
+}
+
+function sleep(milliseconds: number) {
+  return new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }
 
 export function cacheAuthenticatedAccessToken(session: SessionLike) {
@@ -101,4 +105,15 @@ export function getCachedAuthenticatedAccessToken() {
   accessToken = persisted.token;
   expiresAt = persisted.expiresAt;
   return accessToken;
+}
+
+export async function waitForAuthenticatedAccessToken(timeoutMs = 12_000) {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  do {
+    const token = getCachedAuthenticatedAccessToken();
+    if (token) return token;
+    if (Date.now() >= deadline) break;
+    await sleep(100);
+  } while (true);
+  return "";
 }
