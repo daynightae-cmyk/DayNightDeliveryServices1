@@ -15,6 +15,9 @@ export type AdminOrderEditSaveResult = {
   row: Order;
   source: "rpc" | "db";
   financialsLocked?: boolean;
+  auditId?: string;
+  changedFields?: string[];
+  merchantChanged?: boolean;
 };
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -55,6 +58,13 @@ function isMissingFinancialUpdateRuntime(error: unknown) {
     return false;
   }
   return /admin_update_order_with_financials|pgrst202|schema cache|could not find the function|function .* does not exist|migration/.test(
+    detail,
+  );
+}
+
+function isMissingCompleteEditRuntime(error: unknown) {
+  const detail = errorDetail(error).toLowerCase();
+  return /admin_update_order_complete_verified|pgrst202|could not find the function|function .* does not exist|schema cache/.test(
     detail,
   );
 }
@@ -103,6 +113,18 @@ function corePatch(input: FinancialOpsOrderUpdateInput) {
   const editReason = clean(input.edit_reason || "Updated from admin order editor");
 
   return {
+    merchant_id: merchant.id,
+    merchant_name: merchant.trade_name,
+    merchant_code: merchant.merchant_code || "",
+    sender_name: clean(input.sender_name || merchant.trade_name),
+    sender_phone: clean(input.sender_phone || merchant.phone),
+    sender_city: clean(input.pickup_city || merchant.emirate),
+    sender_address: uniqueAddress([
+      input.pickup_area,
+      input.pickup_street,
+      merchant.pickup_address,
+      merchant.address,
+    ]),
     receiver_name: clean(input.receiver_name),
     receiver_phone: clean(input.receiver_phone),
     receiver_city: receiverCity,
@@ -111,11 +133,15 @@ function corePatch(input: FinancialOpsOrderUpdateInput) {
       input.delivery_street,
       input.receiver_address,
     ]),
+    coupon_number: clean(input.coupon_number),
     package_type: packageValue,
     package_description: packageValue,
     weight: Math.max(0.1, Number(input.weight || 1)),
     pieces: count,
     order_count: count,
+    shipping_scope: input.shipping_scope,
+    destination_country: isInternational ? receiverCity : null,
+    service_type: isInternational ? "international" : "standard",
     notes: [notes, `Admin edit: ${editReason}`].filter(Boolean).join(" | "),
     updated_at: new Date().toISOString(),
   };
@@ -135,14 +161,13 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
   );
   const count = Math.max(1, Math.ceil(Number(input.order_count || 1)));
   const notes = clean(input.notes);
-  const editReason = clean(input.edit_reason || "Updated from admin order editor");
 
   return {
     merchant_id: merchant.id,
     merchant_name: merchant.trade_name,
     merchant_code: merchant.merchant_code || "",
-    sender_name: merchant.trade_name,
-    sender_phone: clean(merchant.phone),
+    sender_name: clean(input.sender_name || merchant.trade_name),
+    sender_phone: clean(input.sender_phone || merchant.phone),
     sender_city: clean(input.pickup_city || merchant.emirate),
     sender_address: uniqueAddress([
       input.pickup_area,
@@ -184,10 +209,12 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
     amount: financials.customerTotal,
     price: financials.customerTotal,
     manual_delivery_price:
-      financials.priceSource === "manual" ? financials.deliveryFee : null,
+      financials.priceSource === "manual"
+        ? Number(input.manual_delivery_price ?? financials.deliveryFee)
+        : null,
     price_source: financials.priceSource,
     currency: "AED",
-    notes: [notes, `Admin edit: ${editReason}`].filter(Boolean).join(" | "),
+    notes,
     updated_at: new Date().toISOString(),
   };
 }
@@ -266,6 +293,57 @@ function personalFullPatch(input: FinancialOpsOrderUpdateInput) {
     amount: financials.customerTotal,
     price: financials.customerTotal,
     currency: "AED",
+  };
+}
+
+async function updateCompleteMerchantOrder(
+  input: FinancialOpsOrderUpdateInput,
+): Promise<AdminOrderEditSaveResult> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const orderId = clean(input.order.id);
+  if (!orderId) throw new Error("order_id_required_for_complete_edit");
+  const reason = clean(input.edit_reason);
+  if (reason.length < 6) throw new Error("admin_edit_reason_required_min_6");
+
+  const patch = fullPatch(input);
+  const financials = calculateFinancialOpsOrder(input);
+  const { data, error } = await supabase.rpc("admin_update_order_complete_verified", {
+    p_payload: {
+      order_id: orderId,
+      patch,
+      financials: {
+        goods_value: financials.goodsValue,
+        delivery_fee: financials.deliveryFee,
+        discount_amount: financials.discountAmount,
+        delivery_fee_mode: financials.deliveryFeeMode,
+      },
+      reason,
+    },
+  });
+  if (error) throw error;
+
+  const payload = (Array.isArray(data) ? data[0] : data) as
+    | {
+        ok?: boolean;
+        order?: Order;
+        audit_id?: string;
+        changed_fields?: string[];
+        merchant_changed?: boolean;
+      }
+    | null;
+  if (!payload?.ok || !payload.order?.id) {
+    throw new Error("complete_order_edit_returned_no_order");
+  }
+
+  return {
+    row: payload.order,
+    source: "rpc",
+    financialsLocked: false,
+    auditId: clean(payload.audit_id),
+    changedFields: Array.isArray(payload.changed_fields)
+      ? payload.changed_fields
+      : [],
+    merchantChanged: Boolean(payload.merchant_changed),
   };
 }
 
@@ -354,9 +432,15 @@ export async function saveAdminOrderEdit(
     return { row, source: "db", financialsLocked: locked };
   }
 
-  if (financialsAreLocked(input.order)) {
-    const row = await updateWithPatch(input, corePatch(input));
-    return { row, source: "db", financialsLocked: true };
+  try {
+    return await updateCompleteMerchantOrder(input);
+  } catch (error) {
+    if (!isMissingCompleteEditRuntime(error)) throw error;
+    if (financialsAreLocked(input.order)) {
+      throw new Error(
+        "admin_complete_order_edit_runtime_missing_apply_migration_20260802084500",
+      );
+    }
   }
 
   try {
