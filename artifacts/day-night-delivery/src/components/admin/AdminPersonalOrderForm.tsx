@@ -159,12 +159,10 @@ export default function AdminPersonalOrderForm({
     setMessage("");
     setError("");
     const missing = [
+      !form.reference?.trim() ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
       !form.sender_name.trim() ? (isArabic ? "اسم المرسل" : "sender name") : "",
-      !form.sender_phone.trim() ? (isArabic ? "هاتف المرسل" : "sender phone") : "",
       !form.receiver_name.trim() ? (isArabic ? "اسم المستلم" : "recipient name") : "",
       !form.receiver_phone.trim() ? (isArabic ? "هاتف المستلم" : "recipient phone") : "",
-      !form.pickup_street.trim() ? (isArabic ? "عنوان الاستلام" : "pickup address") : "",
-      !form.delivery_street.trim() ? (isArabic ? "عنوان التسليم" : "delivery address") : "",
       form.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
     ].filter(Boolean);
     if (missing.length) {
@@ -233,8 +231,8 @@ export default function AdminPersonalOrderForm({
             </h2>
             <p className="mt-1 text-xs font-bold leading-6 text-white/60">
               {isArabic
-                ? "طلب مباشر بين مرسل ومستلم. يمكن تسجيل رقم الكوبون، ولا يُنشأ حساب تاجر، ورسوم التوصيل ثابتة 25 درهم."
-                : "Direct sender-to-recipient order. A coupon number can be recorded, no merchant ledger is created, and delivery is fixed at 25 AED."}
+                ? "طلب مباشر بين مرسل ومستلم. رقم الكوبون إلزامي، ولا يُنشأ حساب تاجر، ورسوم التوصيل ثابتة 25 درهم."
+                : "Direct sender-to-recipient order. The coupon number is required, no merchant ledger is created, and delivery is fixed at 25 AED."}
             </p>
           </div>
         </div>
@@ -263,7 +261,7 @@ export default function AdminPersonalOrderForm({
 
       <section className="mb-4 rounded-3xl border border-brand-gold/25 bg-brand-gold/5 p-4">
         <label className="grid gap-2 text-xs font-black text-white/70">
-          <span>{isArabic ? "رقم الكوبون — اختياري" : "Coupon number — optional"}</span>
+          <span>{isArabic ? "رقم الكوبون * — إجباري" : "Coupon number * — required"}</span>
           <input
             data-admin-next-order-focus="true"
             data-admin-personal-coupon="true"
@@ -272,11 +270,13 @@ export default function AdminPersonalOrderForm({
             className={inputClass}
             placeholder={
               isArabic
-                ? "أدخل رقم الكوبون الموجود لديك — رقم التتبع يُولد تلقائيًا"
-                : "Enter your coupon number — tracking is generated automatically"
+                ? "أدخل رقم الكوبون الإجباري — رقم التتبع يُولد تلقائيًا"
+                : "Enter the required coupon number — tracking is generated automatically"
             }
             dir="ltr"
             autoComplete="off"
+            required
+            aria-required="true"
           />
         </label>
       </section>
@@ -299,7 +299,7 @@ export default function AdminPersonalOrderForm({
               value={form.sender_phone}
               onChange={(event) => field("sender_phone", event.target.value)}
               className={inputClass}
-              placeholder={isArabic ? "هاتف المرسل *" : "Sender phone *"}
+              placeholder={isArabic ? "هاتف المرسل — اختياري" : "Sender phone — optional"}
               dir="ltr"
             />
           </div>
@@ -345,7 +345,7 @@ export default function AdminPersonalOrderForm({
             value={form.pickup_street}
             onChange={(event) => field("pickup_street", event.target.value)}
             className={inputClass}
-            placeholder={isArabic ? "عنوان الاستلام التفصيلي *" : "Detailed pickup address *"}
+            placeholder={isArabic ? "عنوان الاستلام التفصيلي — اختياري" : "Detailed pickup address — optional"}
           />
         </section>
 
@@ -412,7 +412,7 @@ export default function AdminPersonalOrderForm({
             value={form.delivery_street}
             onChange={(event) => field("delivery_street", event.target.value)}
             className={inputClass}
-            placeholder={isArabic ? "عنوان التسليم التفصيلي *" : "Detailed delivery address *"}
+            placeholder={isArabic ? "عنوان التسليم التفصيلي — اختياري" : "Detailed delivery address — optional"}
           />
         </section>
       </div>
@@ -461,7 +461,7 @@ export default function AdminPersonalOrderForm({
           value={form.notes || ""}
           onChange={(event) => field("notes", event.target.value)}
           className={`${inputClass} md:col-span-2`}
-          placeholder={isArabic ? "ملاحظات الطلب" : "Order notes"}
+          placeholder={isArabic ? "ملاحظات الطلب — اختياري" : "Order notes — optional"}
         />
         <div className="rounded-2xl border border-brand-sky/25 bg-brand-sky/10 p-3 text-center">
           <small className="block text-[10px] font-black text-white/55">
