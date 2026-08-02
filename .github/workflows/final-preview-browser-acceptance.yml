@@ -6,7 +6,6 @@ on:
     paths:
       - ".github/workflows/final-preview-browser-acceptance.yml"
       - ".github/scripts/final-preview-browser-acceptance.mjs"
-      - ".github/scripts/final-preview-browser-acceptance-v2.mjs"
       - ".github/scripts/ilytk-session-rpc-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
@@ -104,7 +103,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node .github/scripts/final-preview-browser-acceptance-v2.mjs
+          node .github/scripts/final-preview-browser-acceptance.mjs
 
       - name: Stop local application
         if: always()
