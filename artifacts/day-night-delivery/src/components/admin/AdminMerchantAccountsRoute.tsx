@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, RefreshCw, Search } from "lucide-react";
 import type { Merchant, Order } from "../../types";
+import { fetchAdminOrders } from "../../lib/adminData";
 import {
   fetchFinanceLedgerSnapshot,
   type FinanceLedgerSnapshot,
@@ -18,9 +19,14 @@ type Props = {
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
 
+/**
+ * Loads one authoritative order list and finance snapshot directly from the
+ * database. The parent order array is never trusted as the source of truth for
+ * merchant accounts because it may still be loading when this route opens.
+ */
 export default function AdminMerchantAccountsRoute({
   isArabic,
-  orders,
+  orders: parentOrders,
   merchants,
   onRefresh,
   onNavigate,
@@ -28,6 +34,7 @@ export default function AdminMerchantAccountsRoute({
   const [dateFrom, setDateFrom] = useState(monthStart());
   const [dateTo, setDateTo] = useState(today());
   const [query, setQuery] = useState("");
+  const [authoritativeOrders, setAuthoritativeOrders] = useState<Order[]>([]);
   const [snapshot, setSnapshot] = useState<FinanceLedgerSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,15 +44,18 @@ export default function AdminMerchantAccountsRoute({
     setError("");
     try {
       if (includeParent) await onRefresh();
-      const next = await fetchFinanceLedgerSnapshot(orders, dateFrom, dateTo);
+      const loadedOrders = await fetchAdminOrders();
+      const next = await fetchFinanceLedgerSnapshot(loadedOrders, dateFrom, dateTo);
+      setAuthoritativeOrders(loadedOrders);
       setSnapshot(next);
     } catch (cause) {
       console.error("Merchant accounts route load failed.", cause);
+      setAuthoritativeOrders([]);
       setSnapshot(null);
       setError(
         isArabic
-          ? "تعذر تحميل حسابات التجار من قاعدة البيانات. لم يتم عرض بيانات بديلة أو مختلطة."
-          : "Merchant accounts could not be loaded from the database. No mixed or fabricated fallback was shown.",
+          ? "تعذر تحميل حسابات التجار والطلبيات مباشرة من قاعدة البيانات. لم يتم عرض بيانات ناقصة أو مختلطة."
+          : "Merchant accounts and orders could not be loaded directly from the database. No incomplete or mixed fallback was shown.",
       );
     } finally {
       setBusy(false);
@@ -53,11 +63,11 @@ export default function AdminMerchantAccountsRoute({
   }
 
   useEffect(() => {
-    void load();
-  }, [dateFrom, dateTo, orders]);
+    void load(false);
+  }, [dateFrom, dateTo]);
 
   return (
-    <section className="space-y-4" dir={isArabic ? "rtl" : "ltr"}>
+    <section className="space-y-4" dir={isArabic ? "rtl" : "ltr"} data-parent-order-count={parentOrders.length}>
       <section className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-[1fr_1fr_minmax(260px,1.3fr)_auto]">
         <label className="block">
           <span className="mb-2 flex items-center gap-2 text-xs font-black text-white/55">
@@ -117,13 +127,16 @@ export default function AdminMerchantAccountsRoute({
 
       {busy && !snapshot ? (
         <div className="grid min-h-64 place-items-center rounded-[1.8rem] border border-white/10 bg-[#031226] text-sm font-black text-white/55">
-          <span className="inline-flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-brand-gold" />{isArabic ? "جاري تحميل ملفات حسابات التجار..." : "Loading merchant account files..."}</span>
+          <span className="inline-flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-brand-gold" />
+            {isArabic ? "جاري تحميل ملفات حسابات التجار والطلبيات..." : "Loading merchant accounts and orders..."}
+          </span>
         </div>
       ) : (
         <AdminMerchantAccountsCenter
           isArabic={isArabic}
           merchants={merchants}
-          orders={orders}
+          orders={authoritativeOrders}
           accountEntries={snapshot?.accountEntries || []}
           settlements={snapshot?.settlements || []}
           query={query}
