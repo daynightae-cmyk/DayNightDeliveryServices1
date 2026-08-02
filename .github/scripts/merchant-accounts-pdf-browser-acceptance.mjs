@@ -117,6 +117,7 @@ replaceRequired(
   const bodyText = await body.innerText();
   assert(/DN-MER-SHOP-ILYTK|استبي ما عرفنالك/.test(bodyText), label + ': selected merchant PDF workspace is missing.');
   assert(!bodyText.includes('DN-MER-SHOP-G3BXG'), label + ': another merchant leaked into the PDF workspace.');
+  assert(!/تعذر التحقق من سجل كشوف|سجل كشوف PDF غير جاهز|PDF statement log could not be verified|PDF statement log is unavailable/.test(bodyText), label + ': PDF history verification failed and export remained unsafe.');
 
   const statusBadges = page.locator('[data-merchant-pdf-exported="true"], [data-merchant-pdf-not-exported="true"]');
   await statusBadges.first().waitFor({ state: 'visible', timeout: 90000 });
@@ -130,7 +131,19 @@ replaceRequired(
   assert(href.includes('text='), label + ': WhatsApp summary is not prefilled.');
 
   const pdfButtons = page.locator('.dn-admin-pdf-button');
-  assert((await pdfButtons.count()) > 0, label + ': PDF export control is missing.');
+  const pdfButtonCount = await pdfButtons.count();
+  assert(pdfButtonCount > 0, label + ': PDF export control is missing.');
+  let enabledPdfButton = null;
+  for (let index = 0; index < pdfButtonCount; index += 1) {
+    const candidate = pdfButtons.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      enabledPdfButton = candidate;
+      break;
+    }
+  }
+  assert(enabledPdfButton, label + ': no visible PDF export control was found.');
+  assert(!(await enabledPdfButton.isDisabled()), label + ': PDF export is disabled after history verification.');
+
   await page.screenshot({ path: 'merchant-accounts-pdf-evidence/' + label + '-pdf-statements.png', fullPage: true });
 }`,
   'verify_pdf',
@@ -143,6 +156,10 @@ source = source.replace(
 source = source.replace(
   "      crossMerchantOrderBlocked: 'PASS',",
   "      crossMerchantDataBlocked: 'PASS',",
+);
+source = source.replace(
+  "      reviewedCoupons,\n      excludedCoupon,",
+  "      fixedCouponFixturesRemoved: true,",
 );
 
 fs.writeFileSync(temporaryPath, source, 'utf8');
