@@ -10,7 +10,7 @@ select set_config('request.jwt.claim.role', 'service_role', true);
 
 do $migration$
 declare
-  v_run_id constant uuid := '0b5e4b66-587c-4923-a372-9758a11578d4';
+  v_run_id constant uuid := '37348f9e-60d8-4f6b-8cdf-b9181464f2b7';
   v_status text;
   v_order_result jsonb;
   v_finance_result jsonb;

@@ -39,6 +39,10 @@ const customerE2eCleanupMigration = read(
   repoRoot,
 );
 const customerE2e = read("scripts/customer-experience-runtime-e2e.mjs");
+const projectionBackfillGuardMigration = read(
+  "supabase/migrations/20260802034700_defer_projection_during_merchant_backfill.sql",
+  repoRoot,
+);
 const productionAudit = read("scripts/global-order-merchant-production-readonly-audit.mjs");
 const p1Workflow = read(".github/workflows/p1-runtime-evidence.yml", repoRoot);
 const integrityWorkflow = read(
@@ -130,6 +134,8 @@ for (const workflow of [p1Workflow, integrityWorkflow]) {
   assert.match(workflow, /20260802033000_order_merchant_dry_run_timeout\.sql/);
   assert.match(workflow, /20260802034000_financial_reconciliation_without_portal_link\.sql/);
   assert.match(workflow, /20260802034500_customer_e2e_dependency_cleanup\.sql/);
+  assert.match(workflow, /20260802034700_defer_projection_during_merchant_backfill\.sql/);
+  assert.match(workflow, /20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
 }
 assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
 assert.match(unlinkedMerchantFinanceMigration, /financial_reconciliation_eligibility_contract_not_found/);
@@ -137,7 +143,7 @@ assert.doesNotMatch(
   unlinkedMerchantFinanceMigration.match(/v_new text := \$new\$([\s\S]*?)\$new\$/)?.[1] || "",
   /dn_merchant_portal_link_count/,
 );
-assert.match(reviewedReconciliationMigration, /0b5e4b66-587c-4923-a372-9758a11578d4/);
+assert.match(reviewedReconciliationMigration, /37348f9e-60d8-4f6b-8cdf-b9181464f2b7/);
 assert.match(reviewedReconciliationMigration, /set local statement_timeout = '10min'/);
 assert.match(reviewedReconciliationMigration, /request\.jwt\.claim\.role.*service_role/);
 assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_expected_3/);
@@ -150,6 +156,9 @@ assert.match(customerE2eCleanupMigration, /production_test_dependency_cleanup_au
 assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_changed_order_financial_integrity/);
 assert.match(customerE2eCleanupMigration, /v_current - 'dependent_tables'/);
 assert.match(customerE2eCleanupMigration, /missing_dependencies/);
+assert.match(projectionBackfillGuardMigration, /pg_get_functiondef/);
+assert.match(projectionBackfillGuardMigration, /daynight\.order_merchant_reconciliation/);
+assert.match(projectionBackfillGuardMigration, /delivered_projection_backfill_guard_contract_not_found/);
 for (const table of [
   "financial_account_entries",
   "cod_collections",
