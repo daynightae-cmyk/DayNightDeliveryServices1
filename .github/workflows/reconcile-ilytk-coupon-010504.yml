@@ -1,0 +1,164 @@
+name: Restore ILYTK Coupon 010504
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260802164100_reconcile_ilytk_coupon_010504.sql"
+      - ".github/scripts/ilytk-session-rpc-diagnostic.mjs"
+      - ".github/workflows/reconcile-ilytk-coupon-010504.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconcile-ilytk-coupon-010504-production
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Validate protected production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply only the reviewed 010504 migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="20260802164100_reconcile_ilytk_coupon_010504.sql"
+          release_dir="$RUNNER_TEMP/daynight-ilytk-010504"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+
+          supabase --workdir "$release_dir" link \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+
+          if [ -f "$release_dir/supabase/migrations/$target" ]; then
+            echo "$target is already recorded in production; verifying idempotent final state."
+          else
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Verify order, accounts, statements and dependent ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const root = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+          const orderId = '5fa6bc07-a7d6-4b43-a4c4-70dad6af160a';
+          const merchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+          const oldMerchantId = 'b0da2d6d-2fc9-43b3-9e38-260ff2dbd68e';
+          const headers = { apikey: key, Authorization: `Bearer ${key}` };
+          const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+          async function rows(table, select, optional = false) {
+            const query = new URLSearchParams({ select, order_id: `eq.${orderId}` });
+            const response = await fetch(`${root}/rest/v1/${table}?${query}`, { headers });
+            const payload = await response.json().catch(() => null);
+            if (optional && (response.status === 404 || (response.status === 400 && ['42P01', '42703', 'PGRST204'].includes(payload?.code)))) {
+              return [];
+            }
+            if (!response.ok || !Array.isArray(payload)) {
+              throw new Error(`${table}_verification_${response.status}_${JSON.stringify(payload)}`);
+            }
+            return payload;
+          }
+
+          const orderResponse = await fetch(
+            `${root}/rest/v1/orders?id=eq.${orderId}&select=id,coupon_number,tracking_number,merchant_id,merchant_code,merchant_name,sender_phone`,
+            { headers },
+          );
+          const orderRows = await orderResponse.json().catch(() => null);
+          assert(orderResponse.ok && Array.isArray(orderRows) && orderRows.length === 1, 'coupon_010504_order_not_unique');
+          const order = orderRows[0];
+          assert(String(order.coupon_number || '').trim() === '010504', 'coupon_010504_number_changed');
+          assert(String(order.tracking_number || '').trim() === 'DN-INV-2026-010504-MS7ZINTM', 'coupon_010504_tracking_changed');
+          assert(String(order.merchant_id || '') === merchantId, `coupon_010504_owner_${order.merchant_id || 'null'}`);
+          assert(String(order.merchant_code || '').trim() === 'DN-MER-SHOP-ILYTK', `coupon_010504_code_${order.merchant_code || 'null'}`);
+
+          const oldOwnerResponse = await fetch(
+            `${root}/rest/v1/orders?id=eq.${orderId}&merchant_id=eq.${oldMerchantId}&select=id`,
+            { headers },
+          );
+          const oldOwnerRows = await oldOwnerResponse.json().catch(() => null);
+          assert(oldOwnerResponse.ok && Array.isArray(oldOwnerRows) && oldOwnerRows.length === 0, 'coupon_010504_still_under_old_merchant');
+
+          const dependencies = [
+            ['cod_collections', 'id,order_id,merchant_id'],
+            ['merchant_statement_entries', 'id,order_id,merchant_id'],
+            ['order_financial_settlements', 'id,order_id,merchant_id'],
+            ['financial_account_entries', 'id,order_id,merchant_id'],
+            ['merchant_invoices', 'id,order_id,merchant_id'],
+            ['invoices', 'id,order_id,merchant_id'],
+            ['notifications', 'id,order_id,merchant_id'],
+            ['merchant_statement_dispatch_log', 'id,order_id,merchant_id'],
+          ];
+          const evidence = {};
+          for (const [table, select] of dependencies) {
+            const tableRows = await rows(table, select, true);
+            assert(tableRows.every((row) => String(row.merchant_id || '') === merchantId), `${table}_coupon_010504_owner_mismatch`);
+            evidence[table] = tableRows.length;
+          }
+
+          console.log(JSON.stringify({
+            result: 'PASS',
+            order_id: orderId,
+            coupon_number: order.coupon_number,
+            tracking_number: order.tracking_number,
+            merchant_id: order.merchant_id,
+            merchant_code: order.merchant_code,
+            dependency_rows: evidence,
+          }, null, 2));
+          NODE
+
+      - name: Install repository dependencies for authenticated portal verification
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify genuine admin and ILYTK portal visibility
+        shell: bash
+        run: node .github/scripts/ilytk-session-rpc-diagnostic.mjs
