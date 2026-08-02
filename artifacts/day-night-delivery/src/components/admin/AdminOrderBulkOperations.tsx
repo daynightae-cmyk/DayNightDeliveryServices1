@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckSquare2, FileDown, ListChecks, Printer, Search, Square, Store, UserRound, X } from "lucide-react";
+import { CheckSquare2, FileDown, ListChecks, Printer, Search, Square, Store, X } from "lucide-react";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import { localizedOrderRoute } from "../../lib/exportLocalization";
 import { normalizeOrderStatus } from "../../lib/adminOrderLogic";
@@ -37,9 +37,6 @@ function statusLabel(value: unknown, isArabic: boolean) {
 }
 
 function reportTitle(sectionId: AdminSectionId, isArabic: boolean, selected: boolean) {
-  if (sectionId === "personal_orders") {
-    return isArabic ? (selected ? "الطلبيات الشخصية المحددة" : "كل الطلبيات الشخصية") : (selected ? "Selected personal orders" : "All personal orders");
-  }
   return isArabic ? (selected ? "الطلبات المحددة" : "كل نتائج الطلبات") : (selected ? "Selected orders" : "All order results");
 }
 
@@ -97,7 +94,6 @@ export default function AdminOrderBulkOperations({ sectionId, isArabic, orders, 
     [allPayload, isArabic, sectionId, selectedOrders],
   );
   const printRows = selectedOrders.length ? selectedOrders : orders;
-  const personal = sectionId === "personal_orders";
   const selectorPageCount = Math.max(1, Math.ceil(orders.length / SELECTOR_PAGE_SIZE));
   const selectorSafePage = Math.min(selectorPage, selectorPageCount - 1);
   const selectorStart = selectorSafePage * SELECTOR_PAGE_SIZE;
@@ -119,7 +115,7 @@ export default function AdminOrderBulkOperations({ sectionId, isArabic, orders, 
       </div>
 
       <div className="dn-admin-bulk-filter-grid">
-        {personal ? <div className="flex min-h-11 items-center gap-2 rounded-xl border border-brand-gold/25 bg-brand-gold/10 px-4 text-xs font-black text-brand-gold"><UserRound className="h-4 w-4" />{isArabic ? "طلبيات شخصية بدون تاجر" : "Personal orders without merchant"}</div> : <label><span><Store className="inline h-4 w-4" /> {isArabic ? "التاجر" : "Merchant"}</span><select value={merchantId} onChange={(event) => onMerchantChange(event.target.value)}><option value="">{isArabic ? "كل التجار" : "All merchants"}</option>{merchants.map((merchant) => <option value={clean(merchant.id)} key={clean(merchant.id)}>{merchantName(merchant)}{merchant.merchant_code ? ` · ${merchant.merchant_code}` : ""}</option>)}</select></label>}
+        {<label><span><Store className="inline h-4 w-4" /> {isArabic ? "التاجر" : "Merchant"}</span><select value={merchantId} onChange={(event) => onMerchantChange(event.target.value)}><option value="">{isArabic ? "كل التجار والطلبات الشخصية" : "All merchants and personal orders"}</option>{merchants.map((merchant) => <option value={clean(merchant.id)} key={clean(merchant.id)}>{merchantName(merchant)}{merchant.merchant_code ? ` · ${merchant.merchant_code}` : ""}</option>)}</select></label>}
         <label><span><Search className="inline h-4 w-4" /> {isArabic ? "بحث داخل كل الطلبات" : "Search all orders"}</span><input data-admin-order-search="true" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={isArabic ? "تتبع، كوبون، اسم، هاتف، تاجر، مدينة، حالة..." : "Tracking, coupon, name, phone, merchant, city, status..."} /></label>
       </div>
 

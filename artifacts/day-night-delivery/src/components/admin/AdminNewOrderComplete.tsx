@@ -26,6 +26,7 @@ import { createAdminCouponIntakeSession } from "../../lib/couponIntakeData";
 import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
 import type { Merchant, Order } from "../../types";
 import CouponPhotoIntake, { type CouponPhotoReview } from "../shared/CouponPhotoIntake";
+import AdminPersonalOrderForm from "./AdminPersonalOrderForm";
 
 const emptyOrder: FinancialOpsOrderInput = {
   merchant: null,
@@ -72,6 +73,9 @@ const destinations = [
   { value: "Canada", ar: "كندا", en: "Canada" },
   { value: "Australia", ar: "أستراليا", en: "Australia" },
 ] as const;
+
+const PERSONAL_ORDER_OPTION = "__personal_order__";
+type OrderOwnerMode = "merchant" | "personal";
 
 const clean = (value: unknown) => String(value ?? "").trim();
 const inputClass = () =>
@@ -150,6 +154,7 @@ export default function AdminNewOrderComplete({
   onSaved?: (order: Order) => void;
 }) {
   const [form, setForm] = useState<FinancialOpsOrderInput>(() => freshOrderForMerchant(null));
+  const [ownerMode, setOwnerMode] = useState<OrderOwnerMode>("merchant");
   const [entryMode, setEntryMode] = useState<"manual" | "coupon">("manual");
   const [couponReview, setCouponReview] = useState<CouponPhotoReview | null>(null);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
@@ -185,6 +190,7 @@ export default function AdminNewOrderComplete({
     }
   }, [form.goods_value, form.discount_amount, authoritativeDeliveryFeeMode, pricing.total]);
   const settlement = financials ? merchantSettlement(financials.merchantDue, isArabic) : null;
+  const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -221,7 +227,17 @@ export default function AdminNewOrderComplete({
   }
 
   function chooseMerchant(id: string) {
+    if (id === PERSONAL_ORDER_OPTION) {
+      setOwnerMode("personal");
+      setForm(freshOrderForMerchant(null));
+      setSource("pending");
+      setMessage("");
+      setError("");
+      return;
+    }
+
     const merchant = merchants.find((item) => item.id === id) || null;
+    setOwnerMode("merchant");
     setForm((current) => ({
       ...current,
       merchant,
@@ -361,8 +377,50 @@ export default function AdminNewOrderComplete({
     }
   }
 
+
+  if (ownerMode === "personal") {
+    return (
+      <section
+        data-admin-unified-personal-order-entry="true"
+        className="space-y-4"
+        dir={isArabic ? "rtl" : "ltr"}
+      >
+        <div className="rounded-[2rem] border border-brand-gold/30 bg-white/[0.045] p-5 shadow-2xl shadow-black/20">
+          <div className="mb-4">
+            <h2 className="text-xl font-black text-white">
+              {isArabic ? "إضافة طلب — تاجر أو غرض شخصي" : "Add order — merchant or personal purpose"}
+            </h2>
+            <p className="mt-1 text-xs font-bold leading-6 text-white/55">
+              {isArabic
+                ? "اختيار غرض شخصي يلغي أي علاقة بالتجار أو حساباتهم، ويحفظ الطلب مباشرة باسم المرسل والمستلم."
+                : "Personal purpose removes every merchant and merchant-ledger relationship and saves the order directly for the sender and recipient."}
+            </p>
+          </div>
+          <label className="grid gap-2">
+            <span className="text-xs font-black text-brand-gold">
+              {isArabic ? "نوع الطلب أو التاجر" : "Order purpose or merchant"}
+            </span>
+            <select
+              data-admin-order-owner-select="true"
+              value={ownerSelectionValue}
+              onChange={(event) => chooseMerchant(event.target.value)}
+              className={inputClass()}
+            >
+              <option value="">{isArabic ? "اختر التاجر أو غرض شخصي *" : "Select merchant or personal purpose *"}</option>
+              <option value={PERSONAL_ORDER_OPTION}>{isArabic ? "غرض شخصي — بدون تاجر" : "Personal purpose — no merchant"}</option>
+              {merchants.map((merchant) => (
+                <option key={merchant.id} value={merchant.id}>{merchantOptionLabel(merchant)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <AdminPersonalOrderForm isArabic={isArabic} onSaved={onSaved} />
+      </section>
+    );
+  }
+
   return (
-    <form onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
+    <form data-admin-new-order-form="merchant" onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
       <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold"><PackagePlus className="h-6 w-6" /></span>
@@ -395,9 +453,10 @@ export default function AdminNewOrderComplete({
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div className="space-y-4 rounded-[1.5rem] border border-white/10 bg-brand-deep/35 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-black text-white"><Store className="h-4 w-4 text-brand-gold" />{isArabic ? "التاجر والكوبون" : "Merchant and coupon"}</h3>
-          <select value={form.merchant_id || ""} onChange={(event) => chooseMerchant(event.target.value)} className={inputClass()} required>
-            <option value="">{isArabic ? "اختر التاجر *" : "Select merchant *"}</option>
+          <h3 className="flex items-center gap-2 text-sm font-black text-white"><Store className="h-4 w-4 text-brand-gold" />{isArabic ? "نوع الطلب والتاجر والكوبون" : "Order purpose, merchant, and coupon"}</h3>
+          <select data-admin-order-owner-select="true" value={ownerSelectionValue} onChange={(event) => chooseMerchant(event.target.value)} className={inputClass()} required>
+            <option value="">{isArabic ? "اختر التاجر أو غرض شخصي *" : "Select merchant or personal purpose *"}</option>
+            <option value={PERSONAL_ORDER_OPTION}>{isArabic ? "غرض شخصي — بدون تاجر" : "Personal purpose — no merchant"}</option>
             {merchants.map((merchant) => <option key={merchant.id} value={merchant.id}>{merchantOptionLabel(merchant)}</option>)}
           </select>
           <input data-admin-next-order-focus="true" value={form.coupon_number || ""} onChange={(event) => setField("coupon_number", event.target.value)} placeholder={isArabic ? "رقم الكوبون *" : "Coupon number *"} className={inputClass()} required dir="ltr" />

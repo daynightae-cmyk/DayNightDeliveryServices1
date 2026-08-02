@@ -126,6 +126,47 @@ export function calculateOrderFinancials(
 export function financialsFromOrder(
   order: Partial<Order> & Record<string, unknown>,
 ): OrderFinancialBreakdown {
+  const isPersonalOrder =
+    String(order.source_channel ?? "").trim().toLowerCase() === "admin_personal_order" &&
+    !String(order.merchant_id ?? "").trim();
+
+  if (isPersonalOrder) {
+    const goodsValue = roundMoney(Math.max(0, financialNumber(
+      order.goods_value ?? order.product_value ?? order.merchant_goods_value,
+      0,
+    )));
+    const deliveryFee = roundMoney(Math.max(0, financialNumber(
+      order.delivery_fee ??
+        order.delivery_price ??
+        order.manual_delivery_price ??
+        order.base_price,
+      25,
+    )));
+    const discountAmount = roundMoney(Math.max(0, financialNumber(
+      order.discount_amount ?? order.discount,
+      0,
+    )));
+    const calculatedCustomerTotal = roundMoney(
+      Math.max(0, goodsValue + deliveryFee - discountAmount),
+    );
+
+    return {
+      goodsValue,
+      deliveryFee,
+      discountAmount,
+      deliveryFeeMode: "customer_pays",
+      customerTotal: roundMoney(Math.max(0, financialNumber(
+        order.customer_total ?? order.total ?? order.total_price,
+        calculatedCustomerTotal,
+      ))),
+      merchantDue: 0,
+      companyRevenue: roundMoney(Math.max(0, financialNumber(
+        order.company_revenue,
+        deliveryFee,
+      ))),
+    };
+  }
+
   const deliveryFee = financialNumber(
     order.delivery_fee ??
       order.delivery_price ??
