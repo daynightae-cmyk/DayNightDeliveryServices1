@@ -171,6 +171,7 @@ jobs:
             20260802023000_global_order_merchant_integrity_restoration.sql
             20260802031500_personal_order_optional_coupon_policy.sql
             20260802033000_order_merchant_dry_run_timeout.sql
+            20260802034000_financial_reconciliation_without_portal_link.sql
           )
 
           for target in "${targets[@]}"; do
@@ -231,7 +232,7 @@ jobs:
             20260730094500 20260730095500 20260730100500 20260730101500 \
             20260730114000 20260730130000 20260730133000 20260730134000 \
             20260730135000 20260730136000 20260730137000 \
-            20260802023000 20260802031500 20260802033000
+            20260802023000 20260802031500 20260802033000 20260802034000
           do
             grep -Fq "$version" "$evidence/migrations-after.txt" || {
               echo "Required production migration version missing: $version" >&2
@@ -297,6 +298,86 @@ jobs:
           console.log(`::add-mask::${payload.access_token}`);
           fs.appendFileSync(process.env.GITHUB_ENV, `SUPABASE_ADMIN_ACCESS_TOKEN=${payload.access_token}\n`);
           console.log('Protected admin session acquired without exposing credentials.');
+          NODE
+
+      - name: Apply exact reviewed merchant and finance reconciliation
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          ORDER_MERCHANT_REVIEWED_RUN_ID: 0b5e4b66-587c-4923-a372-9758a11578d4
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root = 'artifacts/day-night-delivery/p1-runtime-evidence';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const token = String(process.env.SUPABASE_ADMIN_ACCESS_TOKEN || '');
+          const runId = String(process.env.ORDER_MERCHANT_REVIEWED_RUN_ID || '');
+          const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+          async function json(path, options = {}) {
+            const response = await fetch(`${url}${path}`, { headers, ...options });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(`${path}_http_${response.status}_${JSON.stringify(payload)}`);
+            return payload;
+          }
+          const runs = await json(`/rest/v1/order_merchant_audit_runs?id=eq.${runId}&select=id,status,financial_before,summary`);
+          if (!Array.isArray(runs) || runs.length !== 1) throw new Error('exact_reviewed_run_not_found');
+          const beforeRun = runs[0];
+          if (!['DRY_RUN_REVIEWED', 'APPLIED_SAFE_ONLY', 'FINANCE_RECONCILED_SAFE_ONLY'].includes(beforeRun.status)) {
+            throw new Error(`exact_reviewed_run_status_rejected_${beforeRun.status}`);
+          }
+          const rpc = (name, body) => json(`/rest/v1/rpc/${name}`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+          let orderRepair = { ok: true, status: beforeRun.status, already_applied: true };
+          if (beforeRun.status === 'DRY_RUN_REVIEWED') {
+            orderRepair = await rpc('admin_apply_order_merchant_safe_backfill', {
+              p_run_id: runId,
+              p_confirm: true,
+            });
+            if (orderRepair?.ok !== true || orderRepair?.status !== 'APPLIED_SAFE_ONLY' || orderRepair?.orders_updated !== 3) {
+              throw new Error(`safe_order_repair_contract_failed_${JSON.stringify(orderRepair)}`);
+            }
+            if (JSON.stringify(orderRepair.financial_before) !== JSON.stringify(orderRepair.financial_after)) {
+              throw new Error('safe_order_repair_financial_integrity_changed');
+            }
+          }
+          let financeRepair = { ok: true, status: beforeRun.status, already_applied: true };
+          if (beforeRun.status !== 'FINANCE_RECONCILED_SAFE_ONLY') {
+            financeRepair = await rpc('admin_apply_safe_missing_financial_dependencies', {
+              p_run_id: runId,
+              p_confirm: true,
+            });
+            const expected = {
+              settlements_inserted: 0,
+              merchant_account_entries_inserted: 0,
+              company_account_entries_inserted: 0,
+              cod_rows_inserted: 21,
+              merchant_statement_rows_inserted: 43,
+              driver_statement_rows_inserted: 1,
+            };
+            if (financeRepair?.ok !== true || financeRepair?.status !== 'FINANCE_RECONCILED_SAFE_ONLY' || financeRepair?.orders_modified !== 0) {
+              throw new Error(`safe_finance_repair_contract_failed_${JSON.stringify(financeRepair)}`);
+            }
+            for (const [field, value] of Object.entries(expected)) {
+              if (Number(financeRepair[field]) !== value) throw new Error(`unexpected_${field}_${financeRepair[field]}_expected_${value}`);
+            }
+            if (JSON.stringify(financeRepair.order_financial_before) !== JSON.stringify(financeRepair.order_financial_after)) {
+              throw new Error('safe_finance_repair_order_values_changed');
+            }
+            const missing = financeRepair.remaining_missing_dependencies || {};
+            for (const field of ['missing_cod', 'missing_settlements', 'missing_merchant_accounts', 'missing_company_accounts', 'missing_merchant_statements', 'missing_driver_statements']) {
+              if (Number(missing[field] || 0) !== 0) throw new Error(`remaining_${field}_${missing[field]}`);
+            }
+          }
+          fs.writeFileSync(`${root}/exact-reviewed-order-merchant-reconciliation.json`, JSON.stringify({
+            run_id: runId,
+            status_before: beforeRun.status,
+            order_repair: orderRepair,
+            finance_repair: financeRepair,
+          }, null, 2));
           NODE
 
       - name: Verify finance authority and recover 17TRACK runtime

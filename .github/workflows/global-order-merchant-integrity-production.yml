@@ -7,6 +7,7 @@ on:
       - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
       - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
+      - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -18,6 +19,7 @@ on:
       - "supabase/migrations/20260802023000_global_order_merchant_integrity_restoration.sql"
       - "supabase/migrations/20260802031500_personal_order_optional_coupon_policy.sql"
       - "supabase/migrations/20260802033000_order_merchant_dry_run_timeout.sql"
+      - "supabase/migrations/20260802034000_financial_reconciliation_without_portal_link.sql"
       - "artifacts/day-night-delivery/src/**"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-*.mjs"
       - "artifacts/day-night-delivery/scripts/customer-experience-runtime-e2e.mjs"
@@ -116,7 +118,8 @@ jobs:
           for target in \
             20260802023000_global_order_merchant_integrity_restoration.sql \
             20260802031500_personal_order_optional_coupon_policy.sql \
-            20260802033000_order_merchant_dry_run_timeout.sql
+            20260802033000_order_merchant_dry_run_timeout.sql \
+            20260802034000_financial_reconciliation_without_portal_link.sql
           do
             if [ -f "$release_dir/supabase/migrations/$target" ]; then
               cmp --silent "supabase/migrations/$target" "$release_dir/supabase/migrations/$target" || {
@@ -163,7 +166,8 @@ jobs:
           for target in \
             20260802023000_global_order_merchant_integrity_restoration.sql \
             20260802031500_personal_order_optional_coupon_policy.sql \
-            20260802033000_order_merchant_dry_run_timeout.sql
+            20260802033000_order_merchant_dry_run_timeout.sql \
+            20260802034000_financial_reconciliation_without_portal_link.sql
           do
             if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
               cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
