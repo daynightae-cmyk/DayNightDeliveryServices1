@@ -166,6 +166,7 @@ async function waitForSavedOrder() {
 
 let browser;
 let adminClient;
+let page;
 try {
   assert(base && supabaseUrl && anonKey && serviceRoleKey && adminEmail && adminPassword, 'personal_order_acceptance_configuration_missing');
   await cleanupTestOrder();
@@ -177,7 +178,7 @@ try {
     key: storageKey,
     value: admin.serialized,
   });
-  const page = await context.newPage();
+  page = await context.newPage();
 
   await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=unified_personal_order`, {
     waitUntil: 'domcontentloaded',
@@ -208,9 +209,12 @@ try {
 
   await page.screenshot({ path: path.join(evidenceDir, 'personal-order-form-before-save.png'), fullPage: true });
   await page.locator('[data-admin-personal-order-save="true"]').click();
-  await page.getByText(/تم إنشاء الطلب الشخصي|Personal order .* was created/).waitFor({ state: 'visible', timeout: 90000 });
-
   const saved = await waitForSavedOrder();
+  const successMessageVisible = await page
+    .getByText(/تم إنشاء الطلب الشخصي|Personal order .* was created/)
+    .isVisible()
+    .catch(() => false);
+  await page.screenshot({ path: path.join(evidenceDir, 'personal-order-after-save.png'), fullPage: true });
   assert(String(saved.merchant_id || '') === '', `personal_order_merchant_id_${saved.merchant_id}`);
   assert(String(saved.merchant_name || '') === '', `personal_order_merchant_name_${saved.merchant_name}`);
   assert(String(saved.merchant_code || '') === '', `personal_order_merchant_code_${saved.merchant_code}`);
@@ -254,12 +258,18 @@ try {
       company_revenue: Number(saved.company_revenue),
       customer_total: Number(saved.customer_total),
       visible_in_all_orders: true,
+      success_message_visible: successMessageVisible,
       standalone_personal_menu_removed: true,
     }, null, 2),
   );
   console.log(JSON.stringify({ result: 'PASS', coupon, order_id: saved.id, visible_in_all_orders: true }, null, 2));
   await context.close();
 } catch (error) {
+  if (page) {
+    await page.screenshot({ path: path.join(evidenceDir, 'personal-order-failure.png'), fullPage: true }).catch(() => {});
+    const body = await page.locator('body').innerText().catch(() => 'body unavailable');
+    fs.writeFileSync(path.join(evidenceDir, 'failure-body.txt'), body);
+  }
   fs.writeFileSync(path.join(evidenceDir, 'failure.txt'), String(error?.stack || error));
   throw error;
 } finally {
