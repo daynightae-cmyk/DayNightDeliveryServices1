@@ -195,7 +195,8 @@ async function ensureAuthenticatedDispatchSession() {
 }
 
 async function fetchDispatchStatusDirectly(merchantId: string) {
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+  const client = supabase;
+  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
 
   const rows: DispatchSourceRow[] = [];
   for (let page = 0; page < 100; page += 1) {
@@ -203,7 +204,7 @@ async function fetchDispatchStatusDirectly(merchantId: string) {
     const to = from + DIRECT_HISTORY_PAGE_SIZE - 1;
     const result = await withAbortTimeout(
       (signal) =>
-        supabase
+        client
           .from("merchant_statement_dispatch_log")
           .select("order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id")
           .eq("merchant_id", merchantId)
@@ -244,7 +245,8 @@ export function merchantStatementDispatchErrorCode(error: unknown) {
 export async function fetchMerchantStatementDispatchStatus(
   merchantId: string,
 ): Promise<MerchantStatementDispatchStatus[]> {
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+  const client = supabase;
+  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
   const normalizedMerchantId = clean(merchantId);
   if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
 
@@ -254,7 +256,7 @@ export async function fetchMerchantStatementDispatchStatus(
   try {
     const result = await withAbortTimeout(
       (signal) =>
-        supabase
+        client
           .rpc("admin_get_merchant_statement_dispatch_status", {
             p_merchant_id: normalizedMerchantId,
           })
@@ -299,7 +301,8 @@ export async function fetchMerchantStatementDispatchStatus(
 export async function confirmMerchantStatementDispatch(
   input: ConfirmMerchantStatementDispatchInput,
 ): Promise<ConfirmMerchantStatementDispatchResult> {
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+  const client = supabase;
+  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
 
   const merchantId = clean(input.merchantId);
   const orderIds = [...new Set(input.orderIds.map(clean).filter(Boolean))];
@@ -310,7 +313,7 @@ export async function confirmMerchantStatementDispatch(
 
   const result = await withAbortTimeout(
     (signal) =>
-      supabase
+      client
         .rpc("admin_confirm_merchant_statement_dispatch", {
           p_merchant_id: merchantId,
           p_order_ids: orderIds,
