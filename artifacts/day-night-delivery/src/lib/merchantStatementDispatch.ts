@@ -30,6 +30,10 @@ export type ConfirmMerchantStatementDispatchResult = {
   channel: string;
 };
 
+type DispatchSourceRow = Record<string, unknown>;
+
+const DIRECT_HISTORY_PAGE_SIZE = 1000;
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -52,34 +56,11 @@ function rpcErrorMessage(error: unknown) {
     .join(" | ");
 }
 
-export function merchantStatementDispatchErrorCode(error: unknown) {
-  const message = rpcErrorMessage(error).toLowerCase();
-  if (message.includes("merchant_statement_resend_reason_required")) return "resend_reason_required";
-  if (message.includes("merchant_statement_dispatch_order_ownership_mismatch")) return "ownership_mismatch";
-  if (message.includes("merchant_statement_dispatch_not_authorized")) return "not_authorized";
-  if (message.includes("merchant_statement_dispatch_merchant_not_found")) return "merchant_not_found";
-  if (message.includes("merchant_statement_dispatch_orders_required")) return "orders_required";
-  if (message.includes("could not find the function") || message.includes("schema cache")) return "runtime_missing";
-  return "unknown";
-}
-
-export async function fetchMerchantStatementDispatchStatus(
-  merchantId: string,
-): Promise<MerchantStatementDispatchStatus[]> {
-  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
-  const normalizedMerchantId = clean(merchantId);
-  if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
-
-  const { data, error } = await supabase.rpc("admin_get_merchant_statement_dispatch_status", {
-    p_merchant_id: normalizedMerchantId,
-  });
-
-  if (error) throw new Error(rpcErrorMessage(error) || "merchant_statement_dispatch_status_failed");
-
+function normalizeRpcStatusRows(data: unknown): MerchantStatementDispatchStatus[] {
   const rows = Array.isArray(data) ? data : data ? [data] : [];
   return rows
     .map((row) => {
-      const source = row as Record<string, unknown>;
+      const source = row as DispatchSourceRow;
       return {
         orderId: clean(source.order_id),
         latestSentAt: clean(source.latest_sent_at),
@@ -93,6 +74,120 @@ export async function fetchMerchantStatementDispatchStatus(
     .filter((row) => row.orderId && row.latestSentAt);
 }
 
+function normalizeDirectStatusRows(rows: DispatchSourceRow[]): MerchantStatementDispatchStatus[] {
+  const counts = new Map<string, number>();
+  const latest = new Map<string, MerchantStatementDispatchStatus>();
+
+  for (const source of rows) {
+    const orderId = clean(source.order_id);
+    if (!orderId) continue;
+    counts.set(orderId, (counts.get(orderId) || 0) + 1);
+
+    if (!latest.has(orderId)) {
+      latest.set(orderId, {
+        orderId,
+        latestSentAt: clean(source.sent_at),
+        sentCount: 0,
+        latestBatchId: clean(source.batch_id),
+        latestSentBy: clean(source.sent_by) || null,
+        lastResendReason: clean(source.resend_reason) || null,
+        latestChannel: clean(source.channel) || null,
+      });
+    }
+  }
+
+  return [...latest.values()]
+    .map((row) => ({ ...row, sentCount: counts.get(row.orderId) || 0 }))
+    .filter((row) => row.latestSentAt);
+}
+
+async function ensureAuthenticatedDispatchSession() {
+  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+
+  const current = await supabase.auth.getSession();
+  if (current.error) throw new Error(`merchant_statement_dispatch_session_failed | ${current.error.message}`);
+  if (current.data.session?.access_token) return;
+
+  const refreshed = await supabase.auth.refreshSession();
+  if (refreshed.error || !refreshed.data.session?.access_token) {
+    throw new Error(
+      `merchant_statement_dispatch_session_missing | ${refreshed.error?.message || "authenticated session unavailable"}`,
+    );
+  }
+}
+
+async function fetchDispatchStatusDirectly(merchantId: string) {
+  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+
+  const rows: DispatchSourceRow[] = [];
+  for (let page = 0; page < 100; page += 1) {
+    const from = page * DIRECT_HISTORY_PAGE_SIZE;
+    const to = from + DIRECT_HISTORY_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("merchant_statement_dispatch_log")
+      .select("order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id")
+      .eq("merchant_id", merchantId)
+      .order("sent_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(
+        rpcErrorMessage(error) || "merchant_statement_dispatch_direct_status_failed",
+      );
+    }
+
+    const pageRows = Array.isArray(data) ? (data as DispatchSourceRow[]) : [];
+    rows.push(...pageRows);
+    if (pageRows.length < DIRECT_HISTORY_PAGE_SIZE) break;
+  }
+
+  return normalizeDirectStatusRows(rows);
+}
+
+export function merchantStatementDispatchErrorCode(error: unknown) {
+  const message = rpcErrorMessage(error).toLowerCase();
+  if (message.includes("merchant_statement_resend_reason_required")) return "resend_reason_required";
+  if (message.includes("merchant_statement_dispatch_order_ownership_mismatch")) return "ownership_mismatch";
+  if (message.includes("merchant_statement_dispatch_not_authorized")) return "not_authorized";
+  if (message.includes("merchant_statement_dispatch_merchant_not_found")) return "merchant_not_found";
+  if (message.includes("merchant_statement_dispatch_orders_required")) return "orders_required";
+  if (message.includes("merchant_statement_dispatch_session")) return "not_authorized";
+  if (message.includes("could not find the function") || message.includes("schema cache")) return "runtime_missing";
+  return "unknown";
+}
+
+export async function fetchMerchantStatementDispatchStatus(
+  merchantId: string,
+): Promise<MerchantStatementDispatchStatus[]> {
+  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+  const normalizedMerchantId = clean(merchantId);
+  if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
+
+  await ensureAuthenticatedDispatchSession();
+
+  const { data, error } = await supabase.rpc("admin_get_merchant_statement_dispatch_status", {
+    p_merchant_id: normalizedMerchantId,
+  });
+
+  if (!error) return normalizeRpcStatusRows(data);
+
+  const rpcDetail = rpcErrorMessage(error) || "merchant_statement_dispatch_status_failed";
+  console.warn(
+    "Merchant statement status RPC failed; retrying through the protected RLS table.",
+    rpcDetail,
+  );
+
+  try {
+    return await fetchDispatchStatusDirectly(normalizedMerchantId);
+  } catch (fallbackError) {
+    const fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
+    throw new Error(
+      `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
+    );
+  }
+}
+
 export async function confirmMerchantStatementDispatch(
   input: ConfirmMerchantStatementDispatchInput,
 ): Promise<ConfirmMerchantStatementDispatchResult> {
@@ -102,6 +197,8 @@ export async function confirmMerchantStatementDispatch(
   const orderIds = [...new Set(input.orderIds.map(clean).filter(Boolean))];
   if (!merchantId) throw new Error("merchant_statement_dispatch_merchant_required");
   if (!orderIds.length) throw new Error("merchant_statement_dispatch_orders_required");
+
+  await ensureAuthenticatedDispatchSession();
 
   const { data, error } = await supabase.rpc("admin_confirm_merchant_statement_dispatch", {
     p_merchant_id: merchantId,
