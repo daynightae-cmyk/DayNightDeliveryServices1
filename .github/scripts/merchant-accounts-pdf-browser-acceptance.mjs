@@ -102,6 +102,7 @@ replaceRequired(
 replaceRequired(
   /async function verifyPdfStatements\(page, label\) \{[\s\S]*?^\}/m,
   `async function verifyPdfStatements(page, label) {
+  await openAdmin(page);
   await openSection(page, 'merchant_statements', 'Merchant statements');
   const section = page.locator('section').filter({ hasText: /كشوف PDF للتجار|Merchant PDF statements/ }).first();
   await section.waitFor({ state: 'visible', timeout: 90000 });
