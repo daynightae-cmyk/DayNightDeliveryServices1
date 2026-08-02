@@ -17,7 +17,6 @@ const OPERATIONAL_REQUEST_TIMEOUT_MS = 8_000;
 
 const ORDER_SECTIONS = new Set([
   "all_orders",
-  "personal_orders",
   "cancelled",
   "review",
   "postponed",

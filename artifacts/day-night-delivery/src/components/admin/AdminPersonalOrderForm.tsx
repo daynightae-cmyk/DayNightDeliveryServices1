@@ -194,6 +194,9 @@ export default function AdminPersonalOrderForm({
           : `Personal order ${ref} was created without a merchant. Delivery is fixed at ${PERSONAL_ORDER_DELIVERY_FEE.toFixed(2)} AED and customer total is ${financials.customerTotal.toFixed(2)} AED.`,
       );
       setForm(emptyForm);
+      window.setTimeout(() => {
+        document.querySelector<HTMLInputElement>("[data-admin-personal-coupon=\"true\"]")?.focus();
+      }, 0);
       window.dispatchEvent(
         new CustomEvent("dn-admin-orders-updated", {
           detail: { order: result.row, source: result.source },
@@ -214,6 +217,7 @@ export default function AdminPersonalOrderForm({
 
   return (
     <form
+      data-admin-personal-order-form="true"
       onSubmit={submit}
       className="dn-personal-order-form rounded-[28px] border border-brand-gold/30 bg-gradient-to-br from-[#07172c] to-[#0b3155] p-5 shadow-2xl"
       dir={isArabic ? "rtl" : "ltr"}
@@ -261,6 +265,8 @@ export default function AdminPersonalOrderForm({
         <label className="grid gap-2 text-xs font-black text-white/70">
           <span>{isArabic ? "رقم الكوبون — اختياري" : "Coupon number — optional"}</span>
           <input
+            data-admin-next-order-focus="true"
+            data-admin-personal-coupon="true"
             value={form.reference || ""}
             onChange={(event) => field("reference", event.target.value)}
             className={inputClass}
@@ -282,12 +288,14 @@ export default function AdminPersonalOrderForm({
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <input
+              data-admin-personal-sender-name="true"
               value={form.sender_name}
               onChange={(event) => field("sender_name", event.target.value)}
               className={inputClass}
               placeholder={isArabic ? "اسم المرسل *" : "Sender name *"}
             />
             <input
+              data-admin-personal-sender-phone="true"
               value={form.sender_phone}
               onChange={(event) => field("sender_phone", event.target.value)}
               className={inputClass}
@@ -332,6 +340,7 @@ export default function AdminPersonalOrderForm({
             </label>
           </div>
           <textarea
+            data-admin-personal-pickup-address="true"
             rows={3}
             value={form.pickup_street}
             onChange={(event) => field("pickup_street", event.target.value)}
@@ -346,12 +355,14 @@ export default function AdminPersonalOrderForm({
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <input
+              data-admin-personal-receiver-name="true"
               value={form.receiver_name}
               onChange={(event) => field("receiver_name", event.target.value)}
               className={inputClass}
               placeholder={isArabic ? "اسم المستلم *" : "Recipient name *"}
             />
             <input
+              data-admin-personal-receiver-phone="true"
               value={form.receiver_phone}
               onChange={(event) => field("receiver_phone", event.target.value)}
               className={inputClass}
@@ -396,6 +407,7 @@ export default function AdminPersonalOrderForm({
             </label>
           </div>
           <textarea
+            data-admin-personal-delivery-address="true"
             rows={3}
             value={form.delivery_street}
             onChange={(event) => field("delivery_street", event.target.value)}
@@ -413,6 +425,7 @@ export default function AdminPersonalOrderForm({
           placeholder={isArabic ? "محتوى الشحنة" : "Package content"}
         />
         <input
+          data-admin-personal-goods-value="true"
           type="number"
           min={0}
           step="0.01"
@@ -459,6 +472,7 @@ export default function AdminPersonalOrderForm({
           </strong>
         </div>
         <button
+          data-admin-personal-order-save="true"
           type="submit"
           disabled={saving || !financials}
           className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-brand-gold px-5 font-black text-[#07172c] disabled:opacity-45"
