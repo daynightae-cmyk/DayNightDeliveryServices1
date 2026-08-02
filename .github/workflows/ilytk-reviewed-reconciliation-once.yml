@@ -41,7 +41,51 @@ jobs:
           test "$project_ref" = "ngdwybpgacauorygoedi"
           echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
 
+      - name: Inspect production dependency column contracts without writes
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const root = process.env.VITE_SUPABASE_URL.replace(/\/$/, '');
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const response = await fetch(`${root}/rest/v1/`, {
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${key}`,
+              Accept: 'application/openapi+json',
+            },
+          });
+          if (!response.ok) throw new Error(`openapi_${response.status}_${await response.text()}`);
+          const spec = await response.json();
+          const schemas = spec.definitions || spec.components?.schemas || {};
+          const tables = [
+            'orders',
+            'order_merchant_repair_audit',
+            'cod_collections',
+            'merchant_statement_entries',
+            'driver_statement_entries',
+            'order_financial_settlements',
+            'financial_account_entries',
+            'merchant_invoices',
+            'invoices',
+            'notifications',
+          ];
+          const contracts = {};
+          for (const table of tables) {
+            const properties = schemas[table]?.properties || {};
+            contracts[table] = {
+              order_id: properties.order_id || null,
+              merchant_id: properties.merchant_id || null,
+              id: properties.id || null,
+            };
+          }
+          console.log(JSON.stringify({ mode: 'READ_ONLY_OPENAPI_SCHEMA', contracts }, null, 2));
+          NODE
+
       - name: Apply exact idempotent production reconciliation
+        if: ${{ false }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -62,6 +106,7 @@ jobs:
           fi
 
       - name: Verify ILYTK ownership, portal linkage, and excluded order
+        if: ${{ false }}
         working-directory: artifacts/day-night-delivery
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
