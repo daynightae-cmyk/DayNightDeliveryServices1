@@ -85,7 +85,6 @@ jobs:
           NODE
 
       - name: Apply exact idempotent production reconciliation
-        if: ${{ false }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -106,7 +105,6 @@ jobs:
           fi
 
       - name: Verify ILYTK ownership, portal linkage, and excluded order
-        if: ${{ false }}
         working-directory: artifacts/day-night-delivery
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
