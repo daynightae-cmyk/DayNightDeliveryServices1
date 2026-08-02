@@ -53,7 +53,7 @@ export default function AdminMerchantAccountsRoute({
   const [authoritativeMerchants, setAuthoritativeMerchants] = useState<Merchant[]>(merchants);
   const [snapshot, setSnapshot] = useState<FinanceLedgerSnapshot | null>(null);
   const [financeBusy, setFinanceBusy] = useState(false);
-  const [operationalBusy, setOperationalBusy] = useState(false);
+  const [operationalBusy, setOperationalBusy] = useState(() => !orders.length || !merchants.length);
   const [financeError, setFinanceError] = useState("");
   const [operationalError, setOperationalError] = useState("");
   const financeRequest = useRef(0);
@@ -71,7 +71,10 @@ export default function AdminMerchantAccountsRoute({
     const requestId = ++operationalRequest.current;
     const needOrders = force || !orders.length;
     const needMerchants = force || !merchants.length;
-    if (!needOrders && !needMerchants) return;
+    if (!needOrders && !needMerchants) {
+      setOperationalBusy(false);
+      return;
+    }
 
     setOperationalBusy(true);
     setOperationalError("");
@@ -152,13 +155,14 @@ export default function AdminMerchantAccountsRoute({
   }
 
   const busy = operationalBusy || financeBusy;
+  const availableMerchants = operationalBusy ? [] : authoritativeMerchants;
 
   return (
     <section
       className="space-y-4"
       dir={isArabic ? "rtl" : "ltr"}
       data-authoritative-order-count={authoritativeOrders.length}
-      data-authoritative-merchant-count={authoritativeMerchants.length}
+      data-authoritative-merchant-count={availableMerchants.length}
     >
       <section className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#031226] p-4 md:grid-cols-[1fr_1fr_minmax(260px,1.3fr)_auto]">
         <label className="block">
@@ -241,7 +245,7 @@ export default function AdminMerchantAccountsRoute({
 
       <AdminMerchantAccountsCenter
         isArabic={isArabic}
-        merchants={authoritativeMerchants}
+        merchants={availableMerchants}
         orders={authoritativeOrders}
         accountEntries={snapshot?.accountEntries || []}
         settlements={snapshot?.settlements || []}
