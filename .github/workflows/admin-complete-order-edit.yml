@@ -75,6 +75,22 @@ jobs:
       - name: Production build
         run: pnpm run web:build
 
+      - name: Verify exact save messages in production bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="artifacts/day-night-delivery/dist/public"
+          test -s "$bundle/index.html"
+          if grep -R -F "تعذر تحديث الطلب" "$bundle" >/dev/null; then
+            echo "Generic complete-order save error leaked into production bundle" >&2
+            exit 1
+          fi
+          grep -R -F "انتهت جلسة الإدارة" "$bundle" >/dev/null
+          grep -R -F "رقم الكوبون مستخدم بالفعل" "$bundle" >/dev/null
+          grep -R -F "التاجر المختار غير مرتبط" "$bundle" >/dev/null
+          grep -R -F "القيم المالية غير صالحة" "$bundle" >/dev/null
+          grep -R -F "لم يتم حفظ الطلب لأن قاعدة البيانات رفضت العملية" "$bundle" >/dev/null
+
       - name: Serve exact branch-head build
         shell: bash
         run: |
