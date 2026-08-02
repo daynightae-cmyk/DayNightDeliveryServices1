@@ -31,12 +31,22 @@ export type ConfirmMerchantStatementDispatchResult = {
 };
 
 type DispatchSourceRow = Record<string, unknown>;
+type PersistedSessionCandidate = {
+  access_token?: unknown;
+  expires_at?: unknown;
+  session?: unknown;
+  currentSession?: unknown;
+  data?: unknown;
+};
 
+const SUPABASE_URL = String((import.meta as any).env?.VITE_SUPABASE_URL || "")
+  .trim()
+  .replace(/\/+$/, "");
+const SUPABASE_ANON_KEY = String((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
 const DIRECT_HISTORY_PAGE_SIZE = 1000;
-const STATUS_RPC_TIMEOUT_MS = 12_000;
-const STATUS_TABLE_TIMEOUT_MS = 15_000;
-const CONFIRM_TIMEOUT_MS = 30_000;
-const PROTECTED_HISTORY_ATTEMPTS = 2;
+const READ_TIMEOUT_MS = 18_000;
+const WRITE_TIMEOUT_MS = 30_000;
+const SESSION_FALLBACK_TIMEOUT_MS = 8_000;
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -45,49 +55,6 @@ function clean(value: unknown) {
 function numeric(value: unknown) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
-}
-
-/**
- * Abort the actual PostgREST request. Merely rejecting a wrapper promise leaves
- * the network request alive and can block a second protected request on mobile.
- */
-function withAbortTimeout<T>(
-  createOperation: (signal: AbortSignal) => PromiseLike<T>,
-  label: string,
-  timeoutMs: number,
-): Promise<T> {
-  const controller = new AbortController();
-
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(() => {
-      controller.abort();
-      reject(new Error(`${label}_timeout_${timeoutMs}ms`));
-    }, timeoutMs);
-
-    let operation: PromiseLike<T>;
-    try {
-      operation = createOperation(controller.signal);
-    } catch (cause) {
-      globalThis.clearTimeout(timer);
-      reject(cause);
-      return;
-    }
-
-    Promise.resolve(operation).then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (cause) => {
-        globalThis.clearTimeout(timer);
-        reject(cause);
-      },
-    );
-  });
 }
 
 function rpcErrorMessage(error: unknown) {
@@ -148,39 +115,170 @@ function normalizeDirectStatusRows(rows: DispatchSourceRow[]): MerchantStatement
     .filter((row) => row.latestSentAt);
 }
 
-async function fetchDispatchStatusDirectly(merchantId: string) {
-  const client = supabase;
-  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+function decodeJwtExpiry(token: string) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload || typeof globalThis.atob !== "function") return 0;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const parsed = JSON.parse(globalThis.atob(padded)) as { exp?: unknown };
+    return numeric(parsed.exp);
+  } catch {
+    return 0;
+  }
+}
 
-  const rows: DispatchSourceRow[] = [];
-  for (let page = 0; page < 100; page += 1) {
-    const from = page * DIRECT_HISTORY_PAGE_SIZE;
-    const to = from + DIRECT_HISTORY_PAGE_SIZE - 1;
-    const result = await withAbortTimeout(
-      (signal) =>
-        client
-          .from("merchant_statement_dispatch_log")
-          .select("order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id")
-          .eq("merchant_id", merchantId)
-          .order("sent_at", { ascending: false })
-          .order("created_at", { ascending: false })
-          .range(from, to)
-          .abortSignal(signal),
-      `merchant_statement_dispatch_direct_page_${page + 1}`,
-      STATUS_TABLE_TIMEOUT_MS,
+function extractSessionCandidate(value: unknown): { accessToken: string; expiresAt: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as PersistedSessionCandidate;
+  const accessToken = clean(candidate.access_token);
+  if (accessToken) {
+    return {
+      accessToken,
+      expiresAt: numeric(candidate.expires_at) || decodeJwtExpiry(accessToken),
+    };
+  }
+
+  for (const nested of [candidate.session, candidate.currentSession, candidate.data]) {
+    const extracted = extractSessionCandidate(nested);
+    if (extracted) return extracted;
+  }
+  return null;
+}
+
+function readPersistedSession() {
+  if (!SUPABASE_URL || typeof window === "undefined") return null;
+  try {
+    const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+    if (!projectRef) return null;
+    const raw = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    return extractSessionCandidate(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function tokenIsUsable(session: { accessToken: string; expiresAt: number } | null) {
+  if (!session?.accessToken) return false;
+  if (!session.expiresAt) return true;
+  return session.expiresAt * 1000 > Date.now() + 30_000;
+}
+
+function withPromiseTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(
+      () => reject(new Error(`${label}_timeout_${timeoutMs}ms`)),
+      timeoutMs,
     );
+    Promise.resolve(promise).then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        globalThis.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
 
-    if (result.error) {
-      throw new Error(
-        rpcErrorMessage(result.error) || "merchant_statement_dispatch_direct_status_failed",
-      );
+async function resolveAccessToken() {
+  const persisted = readPersistedSession();
+  if (tokenIsUsable(persisted)) return persisted!.accessToken;
+  if (!supabase) throw new Error("merchant_statement_dispatch_supabase_not_configured");
+
+  const sessionResult = await withPromiseTimeout<{
+    data: { session: { access_token?: string | null } | null };
+    error: unknown;
+  }>(
+    supabase.auth.getSession(),
+    "merchant_statement_dispatch_get_session",
+    SESSION_FALLBACK_TIMEOUT_MS,
+  );
+  if (sessionResult.error) {
+    throw new Error(rpcErrorMessage(sessionResult.error) || "merchant_statement_dispatch_session_failed");
+  }
+
+  const accessToken = clean(sessionResult.data.session?.access_token);
+  if (!accessToken) throw new Error("merchant_statement_dispatch_not_authenticated");
+  return accessToken;
+}
+
+async function protectedRestRequest(
+  path: string,
+  init: RequestInit,
+  label: string,
+  timeoutMs: number,
+) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error("merchant_statement_dispatch_supabase_not_configured");
+  }
+
+  const accessToken = await resolveAccessToken();
+  const controller = new AbortController();
+  const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...init.headers,
+      },
+    });
+
+    const text = await response.text();
+    let payload: unknown = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = text;
+      }
     }
 
-    const pageRows = Array.isArray(result.data) ? (result.data as DispatchSourceRow[]) : [];
+    if (!response.ok) {
+      const detail = rpcErrorMessage(payload) || clean(payload) || response.statusText;
+      throw new Error(`${label}_http_${response.status}${detail ? ` | ${detail}` : ""}`);
+    }
+    return payload;
+  } catch (cause) {
+    if ((cause as { name?: string })?.name === "AbortError") {
+      throw new Error(`${label}_timeout_${timeoutMs}ms`);
+    }
+    throw cause;
+  } finally {
+    globalThis.clearTimeout(timer);
+  }
+}
+
+async function fetchDispatchStatusDirectly(merchantId: string) {
+  const rows: DispatchSourceRow[] = [];
+  for (let page = 0; page < 100; page += 1) {
+    const offset = page * DIRECT_HISTORY_PAGE_SIZE;
+    const query = new URLSearchParams({
+      select: "order_id,sent_at,batch_id,sent_by,resend_reason,channel,created_at,id",
+      merchant_id: `eq.${merchantId}`,
+      order: "sent_at.desc,created_at.desc",
+      offset: String(offset),
+      limit: String(DIRECT_HISTORY_PAGE_SIZE),
+    });
+    const payload = await protectedRestRequest(
+      `merchant_statement_dispatch_log?${query.toString()}`,
+      { method: "GET" },
+      `merchant_statement_dispatch_direct_page_${page + 1}`,
+      READ_TIMEOUT_MS,
+    );
+    const pageRows = Array.isArray(payload) ? (payload as DispatchSourceRow[]) : [];
     rows.push(...pageRows);
     if (pageRows.length < DIRECT_HISTORY_PAGE_SIZE) break;
   }
-
   return normalizeDirectStatusRows(rows);
 }
 
@@ -191,6 +289,7 @@ export function merchantStatementDispatchErrorCode(error: unknown) {
   if (message.includes("merchant_statement_dispatch_not_authorized")) return "not_authorized";
   if (message.includes("permission denied") || message.includes("row-level security")) return "not_authorized";
   if (message.includes("jwt expired") || message.includes("invalid jwt") || message.includes("not authenticated")) return "not_authorized";
+  if (message.includes("merchant_statement_dispatch_not_authenticated")) return "not_authorized";
   if (message.includes("merchant_statement_dispatch_merchant_not_found")) return "merchant_not_found";
   if (message.includes("merchant_statement_dispatch_orders_required")) return "orders_required";
   if (message.includes("could not find the function") || message.includes("schema cache")) return "runtime_missing";
@@ -200,99 +299,73 @@ export function merchantStatementDispatchErrorCode(error: unknown) {
 export async function fetchMerchantStatementDispatchStatus(
   merchantId: string,
 ): Promise<MerchantStatementDispatchStatus[]> {
-  const client = supabase;
-  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
   const normalizedMerchantId = clean(merchantId);
   if (!normalizedMerchantId) throw new Error("merchant_statement_dispatch_merchant_required");
 
-  // Do not call auth.getSession() here. This screen is already protected and
-  // the same client has just loaded the merchant/order data. An extra auth-lock
-  // preflight can stall on mobile while the protected PostgREST request itself
-  // would succeed and enforce authorization at the database boundary.
   let rpcDetail = "merchant_statement_dispatch_status_failed";
   try {
-    const result = await withAbortTimeout(
-      (signal) =>
-        client
-          .rpc("admin_get_merchant_statement_dispatch_status", {
-            p_merchant_id: normalizedMerchantId,
-          })
-          .abortSignal(signal),
+    const payload = await protectedRestRequest(
+      "rpc/admin_get_merchant_statement_dispatch_status",
+      {
+        method: "POST",
+        body: JSON.stringify({ p_merchant_id: normalizedMerchantId }),
+      },
       "merchant_statement_dispatch_status_rpc",
-      STATUS_RPC_TIMEOUT_MS,
+      READ_TIMEOUT_MS,
     );
-
-    if (!result.error) return normalizeRpcStatusRows(result.data);
-    rpcDetail = rpcErrorMessage(result.error) || rpcDetail;
+    return normalizeRpcStatusRows(payload);
   } catch (rpcFailure) {
     rpcDetail = rpcErrorMessage(rpcFailure) || clean(rpcFailure) || rpcDetail;
   }
 
-  console.warn(
-    "Merchant statement status RPC failed or timed out; retrying through the protected RLS table.",
-    rpcDetail,
-  );
-
-  let fallbackDetail = "protected history read was not attempted";
-  for (let attempt = 1; attempt <= PROTECTED_HISTORY_ATTEMPTS; attempt += 1) {
-    try {
-      if (attempt > 1) await wait(700);
-      return await fetchDispatchStatusDirectly(normalizedMerchantId);
-    } catch (fallbackError) {
-      fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
-      console.warn(
-        `Merchant statement protected history attempt ${attempt} failed.`,
-        fallbackDetail,
-      );
-    }
+  try {
+    return await fetchDispatchStatusDirectly(normalizedMerchantId);
+  } catch (fallbackError) {
+    const fallbackDetail = rpcErrorMessage(fallbackError) || clean(fallbackError);
+    throw new Error(
+      `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
+    );
   }
-
-  throw new Error(
-    `merchant_statement_dispatch_status_failed | rpc: ${rpcDetail} | protected_table: ${fallbackDetail}`,
-  );
 }
 
 export async function confirmMerchantStatementDispatch(
   input: ConfirmMerchantStatementDispatchInput,
 ): Promise<ConfirmMerchantStatementDispatchResult> {
-  const client = supabase;
-  if (!client) throw new Error("merchant_statement_dispatch_supabase_not_configured");
-
   const merchantId = clean(input.merchantId);
   const orderIds = [...new Set(input.orderIds.map(clean).filter(Boolean))];
   if (!merchantId) throw new Error("merchant_statement_dispatch_merchant_required");
   if (!orderIds.length) throw new Error("merchant_statement_dispatch_orders_required");
 
-  // No client-side auth preflight and no write retry. The security-definer RPC
-  // checks the current JWT and either commits the complete batch once or writes
-  // nothing. Retrying an ambiguous write automatically could duplicate a batch.
-  const result = await withAbortTimeout(
-    (signal) =>
-      client
-        .rpc("admin_confirm_merchant_statement_dispatch", {
-          p_merchant_id: merchantId,
-          p_order_ids: orderIds,
-          p_period_label: clean(input.periodLabel) || null,
-          p_channel: "pdf_only",
-          p_resend_reason: clean(input.resendReason) || null,
-          p_metadata: {
-            source: "admin_merchant_statements_center",
-            status_trigger: "successful_pdf_export",
-            pdf_generation_succeeded: true,
-            whatsapp_changes_status: false,
-            ...input.metadata,
-          },
-          p_dry_run: false,
-        })
-        .abortSignal(signal),
+  // This write is deliberately sent once. An ambiguous timeout must not be
+  // retried automatically because the database RPC owns batch idempotency.
+  const payload = await protectedRestRequest(
+    "rpc/admin_confirm_merchant_statement_dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_merchant_id: merchantId,
+        p_order_ids: orderIds,
+        p_period_label: clean(input.periodLabel) || null,
+        p_channel: "pdf_only",
+        p_resend_reason: clean(input.resendReason) || null,
+        p_metadata: {
+          source: "admin_merchant_statements_center",
+          status_trigger: "successful_pdf_export",
+          pdf_generation_succeeded: true,
+          whatsapp_changes_status: false,
+          ...input.metadata,
+        },
+        p_dry_run: false,
+      }),
+    },
     "merchant_statement_dispatch_confirm_rpc",
-    CONFIRM_TIMEOUT_MS,
+    WRITE_TIMEOUT_MS,
   );
 
-  if (result.error) throw new Error(rpcErrorMessage(result.error) || "merchant_statement_dispatch_confirm_failed");
-
-  const source = (Array.isArray(result.data) ? result.data[0] : result.data) as Record<string, unknown> | null;
-  if (!source || source.ok !== true) throw new Error("merchant_statement_dispatch_confirmation_unverified");
+  const source = (Array.isArray(payload) ? payload[0] : payload) as Record<string, unknown> | null;
+  if (!source || source.ok !== true) {
+    throw new Error("merchant_statement_dispatch_confirmation_unverified");
+  }
 
   return {
     ok: true,
