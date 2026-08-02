@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import "../../styles/dn-merchant-finance-files.css";
 import AdminMerchantAccountsRoute from "./AdminMerchantAccountsRoute";
 import AdminSectionWorkspaceCompleteLegacy from "./AdminSectionWorkspaceCompleteLegacy";
 
