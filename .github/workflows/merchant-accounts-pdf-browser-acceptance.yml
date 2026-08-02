@@ -1,0 +1,119 @@
+name: Merchant Accounts PDF Browser Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/merchant-accounts-pdf-browser-acceptance.yml"
+      - ".github/scripts/merchant-accounts-pdf-browser-acceptance.mjs"
+      - "artifacts/day-night-delivery/src/components/admin/AdminMerchantAccountsCenter.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminMerchantAccountsRoute.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminMerchantStatementsCenter.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminMerchantStatementsCenterPdf.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/MerchantStatementExportButton.tsx"
+      - "artifacts/day-night-delivery/src/lib/merchantStatementDispatch.ts"
+      - "supabase/migrations/20260802110000_merchant_statement_dispatch_tracking.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merchant-accounts-pdf-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-browser-acceptance:
+    name: Merchant accounts and PDF status on desktop and phone
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    env:
+      TEST_BASE_URL: http://127.0.0.1:4174
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Verify protected browser credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Build and serve exact branch head
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm run web:typecheck
+          pnpm run web:gate
+          pnpm run web:build
+          test -s artifacts/day-night-delivery/dist/public/index.html
+          mkdir -p merchant-accounts-pdf-evidence
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4174 --strictPort > merchant-accounts-pdf-evidence/local-web.log 2>&1 &
+          echo $! > merchant-accounts-pdf-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$TEST_BASE_URL/admin?nosplash=1" | grep -F 'id="root"' >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat merchant-accounts-pdf-evidence/local-web.log >&2
+          exit 1
+
+      - name: Install isolated Chromium runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-merchant-accounts-playwright"
+          rm -rf "$playwright_dir"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Verify accounts isolation and PDF-only status
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/merchant-accounts-pdf-browser-acceptance.mjs
+
+      - name: Stop local application
+        if: always()
+        shell: bash
+        run: |
+          if [ -f merchant-accounts-pdf-evidence/local-web.pid ]; then
+            kill "$(cat merchant-accounts-pdf-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Merchant-Accounts-PDF-Browser-Evidence
+          path: merchant-accounts-pdf-evidence/
+          if-no-files-found: warn
+          retention-days: 30
