@@ -63,7 +63,11 @@ expect(migration, /manual_delivery_price[\s\S]*resolved_mode/, "Database migrati
 reject(migration, /if\s+v_goods\s*=\s*0\s+and\s+v_fee\s*>\s*0/i, "Database function does not force all zero-goods orders onto merchant");
 expect(precisePlugin, /manual !== null && manual > 0/, "Manual zero uses official pricing while retaining merchant liability intent");
 
-expect(editModal, /حفظ التعديلات(?: الآن)?|Save changes(?: now)?/, "Order edit has an explicit visible save button");
+expect(
+  editModal,
+  /حفظ(?: كل)? التعديلات(?: الآن)?|Save(?: all)? changes(?: now)?/,
+  "Order edit has an explicit visible save button",
+);
 expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");
 expect(editModal, /saveAdminOrderEdit/, "Order edits use verified persistence");
 expect(editModal, /dn-admin-orders-updated/, "Successful edits notify the live admin workspace");

@@ -25,8 +25,16 @@ const reject = (content, pattern, label) => {
 };
 
 const modal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
-expect(modal, /حفظ التعديلات/, "edit modal has visible save action");
-expect(modal, /h-\[94dvh\]/, "edit modal is viewport constrained");
+expect(
+  modal,
+  /حفظ(?: كل)? التعديلات(?: الآن)?|حفظ واعتماد التعديلات|Save(?: all)? changes(?: now)?|Save and audit changes/,
+  "edit modal has visible save action",
+);
+expect(
+  modal,
+  /h-\[(?:94|96)dvh\][\s\S]*max-h-\[(?:94|96)dvh\][\s\S]*overflow-hidden[\s\S]*min-h-0 flex-1 overflow-y-auto/,
+  "edit modal is viewport constrained",
+);
 expect(modal, /personalOrder[\s\S]*merchant: personalOrder \? null/, "personal edit saves without merchant");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
 expect(persistence, /isPersonalAdminOrder[\s\S]*personalFullPatch/, "personal edit persistence bypasses merchant requirement");

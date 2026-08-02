@@ -190,6 +190,11 @@ async function createAuthenticatedContext(browser, contextOptions, serializedSes
   return context;
 }
 
+async function revokeLocalSession(label, client) {
+  const { error } = await client.auth.signOut({ scope: 'local' });
+  if (error) throw new Error(`${label}_temporary_session_cleanup_failed_${error.message}`);
+}
+
 async function openAllOrders(page) {
   const shell = page.locator('.dncc-shell');
   await shell.waitFor({ state: 'visible', timeout: 90000 });
@@ -222,9 +227,53 @@ async function openAdminFromInjectedSession(page) {
   await page.locator('[data-dn-command-section="all_orders"]').first().waitFor({ state: 'attached', timeout: 90000 });
 }
 
-async function selectorText(page) {
-  await page.waitForTimeout(700);
-  return page.locator('.dn-admin-bulk-selector-list').innerText();
+async function selectorText(page, expectedText = '') {
+  const list = page.locator('.dn-admin-bulk-selector-list');
+  await list.waitFor({ state: 'visible', timeout: 90000 });
+
+  if (expectedText) {
+    let latest = '';
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      latest = await list.innerText().catch(() => '');
+      if (latest.includes(expectedText)) return latest;
+      await page.waitForTimeout(500);
+    }
+    throw new Error(
+      `Timed out waiting for admin selector text ${expectedText}. Last text: ${latest.slice(0, 500)}`,
+    );
+  }
+
+  await page.waitForTimeout(1500);
+  return list.innerText();
+}
+
+async function verifyCompleteOrderEditor(page, label) {
+  const editButtons = page.getByRole('button', { name: /تعديل|Edit/ });
+  await clickFirstVisible(editButtons, `${label} order edit button`);
+
+  const dialog = page.getByRole('dialog');
+  await dialog.waitFor({ state: 'visible', timeout: 30000 });
+
+  const merchantEditor = dialog.locator('[data-admin-complete-order-merchant="true"]');
+  const couponEditor = dialog.locator('[data-admin-complete-order-coupon="true"]');
+  const reasonEditor = dialog.locator('[data-admin-complete-order-reason="true"]');
+  const confirmEditor = dialog.locator('[data-admin-complete-order-confirm="true"]');
+
+  await merchantEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await couponEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await reasonEditor.waitFor({ state: 'visible', timeout: 30000 });
+  await confirmEditor.waitFor({ state: 'visible', timeout: 30000 });
+
+  assert(!(await merchantEditor.isDisabled()), `${label}: merchant selector is still disabled in complete editor.`);
+  assert((await merchantEditor.inputValue()) === ilytkId, `${label}: complete editor did not load canonical ILYTK UUID.`);
+  assert((await couponEditor.inputValue()).trim() === '003860', `${label}: complete editor did not load coupon 003860.`);
+  assert(!(await reasonEditor.isDisabled()), `${label}: audited edit reason is disabled.`);
+  assert(!(await confirmEditor.isDisabled()), `${label}: edit impact confirmation is disabled.`);
+  assert((await dialog.getByText(/رقم التتبع والفاتورة لا بيتغيروش|Tracking and invoice identifiers are immutable/).count()) > 0, `${label}: immutable identity guidance is missing.`);
+
+  await dialog.screenshot({ path: `preview-browser-evidence/${label}-admin-complete-order-editor.png` });
+  await clickFirstVisible(dialog.getByRole('button', { name: /إلغاء|Cancel/ }), `${label} complete editor cancel`);
+  await dialog.waitFor({ state: 'hidden', timeout: 30000 });
 }
 
 async function testAdmin(page, label) {
@@ -241,7 +290,7 @@ async function testAdmin(page, label) {
 
     await merchantSelect.selectOption(ilytkId);
     await search.fill('003860');
-    let text = await selectorText(page);
+    let text = await selectorText(page, '003860');
     assert(text.includes('003860'), `${label}: ILYTK admin scope did not return coupon 003860.`);
 
     await merchantSelect.selectOption(g3bxgId);
@@ -249,7 +298,7 @@ async function testAdmin(page, label) {
     assert(!text.includes('003860'), `${label}: coupon 003860 leaked into G3BXG admin scope.`);
 
     await search.fill(excludedCoupon);
-    text = await selectorText(page);
+    text = await selectorText(page, excludedCoupon);
     assert(text.includes(excludedCoupon), `${label}: G3BXG admin scope did not return coupon 010504.`);
 
     await merchantSelect.selectOption(ilytkId);
@@ -257,8 +306,9 @@ async function testAdmin(page, label) {
     assert(!text.includes(excludedCoupon), `${label}: coupon 010504 leaked into ILYTK admin scope.`);
 
     await search.fill('003860');
-    text = await selectorText(page);
+    text = await selectorText(page, '003860');
     assert(text.includes('003860'), `${label}: ILYTK admin scope lost coupon 003860 after owner switching.`);
+    await verifyCompleteOrderEditor(page, label);
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-orders.png`, fullPage: true });
   } catch (error) {
     await page.screenshot({ path: `preview-browser-evidence/${label}-admin-failure.png`, fullPage: true }).catch(() => {});
@@ -319,8 +369,6 @@ async function testMerchant(page, label) {
   }
 }
 
-const adminAuth = await createAdminSession();
-const merchantAuth = await createTemporaryIlytkSession();
 const browser = await chromium.launch({ headless: true });
 const scenarios = [
   { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
@@ -331,16 +379,38 @@ let cleanupError = null;
 
 try {
   for (const scenario of scenarios) {
-    const adminContext = await createAuthenticatedContext(browser, scenario.context, adminAuth.serializedSession);
-    await testAdmin(await adminContext.newPage(), scenario.label);
-    await adminContext.close();
+    const adminAuth = await createAdminSession();
+    try {
+      const adminContext = await createAuthenticatedContext(browser, scenario.context, adminAuth.serializedSession);
+      try {
+        await testAdmin(await adminContext.newPage(), scenario.label);
+      } finally {
+        await adminContext.close();
+      }
+    } finally {
+      await revokeLocalSession(`${scenario.label}_admin`, adminAuth.sessionClient).catch((error) => {
+        cleanupError ||= error;
+      });
+    }
 
-    const merchantContext = await createAuthenticatedContext(browser, scenario.context, merchantAuth.serializedSession);
-    await testMerchant(await merchantContext.newPage(), scenario.label);
-    await merchantContext.close();
+    const merchantAuth = await createTemporaryIlytkSession();
+    try {
+      const merchantContext = await createAuthenticatedContext(browser, scenario.context, merchantAuth.serializedSession);
+      try {
+        await testMerchant(await merchantContext.newPage(), scenario.label);
+      } finally {
+        await merchantContext.close();
+      }
+    } finally {
+      await revokeLocalSession(`${scenario.label}_ilytk`, merchantAuth.sessionClient).catch((error) => {
+        cleanupError ||= error;
+      });
+    }
+
     report.push({
       scenario: scenario.label,
       admin: 'PASS',
+      completeOrderEditor: 'PASS',
       merchant: 'PASS',
       search: 'PASS',
       crossOwner: 'PASS',
@@ -348,13 +418,6 @@ try {
   }
 } finally {
   await browser.close();
-  for (const [label, client] of [
-    ['admin', adminAuth.sessionClient],
-    ['ilytk', merchantAuth.sessionClient],
-  ]) {
-    const { error } = await client.auth.signOut({ scope: 'local' });
-    if (error && !cleanupError) cleanupError = new Error(`${label}_temporary_session_cleanup_failed_${error.message}`);
-  }
 }
 
 if (cleanupError) throw cleanupError;
@@ -368,12 +431,14 @@ fs.writeFileSync(
       testedExactSourceBundle: true,
       adminIdentity: {
         roleVerifiedBeforeBrowser: true,
+        independentSessionPerViewport: true,
         authStorageSerializedByInstalledSupabaseClient: true,
         temporarySessionRevokedLocally: true,
       },
       merchantIdentity: {
         merchantId: ilytkId,
         portalLinkResolvedByUuid: true,
+        independentSessionPerViewport: true,
         authStorageSerializedByInstalledSupabaseClient: true,
         temporarySessionRevokedLocally: true,
       },
