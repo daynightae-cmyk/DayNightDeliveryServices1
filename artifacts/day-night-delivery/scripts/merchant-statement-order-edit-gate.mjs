@@ -9,7 +9,7 @@ const source = fs
   .readFileSync(sourcePath, "utf8")
   .replace(
     "/No mixed or fabricated fallback was shown|لم يتم عرض بيانات بديلة أو مختلطة/",
-    "/No mixed data was shown|لم يتم عرض بيانات مختلطة/",
+    "/No mixed data was shown|No merchant account was opened with incomplete or mixed data|لم يتم عرض بيانات مختلطة|لم يتم فتح أي ملف تاجر ببيانات ناقصة أو مختلطة/",
   );
 
 fs.writeFileSync(temporaryPath, source, "utf8");
