@@ -28,6 +28,43 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function createMemoryStorage() {
+  const values = new Map();
+  return {
+    values,
+    adapter: {
+      getItem(key) {
+        return values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        values.set(key, value);
+      },
+      removeItem(key) {
+        values.delete(key);
+      },
+    },
+  };
+}
+
+function createPersistentSessionClient(storage) {
+  return createClient(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: true,
+      detectSessionInUrl: false,
+      storage,
+      storageKey,
+    },
+  });
+}
+
+function verifySerializedSession(memoryStorage, session, label) {
+  const serializedSession = memoryStorage.values.get(storageKey);
+  assert(typeof serializedSession === 'string' && serializedSession.length > 100, `${label}_serialized_session_missing`);
+  assert(serializedSession.includes(session.access_token), `${label}_serialized_session_access_token_missing`);
+  return serializedSession;
+}
+
 async function bodyText(page) {
   return page.locator('body').innerText();
 }
@@ -72,6 +109,33 @@ async function resolveLinkedIlytkUser(adminClient) {
   throw new Error('ilytk_linked_auth_user_not_found');
 }
 
+async function createAdminSession() {
+  const memoryStorage = createMemoryStorage();
+  const sessionClient = createPersistentSessionClient(memoryStorage.adapter);
+  const { data, error } = await sessionClient.auth.signInWithPassword({
+    email: String(adminEmail || '').trim().toLowerCase(),
+    password: String(adminPassword || '').trim(),
+  });
+  if (error) throw new Error(`admin_session_login_failed_${error.message}`);
+
+  const session = data?.session;
+  const userId = data?.user?.id;
+  assert(session?.access_token && session?.refresh_token && userId, 'admin_session_missing');
+
+  const { data: profile, error: profileError } = await sessionClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+  if (profileError) throw new Error(`admin_profile_check_failed_${profileError.message}`);
+  assert(String(profile?.role || '').toLowerCase() === 'admin', `admin_profile_role_${profile?.role || 'null'}`);
+
+  return {
+    serializedSession: verifySerializedSession(memoryStorage, session, 'admin'),
+    sessionClient,
+  };
+}
+
 async function createTemporaryIlytkSession() {
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
@@ -93,30 +157,8 @@ async function createTemporaryIlytkSession() {
   assert(tokenHash, 'ilytk_magic_link_hash_missing');
   assert(verificationType === 'magiclink', `ilytk_unexpected_verification_type_${verificationType}`);
 
-  // Let the exact installed auth-js version serialize the session itself. This
-  // avoids guessing the browser storage envelope or future storage migrations.
-  const memoryStorage = new Map();
-  const authStorage = {
-    getItem(key) {
-      return memoryStorage.get(key) ?? null;
-    },
-    setItem(key, value) {
-      memoryStorage.set(key, value);
-    },
-    removeItem(key) {
-      memoryStorage.delete(key);
-    },
-  };
-
-  const sessionClient = createClient(supabaseUrl, anonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: true,
-      detectSessionInUrl: false,
-      storage: authStorage,
-      storageKey,
-    },
-  });
+  const memoryStorage = createMemoryStorage();
+  const sessionClient = createPersistentSessionClient(memoryStorage.adapter);
   const { data: verified, error: verifyError } = await sessionClient.auth.verifyOtp({
     token_hash: tokenHash,
     type: 'magiclink',
@@ -127,21 +169,17 @@ async function createTemporaryIlytkSession() {
   assert(session?.access_token && session?.refresh_token, 'ilytk_temporary_session_missing');
   assert(String(session.user?.id || '') === String(linkedUser.id), 'ilytk_temporary_session_user_mismatch');
 
-  const serializedSession = memoryStorage.get(storageKey);
-  assert(typeof serializedSession === 'string' && serializedSession.length > 100, 'ilytk_serialized_session_missing');
-  assert(serializedSession.includes(session.access_token), 'ilytk_serialized_session_access_token_missing');
-
-  // Prove that the generated JWT resolves to ILYTK before opening a browser.
   const { data: resolvedMerchantId, error: merchantSessionError } = await sessionClient.rpc('merchant_session_id');
-  if (merchantSessionError) {
-    throw new Error(`ilytk_session_rpc_failed_${merchantSessionError.message}`);
-  }
+  if (merchantSessionError) throw new Error(`ilytk_session_rpc_failed_${merchantSessionError.message}`);
   assert(String(resolvedMerchantId || '') === ilytkId, `ilytk_session_rpc_resolved_${resolvedMerchantId || 'null'}`);
 
-  return { serializedSession, sessionClient };
+  return {
+    serializedSession: verifySerializedSession(memoryStorage, session, 'ilytk'),
+    sessionClient,
+  };
 }
 
-async function createIlytkContext(browser, contextOptions, serializedSession) {
+async function createAuthenticatedContext(browser, contextOptions, serializedSession) {
   const context = await browser.newContext(contextOptions);
   await context.addInitScript(
     ({ key, value }) => {
@@ -174,20 +212,14 @@ async function openAllOrders(page) {
   await clickFirstVisible(section, 'All Orders command section in mobile drawer');
 }
 
-async function loginAdmin(page) {
-  await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=admin`, {
+async function openAdminFromInjectedSession(page) {
+  await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=admin`, {
     waitUntil: 'domcontentloaded',
     timeout: 90000,
   });
-  await page.locator('.auth-clean__intro-cta').click();
-  await page.locator('#dn-admin-email').fill(adminEmail);
-  await page.locator('#dn-admin-password').fill(adminPassword);
-  await Promise.all([
-    page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 }),
-    page.locator('button[type="submit"]').click(),
-  ]);
+  await page.waitForURL((url) => url.pathname === '/admin', { timeout: 90000 });
   await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });
-  assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render after protected login.');
+  assert(/لوحة التحكم|Dashboard/.test(await bodyText(page)), 'Admin portal did not render from the verified admin session.');
 }
 
 async function selectorText(page) {
@@ -197,7 +229,7 @@ async function selectorText(page) {
 
 async function testAdmin(page, label) {
   try {
-    await loginAdmin(page);
+    await openAdminFromInjectedSession(page);
     await openAllOrders(page);
     const search = page.locator('[data-admin-order-search="true"]');
     const merchantSelect = page
@@ -238,7 +270,7 @@ async function testAdmin(page, label) {
   }
 }
 
-async function loginMerchantFromInjectedSession(page) {
+async function openMerchantFromInjectedSession(page) {
   await page.goto(`${base}/merchant?nosplash=1&lang=ar&__dn_acceptance=merchant`, {
     waitUntil: 'domcontentloaded',
     timeout: 90000,
@@ -264,7 +296,7 @@ async function merchantSearch(page, query) {
 
 async function testMerchant(page, label) {
   try {
-    await loginMerchantFromInjectedSession(page);
+    await openMerchantFromInjectedSession(page);
     for (const coupon of reviewedCoupons) {
       const result = await merchantSearch(page, coupon);
       assert(result.resultCount > 0, `${label}: ILYTK search returned no result for ${coupon}.`);
@@ -287,21 +319,23 @@ async function testMerchant(page, label) {
   }
 }
 
-const { serializedSession, sessionClient } = await createTemporaryIlytkSession();
+const adminAuth = await createAdminSession();
+const merchantAuth = await createTemporaryIlytkSession();
 const browser = await chromium.launch({ headless: true });
 const scenarios = [
   { label: 'desktop', context: { viewport: { width: 1440, height: 1000 }, locale: 'ar-AE' } },
   { label: 'phone', context: { ...devices['Pixel 7'], locale: 'ar-AE' } },
 ];
 const report = [];
+let cleanupError = null;
 
 try {
   for (const scenario of scenarios) {
-    const adminContext = await browser.newContext(scenario.context);
+    const adminContext = await createAuthenticatedContext(browser, scenario.context, adminAuth.serializedSession);
     await testAdmin(await adminContext.newPage(), scenario.label);
     await adminContext.close();
 
-    const merchantContext = await createIlytkContext(browser, scenario.context, serializedSession);
+    const merchantContext = await createAuthenticatedContext(browser, scenario.context, merchantAuth.serializedSession);
     await testMerchant(await merchantContext.newPage(), scenario.label);
     await merchantContext.close();
     report.push({
@@ -314,11 +348,16 @@ try {
   }
 } finally {
   await browser.close();
-  const { error: signOutError } = await sessionClient.auth.signOut({ scope: 'local' });
-  if (signOutError) {
-    throw new Error(`ilytk_temporary_session_cleanup_failed_${signOutError.message}`);
+  for (const [label, client] of [
+    ['admin', adminAuth.sessionClient],
+    ['ilytk', merchantAuth.sessionClient],
+  ]) {
+    const { error } = await client.auth.signOut({ scope: 'local' });
+    if (error && !cleanupError) cleanupError = new Error(`${label}_temporary_session_cleanup_failed_${error.message}`);
   }
 }
+
+if (cleanupError) throw cleanupError;
 
 fs.writeFileSync(
   'preview-browser-evidence/report.json',
@@ -327,6 +366,11 @@ fs.writeFileSync(
       branchHead: process.env.GITHUB_HEAD_SHA || process.env.GITHUB_SHA,
       deployedPreview,
       testedExactSourceBundle: true,
+      adminIdentity: {
+        roleVerifiedBeforeBrowser: true,
+        authStorageSerializedByInstalledSupabaseClient: true,
+        temporarySessionRevokedLocally: true,
+      },
       merchantIdentity: {
         merchantId: ilytkId,
         portalLinkResolvedByUuid: true,
