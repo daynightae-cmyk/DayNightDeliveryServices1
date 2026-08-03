@@ -1,0 +1,76 @@
+name: Fix Delivered Order Core Save
+
+on:
+  push:
+    branches:
+      - fix/delivered-order-core-save-20260804
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-delivered-order-core-save-20260804
+  cancel-in-progress: true
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/delivered-order-core-save-20260804
+          fetch-depth: 0
+
+      - name: Apply delivered-order repair
+        run: python .github/scripts/apply-delivered-order-core-save-fix.py
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify delivered-order save contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          persistence="artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts"
+          modal="artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx"
+          grep -F 'export async function saveAdminLockedMerchantCoreEdit' "$persistence"
+          grep -F 'updateWithPatch(input, corePatch(input))' "$persistence"
+          grep -F 'financialLocked && !personalOrder && !sensitiveChange' "$modal"
+          grep -F 'saveAdminLockedMerchantCoreEdit(saveInput)' "$modal"
+          grep -F 'ظل الحساب المُرحَّل' "$modal"
+          echo "Delivered-order core save contract passed."
+
+      - name: Typecheck application
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - name: Build production application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Commit verified implementation only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/apply-delivered-order-core-save-fix.py
+          rm -f .github/workflows/fix-delivered-order-core-save.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No implementation changes produced." >&2; exit 1; }
+          git commit -m "fix(admin): save delivered order details without rewriting posted finance"
+          git push origin HEAD:fix/delivered-order-core-save-20260804
