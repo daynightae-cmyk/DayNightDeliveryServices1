@@ -1,1 +1,2 @@
 DAY NIGHT admin order save and Arabic localization verification.
+Retry: 2
