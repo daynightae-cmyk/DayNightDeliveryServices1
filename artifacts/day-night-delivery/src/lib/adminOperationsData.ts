@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import { currentUiIsArabic, friendlyDatabaseErrorMessage } from "./friendlyErrorMessage";
 import {
   resolveCanonicalMerchantForOrder,
   verifySavedOrderMerchant,
@@ -127,20 +128,50 @@ export function opsErrorDetail(error: unknown) {
     message?: string;
     details?: string;
     hint?: string;
+    code?: string;
+    constraint?: string;
     dbDetail?: string;
+    cause?: unknown;
   };
-  return [record?.dbDetail, record?.message, record?.details, record?.hint]
+  const cause = record?.cause as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+    constraint?: string;
+    dbDetail?: string;
+  } | undefined;
+  const technicalDetail = [
+    record?.dbDetail,
+    record?.message,
+    record?.details,
+    record?.hint,
+    record?.code,
+    record?.constraint,
+    cause?.dbDetail,
+    cause?.message,
+    cause?.details,
+    cause?.hint,
+    cause?.code,
+    cause?.constraint,
+  ]
     .map(clean)
     .filter(Boolean)
     .filter((value, index, all) => all.indexOf(value) === index)
     .join(" | ");
+
+  return technicalDetail || friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation");
 }
 
 function operationsError(error: unknown, fallback: string) {
-  const detail = opsErrorDetail(error);
-  if (detail) console.warn("Admin operations DB detail:", detail);
-  const wrapped = new Error(fallback) as Error & { dbDetail?: string };
-  wrapped.dbDetail = detail;
+  const technicalDetail = opsErrorDetail(error);
+  if (technicalDetail) console.warn("Admin operations DB detail:", technicalDetail);
+
+  const wrapped = new Error(
+    friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation", fallback),
+  ) as Error & { dbDetail?: string; cause?: unknown };
+  wrapped.dbDetail = technicalDetail;
+  wrapped.cause = error;
   return wrapped;
 }
 

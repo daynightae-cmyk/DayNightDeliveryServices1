@@ -1,4 +1,5 @@
 import type { Order } from "../types";
+import { internationalDestinationLabel, isKnownInternationalDestination } from "../data/internationalDestinations";
 import { areEquivalentLocations, extractDestinationAreaFromAddress, formatDestinationLocation, inferDestinationEmirate } from "./destinationLocation";
 
 export type ExportDocumentLanguage = "ar" | "en";
@@ -106,6 +107,9 @@ function transliterateLatinWord(word: string) {
 export function localizeExportText(value: unknown, language: ExportDocumentLanguage) {
   let text = clean(value);
   if (!text) return EMPTY;
+  if (isKnownInternationalDestination(text)) {
+    return internationalDestinationLabel(text, language === "ar");
+  }
   if (language !== "ar" || !/[A-Za-z]/.test(text)) return text;
   [...ARABIC_PHRASES].sort((a, b) => b[0].length - a[0].length).forEach(([latin, arabic]) => { text = replacePhrase(text, latin, arabic); });
   [...ARABIC_TERMS].sort((a, b) => b[0].length - a[0].length).forEach(([latin, arabic]) => { text = replacePhrase(text, latin, arabic); });

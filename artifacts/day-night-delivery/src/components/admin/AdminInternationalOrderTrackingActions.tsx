@@ -10,6 +10,11 @@ import {
   X,
 } from "lucide-react";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
+import {
+  INTERNATIONAL_DESTINATIONS,
+  internationalDestinationLabel,
+  normalizeInternationalDestination,
+} from "../../data/internationalDestinations";
 import { financialsFromOrder } from "../../lib/orderFinancials";
 import {
   internationalTrackingUrl,
@@ -55,17 +60,7 @@ function trackingNumber(shipment?: InternationalShipment | null) {
 }
 
 function canonicalCountry(value: unknown) {
-  const normalized = clean(value).toUpperCase();
-  const known: Record<string, string> = {
-    UAE: "AE",
-    EMIRATES: "AE",
-    "UNITED ARAB EMIRATES": "AE",
-    KSA: "SA",
-    SAUDI: "SA",
-    "SAUDI ARABIA": "SA",
-    السعودية: "SA",
-  };
-  return known[normalized] || normalized.slice(0, 3);
+  return normalizeInternationalDestination(value, "SA");
 }
 
 function orderPdfPayload(order: Order, shipment: InternationalShipment | null | undefined, isArabic: boolean): AdminPdfPayload {
@@ -96,7 +91,10 @@ function orderPdfPayload(order: Order, shipment: InternationalShipment | null | 
       awb,
       merchant: clean(order.merchant_name || order.sender_name) || "—",
       customer: clean(order.receiver_name || order.customer_name) || "—",
-      route: `${clean(order.sender_city) || "—"} → ${clean(order.receiver_city || order.destination_country) || "—"}`,
+      route: `${clean(order.sender_city) || "—"} → ${internationalDestinationLabel(
+        order.destination_country || order.receiver_city,
+        isArabic,
+      )}`,
       goods: `${financial.goodsValue.toFixed(2)} AED`,
       delivery: `${financial.deliveryFee.toFixed(2)} AED`,
       total: `${financial.customerTotal.toFixed(2)} AED`,
@@ -183,7 +181,7 @@ export default function AdminInternationalOrderTrackingActions({
         tracking_number: number,
         origin_country: clean(form.originCountry) || "AE",
         origin_city: clean(form.originCity),
-        destination_country: clean(form.destinationCountry),
+        destination_country: normalizeInternationalDestination(form.destinationCountry, "SA"),
         destination_city: clean(form.destinationCity),
         ship_date: clean(form.shipDate),
       });
@@ -195,7 +193,12 @@ export default function AdminInternationalOrderTrackingActions({
       setOpen(false);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "tracking_registration_failed";
-      setError(isArabic ? `تعذر حفظ رقم التتبع: ${message}` : `Unable to save tracking number: ${message}`);
+      console.error("DAY NIGHT tracking registration rejected:", message);
+      setError(
+        isArabic
+          ? "تعذر حفظ رقم التتبع الدولي. راجع رقم البوليصة وبيانات الدولة، ثم أعد المحاولة."
+          : "The international tracking number could not be saved. Review the AWB and country details, then try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -269,7 +272,16 @@ export default function AdminInternationalOrderTrackingActions({
             </label>
             <label>
               <span>{isArabic ? "دولة المنشأ" : "Origin country"}</span>
-              <input dir="ltr" maxLength={3} value={form.originCountry} onChange={(event) => setForm({ ...form, originCountry: event.target.value.toUpperCase() })} />
+              <select
+                value={normalizeInternationalDestination(form.originCountry, "AE")}
+                onChange={(event) => setForm({ ...form, originCountry: event.target.value })}
+              >
+                {INTERNATIONAL_DESTINATIONS.map((country) => (
+                  <option key={country.value} value={country.value}>
+                    {isArabic ? country.ar : country.en}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               <span>{isArabic ? "مدينة المنشأ" : "Origin city"}</span>
@@ -277,7 +289,18 @@ export default function AdminInternationalOrderTrackingActions({
             </label>
             <label>
               <span>{isArabic ? "دولة الوجهة" : "Destination country"}</span>
-              <input dir="ltr" maxLength={3} value={form.destinationCountry} onChange={(event) => setForm({ ...form, destinationCountry: event.target.value.toUpperCase() })} placeholder="SA" />
+              <select
+                value={normalizeInternationalDestination(form.destinationCountry, "SA")}
+                onChange={(event) => setForm({ ...form, destinationCountry: event.target.value })}
+              >
+                {INTERNATIONAL_DESTINATIONS.filter((country) => country.value !== "AE").map(
+                  (country) => (
+                    <option key={country.value} value={country.value}>
+                      {isArabic ? country.ar : country.en}
+                    </option>
+                  ),
+                )}
+              </select>
             </label>
             <label>
               <span>{isArabic ? "مدينة الوجهة" : "Destination city"}</span>
