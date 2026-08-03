@@ -92,11 +92,27 @@ export default function AdminNewOrderCouponGuard(
 
   function handleSaved(order: Order) {
     setCouponError("");
-    props.onSaved?.(order);
+
+    // The complete merchant and personal forms already clear their editable
+    // fields and focus the first field for the next order. Publish the saved row
+    // to open admin workspaces, but deliberately do not call the legacy parent
+    // callback because it navigates to All Orders and starts a global refresh.
+    window.dispatchEvent(
+      new CustomEvent("dn-admin-orders-updated", {
+        detail: {
+          mutation: "upsert",
+          order,
+          source: "new_order_stay_in_place",
+        },
+      }),
+    );
   }
 
   return (
-    <div onSubmitCapture={handleSubmitCapture}>
+    <div
+      data-admin-order-stay-in-place="true"
+      onSubmitCapture={handleSubmitCapture}
+    >
       {couponError && (
         <div
           role="alert"
