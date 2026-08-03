@@ -81,3 +81,14 @@ if count != 1:
 probe = ROOT / ".github/scripts/admin-complete-order-real-edit-production-probe.mjs"
 probe.write_text(probe_source, encoding="utf-8")
 print("PASS prepared rollback-safe production real-edit probe")
+
+gate = ROOT / "artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs"
+gate_source = gate.read_text(encoding="utf-8")
+wrong = '"../../../supabase/migrations/'
+correct = '"../../supabase/migrations/'
+if gate_source.count(wrong) != 3:
+    raise SystemExit(
+        f"expected three incorrect migration paths in localization gate, found {gate_source.count(wrong)}"
+    )
+gate.write_text(gate_source.replace(wrong, correct), encoding="utf-8")
+print("PASS corrected localization gate migration paths")
