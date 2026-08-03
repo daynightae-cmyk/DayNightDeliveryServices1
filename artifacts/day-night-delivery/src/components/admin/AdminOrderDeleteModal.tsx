@@ -22,8 +22,8 @@ const orderReference = (order: Order) =>
  * One-click admin deletion.
  *
  * No reason field, no second confirmation, and no raw database/schema message is
- * ever shown to the operator. Compatibility across Supabase migration generations
- * is handled by the deletion data layer.
+ * ever shown to the operator. The successful row is removed through the admin
+ * mutation event without reloading the page or losing the current workspace.
  */
 export default function AdminOrderDeleteModal({
   order,
@@ -58,15 +58,19 @@ export default function AdminOrderDeleteModal({
 
         window.dispatchEvent(
           new CustomEvent("dn-admin-orders-updated", {
-            detail: { deletedReference: result.reference },
+            detail: {
+              mutation: "delete",
+              deletedId: order.id,
+              deletedReference: result.reference,
+              order,
+              source: "admin_order_delete",
+            },
           }),
         );
 
+        // Close immediately. The current section, filters, pagination and scroll
+        // position remain mounted while the deleted row disappears locally.
         onClose();
-
-        // Reload from the authoritative Supabase snapshot so every live installed
-        // shell immediately reflects the deletion without retaining a stale row.
-        window.setTimeout(() => window.location.reload(), 80);
       } catch (cause) {
         console.error("DAY NIGHT order deletion failed", cause);
         setBusy(false);
