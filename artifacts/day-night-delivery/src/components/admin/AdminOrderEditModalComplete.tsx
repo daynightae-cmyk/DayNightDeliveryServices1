@@ -136,10 +136,14 @@ function professionalEditError(detail: string, isArabic: boolean) {
       ? "تعذر اعتماد القيم المالية. راجع قيمة البضاعة ورسوم التوصيل والخصم وطريقة التحصيل، ثم أعد الحفظ. لم يُحفظ أي تعديل جزئي."
       : "The financial values could not be verified. Review goods, delivery, discount, and payment method, then save again. No partial change was stored.";
   }
-  if (/pgrst202|schema cache|could not find the function|runtime_missing|does not exist/.test(reason)) {
+  if (
+    /pgrst202|runtime_missing|could not find the function (public\.)?admin_update_order_(complete_verified(_v2)?|with_financials)|function (public\.)?admin_update_order_(complete_verified(_v2)?|with_financials).*does not exist/.test(
+      reason,
+    )
+  ) {
     return isArabic
-      ? "خدمة حفظ التعديلات غير متاحة في نسخة قاعدة البيانات الحالية. حدّث الصفحة بعد اكتمال تحديث قاعدة البيانات. لم يُحفظ أي تعديل جزئي."
-      : "The complete-save service is unavailable in the current database version. Refresh after the database update completes. No partial change was stored.";
+      ? "خدمة حفظ التعديلات غير متاحة حاليًا بسبب عدم اكتمال مكوّن قاعدة البيانات المسؤول عن الحفظ. لم يُحفظ أي تعديل جزئي."
+      : "The order-save database component is currently unavailable. No partial change was stored.";
   }
   if (/network|failed to fetch|timeout|connection/.test(reason)) {
     return isArabic
