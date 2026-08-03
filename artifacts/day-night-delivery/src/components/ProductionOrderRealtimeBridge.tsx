@@ -4,15 +4,8 @@ import "../styles/dn-admin-status-auto-save.css";
 
 const STATUS_CONTROL_SELECTOR = ".dn-order-status-control";
 
-function clickAdminRefresh() {
-  const buttons = Array.from(
-    document.querySelectorAll<HTMLButtonElement>(".dn-admin-top-actions button"),
-  );
-  const refresh = buttons.find((button) => {
-    const text = String(button.textContent || "").toLowerCase();
-    return text.includes("تحديث") || text.includes("refresh");
-  });
-  if (refresh && !refresh.disabled) refresh.click();
+function clean(value: unknown) {
+  return String(value ?? "").trim();
 }
 
 function isArabicInterface() {
@@ -45,8 +38,94 @@ function enhanceStatusControls() {
   });
 }
 
+type RealtimeRow = Record<string, unknown>;
+type RealtimePayload = {
+  eventType?: string;
+  new?: RealtimeRow;
+  old?: RealtimeRow;
+};
+
+function publishProductionChange(detail: Record<string, unknown>) {
+  window.dispatchEvent(new CustomEvent("dn-production-order-change", { detail }));
+}
+
+function publishOrderMutation(payload: RealtimePayload) {
+  const eventType = clean(payload.eventType).toUpperCase();
+  const next = payload.new && typeof payload.new === "object" ? payload.new : null;
+  const previous = payload.old && typeof payload.old === "object" ? payload.old : null;
+
+  publishProductionChange({ table: "orders", event: eventType });
+
+  if ((eventType === "INSERT" || eventType === "UPDATE") && next) {
+    window.dispatchEvent(
+      new CustomEvent("dn-admin-orders-updated", {
+        detail: {
+          mutation: "upsert",
+          order: next,
+          source: "supabase_realtime",
+        },
+      }),
+    );
+    return;
+  }
+
+  if (eventType === "DELETE" && previous) {
+    window.dispatchEvent(
+      new CustomEvent("dn-admin-orders-updated", {
+        detail: {
+          mutation: "delete",
+          deletedId: previous.id,
+          deletedReference:
+            previous.tracking_number ||
+            previous.invoice_number ||
+            previous.coupon_number,
+          order: previous,
+          source: "supabase_realtime",
+        },
+      }),
+    );
+  }
+}
+
+function publishStatusHistoryMutation(payload: RealtimePayload) {
+  const row = payload.new && typeof payload.new === "object" ? payload.new : null;
+  publishProductionChange({ table: "order_status_history", event: payload.eventType });
+  if (!row) return;
+
+  const orderId = row.order_id || row.orderId;
+  const status = row.status || row.new_status;
+  if (!clean(orderId) || !clean(status)) return;
+
+  window.dispatchEvent(
+    new CustomEvent("dn-admin-order-status-change", {
+      detail: {
+        orderId,
+        status,
+        source: "supabase_status_history_realtime",
+      },
+    }),
+  );
+}
+
+function publishDriverLocationMutation(payload: RealtimePayload) {
+  const row = payload.new && typeof payload.new === "object" ? payload.new : payload.old;
+  publishProductionChange({ table: "driver_locations", event: payload.eventType });
+  window.dispatchEvent(
+    new CustomEvent("dn-admin-driver-location-change", {
+      detail: {
+        mutation: clean(payload.eventType).toLowerCase(),
+        location: row || null,
+        source: "supabase_realtime",
+      },
+    }),
+  );
+}
+
 /**
- * Keeps the legacy admin state synchronized without duplicating order data locally.
+ * Keeps admin order state synchronized without a browser reload or a global data
+ * refresh. Realtime rows are published as exact local upsert/delete/status events,
+ * preserving the active section, search, merchant filter, pagination and scroll.
+ *
  * It also turns the existing status selector into an auto-save control: selecting
  * any status triggers the verified save action after React applies the new value.
  * The hidden legacy button remains available only as a visible retry on failure.
@@ -55,7 +134,6 @@ export default function ProductionOrderRealtimeBridge() {
   useEffect(() => {
     if (!supabase || !window.location.pathname.startsWith("/admin")) return;
 
-    let timer = 0;
     const managedTimers = new Set<number>();
     const later = (callback: () => void, delay: number) => {
       const id = window.setTimeout(() => {
@@ -66,32 +144,27 @@ export default function ProductionOrderRealtimeBridge() {
       return id;
     };
 
-    const scheduleRefresh = (detail: Record<string, unknown>) => {
-      window.dispatchEvent(new CustomEvent("dn-production-order-change", { detail }));
-      window.clearTimeout(timer);
-      timer = window.setTimeout(clickAdminRefresh, 350);
-    };
-
     const channel = supabase
       .channel(`admin-orders-production-${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        (payload) => scheduleRefresh({ table: "orders", event: payload.eventType }),
+        (payload) => publishOrderMutation(payload as RealtimePayload),
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_status_history" },
-        (payload) => scheduleRefresh({ table: "order_status_history", event: payload.eventType }),
+        (payload) => publishStatusHistoryMutation(payload as RealtimePayload),
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "driver_locations" },
-        (payload) => scheduleRefresh({ table: "driver_locations", event: payload.eventType }),
+        (payload) => publishDriverLocationMutation(payload as RealtimePayload),
       )
       .subscribe();
 
-    const localStatusHandler = () => scheduleRefresh({ source: "local-status-event" });
+    const localStatusHandler = () =>
+      publishProductionChange({ source: "local-status-event" });
     window.addEventListener("dn-admin-order-status-change", localStatusHandler);
 
     enhanceStatusControls();
@@ -224,7 +297,6 @@ export default function ProductionOrderRealtimeBridge() {
     document.addEventListener("change", autoSaveStatus);
 
     return () => {
-      window.clearTimeout(timer);
       managedTimers.forEach((id) => window.clearTimeout(id));
       managedTimers.clear();
       controlsObserver.disconnect();
