@@ -26,6 +26,12 @@ import {
   getAreasForEmirate,
   getDefaultAreaForEmirate,
 } from "../../data/uaeLocations";
+import {
+  INTERNATIONAL_DESTINATIONS,
+  internationalDestinationLabel,
+  isKnownInternationalDestination,
+  normalizeInternationalDestination,
+} from "../../data/internationalDestinations";
 import type { Merchant, Order } from "../../types";
 import { isPersonalAdminOrder } from "../../lib/adminOrderLogic";
 import {
@@ -60,6 +66,91 @@ const numberOrBlank = (value: unknown) => {
 const orderReference = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
 
+const ORDER_STATUS_LABELS: Record<string, { ar: string; en: string }> = {
+  pending: { ar: "قيد الانتظار", en: "Pending" },
+  review: { ar: "قيد المراجعة", en: "Under review" },
+  under_review: { ar: "قيد المراجعة", en: "Under review" },
+  confirmed: { ar: "تم التأكيد", en: "Confirmed" },
+  assigned: { ar: "تم تعيين المندوب", en: "Driver assigned" },
+  picked_up: { ar: "تم استلام الشحنة", en: "Picked up" },
+  in_transit: { ar: "قيد النقل", en: "In transit" },
+  out_for_delivery: { ar: "خرجت للتسليم", en: "Out for delivery" },
+  delivered: { ar: "تم التسليم", en: "Delivered" },
+  completed: { ar: "مكتمل", en: "Completed" },
+  postponed: { ar: "مؤجل", en: "Postponed" },
+  returned: { ar: "مرتجع", en: "Returned" },
+  cancelled: { ar: "ملغي", en: "Cancelled" },
+  canceled: { ar: "ملغي", en: "Cancelled" },
+  failed: { ar: "تعذر التنفيذ", en: "Failed" },
+};
+
+function orderStatusLabel(value: unknown, isArabic: boolean) {
+  const key = clean(value).toLowerCase().replace(/[\s-]+/g, "_");
+  const label = ORDER_STATUS_LABELS[key];
+  return label ? (isArabic ? label.ar : label.en) : clean(value) || "—";
+}
+
+function paymentKey(value: unknown) {
+  const key = clean(value || "cod").toLowerCase().replace(/[\s-]+/g, "_");
+  if (key === "merchant_pays") return "sender_pays";
+  if (key === "cash") return "cod";
+  if (["card", "bank_transfer", "wallet"].includes(key)) return "prepaid";
+  return key;
+}
+
+function moneyDiffers(left: unknown, right: unknown) {
+  const a = Number(left || 0);
+  const b = Number(right || 0);
+  return !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a - b) > 0.005;
+}
+
+function professionalEditError(detail: string, isArabic: boolean) {
+  const reason = clean(detail).toLowerCase();
+  if (/not_authenticated|jwt expired|invalid jwt|refresh_token|session/.test(reason)) {
+    return isArabic
+      ? "انتهت جلسة الإدارة. سجّل الدخول مرة أخرى، ثم افتح الطلب وأعد الحفظ. لم يُحفظ أي تعديل جزئي."
+      : "The admin session expired. Sign in again, reopen the order, and save. No partial change was stored.";
+  }
+  if (/not_authorized|permission denied|row-level security|rls/.test(reason)) {
+    return isArabic
+      ? "لا يملك الحساب الحالي صلاحية تعديل هذا الطلب. استخدم حساب مدير أو دعم معتمد. لم يُحفظ أي تعديل جزئي."
+      : "The current account is not authorized to edit this order. Use an approved admin or support account. No partial change was stored.";
+  }
+  if (/23505|duplicate key|unique constraint|coupon.*duplicate|duplicate.*coupon|already exists/.test(reason)) {
+    return isArabic
+      ? "رقم الكوبون مستخدم في طلب آخر. افتح الطلب الموجود أو أدخل رقم كوبون مختلفًا. لم يُحفظ أي تعديل جزئي."
+      : "The coupon number is already used by another order. Open the existing order or enter a different coupon. No partial change was stored.";
+  }
+  if (/merchant_required|merchant_not_found|canonical_merchant|ownership.*conflict|merchant.*mismatch/.test(reason)) {
+    return isArabic
+      ? "تعذر اعتماد التاجر المختار أو مزامنة ملكية الطلب. راجع التاجر ثم أعد الحفظ. لم يُحفظ أي تعديل جزئي."
+      : "The selected merchant could not be verified or synchronized. Review the merchant and save again. No partial change was stored.";
+  }
+  if (/complete_order_edit_created_invalid_fields|admin_order_validation_failed|required.*field/.test(reason)) {
+    return isArabic
+      ? "تتضمن بيانات الطلب حقولًا أساسية ناقصة. أكمل اسم المستلم وهاتفه ورقم الكوبون، ثم أعد الحفظ. لم يُحفظ أي تعديل جزئي."
+      : "The order has missing core fields. Complete the recipient name, phone, and coupon number, then save again. No partial change was stored.";
+  }
+  if (/invalid_delivery_fee|invalid_manual_delivery_price|negative_financial|invalid_payment|financial.*mismatch/.test(reason)) {
+    return isArabic
+      ? "تعذر اعتماد القيم المالية. راجع قيمة البضاعة ورسوم التوصيل والخصم وطريقة التحصيل، ثم أعد الحفظ. لم يُحفظ أي تعديل جزئي."
+      : "The financial values could not be verified. Review goods, delivery, discount, and payment method, then save again. No partial change was stored.";
+  }
+  if (/pgrst202|schema cache|could not find the function|runtime_missing|does not exist/.test(reason)) {
+    return isArabic
+      ? "خدمة حفظ التعديلات غير متاحة في نسخة قاعدة البيانات الحالية. حدّث الصفحة بعد اكتمال تحديث قاعدة البيانات. لم يُحفظ أي تعديل جزئي."
+      : "The complete-save service is unavailable in the current database version. Refresh after the database update completes. No partial change was stored.";
+  }
+  if (/network|failed to fetch|timeout|connection/.test(reason)) {
+    return isArabic
+      ? "تعذر الاتصال بقاعدة البيانات. تحقق من الاتصال، ثم أعد المحاولة. لم يُحفظ أي تعديل جزئي."
+      : "The database could not be reached. Check the connection and try again. No partial change was stored.";
+  }
+  return isArabic
+    ? "تعذر حفظ التعديلات لأن قاعدة البيانات رفضت العملية. تم إلغاء العملية بالكامل دون حفظ جزئي. حدّث الصفحة ثم أعد المحاولة."
+    : "The database rejected the update. The entire transaction was rolled back with no partial save. Refresh and try again.";
+}
+
 function merchantOptionLabel(merchant: Merchant) {
   const owner = clean(merchant.owner_name);
   const store = clean(merchant.trade_name);
@@ -92,7 +183,10 @@ function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInpu
     delivery_city: order.receiver_city || order.receiver_emirate || "Abu Dhabi",
     delivery_area: order.receiver_area || "",
     delivery_street: order.receiver_address || "",
-    destination_country: order.destination_country || "SA",
+    destination_country: normalizeInternationalDestination(
+      order.destination_country || order.receiver_city || "SA",
+      "SA",
+    ),
     receiver_name: order.receiver_name || order.customer_name || "",
     receiver_phone: order.receiver_phone || order.customer_phone || "",
     receiver_address: order.receiver_address || "",
@@ -106,12 +200,12 @@ function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInpu
     cod_amount: numberOrBlank(order.cod_amount),
     notes: order.notes || "",
     status: order.status || "pending",
-    price_mode: personal ? "system" : manual ? "manual" : "system",
+    // Existing orders open with their exact saved delivery value. This prevents a
+    // harmless customer/address edit from silently recalculating historical pricing.
+    price_mode: personal ? "system" : "manual",
     manual_delivery_price: personal
       ? ""
-      : manual
-        ? numberOrBlank(order.manual_delivery_price ?? currentPrice)
-        : "",
+      : numberOrBlank(order.manual_delivery_price ?? currentPrice),
     goods_value: finance.goodsValue,
     discount_amount: finance.discountAmount,
     delivery_fee_mode: personal ? "customer_pays" : finance.deliveryFeeMode,
@@ -211,6 +305,22 @@ export default function AdminOrderEditModalComplete({
   const merchantChanged =
     !personalOrder && clean(selectedMerchant?.id) !== clean(order.merchant_id);
   const activeDeliveryFee = financials?.deliveryFee ?? 0;
+  const originalFinancials = financialsFromOrder(
+    currentOrder as Order & Record<string, unknown>,
+  );
+  const financialChanged =
+    !personalOrder &&
+    (moneyDiffers(currentForm.goods_value, originalFinancials.goodsValue) ||
+      moneyDiffers(activeDeliveryFee, originalFinancials.deliveryFee) ||
+      moneyDiffers(currentForm.discount_amount, originalFinancials.discountAmount) ||
+      currentForm.delivery_fee_mode !== originalFinancials.deliveryFeeMode ||
+      paymentKey(currentForm.payment_method) !== paymentKey(currentOrder.payment_method));
+  const sensitiveChange = merchantChanged || financialChanged;
+  const normalizedDestination = normalizeInternationalDestination(
+    currentForm.destination_country || currentForm.delivery_city || "SA",
+    "SA",
+  );
+  const destinationIsKnown = isKnownInternationalDestination(normalizedDestination);
 
   function clearFeedback() {
     setMessage("");
@@ -250,16 +360,14 @@ export default function AdminOrderEditModalComplete({
   function validate() {
     const missing = [
       !personalOrder && !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !personalOrder && !clean(currentForm.coupon_number)
+      !clean(currentForm.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
+      personalOrder && !clean(currentForm.sender_name)
         ? isArabic
-          ? "رقم الكوبون"
-          : "coupon number"
+          ? "اسم المرسل"
+          : "sender name"
         : "",
-      !clean(currentForm.sender_name) ? (isArabic ? "اسم المرسل" : "sender name") : "",
-      !clean(currentForm.sender_phone) ? (isArabic ? "هاتف المرسل" : "sender phone") : "",
-      !clean(currentForm.receiver_name) ? (isArabic ? "اسم العميل" : "customer name") : "",
-      !clean(currentForm.receiver_phone) ? (isArabic ? "هاتف العميل" : "customer phone") : "",
-      !clean(currentForm.package_type) ? (isArabic ? "محتوى الشحنة" : "package content") : "",
+      !clean(currentForm.receiver_name) ? (isArabic ? "اسم المستلم" : "recipient name") : "",
+      !clean(currentForm.receiver_phone) ? (isArabic ? "هاتف المستلم" : "recipient phone") : "",
       currentForm.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
     ].filter(Boolean);
 
@@ -268,14 +376,14 @@ export default function AdminOrderEditModalComplete({
         ? `الحقول المطلوبة: ${missing.join("، ")}`
         : `Required fields: ${missing.join(", ")}`;
     }
-    if (clean(editReason).length < 6) {
+    if (sensitiveChange && clean(editReason).length < 6) {
       return isArabic
-        ? "اكتب سبب واضح للتعديل لا يقل عن 6 أحرف؛ السبب بيتسجل في سجل التدقيق."
-        : "Enter a clear edit reason of at least 6 characters; it is stored in the audit log.";
+        ? "اكتب سببًا واضحًا للتعديل المالي أو نقل الطلب، على ألا يقل عن 6 أحرف."
+        : "Enter a clear reason of at least 6 characters for the financial or merchant change.";
     }
-    if (!confirmed) {
+    if (sensitiveChange && !confirmed) {
       return isArabic
-        ? "أكد إنك راجعت تأثير التعديل على التاجر والعميل والحسابات."
+        ? "أكد مراجعة أثر التعديل على التاجر والعميل والحسابات."
         : "Confirm that you reviewed the merchant, customer, and accounting impact.";
     }
     if (
@@ -324,7 +432,11 @@ export default function AdminOrderEditModalComplete({
         package_type: packageValue,
         package_description: packageValue,
         order: currentOrder,
-        edit_reason: clean(editReason),
+        edit_reason:
+          clean(editReason) ||
+          (isArabic
+            ? "تحديث بيانات الطلب من لوحة الإدارة"
+            : "Order details updated from the admin panel"),
       });
 
       window.dispatchEvent(
@@ -351,20 +463,17 @@ export default function AdminOrderEditModalComplete({
       setMessage(
         result.financialsLocked
           ? isArabic
-            ? `تم تحديث بيانات الطلب الشخصي ${orderReference(result.row)}. الحساب المُرحّل اتساب محمي، واستخدم صندوق التصحيح المالي المنفصل لتغييره.`
+            ? `تم تحديث بيانات الطلب الشخصي ${orderReference(result.row)}. ظل الحساب المُرحَّل محميًا، واستخدم صندوق التصحيح المالي المنفصل لتغييره.`
             : `Personal order ${orderReference(result.row)} was updated. Posted financials remain protected and use the separate audited adjustment panel.`
           : isArabic
-            ? `تم تحديث الطلب ${orderReference(result.row)} بالكامل وحفظه فعليًا. التاجر والكشوف والحسابات اتزامنوا بأمان.${auditSuffix}${fieldsSuffix}`
+            ? `تم تحديث الطلب ${orderReference(result.row)} بالكامل وحفظه فعليًا. تمت مزامنة التاجر والكشوف والحسابات بأمان.${auditSuffix}${fieldsSuffix}`
             : `Order ${orderReference(result.row)} was completely updated and verified. Merchant ownership, statements, and accounting were synchronized safely.${auditSuffix}${fieldsSuffix}`,
       );
       setConfirmed(false);
     } catch (cause) {
       const detail = opsErrorDetail(cause);
-      setError(
-        isArabic
-          ? `تعذر تحديث الطلب. العملية اتلغت بالكامل ومفيش تعديل جزئي.${detail ? ` السبب: ${detail}` : ""}`
-          : `The order update failed. The transaction was fully rolled back with no partial edit.${detail ? ` Reason: ${detail}` : ""}`,
-      );
+      console.error("DAY NIGHT complete order save rejected:", detail || cause);
+      setError(professionalEditError(detail, isArabic));
     } finally {
       setBusy(false);
     }
@@ -443,7 +552,7 @@ export default function AdminOrderEditModalComplete({
               </b>
               <span className="mt-1 block text-[10px] text-white/40">
                 {isArabic
-                  ? "رقم التتبع والفاتورة لا بيتغيروش من محرر البيانات."
+                  ? "لا يمكن تغيير رقم التتبع أو رقم الفاتورة من محرر البيانات."
                   : "Tracking and invoice identifiers are immutable here."}
               </span>
             </div>
@@ -451,7 +560,9 @@ export default function AdminOrderEditModalComplete({
               <small className="text-[10px] font-black text-white/45">
                 {isArabic ? "الحالة الحالية" : "Current status"}
               </small>
-              <b className="mt-1 block text-sm text-white">{order.status || "—"}</b>
+              <b className="mt-1 block text-sm text-white">
+                {orderStatusLabel(order.status, isArabic)}
+              </b>
               <span className="mt-1 block text-[10px] text-white/40">
                 {isArabic
                   ? "تغيير الحالة أو التراجع عن التسليم له مسار تشغيل منفصل."
@@ -473,7 +584,7 @@ export default function AdminOrderEditModalComplete({
               </b>
               <span className="mt-1 block text-[10px] text-white/50">
                 {isArabic
-                  ? "كل عملية بتتسجل قبل/بعد باسم المدير وسبب التعديل."
+                  ? "تُسجَّل كل عملية بالقيم السابقة واللاحقة واسم المسؤول وسبب التعديل."
                   : "Every save records actor, reason, and before/after values."}
               </span>
             </div>
@@ -483,7 +594,7 @@ export default function AdminOrderEditModalComplete({
             <div className="mb-4 flex gap-3 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-xs font-bold leading-6 text-cyan-50">
               <ShieldCheck className="h-5 w-5 shrink-0 text-brand-gold" />
               {isArabic
-                ? "الطلب مُسلّم أو حسابه مُرحّل، لكن محرر الإدارة المُدقّق يسمح بتعديل التاجر والعميل والعنوان والشحنة والمبالغ. تغيير التاجر يزامن ملكية COD وكشف التاجر والقيود التابعة، والتعديل المالي بيتسجل قبل/بعد في عملية واحدة قابلة للمراجعة."
+                ? "الطلب مُسلّم أو حسابه مُرحّل، لكن محرر الإدارة المُدقّق يسمح بتعديل التاجر والعميل والعنوان والشحنة والمبالغ. تغيير التاجر يزامن ملكية COD وكشف التاجر والقيود التابعة، ويُسجَّل التعديل المالي بالقيم السابقة واللاحقة ضمن عملية واحدة قابلة للمراجعة."
                 : "This order is delivered or financially posted. The audited editor still permits merchant, customer, address, shipment, and financial changes. Merchant ownership dependencies and delivered accounting are synchronized atomically with before/after audit evidence."}
             </div>
           )}
@@ -492,7 +603,7 @@ export default function AdminOrderEditModalComplete({
             <div className="mb-4 flex gap-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-xs font-bold leading-6 text-amber-100">
               <Store className="h-5 w-5 shrink-0" />
               {isArabic
-                ? `أنت بتنقل الطلب من التاجر الحالي إلى ${merchantOptionLabel(selectedMerchant!)}. الحفظ مش هيتم إلا لو التاجر الجديد مرتبط ببوابة قانونية ومفيش تعارض ملكية في القيود التابعة.`
+                ? `أنت تنقل الطلب من التاجر الحالي إلى ${merchantOptionLabel(selectedMerchant!)}. لن يتم الحفظ إلا بعد التحقق من التاجر الجديد وعدم وجود تعارض في ملكية القيود التابعة.`
                 : `You are moving this order to ${merchantOptionLabel(selectedMerchant!)}. Save is allowed only for a canonical portal-linked merchant with no dependent ownership conflict.`}
             </div>
           )}
@@ -501,7 +612,7 @@ export default function AdminOrderEditModalComplete({
             <div className="mb-4 flex gap-3 rounded-2xl border border-amber-300/35 bg-amber-300/10 p-4 text-xs font-bold leading-6 text-amber-100">
               <ShieldCheck className="h-5 w-5 shrink-0" />
               {isArabic
-                ? "الطلب الشخصي مُسلّم وحسابه مُرحّل. بيانات المرسل والعميل والعنوان والشحنة متاحة، أما المبالغ فتتعدل من صندوق التصحيح المالي المُدقّق الموجود تحت الرسالة دي."
+                ? "الطلب الشخصي مُسلّم وحسابه مُرحّل. بيانات المرسل والعميل والعنوان والشحنة متاحة، أما المبالغ فتُعدَّل من خلال لوحة التصحيح المالي المُدقَّق أدناه."
                 : "This personal order is delivered and posted. Sender, customer, address, and package fields remain editable; use the audited financial adjustment panel below for money changes."}
             </div>
           )}
@@ -558,21 +669,28 @@ export default function AdminOrderEditModalComplete({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className={labelClass}>
-                  <span>{isArabic ? "اسم المرسل *" : "Sender name *"}</span>
+                  <span>
+                    {personalOrder
+                      ? isArabic
+                        ? "اسم المرسل *"
+                        : "Sender name *"
+                      : isArabic
+                        ? "اسم المرسل — يُستكمل تلقائيًا عند الحاجة"
+                        : "Sender name — completed automatically when needed"}
+                  </span>
                   <input
                     value={form.sender_name || ""}
                     onChange={(event) => setField("sender_name", event.target.value)}
                     className={inputClass()}
-                    required
+                    required={personalOrder}
                   />
                 </label>
                 <label className={labelClass}>
-                  <span>{isArabic ? "هاتف المرسل *" : "Sender phone *"}</span>
+                  <span>{isArabic ? "هاتف المرسل — اختياري" : "Sender phone — optional"}</span>
                   <input
                     value={form.sender_phone || ""}
                     onChange={(event) => setField("sender_phone", event.target.value)}
                     className={inputClass()}
-                    required
                     dir="ltr"
                     inputMode="tel"
                   />
@@ -622,7 +740,7 @@ export default function AdminOrderEditModalComplete({
               </div>
 
               <label className={labelClass}>
-                <span>{isArabic ? "عنوان الاستلام" : "Pickup address"}</span>
+                <span>{isArabic ? "عنوان الاستلام التفصيلي — اختياري" : "Detailed pickup address — optional"}</span>
                 <textarea
                   rows={3}
                   value={form.pickup_street || ""}
@@ -728,17 +846,39 @@ export default function AdminOrderEditModalComplete({
               ) : (
                 <label className={labelClass}>
                   <span>{isArabic ? "دولة الوجهة" : "Destination country"}</span>
-                  <input
-                    value={form.destination_country || ""}
-                    onChange={(event) => setField("destination_country", event.target.value)}
+                  <select
+                    value={normalizedDestination}
+                    onChange={(event) =>
+                      setField(
+                        "destination_country",
+                        normalizeInternationalDestination(event.target.value, "SA"),
+                      )
+                    }
                     className={inputClass()}
-                    placeholder={isArabic ? "الدولة" : "Country"}
-                  />
+                  >
+                    {!destinationIsKnown && normalizedDestination && (
+                      <option value={normalizedDestination}>
+                        {internationalDestinationLabel(normalizedDestination, isArabic)}
+                      </option>
+                    )}
+                    {INTERNATIONAL_DESTINATIONS.filter((country) => country.value !== "AE").map(
+                      (country) => (
+                        <option key={country.value} value={country.value}>
+                          {isArabic ? country.ar : country.en}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                  <small className="text-[10px] font-bold text-white/40">
+                    {isArabic
+                      ? "يظهر اسم الدولة كاملًا، بينما يُحفظ رمزها القياسي داخليًا."
+                      : "The full country name is shown while its standard code is stored internally."}
+                  </small>
                 </label>
               )}
 
               <label className={labelClass}>
-                <span>{isArabic ? "العنوان التفصيلي" : "Detailed address"}</span>
+                <span>{isArabic ? "عنوان التسليم التفصيلي — اختياري" : "Detailed delivery address — optional"}</span>
                 <textarea
                   rows={3}
                   value={form.delivery_street || form.receiver_address}
@@ -769,8 +909,8 @@ export default function AdminOrderEditModalComplete({
                 <span>
                   {personalOrder
                     ? isArabic
-                      ? "رقم الكوبون — اختياري"
-                      : "Coupon number — optional"
+                      ? "رقم الكوبون *"
+                      : "Coupon number *"
                     : isArabic
                       ? "رقم الكوبون *"
                       : "Coupon number *"}
@@ -779,14 +919,15 @@ export default function AdminOrderEditModalComplete({
                   value={form.coupon_number || ""}
                   onChange={(event) => setField("coupon_number", event.target.value)}
                   className={inputClass()}
-                  required={!personalOrder}
+                  required
+                  aria-required="true"
                   dir="ltr"
                   data-admin-complete-order-coupon="true"
                 />
               </label>
 
               <label className={labelClass}>
-                <span>{isArabic ? "محتوى الشحنة *" : "Package content *"}</span>
+                <span>{isArabic ? "محتوى الشحنة — اختياري" : "Package content — optional"}</span>
                 <input
                   value={form.package_type}
                   onChange={(event) =>
@@ -801,7 +942,6 @@ export default function AdminOrderEditModalComplete({
                     )
                   }
                   className={inputClass()}
-                  required
                 />
               </label>
 
@@ -1029,17 +1169,21 @@ export default function AdminOrderEditModalComplete({
               value={form.notes || ""}
               onChange={(event) => setField("notes", event.target.value)}
               className={inputClass()}
-              placeholder={isArabic ? "ملاحظات الطلب" : "Order notes"}
+              placeholder={isArabic ? "ملاحظات الطلب — اختياري" : "Order notes — optional"}
             />
             <label className={labelClass}>
               <span>
-                {isArabic
-                  ? "سبب التعديل — إجباري وبيتسجل باسم المدير"
-                  : "Edit reason — required and attributed to the admin"}
+                {sensitiveChange
+                  ? isArabic
+                    ? "سبب التعديل — إجباري للتعديلات المالية أو نقل الطلب"
+                    : "Edit reason — required for financial or merchant changes"
+                  : isArabic
+                    ? "سبب التعديل — اختياري، ويُضاف وصف مهني تلقائيًا عند تركه فارغًا"
+                    : "Edit reason — optional; a professional audit note is added automatically"}
               </span>
               <textarea
                 rows={3}
-                minLength={6}
+                minLength={sensitiveChange ? 6 : undefined}
                 maxLength={600}
                 value={editReason}
                 onChange={(event) => {
@@ -1052,27 +1196,29 @@ export default function AdminOrderEditModalComplete({
                     ? "مثال: نقل الطلب للتاجر الصحيح بعد مراجعة الكود، وتصحيح عنوان العميل وقيمة التوصيل."
                     : "Example: Moved the order to the verified merchant and corrected customer address and delivery fee."
                 }
-                required
+                required={sensitiveChange}
                 data-admin-complete-order-reason="true"
               />
             </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 text-xs font-bold leading-6 text-white/75">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(event) => {
-                  setConfirmed(event.target.checked);
-                  clearFeedback();
-                }}
-                className="mt-1 h-4 w-4 accent-[#d4af37]"
-                data-admin-complete-order-confirm="true"
-              />
-              <span>
-                {isArabic
-                  ? "أؤكد إني راجعت التاجر الجديد، بيانات العميل، الكوبون، العنوان، الشحنة، وطريقة الحساب. فاهم إن النظام هيزامن الملكية والكشوف والقيود المالية ويسجل القيم قبل وبعد."
-                  : "I confirm that I reviewed the merchant, customer, coupon, address, package, and accounting. The system will synchronize ownership dependencies and record before/after values."}
-              </span>
-            </label>
+            {sensitiveChange && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 text-xs font-bold leading-6 text-white/75">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(event) => {
+                    setConfirmed(event.target.checked);
+                    clearFeedback();
+                  }}
+                  className="mt-1 h-4 w-4 accent-[#d4af37]"
+                  data-admin-complete-order-confirm="true"
+                />
+                <span>
+                  {isArabic
+                    ? "أؤكد أنني راجعت التاجر والعميل والكوبون والعنوان والقيم المالية، وأنني أوافق على مزامنة الملكية والكشوف وتسجيل القيم السابقة واللاحقة."
+                    : "I confirm that I reviewed the merchant, customer, coupon, address, and financial values, and approve synchronization of ownership and ledgers with before/after audit records."}
+                </span>
+              </label>
+            )}
           </section>
         </div>
 
@@ -1081,7 +1227,7 @@ export default function AdminOrderEditModalComplete({
             <p className="flex items-center gap-2 text-[10px] font-bold leading-5 text-white/50">
               <Truck className="h-4 w-4 text-brand-gold" />
               {isArabic
-                ? "الحفظ ذري: يا كل التعديلات تنجح وتتراجع من قاعدة البيانات، يا العملية كلها تتلغي من غير حفظ جزئي."
+                ? "الحفظ ذري: إما أن تُعتمد جميع التعديلات وسجل التدقيق معًا، أو تُلغى العملية بالكامل دون حفظ جزئي."
                 : "Save is atomic: every change and audit succeeds together, or the entire transaction rolls back with no partial edit."}
             </p>
             <div className="flex flex-wrap justify-end gap-2">

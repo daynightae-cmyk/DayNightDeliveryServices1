@@ -16,6 +16,7 @@ import {
   Truck,
 } from "lucide-react";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
+import { internationalDestinationLabel, isKnownInternationalDestination } from "../../data/internationalDestinations";
 import { matchesAdminSection, normalizeOrderStatus } from "../../lib/adminOrderLogic";
 import { financialsFromOrder } from "../../lib/orderFinancials";
 import { matchesSearchQuery } from "../../lib/searchNormalization";
@@ -131,6 +132,14 @@ function searchValues(order: Order, shipment?: InternationalShipment | null) {
   ];
 }
 
+function destinationLabel(order: Order, isArabic: boolean) {
+  const raw = clean(order.destination_country || order.receiver_city);
+  if (isKnownInternationalDestination(raw)) {
+    return internationalDestinationLabel(raw, isArabic);
+  }
+  return raw || "—";
+}
+
 function statusLabel(value: unknown, isArabic: boolean) {
   const key = normalizeOrderStatus(value as string | Order | null | undefined);
   const option = statusOptions.find(([status]) => status === key);
@@ -184,7 +193,7 @@ function allOrdersPdfPayload(
         awb: shipmentAwb(shipment) || "—",
         merchant: clean(order.merchant_name || order.sender_name) || "—",
         customer: clean(order.receiver_name || order.customer_name) || "—",
-        route: `${clean(order.sender_city) || "—"} → ${clean(order.receiver_city || order.destination_country) || "—"}`,
+        route: `${clean(order.sender_city) || "—"} → ${destinationLabel(order, isArabic)}`,
         delivery: money(financial.deliveryFee),
         total: money(financial.customerTotal),
         status: statusLabel(order.status, isArabic),
@@ -386,7 +395,7 @@ export default function AdminInternationalOrdersWorkspace({
               const isSelected = key === selectedOrderId;
               return <button type="button" key={key || orderReference(order)} className={isSelected ? "is-selected" : ""} onClick={() => setSelectedOrderId(key)} aria-pressed={isSelected}>
                 <span className="dn-intl-order-selector__top"><b dir="ltr">{orderReference(order)}</b><em className={shipment ? "is-linked" : "is-waiting"}>{shipment ? (isArabic ? "مربوط" : "Linked") : (isArabic ? "بانتظار AWB" : "Awaiting AWB")}</em></span>
-                <span className="dn-intl-order-selector__route"><MapPin />{clean(order.sender_city) || "—"}<i>→</i>{clean(order.receiver_city || order.destination_country) || "—"}</span>
+                <span className="dn-intl-order-selector__route"><MapPin />{clean(order.sender_city) || "—"}<i>→</i>{destinationLabel(order, isArabic)}</span>
                 <span className="dn-intl-order-selector__meta"><small>{clean(order.merchant_name || order.sender_name) || "—"}</small><strong>{statusLabel(order.status, isArabic)}</strong></span>
                 {shipment && <span className="dn-intl-order-selector__awb" dir="ltr"><Plane />{shipmentAwb(shipment)}</span>}
               </button>;
@@ -407,7 +416,7 @@ export default function AdminInternationalOrdersWorkspace({
             <div className="dn-intl-selected-order__facts">
               <div><small>{isArabic ? "التاجر" : "Merchant"}</small><b>{clean(selectedOrder.merchant_name || selectedOrder.sender_name) || "—"}</b><span dir="ltr">{clean(selectedMerchant?.phone || selectedOrder.sender_phone) || "—"}</span></div>
               <div><small>{isArabic ? "العميل" : "Customer"}</small><b>{clean(selectedOrder.receiver_name || selectedOrder.customer_name) || "—"}</b><span dir="ltr">{clean(selectedOrder.receiver_phone || selectedOrder.customer_phone) || "—"}</span></div>
-              <div><small>{isArabic ? "المسار" : "Route"}</small><b>{clean(selectedOrder.sender_city) || "—"} → {clean(selectedOrder.receiver_city || selectedOrder.destination_country) || "—"}</b><span>{selectedShipment?.latest_location || (isArabic ? "بانتظار تحديث الناقل" : "Awaiting carrier update")}</span></div>
+              <div><small>{isArabic ? "المسار" : "Route"}</small><b>{clean(selectedOrder.sender_city) || "—"} → {destinationLabel(selectedOrder, isArabic)}</b><span>{selectedShipment?.latest_location || (isArabic ? "بانتظار تحديث الناقل" : "Awaiting carrier update")}</span></div>
               <div><small>{isArabic ? "الحساب" : "Financials"}</small><b>{money(selectedFinancial.customerTotal)}</b><span>{isArabic ? `التوصيل ${money(selectedFinancial.deliveryFee)}` : `Delivery ${money(selectedFinancial.deliveryFee)}`}</span></div>
               <div><small>{isArabic ? "رقم البوليصة" : "Aramex AWB"}</small><b dir="ltr">{shipmentAwb(selectedShipment) || "—"}</b><span>{selectedShipment?.carrier_name || "Aramex"}</span></div>
               <div><small>{isArabic ? "آخر تحديث" : "Last update"}</small><b>{formatDate(selectedShipment?.latest_update_at || selectedShipment?.last_synced_at, isArabic)}</b><span>{selectedShipment?.latest_description || (isArabic ? "لا توجد أحداث بعد" : "No carrier events yet")}</span></div>

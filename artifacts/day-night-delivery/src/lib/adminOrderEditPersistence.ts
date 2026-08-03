@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
 import type { Order } from "../types";
+import { normalizeInternationalDestination } from "../data/internationalDestinations";
 import { isPersonalAdminOrder } from "./adminOrderLogic";
 import {
   PERSONAL_ORDER_DELIVERY_FEE,
@@ -103,7 +104,10 @@ function corePatch(input: FinancialOpsOrderUpdateInput) {
   if (!merchant?.id) throw new Error("merchant_required");
   const isInternational = input.shipping_scope === "international";
   const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
+    ? normalizeInternationalDestination(
+        input.destination_country || input.delivery_city || "WORLD",
+        "WORLD",
+      )
     : clean(input.delivery_city || "Abu Dhabi");
   const packageValue = clean(
     input.package_description || input.package_type || "Shipment",
@@ -154,7 +158,10 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
   const isInternational = input.shipping_scope === "international";
   const paymentMethod = normalizedPaymentMethod(input.payment_method);
   const receiverCity = isInternational
-    ? clean(input.destination_country || input.delivery_city || "WORLD")
+    ? normalizeInternationalDestination(
+        input.destination_country || input.delivery_city || "WORLD",
+        "WORLD",
+      )
     : clean(input.delivery_city || "Abu Dhabi");
   const packageValue = clean(
     input.package_description || input.package_type || "Shipment",
@@ -220,6 +227,8 @@ function fullPatch(input: FinancialOpsOrderUpdateInput) {
 }
 
 function personalCorePatch(input: FinancialOpsOrderUpdateInput) {
+  const couponNumber = clean(input.coupon_number);
+  if (!couponNumber) throw new Error("coupon_number_required_for_personal_order");
   const receiverCity = clean(input.delivery_city || "Abu Dhabi");
   const packageValue = clean(
     input.package_description || input.package_type || "Shipment",
@@ -246,7 +255,7 @@ function personalCorePatch(input: FinancialOpsOrderUpdateInput) {
       input.delivery_street,
       input.receiver_address,
     ]),
-    coupon_number: clean(input.coupon_number) || null,
+    coupon_number: couponNumber,
     package_type: packageValue,
     package_description: packageValue,
     weight: Math.max(0.1, Number(input.weight || 1)),
@@ -307,7 +316,7 @@ async function updateCompleteMerchantOrder(
 
   const patch = fullPatch(input);
   const financials = calculateFinancialOpsOrder(input);
-  const { data, error } = await supabase.rpc("admin_update_order_complete_verified", {
+  const args = {
     p_payload: {
       order_id: orderId,
       patch,
@@ -319,7 +328,20 @@ async function updateCompleteMerchantOrder(
       },
       reason,
     },
-  });
+  };
+
+  let { data, error } = await supabase.rpc(
+    "admin_update_order_complete_verified_v2",
+    args,
+  );
+  if (error && isMissingCompleteEditRuntime(error)) {
+    const compatibility = await supabase.rpc(
+      "admin_update_order_complete_verified",
+      args,
+    );
+    data = compatibility.data;
+    error = compatibility.error;
+  }
   if (error) throw error;
 
   const payload = (Array.isArray(data) ? data[0] : data) as

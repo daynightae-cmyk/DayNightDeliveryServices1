@@ -24,6 +24,7 @@ import {
 import { calculateOrderFinancials, orderFinancialValidation } from "../../lib/orderFinancials";
 import { createAdminCouponIntakeSession } from "../../lib/couponIntakeData";
 import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
+import { INTERNATIONAL_DESTINATIONS } from "../../data/internationalDestinations";
 import type { Merchant, Order } from "../../types";
 import CouponPhotoIntake, { type CouponPhotoReview } from "../shared/CouponPhotoIntake";
 import AdminPersonalOrderForm from "./AdminPersonalOrderForm";
@@ -59,20 +60,6 @@ const emptyOrder: FinancialOpsOrderInput = {
   discount_amount: "",
   delivery_fee_mode: "customer_pays",
 };
-
-const destinations = [
-  { value: "SA", ar: "المملكة العربية السعودية", en: "Saudi Arabia" },
-  { value: "KW", ar: "الكويت", en: "Kuwait" },
-  { value: "BH", ar: "البحرين", en: "Bahrain" },
-  { value: "OM", ar: "سلطنة عُمان", en: "Oman" },
-  { value: "QA", ar: "قطر", en: "Qatar" },
-  { value: "WORLD", ar: "باقي دول العالم", en: "Rest of the world" },
-  { value: "USA", ar: "الولايات المتحدة الأمريكية", en: "United States" },
-  { value: "UK", ar: "المملكة المتحدة", en: "United Kingdom" },
-  { value: "EU", ar: "دول الاتحاد الأوروبي", en: "European Union" },
-  { value: "Canada", ar: "كندا", en: "Canada" },
-  { value: "Australia", ar: "أستراليا", en: "Australia" },
-] as const;
 
 const PERSONAL_ORDER_OPTION = "__personal_order__";
 type OrderOwnerMode = "merchant" | "personal";
@@ -476,7 +463,7 @@ export default function AdminNewOrderComplete({
             <label className="space-y-1">
               <span className="text-[10px] font-black text-white/50">{isArabic ? "دولة التسليم *" : "Destination country *"}</span>
               <select value={form.destination_country || "SA"} onChange={(event) => setField("destination_country", event.target.value)} className={inputClass()}>
-                {destinations.map((country) => <option key={country.value} value={country.value}>{isArabic ? country.ar : country.en}</option>)}
+                {INTERNATIONAL_DESTINATIONS.map((country) => <option key={country.value} value={country.value}>{isArabic ? country.ar : country.en}</option>)}
               </select>
             </label>
           ) : (

@@ -18,6 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { fetchAdminOrders } from "../../lib/adminData";
+import {
+  INTERNATIONAL_DESTINATIONS,
+  internationalDestinationLabel,
+  normalizeInternationalDestination,
+} from "../../data/internationalDestinations";
 import { matchesSearchQuery } from "../../lib/searchNormalization";
 import {
   internationalTrackingUrl,
@@ -120,18 +125,7 @@ function orderReference(order: OrderOption) {
 }
 
 function countryCode(value: unknown) {
-  const raw = text(value).toUpperCase();
-  const known: Record<string, string> = {
-    UAE: "AE",
-    EMIRATES: "AE",
-    "UNITED ARAB EMIRATES": "AE",
-    KSA: "SA",
-    SAUDI: "SA",
-    "SAUDI ARABIA": "SA",
-    "المملكة العربية السعودية": "SA",
-    السعودية: "SA",
-  };
-  return known[raw] || raw.slice(0, 3);
+  return normalizeInternationalDestination(value);
 }
 
 function isInternational(order: OrderOption) {
@@ -425,11 +419,15 @@ export default function AdminInternationalTrackingLauncher() {
             <header><PackagePlus /><div><small>REGISTER & LINK</small><h2>{arabic ? "تسجيل بوليصة أرامكس" : "Register an Aramex AWB"}</h2></div></header>
             <div className="dn-it-admin-form">
               <label className="is-wide"><span>{arabic ? `بحث في الطلبات (${orders.length})` : `Search orders (${orders.length})`}</span><input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder={arabic ? "رقم الطلب، المدينة أو اسم المستلم" : "Order number, city or receiver"} /></label>
-              <label className="is-wide"><span>{arabic ? "اختر الطلب" : "Select order"}</span><select value={form.order_id} onChange={(event) => selectOrder(event.target.value)}><option value="">{loading ? (arabic ? "جاري التحميل…" : "Loading…") : (arabic ? "اختر الطلب" : "Select order")}</option>{internationalOrders.length > 0 && <optgroup label={arabic ? `الطلبات الدولية (${internationalOrders.length})` : `International orders (${internationalOrders.length})`}>{internationalOrders.map((order) => <option key={order.id} value={order.id}>دولي · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || order.destination_country || "—"}</option>)}</optgroup>}{otherOrders.length > 0 && <optgroup label={arabic ? `باقي الطلبات (${otherOrders.length})` : `Other orders (${otherOrders.length})`}>{otherOrders.map((order) => <option key={order.id} value={order.id}>نظام · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || "—"}</option>)}</optgroup>}</select></label>
+              <label className="is-wide"><span>{arabic ? "اختر الطلب" : "Select order"}</span><select value={form.order_id} onChange={(event) => selectOrder(event.target.value)}><option value="">{loading ? (arabic ? "جاري التحميل…" : "Loading…") : (arabic ? "اختر الطلب" : "Select order")}</option>{internationalOrders.length > 0 && <optgroup label={arabic ? `الطلبات الدولية (${internationalOrders.length})` : `International orders (${internationalOrders.length})`}>{internationalOrders.map((order) => <option key={order.id} value={order.id}>
+                          {arabic ? "دولي" : "International"} · {orderReference(order)} · {order.sender_city || "—"} → {internationalDestinationLabel(order.destination_country || order.receiver_city, arabic)}
+                        </option>)}</optgroup>}{otherOrders.length > 0 && <optgroup label={arabic ? `باقي الطلبات (${otherOrders.length})` : `Other orders (${otherOrders.length})`}>{otherOrders.map((order) => <option key={order.id} value={order.id}>
+                          {arabic ? "طلب محلي" : "Local order"} · {orderReference(order)} · {order.sender_city || "—"} → {order.receiver_city || "—"}
+                        </option>)}</optgroup>}</select></label>
               <label className="is-wide"><span>Aramex AWB</span><input dir="ltr" value={form.tracking_number} onChange={(event) => setForm({ ...form, tracking_number: event.target.value.toUpperCase() })} placeholder="37313304803" /></label>
-              <label><span>{arabic ? "دولة المنشأ" : "Origin country"}</span><input dir="ltr" maxLength={3} value={form.origin_country} onChange={(event) => setForm({ ...form, origin_country: event.target.value.toUpperCase() })} /></label>
+              <label><span>{arabic ? "دولة المنشأ" : "Origin country"}</span><select value={normalizeInternationalDestination(form.origin_country, "AE")} onChange={(event) => setForm({ ...form, origin_country: event.target.value })}>{INTERNATIONAL_DESTINATIONS.map((country) => <option key={country.value} value={country.value}>{arabic ? country.ar : country.en}</option>)}</select></label>
               <label><span>{arabic ? "مدينة المنشأ" : "Origin city"}</span><input value={form.origin_city} onChange={(event) => setForm({ ...form, origin_city: event.target.value })} placeholder="Ajman" /></label>
-              <label><span>{arabic ? "دولة الوجهة" : "Destination country"}</span><input dir="ltr" maxLength={3} value={form.destination_country} onChange={(event) => setForm({ ...form, destination_country: event.target.value.toUpperCase() })} placeholder="SA" /></label>
+              <label><span>{arabic ? "دولة الوجهة" : "Destination country"}</span><select value={normalizeInternationalDestination(form.destination_country, "SA")} onChange={(event) => setForm({ ...form, destination_country: event.target.value })}>{INTERNATIONAL_DESTINATIONS.filter((country) => country.value !== "AE").map((country) => <option key={country.value} value={country.value}>{arabic ? country.ar : country.en}</option>)}</select></label>
               <label><span>{arabic ? "مدينة الوجهة" : "Destination city"}</span><input value={form.destination_city} onChange={(event) => setForm({ ...form, destination_city: event.target.value })} placeholder="Riyadh" /></label>
               <label className="is-wide"><span>{arabic ? "تاريخ الشحن" : "Ship date"}</span><input type="date" value={form.ship_date} onChange={(event) => setForm({ ...form, ship_date: event.target.value })} /></label>
               <button type="button" className="dn-it-admin-primary" onClick={() => void register()} disabled={Boolean(operation) || !form.order_id || !form.tracking_number.trim()}>{operation === "register" ? <Loader2 className="dn-it-admin-spin" /> : <PackagePlus />}{arabic ? "تسجيل وربط الشحنة" : "Register and link shipment"}</button>
@@ -438,7 +436,7 @@ export default function AdminInternationalTrackingLauncher() {
 
           <section className="dn-it-admin-list">
             <header><div><span>LIVE OPERATIONS</span><h2>{arabic ? "شحنات أرامكس الدولية" : "International Aramex shipments"}</h2></div><label><Search /><input value={shipmentSearch} onChange={(event) => setShipmentSearch(event.target.value)} placeholder={arabic ? "بحث بالرقم أو الموقع" : "Search number or location"} /></label></header>
-            {loading && !center.shipments.length ? <div className="dn-it-admin-loading"><Loader2 /><span>{arabic ? "تحميل بيانات التتبع…" : "Loading tracking data…"}</span></div> : !visibleShipments.length ? <div className="dn-it-admin-empty"><Plane /><b>{arabic ? "لا توجد شحنات مسجلة" : "No registered shipments"}</b><p>{arabic ? "اختر طلبًا وسجّل بوليصة أرامكس." : "Select an order and register its Aramex AWB."}</p></div> : <div className="dn-it-admin-cards">{visibleShipments.map((shipment) => { const busy = operation.endsWith(`:${shipment.id}`); return <article key={shipment.id}><div className="dn-it-admin-card-top"><div><small>ARAMEX AWB</small><b dir="ltr">{shipment.tracking_number || shipment.carrier_tracking_number_full || "—"}</b><span>{shipment.public_tracking_number || "—"}</span></div><i className={`is-${shipment.normalized_status || "unknown"}`}>{statusLabel(shipment.normalized_status, arabic)}</i></div><div className="dn-it-admin-route"><span>{shipment.origin_city || shipment.origin_country || "UAE"}</span><Plane /><span>{shipment.destination_city || shipment.destination_country || "—"}</span></div><dl><div><dt>{arabic ? "آخر موقع" : "Latest location"}</dt><dd>{shipment.latest_location || "—"}</dd></div><div><dt>{arabic ? "آخر تحديث" : "Last update"}</dt><dd>{displayDate(shipment.latest_update_at, arabic)}</dd></div></dl><div className="dn-it-admin-card-actions"><button type="button" onClick={() => void shipmentAction("sync", shipment)} disabled={busy}>{operation === `sync:${shipment.id}` ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}{arabic ? "مزامنة" : "Sync"}</button><button type="button" onClick={() => void navigator.clipboard.writeText(internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || ""))}><Copy />{arabic ? "نسخ الرابط" : "Copy link"}</button><a href={internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || "")} target="_blank" rel="noreferrer"><Link2 />{arabic ? "فتح" : "Open"}</a>{shipment.tracking_stopped_at ? <button type="button" onClick={() => void shipmentAction("retrack", shipment)} disabled={busy}><RotateCcw />{arabic ? "إعادة التتبع" : "Retrack"}</button> : <button type="button" className="is-danger" onClick={() => void shipmentAction("stop", shipment)} disabled={busy}><Square />{arabic ? "إيقاف" : "Stop"}</button>}</div></article>; })}</div>}
+            {loading && !center.shipments.length ? <div className="dn-it-admin-loading"><Loader2 /><span>{arabic ? "تحميل بيانات التتبع…" : "Loading tracking data…"}</span></div> : !visibleShipments.length ? <div className="dn-it-admin-empty"><Plane /><b>{arabic ? "لا توجد شحنات مسجلة" : "No registered shipments"}</b><p>{arabic ? "اختر طلبًا وسجّل بوليصة أرامكس." : "Select an order and register its Aramex AWB."}</p></div> : <div className="dn-it-admin-cards">{visibleShipments.map((shipment) => { const busy = operation.endsWith(`:${shipment.id}`); return <article key={shipment.id}><div className="dn-it-admin-card-top"><div><small>ARAMEX AWB</small><b dir="ltr">{shipment.tracking_number || shipment.carrier_tracking_number_full || "—"}</b><span>{shipment.public_tracking_number || "—"}</span></div><i className={`is-${shipment.normalized_status || "unknown"}`}>{statusLabel(shipment.normalized_status, arabic)}</i></div><div className="dn-it-admin-route"><span>{shipment.origin_city || shipment.origin_country || "UAE"}</span><Plane /><span>{shipment.destination_city || internationalDestinationLabel(shipment.destination_country, arabic)}</span></div><dl><div><dt>{arabic ? "آخر موقع" : "Latest location"}</dt><dd>{shipment.latest_location || "—"}</dd></div><div><dt>{arabic ? "آخر تحديث" : "Last update"}</dt><dd>{displayDate(shipment.latest_update_at, arabic)}</dd></div></dl><div className="dn-it-admin-card-actions"><button type="button" onClick={() => void shipmentAction("sync", shipment)} disabled={busy}>{operation === `sync:${shipment.id}` ? <Loader2 className="dn-it-admin-spin" /> : <RefreshCw />}{arabic ? "مزامنة" : "Sync"}</button><button type="button" onClick={() => void navigator.clipboard.writeText(internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || ""))}><Copy />{arabic ? "نسخ الرابط" : "Copy link"}</button><a href={internationalTrackingUrl(shipment.public_tracking_number || shipment.tracking_number || "")} target="_blank" rel="noreferrer"><Link2 />{arabic ? "فتح" : "Open"}</a>{shipment.tracking_stopped_at ? <button type="button" onClick={() => void shipmentAction("retrack", shipment)} disabled={busy}><RotateCcw />{arabic ? "إعادة التتبع" : "Retrack"}</button> : <button type="button" className="is-danger" onClick={() => void shipmentAction("stop", shipment)} disabled={busy}><Square />{arabic ? "إيقاف" : "Stop"}</button>}</div></article>; })}</div>}
           </section>
         </div>
       </section>
