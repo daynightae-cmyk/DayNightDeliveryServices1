@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - final/admin-order-lifecycle-ux-20260804
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 concurrency:
   group: final-admin-order-lifecycle-ux-20260804
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   audit-fix-verify:
