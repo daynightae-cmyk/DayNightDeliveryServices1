@@ -9,6 +9,7 @@ import AdminNewOrderComplete from "./AdminNewOrderComplete";
 type AdminNewOrderCouponGuardProps = {
   isArabic: boolean;
   merchants: Merchant[];
+  orders: Order[];
   onSaved?: (order: Order) => void;
 };
 

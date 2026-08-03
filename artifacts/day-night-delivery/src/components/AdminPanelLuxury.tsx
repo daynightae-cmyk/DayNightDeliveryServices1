@@ -41,6 +41,8 @@ import {
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
 import { supabase } from "../supabase";
+import { formatAdminMoney } from "../lib/adminLocale";
+import AdminHistoryAutocomplete from "./admin/AdminHistoryAutocomplete";
 import {
   fetchAdminOrders,
   fetchFinanceSummary,
@@ -542,8 +544,8 @@ function normalize(value: unknown) {
     .trim();
 }
 
-function money(value: number) {
-  return `${Number(value || 0).toFixed(2)} AED`;
+function money(value: number, isArabic: boolean) {
+  return formatAdminMoney(value, isArabic);
 }
 
 function getOrderIncome(order: any) {
@@ -612,8 +614,8 @@ function buildDashboardPdfPayload(
       active: metrics.active,
       delivered: metrics.delivered,
       unassigned: metrics.unassigned,
-      cod: money(metrics.codTotal),
-      income: money(metrics.income),
+      cod: money(metrics.codTotal, isArabic),
+      income: money(metrics.income, isArabic),
     },
     columns: [
       { key: "metric", label: isArabic ? "المؤشر" : "Metric" },
@@ -896,8 +898,8 @@ export default function AdminPanelLuxury() {
         audioEvent: "cod_alert",
         titleAr: "تحصيل معلق",
         titleEn: "Pending COD",
-        bodyAr: `يوجد COD معلق بقيمة ${money(Number(financeSummary.cod_pending || 0))}.`,
-        bodyEn: `Pending COD is ${money(Number(financeSummary.cod_pending || 0))}.`,
+        bodyAr: `يوجد COD معلق بقيمة ${money(Number(financeSummary.cod_pending || 0), false)}.`,
+        bodyEn: `Pending COD is ${money(Number(financeSummary.cod_pending || 0), false)}.`,
       });
     if (active === "print" && orders.length > 0)
       addAdminNotification({
@@ -1032,13 +1034,13 @@ export default function AdminPanelLuxury() {
       },
       {
         label: ui.codTotal,
-        value: money(metrics.codTotal),
+        value: money(metrics.codTotal, isArabic),
         icon: "cod" as AdminIconName,
         hint: ui.sourceDerived,
       },
       {
         label: ui.income,
-        value: money(metrics.income),
+        value: money(metrics.income, isArabic),
         icon: "income" as AdminIconName,
         hint: ui.sourceDerived,
       },
@@ -1280,6 +1282,7 @@ export default function AdminPanelLuxury() {
           <AdminNewOrder
             isArabic={isArabic}
             merchants={merchants}
+            orders={orders}
             onSaved={(savedOrder) => {
               setOrders((current) => [
                 savedOrder,
@@ -1415,7 +1418,13 @@ export default function AdminPanelLuxury() {
   }
 
   return (
-    <div className="dn-admin-fullscreen" dir={isArabic ? "rtl" : "ltr"}>
+    <AdminHistoryAutocomplete
+      isArabic={isArabic}
+      orders={orders}
+      merchants={merchants}
+      scope="admin-global"
+    >
+      <div className="dn-admin-fullscreen" dir={isArabic ? "rtl" : "ltr"}>
       <button
         type="button"
         className="dn-admin-mobile-open"
@@ -1570,7 +1579,8 @@ export default function AdminPanelLuxury() {
             <div className="dn-admin-workspace-host">{renderWorkspace()}</div>
           </div>
         </main>
+        </div>
       </div>
-    </div>
+    </AdminHistoryAutocomplete>
   );
 }

@@ -1,0 +1,64 @@
+.dn-admin-history-autocomplete {
+  min-width: 0;
+}
+
+.dn-admin-history-autocomplete input[data-admin-smart-autocomplete-bound="true"] {
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease,
+    background-color 160ms ease;
+}
+
+.dn-admin-history-autocomplete input[data-admin-smart-autocomplete-bound="true"]:focus {
+  border-color: rgba(212, 175, 55, 0.72) !important;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1), 0 14px 38px rgba(0, 0, 0, 0.16) !important;
+  transform: translateY(-1px);
+}
+
+.dn-admin-history-autocomplete input[data-admin-smart-autocomplete-bound="true"]::placeholder {
+  opacity: 0.72;
+}
+
+form[data-admin-new-order-form="merchant"],
+.dn-personal-order-form {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+}
+
+form[data-admin-new-order-form="merchant"]::before,
+.dn-personal-order-form::before {
+  content: "";
+  position: absolute;
+  inset: -30% auto auto -12%;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: rgba(38, 161, 220, 0.08);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.dn-admin-bulk-console,
+.dn-section-table-card,
+.dn-admin-action-modal {
+  scroll-margin-top: 18px;
+}
+
+.dn-order-status-control select:focus,
+.dn-admin-bulk-filter-grid input:focus,
+.dn-admin-bulk-filter-grid select:focus {
+  outline: none;
+  border-color: rgba(212, 175, 55, 0.68) !important;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+}
+
+@media (max-width: 760px) {
+  .dn-admin-action-modal {
+    border-radius: 22px !important;
+    max-height: 97dvh !important;
+  }
+
+  .dn-admin-bulk-filter-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { opsErrorDetail } from "../../lib/adminOperationsData";
+import { formatAdminMoney } from "../../lib/adminLocale";
 import {
   saveAdminLockedMerchantCoreEdit,
   saveAdminOrderEdit,
@@ -296,10 +297,12 @@ function initialForm(order: Order, merchants: Merchant[]): FinancialOpsOrderInpu
 function Metric({
   label,
   value,
+  isArabic,
   accent = false,
 }: {
   label: string;
   value: number;
+  isArabic: boolean;
   accent?: boolean;
 }) {
   return (
@@ -312,7 +315,7 @@ function Metric({
     >
       {label}
       <b className="mt-1 block text-sm" dir="ltr">
-        {Math.abs(value).toFixed(2)} AED
+        {formatAdminMoney(value, isArabic, { absolute: true })}
       </b>
     </span>
   );
@@ -1175,7 +1178,7 @@ export default function AdminOrderEditModalComplete({
                     className="rounded-xl border border-brand-sky/25 bg-brand-sky/10 px-3 py-3 text-sm font-black text-brand-sky"
                     dir="ltr"
                   >
-                    {activeDeliveryFee.toFixed(2)} AED
+                    {formatAdminMoney(activeDeliveryFee, isArabic)}
                   </div>
                 </div>
               </div>
@@ -1293,15 +1296,15 @@ export default function AdminOrderEditModalComplete({
 
               {financials && (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <Metric label={isArabic ? "البضاعة" : "Goods"} value={financials.goodsValue} />
-                  <Metric label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
-                  <Metric label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />
-                  <Metric
+                  <Metric isArabic={isArabic} label={isArabic ? "البضاعة" : "Goods"} value={financials.goodsValue} />
+                  <Metric isArabic={isArabic} label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
+                  <Metric isArabic={isArabic} label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />
+                  <Metric isArabic={isArabic}
                     label={isArabic ? "المطلوب من العميل" : "Customer total"}
                     value={financials.customerTotal}
                     accent
                   />
-                  <Metric
+                  <Metric isArabic={isArabic}
                     label={
                       financials.merchantDue < 0
                         ? isArabic
@@ -1313,7 +1316,7 @@ export default function AdminOrderEditModalComplete({
                     }
                     value={financials.merchantDue}
                   />
-                  <Metric
+                  <Metric isArabic={isArabic}
                     label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"}
                     value={financials.companyRevenue}
                   />

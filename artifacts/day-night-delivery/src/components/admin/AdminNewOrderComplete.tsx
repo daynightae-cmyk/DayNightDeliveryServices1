@@ -15,7 +15,9 @@ import {
   Store,
   WalletCards,
 } from "lucide-react";
-import { calculateOpsOrderPrice, opsErrorDetail, type OpsDataSource } from "../../lib/adminOperationsData";
+import { calculateOpsOrderPrice, type OpsDataSource } from "../../lib/adminOperationsData";
+import { formatAdminMoney } from "../../lib/adminLocale";
+import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import {
   calculateFinancialOpsOrder,
   createFinancialOpsOrder,
@@ -120,12 +122,12 @@ function merchantSettlement(value: number, isArabic: boolean) {
   };
 }
 
-function FinancialMetric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+function FinancialMetric({ label, value, isArabic, accent = false }: { label: string; value: number; isArabic: boolean; accent?: boolean }) {
   return (
     <div className={`rounded-2xl border p-3 ${accent ? "border-brand-gold/40 bg-brand-gold/10" : "border-white/10 bg-black/10"}`}>
       <span className="block text-[10px] font-black text-white/50">{label}</span>
       <strong className={`mt-1 block text-lg font-black ${accent ? "text-brand-gold" : "text-white"}`} dir="ltr">
-        {value.toFixed(2)} AED
+        {formatAdminMoney(value, isArabic)}
       </strong>
     </div>
   );
@@ -138,6 +140,7 @@ export default function AdminNewOrderComplete({
 }: {
   isArabic: boolean;
   merchants: Merchant[];
+  orders?: Order[];
   onSaved?: (order: Order) => void;
 }) {
   const [form, setForm] = useState<FinancialOpsOrderInput>(() => freshOrderForMerchant(null));
@@ -352,13 +355,10 @@ export default function AdminNewOrderComplete({
       );
       onSaved?.(saved);
     } catch (cause) {
-      const detail = opsErrorDetail(cause);
+      const feedback = adminOrderActionFeedback(cause, isArabic, "create");
       setSource("none");
-      setError(
-        isArabic
-          ? `تعذر حفظ الطلب المالي الحقيقي.${detail ? ` السبب: ${detail}` : ""}`
-          : `The real financial order could not be saved.${detail ? ` Reason: ${detail}` : ""}`,
-      );
+      setError(`${feedback.message} ${isArabic ? "رمز العملية" : "Operation code"}: ${feedback.code}`);
+      console.error("DAY NIGHT order creation rejected:", feedback.diagnostic || cause);
     } finally {
       setSaving(false);
     }
@@ -529,12 +529,12 @@ export default function AdminNewOrderComplete({
 
         {financials && settlement ? (
           <div className={`mt-4 grid gap-3 sm:grid-cols-2 ${financials.discountAmount > 0 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
-            <FinancialMetric label={isArabic ? "قيمة البضاعة" : "Goods"} value={financials.goodsValue} />
-            <FinancialMetric label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
-            {financials.discountAmount > 0 && <FinancialMetric label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />}
-            <FinancialMetric label={isArabic ? "المطلوب من العميل" : "Customer total"} value={financials.customerTotal} accent />
-            <FinancialMetric label={settlement.label} value={settlement.amount} />
-            <FinancialMetric label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
+            <FinancialMetric isArabic={isArabic} label={isArabic ? "قيمة البضاعة" : "Goods"} value={financials.goodsValue} />
+            <FinancialMetric isArabic={isArabic} label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
+            {financials.discountAmount > 0 && <FinancialMetric isArabic={isArabic} label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />}
+            <FinancialMetric isArabic={isArabic} label={isArabic ? "المطلوب من العميل" : "Customer total"} value={financials.customerTotal} accent />
+            <FinancialMetric isArabic={isArabic} label={settlement.label} value={settlement.amount} />
+            <FinancialMetric isArabic={isArabic} label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/8 p-3 text-xs font-bold text-rose-100">{isArabic ? "راجع الخصم والقيم المالية لإظهار الإجمالي." : "Check the discount and financial values to display totals."}</div>
