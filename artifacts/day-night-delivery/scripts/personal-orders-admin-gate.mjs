@@ -32,7 +32,7 @@ expect(
 );
 expect(
   modal,
-  /h-\[(?:94|96)dvh\][\s\S]*max-h-\[(?:94|96)dvh\][\s\S]*overflow-hidden[\s\S]*min-h-0 flex-1 overflow-y-auto/,
+  /h-\[(?:94|95|96)dvh\][\s\S]*max-h-\[(?:94|95|96)dvh\][\s\S]*overflow-hidden[\s\S]*min-h-0 flex-1[\s\S]*overflow-y-auto/,
   "edit modal is viewport constrained",
 );
 expect(modal, /personalOrder[\s\S]*merchant: personalOrder \? null/, "personal edit saves without merchant");
@@ -40,7 +40,11 @@ const persistence = read("src/lib/adminOrderEditPersistence.ts");
 expect(persistence, /isPersonalAdminOrder[\s\S]*personalFullPatch/, "personal edit persistence bypasses merchant requirement");
 expect(persistence, /ORDERS_SCHEMA_COLUMN_RE/, "order edit recognizes missing PostgREST schema columns");
 expect(persistence, /Retrying order edit without unavailable orders/, "order edit retries without unavailable optional columns");
-expect(persistence, /coupon_number: clean\(input\.coupon_number\) \|\| null/, "personal edits persist optional coupon numbers");
+expect(
+  persistence,
+  /const couponNumber = clean\(input\.coupon_number\)[\s\S]*coupon_number_required_for_personal_order[\s\S]*coupon_number: couponNumber/,
+  "personal edits require and persist coupon numbers",
+);
 const bulk = read("src/components/admin/AdminOrderBulkOperations.tsx");
 expect(bulk, /تحديد الطلبات والتصدير الجماعي/, "bulk selector is generic and visible");
 expect(bulk, /تصدير كل النتائج PDF/, "all visible results export exists");
@@ -56,7 +60,11 @@ expect(unified, /data-admin-unified-personal-order-entry="true"/, "personal form
 expect(unified, /AdminPersonalOrderForm/, "unified new-order route reuses protected personal save flow");
 const personal = read("src/components/admin/AdminPersonalOrderForm.tsx");
 expect(personal, /إنشاء طلب شخصي بدون تاجر/, "personal order form is present");
-expect(personal, /25\.00 AED/, "personal order UI shows fixed 25 AED");
+expect(
+  personal,
+  /formatAdminMoney\(PERSONAL_ORDER_DELIVERY_FEE, isArabic\)/,
+  "personal order UI shows the fixed fee in the active language",
+);
 expect(personal, /رقم الكوبون \* — إجباري/, "personal coupon is visibly required");
 expect(personal, /data-admin-personal-coupon="true"[\s\S]*required[\s\S]*aria-required="true"/, "personal coupon uses native required semantics");
 expect(personal, /هاتف المرسل — اختياري/, "sender phone is explicitly optional");
