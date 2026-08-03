@@ -104,7 +104,6 @@ export default function AdminDriverAssignmentModal({
   isArabic,
   open,
   onClose,
-  onSaved,
 }: Props) {
   const [drivers, setDrivers] = useState<DispatchCandidate[]>([]);
   const [driverId, setDriverId] = useState("");
@@ -188,11 +187,37 @@ export default function AdminDriverAssignmentModal({
           ? `${result.action === "reassigned" ? "تم نقل" : "تم إسناد"} الطلب إلى ${selected?.full_name || selected?.name || "المندوب"}.`
           : `Order ${result.action} to ${selected?.full_name || selected?.name || "driver"}.`,
       );
-      await onSaved?.();
-      window.dispatchEvent(new CustomEvent("dn-admin-orders-updated"));
+
+      const patchedOrder = {
+        ...activeOrder,
+        driver_id: driverId,
+        assigned_driver_id: driverId,
+        driver_name: selected?.full_name || selected?.name || activeOrder.driver_name,
+        status:
+          ["pending", "review", "confirmed", ""].includes(
+            String(activeOrder.status || "").toLowerCase(),
+          )
+            ? "assigned"
+            : activeOrder.status,
+      } as Order;
+
+      window.dispatchEvent(
+        new CustomEvent("dn-admin-orders-updated", {
+          detail: {
+            mutation: "upsert",
+            order: patchedOrder,
+            source: "admin_driver_assignment",
+          },
+        }),
+      );
       window.dispatchEvent(
         new CustomEvent("dn-admin-order-assignment-change", {
-          detail: { orderId: activeOrder.id, driverId, action: result.action },
+          detail: {
+            orderId: activeOrder.id,
+            driverId,
+            driverName: selected?.full_name || selected?.name || "",
+            action: result.action,
+          },
         }),
       );
     } catch (assignmentError) {

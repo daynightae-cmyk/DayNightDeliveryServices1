@@ -28,20 +28,90 @@ const ORDER_SECTIONS = new Set([
 ]);
 
 type WorkspaceProps = ComponentProps<typeof AdminSectionWorkspaceComplete>;
+type WorkspaceOrder = WorkspaceProps["orders"][number];
 type AdminSectionWorkspaceProps = WorkspaceProps & {
   initialMerchantId?: string;
   onMerchantScopeChange?: (merchantId: string) => void;
+};
+
+type AdminOrderMutationDetail = {
+  mutation?: unknown;
+  order?: WorkspaceOrder;
+  deletedId?: unknown;
+  deletedReference?: unknown;
+  orderId?: unknown;
+  status?: unknown;
+  driverId?: unknown;
+  driverName?: unknown;
+  driverCode?: unknown;
 };
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function orderId(order: WorkspaceProps["orders"][number]) {
+function orderId(order: WorkspaceOrder) {
   return clean(order.id || order.tracking_number || order.invoice_number || order.coupon_number);
 }
 
-function orderSearchValues(order: WorkspaceProps["orders"][number]) {
+function orderReferences(order: WorkspaceOrder) {
+  return [
+    order.id,
+    order.tracking_number,
+    order.invoice_number,
+    order.coupon_number,
+  ]
+    .map(clean)
+    .filter(Boolean);
+}
+
+function matchesOrderReference(order: WorkspaceOrder, reference: unknown) {
+  const target = clean(reference);
+  return Boolean(target && orderReferences(order).includes(target));
+}
+
+function upsertOrder(current: WorkspaceOrder[], incoming: WorkspaceOrder) {
+  const incomingReferences = orderReferences(incoming);
+  if (!incomingReferences.length) return current;
+
+  const index = current.findIndex((row) =>
+    orderReferences(row).some((reference) => incomingReferences.includes(reference)),
+  );
+  if (index < 0) return [incoming, ...current];
+
+  const next = current.slice();
+  next[index] = { ...current[index], ...incoming };
+  return next;
+}
+
+function removeOrder(
+  current: WorkspaceOrder[],
+  deletedId: unknown,
+  deletedReference: unknown,
+) {
+  const next = current.filter(
+    (order) =>
+      !matchesOrderReference(order, deletedId) &&
+      !matchesOrderReference(order, deletedReference),
+  );
+  return next.length === current.length ? current : next;
+}
+
+function patchOrder(
+  current: WorkspaceOrder[],
+  reference: unknown,
+  patch: Record<string, unknown>,
+) {
+  let changed = false;
+  const next = current.map((order) => {
+    if (!matchesOrderReference(order, reference)) return order;
+    changed = true;
+    return { ...order, ...patch } as WorkspaceOrder;
+  });
+  return changed ? next : current;
+}
+
+function orderSearchValues(order: WorkspaceOrder) {
   return [
     order.id,
     order.tracking_number,
@@ -111,6 +181,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const [bulkQuery, setBulkQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [orderPage, setOrderPage] = useState(0);
+  const [localOrders, setLocalOrders] = useState<WorkspaceProps["orders"]>(() => props.orders);
   const [recoveredOrders, setRecoveredOrders] = useState<WorkspaceProps["orders"]>([]);
   const [recoveredMerchants, setRecoveredMerchants] = useState<WorkspaceProps["merchants"]>([]);
   const [authoritativeReady, setAuthoritativeReady] = useState(false);
@@ -118,12 +189,77 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const [recoveryError, setRecoveryError] = useState("");
   const [recoveryNonce, setRecoveryNonce] = useState(0);
 
+  useEffect(() => {
+    setLocalOrders(props.orders);
+  }, [props.orders]);
+
   // Parent data is already loaded through the protected admin data layer. Keep
   // it visible while an independent refresh runs, then atomically replace both
   // lists only after the same refresh succeeds. This prevents a slow finance or
   // auth request from hiding a valid merchant filter without ever mixing owners.
-  const effectiveOrders = showBulkConsole && authoritativeReady ? recoveredOrders : props.orders;
+  const effectiveOrders = showBulkConsole && authoritativeReady ? recoveredOrders : localOrders;
   const effectiveMerchants = showBulkConsole && authoritativeReady ? recoveredMerchants : props.merchants;
+
+  useEffect(() => {
+    const applyToVisibleStores = (
+      mutation: (current: WorkspaceOrder[]) => WorkspaceOrder[],
+    ) => {
+      setLocalOrders((current) => mutation(current));
+      setRecoveredOrders((current) => mutation(current));
+    };
+
+    const handleOrdersUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<AdminOrderMutationDetail>).detail || {};
+      if (detail.order && typeof detail.order === "object") {
+        applyToVisibleStores((current) => upsertOrder(current, detail.order as WorkspaceOrder));
+        return;
+      }
+
+      if (
+        clean(detail.mutation).toLowerCase() === "delete" ||
+        clean(detail.deletedId) ||
+        clean(detail.deletedReference)
+      ) {
+        applyToVisibleStores((current) =>
+          removeOrder(current, detail.deletedId, detail.deletedReference),
+        );
+      }
+    };
+
+    const handleStatusChange = (event: Event) => {
+      const detail = (event as CustomEvent<AdminOrderMutationDetail>).detail || {};
+      const orderReference = detail.orderId;
+      const status = clean(detail.status);
+      if (!clean(orderReference) || !status) return;
+      applyToVisibleStores((current) =>
+        patchOrder(current, orderReference, { status }),
+      );
+    };
+
+    const handleAssignmentChange = (event: Event) => {
+      const detail = (event as CustomEvent<AdminOrderMutationDetail>).detail || {};
+      const orderReference = detail.orderId;
+      const driverId = clean(detail.driverId);
+      if (!clean(orderReference) || !driverId) return;
+      applyToVisibleStores((current) =>
+        patchOrder(current, orderReference, {
+          driver_id: driverId,
+          assigned_driver_id: driverId,
+          driver_name: clean(detail.driverName),
+          driver_code: clean(detail.driverCode),
+        }),
+      );
+    };
+
+    window.addEventListener("dn-admin-orders-updated", handleOrdersUpdated);
+    window.addEventListener("dn-admin-order-status-change", handleStatusChange);
+    window.addEventListener("dn-admin-order-assignment-change", handleAssignmentChange);
+    return () => {
+      window.removeEventListener("dn-admin-orders-updated", handleOrdersUpdated);
+      window.removeEventListener("dn-admin-order-status-change", handleStatusChange);
+      window.removeEventListener("dn-admin-order-assignment-change", handleAssignmentChange);
+    };
+  }, []);
 
   useEffect(() => {
     setMerchantFilterId(props.id === "all_orders" ? clean(props.initialMerchantId) : "");
@@ -215,11 +351,20 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
   const workspaceOrders = filteredOrders;
   const renderedWorkspaceOrders = shouldPageWorkspace ? pagedSectionOrders : workspaceOrders;
 
+  async function refreshCurrentWorkspace() {
+    if (showBulkConsole) {
+      setRecoveryNonce((value) => value + 1);
+      return;
+    }
+    await props.onRefresh?.();
+  }
+
   return (
     <section
       data-admin-order-data-source={authoritativeReady ? "refreshed" : "protected-parent"}
       data-admin-order-count={effectiveOrders.length}
       data-admin-merchant-count={effectiveMerchants.length}
+      data-admin-actions-stay-in-place="true"
     >
       {recoveryLoading && showBulkConsole && (
         <p
@@ -340,7 +485,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           isArabic={props.isArabic}
           orders={renderedWorkspaceOrders}
           merchants={effectiveMerchants}
-          onRefresh={props.onRefresh}
+          onRefresh={refreshCurrentWorkspace}
           searchManaged
         />
       ) : (
@@ -348,6 +493,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           {...props}
           orders={renderedWorkspaceOrders}
           merchants={effectiveMerchants}
+          onRefresh={refreshCurrentWorkspace}
           searchManaged={showBulkConsole}
         />
       )}

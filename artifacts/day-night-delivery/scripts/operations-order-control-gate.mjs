@@ -46,6 +46,8 @@ const workspace = read("src/components/admin/AdminSectionWorkspace.tsx");
 expect(workspace, /AdminOrderBulkOperations/, "Admin order workspace mounts bulk operations");
 expect(workspace, /merchantFilterId[\s\S]{0,120}clean\(order\.merchant_id\) !== merchantFilterId/, "Merchant filter excludes every non-matching orders.merchant_id row");
 expect(workspace, /matchesAdminSection/, "Bulk list respects the active operational order section");
+expect(workspace, /data-admin-actions-stay-in-place="true"/, "Admin mutations preserve the current operational workspace");
+expect(workspace, /dn-admin-orders-updated/, "Admin workspace applies saved and deleted order rows locally");
 
 const driver = read("src/components/driver/DriverOrderCard.tsx");
 for (const status of ["confirmed", "picked_up", "in_transit", "delivered", "cancelled", "returned"]) {
@@ -115,7 +117,10 @@ expect(portalScroll, /touch-action:\s*pan-y/, "Touch vertical panning is explici
 const realtime = read("src/components/ProductionOrderRealtimeBridge.tsx");
 expect(realtime, /table: ["']orders["']/, "Admin subscribes to real order changes");
 expect(realtime, /order_status_history/, "Admin subscribes to status-history changes");
-expect(realtime, /clickAdminRefresh/, "Realtime changes refresh the existing authoritative admin loader");
+expect(realtime, /publishOrderMutation/, "Realtime order changes are converted into exact row mutations");
+expect(realtime, /dn-admin-orders-updated/, "Realtime order changes update the open admin workspace locally");
+expect(realtime, /dn-admin-order-status-change/, "Realtime status history patches the affected order locally");
+reject(realtime, /clickAdminRefresh|window\.location\.reload/, "Realtime changes never trigger a global page refresh");
 
 const styles = read("src/styles/dn-operations-control-rescue.css");
 expect(styles, /dn-section-table-wrap tbody tr/, "Admin order rows have explicit high-contrast styling");
