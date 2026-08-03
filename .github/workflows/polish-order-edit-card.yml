@@ -27,6 +27,9 @@ jobs:
       - name: Apply polished editor and diagnostics
         run: python .github/scripts/apply-order-edit-card-diagnostics.py
 
+      - name: Repair complete-order gate compatibility
+        run: python .github/scripts/apply-admin-complete-order-gate-v2-fix.py
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -48,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           modal="artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx"
+          gate="artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs"
           grep -F 'data-admin-order-error-card="true"' "$modal"
           grep -F 'data-admin-error-reference="true"' "$modal"
           grep -F 'safeEditDiagnostic' "$modal"
@@ -56,7 +60,11 @@ jobs:
           grep -F '40001|40p01' "$modal"
           grep -F 'عرض السبب التشخيصي الدقيق' "$modal"
           grep -F 'rounded-[2rem]' "$modal"
+          grep -F 'admin_update_order_complete_verified(?:_v2)?' "$gate"
           echo "Professional order editor contract passed."
+
+      - name: Verify complete-order contract
+        run: pnpm --dir artifacts/day-night-delivery exec node scripts/admin-complete-order-edit-gate.mjs
 
       - name: Typecheck application
         run: pnpm --dir artifacts/day-night-delivery run typecheck
@@ -69,6 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/scripts/apply-order-edit-card-diagnostics.py
+          rm -f .github/scripts/apply-admin-complete-order-gate-v2-fix.py
           rm -f .github/workflows/polish-order-edit-card.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
