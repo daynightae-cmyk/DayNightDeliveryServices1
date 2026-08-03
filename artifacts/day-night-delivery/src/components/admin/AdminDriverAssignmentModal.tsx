@@ -193,7 +193,6 @@ export default function AdminDriverAssignmentModal({
         driver_id: driverId,
         assigned_driver_id: driverId,
         driver_name: selected?.full_name || selected?.name || activeOrder.driver_name,
-        driver_code: selected?.driver_code || activeOrder.driver_code,
         status:
           ["pending", "review", "confirmed", ""].includes(
             String(activeOrder.status || "").toLowerCase(),
@@ -217,7 +216,6 @@ export default function AdminDriverAssignmentModal({
             orderId: activeOrder.id,
             driverId,
             driverName: selected?.full_name || selected?.name || "",
-            driverCode: selected?.driver_code || "",
             action: result.action,
           },
         }),
