@@ -3,6 +3,7 @@ import { CheckSquare2, FileDown, ListChecks, Printer, Search, Square, Store, X }
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import { localizedOrderRoute } from "../../lib/exportLocalization";
 import { normalizeOrderStatus } from "../../lib/adminOrderLogic";
+import { formatAdminMoney } from "../../lib/adminLocale";
 import type { Merchant, Order } from "../../types";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import type { AdminSectionId } from "./AdminSectionRegistry";
@@ -47,8 +48,8 @@ function makePayload(orders: Order[], isArabic: boolean, sectionId: AdminSection
     filters: isArabic ? `عدد الطلبات: ${orders.length}` : `Orders: ${orders.length}`,
     totals: {
       orders: orders.length,
-      cod: `${orders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0).toFixed(2)} AED`,
-      delivery: `${orders.reduce((sum, order) => sum + Number(order.delivery_price || order.delivery_fee || 0), 0).toFixed(2)} AED`,
+      cod: formatAdminMoney(orders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0), isArabic),
+      delivery: formatAdminMoney(orders.reduce((sum, order) => sum + Number(order.delivery_price || order.delivery_fee || 0), 0), isArabic),
     },
     columns: [
       { key: "tracking", label: isArabic ? "التتبع" : "Tracking" },
@@ -65,7 +66,7 @@ function makePayload(orders: Order[], isArabic: boolean, sectionId: AdminSection
       customer: clean(order.receiver_name || order.customer_name) || "—",
       phone: clean(order.receiver_phone || order.customer_phone) || "—",
       route: localizedOrderRoute(order, isArabic ? "ar" : "en"),
-      cod: `${Number(order.cod_amount || 0).toFixed(2)} AED`,
+      cod: formatAdminMoney(order.cod_amount, isArabic),
       status: statusLabel(order.status, isArabic),
     })),
   };
@@ -78,7 +79,7 @@ function escapeHtml(value: unknown) {
 function printOrders(orders: Order[], isArabic: boolean, sectionId: AdminSectionId) {
   const popup = window.open("", "DAY_NIGHT_ORDER_PRINT", "width=1280,height=860");
   if (!popup) return;
-  const rows = orders.map((order) => `<tr><td dir="ltr">${escapeHtml(reference(order))}</td><td>${escapeHtml(order.merchant_name || order.sender_name || "—")}</td><td>${escapeHtml(order.receiver_name || order.customer_name || "—")}</td><td dir="ltr">${escapeHtml(order.receiver_phone || order.customer_phone || "—")}</td><td>${escapeHtml(localizedOrderRoute(order, isArabic ? "ar" : "en"))}</td><td dir="ltr">${Number(order.cod_amount || 0).toFixed(2)} AED</td><td>${escapeHtml(statusLabel(order.status, isArabic))}</td></tr>`).join("");
+  const rows = orders.map((order) => `<tr><td dir="ltr">${escapeHtml(reference(order))}</td><td>${escapeHtml(order.merchant_name || order.sender_name || "—")}</td><td>${escapeHtml(order.receiver_name || order.customer_name || "—")}</td><td dir="ltr">${escapeHtml(order.receiver_phone || order.customer_phone || "—")}</td><td>${escapeHtml(localizedOrderRoute(order, isArabic ? "ar" : "en"))}</td><td dir="${isArabic ? "rtl" : "ltr"}">${escapeHtml(formatAdminMoney(order.cod_amount, isArabic))}</td><td>${escapeHtml(statusLabel(order.status, isArabic))}</td></tr>`).join("");
   popup.document.write(`<!doctype html><html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}"><head><meta charset="utf-8"/><title>DAY NIGHT — ${reportTitle(sectionId, isArabic, false)}</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;color:#07172c;margin:0}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #d4af37;padding-bottom:12px;margin-bottom:18px}h1{margin:0;font-size:24px}p{margin:5px 0 0;color:#4a5d73}strong{color:#0b3d70}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#07172c;color:#fff;padding:9px;border:1px solid #253e58}td{padding:8px;border:1px solid #ccd6e0;vertical-align:top}tbody tr:nth-child(even){background:#eef4f9}footer{margin-top:14px;font-size:10px;color:#60758b}</style></head><body><header><div><strong>DAY NIGHT DELIVERY SERVICES</strong><h1>${reportTitle(sectionId, isArabic, false)}</h1><p>${isArabic ? "بيانات تشغيل حقيقية من لوحة الإدارة" : "Live operational data from the admin portal"}</p></div><b>${orders.length}</b></header><table><thead><tr><th>${isArabic ? "التتبع" : "Tracking"}</th><th>${isArabic ? "المرسل / التاجر" : "Sender / merchant"}</th><th>${isArabic ? "المستلم" : "Recipient"}</th><th>${isArabic ? "الهاتف" : "Phone"}</th><th>${isArabic ? "المسار" : "Route"}</th><th>COD</th><th>${isArabic ? "الحالة" : "Status"}</th></tr></thead><tbody>${rows}</tbody></table><footer>www.daynightae.com · +971 56 875 7331 · ${new Date().toLocaleString(isArabic ? "ar-AE" : "en-AE")}</footer><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),180));</script></body></html>`);
   popup.document.close();
   popup.focus();

@@ -38,7 +38,8 @@
     "coupon-integrity:gate": "node scripts/global-coupon-integrity-gate.mjs",
     "order-merchant-integrity:gate": "node scripts/global-order-merchant-integrity-gate.mjs",
     "search:gate": "node scripts/search-integrity-gate.mjs",
-    "admin-order-save-localization:gate": "node scripts/admin-order-save-localization-gate.mjs"
+    "admin-order-save-localization:gate": "node scripts/admin-order-save-localization-gate.mjs",
+    "admin-order-lifecycle:gate": "node scripts/admin-order-lifecycle-final-gate.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

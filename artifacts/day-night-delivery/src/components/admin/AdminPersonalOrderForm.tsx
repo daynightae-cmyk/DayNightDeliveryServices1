@@ -5,7 +5,8 @@ import {
   type LocalizedOption,
   type UaeLocation,
 } from "../../data/uaeLocations";
-import { opsErrorDetail } from "../../lib/adminOperationsData";
+import { formatAdminMoney } from "../../lib/adminLocale";
+import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import {
   PERSONAL_ORDER_DELIVERY_FEE,
   calculatePersonalOrderFinancials,
@@ -202,12 +203,9 @@ export default function AdminPersonalOrderForm({
       );
       await onSaved?.(result.row);
     } catch (cause) {
-      const detail = opsErrorDetail(cause);
-      setError(
-        isArabic
-          ? `تعذر إنشاء الطلب الشخصي الحقيقي.${detail ? ` السبب: ${detail}` : ""}`
-          : `The personal order could not be created.${detail ? ` Reason: ${detail}` : ""}`,
-      );
+      const feedback = adminOrderActionFeedback(cause, isArabic, "create");
+      setError(`${feedback.message} ${isArabic ? "رمز العملية" : "Operation code"}: ${feedback.code}`);
+      console.error("DAY NIGHT personal order creation rejected:", feedback.diagnostic || cause);
     } finally {
       setSaving(false);
     }
@@ -240,8 +238,11 @@ export default function AdminPersonalOrderForm({
           <small className="block text-[10px] font-black text-white/55">
             {isArabic ? "سعر التوصيل الثابت" : "Fixed delivery fee"}
           </small>
-          <strong className="text-2xl font-black text-brand-gold" dir="ltr">
-            25.00 AED
+          <strong
+            className="text-2xl font-black text-brand-gold"
+            dir={isArabic ? "rtl" : "ltr"}
+          >
+            {formatAdminMoney(PERSONAL_ORDER_DELIVERY_FEE, isArabic)}
           </strong>
         </div>
       </header>

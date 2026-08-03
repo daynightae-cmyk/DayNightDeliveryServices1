@@ -12,6 +12,10 @@ const source = fs
     "/No mixed data was shown|No merchant account was opened with incomplete or mixed data|لم يتم عرض بيانات مختلطة|لم يتم فتح أي ملف تاجر ببيانات ناقصة أو مختلطة/",
   )
   .replace(
+    'expect(editModal, /sticky bottom-0/, "Order update controls remain visible while scrolling");',
+    'expect(editModal, /<header[^>]*shrink-0[\\s\\S]*min-h-0 flex-1[\\s\\S]*overflow-y-auto[\\s\\S]*<footer[^>]*shrink-0/, "Order update controls remain visible outside the scrolling form body");',
+  )
+  .replace(
     'expect(editModalBoundary, /setLastSavedOrder\\(savedOrder\\)/, "Verified saves keep the order editor mounted");',
     'expect(editModalBoundary, /async function handleSaved\\(_savedOrder: Order\\)[\\s\\S]*Intentionally no parent callback/, "Verified saves keep the order editor mounted without a refresh");',
   )

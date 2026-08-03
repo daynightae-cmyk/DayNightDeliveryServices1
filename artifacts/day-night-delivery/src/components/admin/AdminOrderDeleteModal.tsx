@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { deleteAdminOrderImmediately } from "../../lib/adminOrderDeleteData";
+import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import type { Order } from "../../types";
 
 type Props = {
@@ -72,13 +73,10 @@ export default function AdminOrderDeleteModal({
         // position remain mounted while the deleted row disappears locally.
         onClose();
       } catch (cause) {
-        console.error("DAY NIGHT order deletion failed", cause);
+        const feedback = adminOrderActionFeedback(cause, isArabic, "delete");
+        console.error("DAY NIGHT order deletion failed", feedback.diagnostic || cause);
         setBusy(false);
-        setError(
-          isArabic
-            ? "تعذر الحذف الآن. اضغط إعادة المحاولة."
-            : "Deletion could not be completed. Press retry.",
-        );
+        setError(`${feedback.message} ${isArabic ? "رمز العملية" : "Operation code"}: ${feedback.code}`);
       }
     })();
   }, [isArabic, onClose, open, order, retryToken]);
