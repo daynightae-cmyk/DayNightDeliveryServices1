@@ -126,7 +126,7 @@ function FinancialMetric({ label, value, isArabic, accent = false }: { label: st
   return (
     <div className={`rounded-2xl border p-3 ${accent ? "border-brand-gold/40 bg-brand-gold/10" : "border-white/10 bg-black/10"}`}>
       <span className="block text-[10px] font-black text-white/50">{label}</span>
-      <strong className={`mt-1 block text-lg font-black ${accent ? "text-brand-gold" : "text-white"}`} dir="ltr">
+      <strong className={`mt-1 block text-lg font-black ${accent ? "text-brand-gold" : "text-white"}`} dir={isArabic ? "rtl" : "ltr"}>
         {formatAdminMoney(value, isArabic)}
       </strong>
     </div>

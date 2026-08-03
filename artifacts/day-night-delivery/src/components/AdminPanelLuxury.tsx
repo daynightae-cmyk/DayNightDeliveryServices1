@@ -898,7 +898,7 @@ export default function AdminPanelLuxury() {
         audioEvent: "cod_alert",
         titleAr: "تحصيل معلق",
         titleEn: "Pending COD",
-        bodyAr: `يوجد COD معلق بقيمة ${money(Number(financeSummary.cod_pending || 0), false)}.`,
+        bodyAr: `يوجد تحصيل معلق بقيمة ${money(Number(financeSummary.cod_pending || 0), true)}.`,
         bodyEn: `Pending COD is ${money(Number(financeSummary.cod_pending || 0), false)}.`,
       });
     if (active === "print" && orders.length > 0)

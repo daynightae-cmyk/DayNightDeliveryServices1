@@ -314,7 +314,7 @@ function Metric({
       }`}
     >
       {label}
-      <b className="mt-1 block text-sm" dir="ltr">
+      <b className="mt-1 block text-sm" dir={isArabic ? "rtl" : "ltr"}>
         {formatAdminMoney(value, isArabic, { absolute: true })}
       </b>
     </span>
@@ -1176,7 +1176,7 @@ export default function AdminOrderEditModalComplete({
                   <span>{isArabic ? "رسوم التوصيل الفعلية" : "Effective delivery fee"}</span>
                   <div
                     className="rounded-xl border border-brand-sky/25 bg-brand-sky/10 px-3 py-3 text-sm font-black text-brand-sky"
-                    dir="ltr"
+                    dir={isArabic ? "rtl" : "ltr"}
                   >
                     {formatAdminMoney(activeDeliveryFee, isArabic)}
                   </div>
