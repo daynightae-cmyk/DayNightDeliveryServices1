@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/admin-order-edit-error-classification-20260804
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -71,6 +74,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f .github/admin-order-runtime-trigger.txt
           rm -f .github/scripts/apply-admin-order-error-classification-fix.py
           rm -f .github/workflows/fix-admin-order-runtime-classification.yml
           git config user.name "github-actions[bot]"
