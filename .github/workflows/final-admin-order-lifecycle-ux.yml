@@ -1,0 +1,78 @@
+name: Final Admin Order Lifecycle UX
+
+on:
+  push:
+    branches:
+      - final/admin-order-lifecycle-ux-20260804
+
+permissions:
+  contents: write
+
+concurrency:
+  group: final-admin-order-lifecycle-ux-20260804
+  cancel-in-progress: false
+
+jobs:
+  audit-fix-verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: final/admin-order-lifecycle-ux-20260804
+          fetch-depth: 0
+
+      - name: Apply final lifecycle and UX repair
+        run: python .github/scripts/apply-admin-order-lifecycle-final.py
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Final order lifecycle gate
+        run: pnpm --dir artifacts/day-night-delivery run admin-order-lifecycle:gate
+
+      - name: Existing operations gate
+        run: pnpm --dir artifacts/day-night-delivery run operations:gate
+
+      - name: Existing financial matrix gate
+        run: pnpm --dir artifacts/day-night-delivery run financial-matrix:gate
+
+      - name: Existing delivered adjustment gate
+        run: pnpm --dir artifacts/day-night-delivery run delivered-financial-adjustment:gate
+
+      - name: Existing personal order gate
+        run: pnpm --dir artifacts/day-night-delivery run personal-orders:gate
+
+      - name: Existing save and Arabic localization gate
+        run: pnpm --dir artifacts/day-night-delivery run admin-order-save-localization:gate
+
+      - name: Typecheck application
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - name: Build production application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Commit verified implementation only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/apply-admin-order-lifecycle-final.py
+          rm -f .github/workflows/final-admin-order-lifecycle-ux.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No implementation changes produced." >&2; exit 1; }
+          git commit -m "feat(admin): finalize order lifecycle UX and Arabic localization"
+          git push origin HEAD:final/admin-order-lifecycle-ux-20260804
