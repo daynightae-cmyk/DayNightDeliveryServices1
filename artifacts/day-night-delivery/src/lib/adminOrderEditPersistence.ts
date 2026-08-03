@@ -453,6 +453,26 @@ async function updateWithPatch(
   throw new Error("order_update_verification_failed");
 }
 
+export async function saveAdminLockedMerchantCoreEdit(
+  input: FinancialOpsOrderUpdateInput,
+): Promise<AdminOrderEditSaveResult> {
+  if (isPersonalAdminOrder(input.order)) {
+    throw new Error("locked_merchant_core_edit_received_personal_order");
+  }
+  if (!financialsAreLocked(input.order)) {
+    throw new Error("locked_merchant_core_edit_requires_delivered_or_posted_order");
+  }
+
+  const currentMerchantId = clean(input.order.merchant_id);
+  const selectedMerchantId = clean(input.merchant?.id);
+  if (!selectedMerchantId || selectedMerchantId !== currentMerchantId) {
+    throw new Error("locked_order_merchant_change_requires_complete_audited_edit");
+  }
+
+  const row = await updateWithPatch(input, corePatch(input));
+  return { row, source: "db", financialsLocked: true };
+}
+
 export async function saveAdminOrderEdit(
   input: FinancialOpsOrderUpdateInput,
 ): Promise<AdminOrderEditSaveResult> {
