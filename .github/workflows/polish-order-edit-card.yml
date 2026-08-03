@@ -4,16 +4,13 @@ on:
   push:
     branches:
       - fix/delivered-order-core-save-20260804
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: polish-order-edit-card-20260804
-  cancel-in-progress: true
+  group: polish-order-edit-card-20260804-push
+  cancel-in-progress: false
 
 jobs:
   polish-and-verify:
