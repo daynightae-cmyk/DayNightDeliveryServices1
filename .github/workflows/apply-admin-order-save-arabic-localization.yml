@@ -1,0 +1,196 @@
+name: Apply Admin Order Save Arabic Localization
+
+on:
+  push:
+    branches:
+      - fix/admin-order-save-arabic-localization-20260803
+    paths:
+      - ".github/scripts/apply-admin-order-save-arabic-localization.py"
+      - ".github/workflows/apply-admin-order-save-arabic-localization.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-order-save-arabic-localization
+  cancel-in-progress: true
+
+jobs:
+  patch-test-deploy-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-order-save-arabic-localization-20260803
+          fetch-depth: 0
+
+      - name: Apply guarded source repair
+        run: python .github/scripts/apply-admin-order-save-arabic-localization.py
+
+      - name: Restore reviewed complete-save database contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          reviewed_branch="origin/fix/admin-order-save-real-edits-20260802"
+          for target in \
+            supabase/migrations/20260802102000_admin_complete_order_legacy_validation_hotfix.sql \
+            supabase/migrations/20260802103000_admin_complete_order_sender_identity_fallback.sql \
+            supabase/migrations/20260802104000_admin_complete_order_save_compatibility_alias.sql
+          do
+            git show "$reviewed_branch:$target" > "$target"
+          done
+
+          git show "$reviewed_branch:.github/scripts/admin-complete-order-save-production-probe.mjs" \
+            > .github/scripts/admin-complete-order-real-edit-production-probe.mjs
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('.github/scripts/admin-complete-order-real-edit-production-probe.mjs')
+          text = path.read_text(encoding='utf-8')
+
+          text, count = re.subn(
+              r"  const \{ data: reviewedOrder, error: reviewedError \} = await supabase[\s\S]*?  assert\(reviewedOrder\?\.merchant_id, 'production_save_probe_requires_merchant_order'\);",
+              """  const { data: reviewedRows, error: reviewedError } = await supabase
+            .from('orders')
+            .select('*')
+            .not('merchant_id', 'is', null)
+            .not('coupon_number', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(250);
+          if (reviewedError) {
+            throw new Error(`production_save_probe_order_lookup_failed: ${errorDetail(reviewedError)}`);
+          }
+          const reviewedOrder = (reviewedRows || []).find((row) => row?.id && row?.merchant_id && text(row?.coupon_number));
+          assert(reviewedOrder?.id, 'production_save_probe_order_missing');
+          assert(reviewedOrder?.merchant_id, 'production_save_probe_requires_merchant_order');""",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'failed to make reviewed order selection fixture-independent: {count}')
+
+          text, count = re.subn(
+              r"  const \{ data: links, error: linksError \} = await supabase[\s\S]*?    \.limit\(500\);",
+              """  const { data: links, error: linksError } = await supabase
+            .from('merchant_user_links')
+            .select('*')
+            .limit(500);""",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'failed to make merchant-link schema compatible: {count}')
+
+          old = """  const linkedIds = Array.from(
+            new Set((links || []).map((row) => text(row.merchant_id)).filter(Boolean)),
+          );"""
+          new = """  const linkedIds = Array.from(
+            new Set(
+              (links || [])
+                .filter((row) => row.is_active ?? row.active ?? true)
+                .map((row) => text(row.merchant_id))
+                .filter(Boolean),
+            ),
+          );"""
+          if text.count(old) != 1:
+              raise SystemExit('failed to find linked merchant id block')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate focused source contract
+        run: pnpm --dir artifacts/day-night-delivery run admin-order-save-localization:gate
+
+      - name: Typecheck complete application
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+
+      - name: Build exact production bundle
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate protected production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply reviewed complete-save migrations when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/daynight-admin-complete-save"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+
+          pending=false
+          for target in \
+            20260802102000_admin_complete_order_legacy_validation_hotfix.sql \
+            20260802103000_admin_complete_order_sender_identity_fallback.sql \
+            20260802104000_admin_complete_order_save_compatibility_alias.sql
+          do
+            if [ -f "$release_dir/supabase/migrations/$target" ]; then
+              echo "$target already exists in production."
+            else
+              cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+              pending=true
+            fi
+          done
+
+          supabase --workdir "$release_dir" db push --dry-run
+          if [ "$pending" = "true" ]; then
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+      - name: Prove real order edits through production RPC with rollback
+        run: node .github/scripts/admin-complete-order-real-edit-production-probe.mjs
+
+      - name: Commit only verified final implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/apply-admin-order-save-arabic-localization.py
+          rm -f .github/workflows/apply-admin-order-save-arabic-localization.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No final implementation changes produced." >&2; exit 1; }
+          git commit -m "fix(admin): save order edits and localize Arabic destinations"
+          git push origin HEAD:fix/admin-order-save-arabic-localization-20260803
