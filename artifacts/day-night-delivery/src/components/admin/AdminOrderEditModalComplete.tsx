@@ -15,7 +15,10 @@ import {
   X,
 } from "lucide-react";
 import { opsErrorDetail } from "../../lib/adminOperationsData";
-import { saveAdminOrderEdit } from "../../lib/adminOrderEditPersistence";
+import {
+  saveAdminLockedMerchantCoreEdit,
+  saveAdminOrderEdit,
+} from "../../lib/adminOrderEditPersistence";
 import {
   calculateFinancialOpsOrder,
   type FinancialOpsOrderInput,
@@ -135,6 +138,11 @@ function professionalEditError(detail: string, isArabic: boolean) {
     return isArabic
       ? "تعذر اعتماد القيم المالية. راجع قيمة البضاعة ورسوم التوصيل والخصم وطريقة التحصيل، ثم أعد الحفظ. لم يُحفظ أي تعديل جزئي."
       : "The financial values could not be verified. Review goods, delivery, discount, and payment method, then save again. No partial change was stored.";
+  }
+  if (/financials_locked|delivered settlements are locked|posted financials|financial.*posted/.test(reason)) {
+    return isArabic
+      ? "الطلب مُسلّم أو مُرحّل ماليًا. احفظ بيانات العميل والعنوان والشحنة دون تغيير المبالغ، واستخدم صندوق التصحيح المالي المُدقّق عند تعديل الحسابات. لم يُحفظ أي تعديل جزئي."
+      : "The order is delivered or financially posted. Save customer, address, and package details without changing money fields, and use the audited financial adjustment panel for accounting changes. No partial change was stored.";
   }
   if (
     /pgrst202|runtime_missing|could not find the function (public\.)?admin_update_order_(complete_verified(_v2)?|with_financials)|function (public\.)?admin_update_order_(complete_verified(_v2)?|with_financials).*does not exist/.test(
@@ -425,7 +433,7 @@ export default function AdminOrderEditModalComplete({
       const packageValue =
         clean(currentForm.package_description || currentForm.package_type) ||
         originalPackage;
-      const result = await saveAdminOrderEdit({
+      const saveInput = {
         ...currentForm,
         coupon_number: clean(currentForm.coupon_number),
         merchant: personalOrder ? null : selectedMerchant,
@@ -441,7 +449,11 @@ export default function AdminOrderEditModalComplete({
           (isArabic
             ? "تحديث بيانات الطلب من لوحة الإدارة"
             : "Order details updated from the admin panel"),
-      });
+      };
+      const result =
+        financialLocked && !personalOrder && !sensitiveChange
+          ? await saveAdminLockedMerchantCoreEdit(saveInput)
+          : await saveAdminOrderEdit(saveInput);
 
       window.dispatchEvent(
         new CustomEvent("dn-admin-orders-updated", {
@@ -466,9 +478,13 @@ export default function AdminOrderEditModalComplete({
         : "";
       setMessage(
         result.financialsLocked
-          ? isArabic
-            ? `تم تحديث بيانات الطلب الشخصي ${orderReference(result.row)}. ظل الحساب المُرحَّل محميًا، واستخدم صندوق التصحيح المالي المنفصل لتغييره.`
-            : `Personal order ${orderReference(result.row)} was updated. Posted financials remain protected and use the separate audited adjustment panel.`
+          ? personalOrder
+            ? isArabic
+              ? `تم تحديث بيانات الطلب الشخصي ${orderReference(result.row)}. ظل الحساب المُرحَّل محميًا، واستخدم صندوق التصحيح المالي المنفصل لتغييره.`
+              : `Personal order ${orderReference(result.row)} was updated. Posted financials remain protected and use the separate audited adjustment panel.`
+            : isArabic
+              ? `تم تحديث بيانات الطلب ${orderReference(result.row)} وحفظها فعليًا. ظل الحساب المُرحَّل بقيمة ${originalFinancials.deliveryFee.toFixed(2)} درهم محميًا دون إعادة ترحيل أو تغيير.`
+              : `Order ${orderReference(result.row)} details were saved. Posted financials remained protected without reposting or recalculation.`
           : isArabic
             ? `تم تحديث الطلب ${orderReference(result.row)} بالكامل وحفظه فعليًا. تمت مزامنة التاجر والكشوف والحسابات بأمان.${auditSuffix}${fieldsSuffix}`
             : `Order ${orderReference(result.row)} was completely updated and verified. Merchant ownership, statements, and accounting were synchronized safely.${auditSuffix}${fieldsSuffix}`,
