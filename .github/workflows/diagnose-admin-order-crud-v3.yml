@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/scripts/finalize-admin-order-crud-v3.mjs"
       - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
+      - ".github/scripts/finalize-admin-order-create-v3.mjs"
+      - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
@@ -16,6 +18,8 @@ on:
     paths:
       - ".github/scripts/finalize-admin-order-crud-v3.mjs"
       - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
+      - ".github/scripts/finalize-admin-order-create-v3.mjs"
+      - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
@@ -32,7 +36,7 @@ concurrency:
 jobs:
   finalize-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - name: Checkout exact feature branch
         uses: actions/checkout@v4
@@ -40,11 +44,17 @@ jobs:
           ref: fix/admin-order-crud-v3-nonblocking-20260804
           fetch-depth: 0
 
-      - name: Patch generated JSX placeholder
+      - name: Patch generated update finalizer
         run: node .github/scripts/patch-admin-order-crud-finalizer.mjs
 
-      - name: Apply canonical CRUD v3 frontend and gates
+      - name: Apply canonical update CRUD v3
         run: node .github/scripts/finalize-admin-order-crud-v3.mjs
+
+      - name: Apply canonical create CRUD v3 backend
+        run: node .github/scripts/finalize-admin-order-create-v3.mjs
+
+      - name: Apply canonical create CRUD v3 UI and gates
+        run: node .github/scripts/finalize-admin-order-create-v3-ui.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -62,9 +72,13 @@ jobs:
       - name: Install exact dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Canonical Admin CRUD v3 gate
+      - name: Canonical Admin update CRUD v3 gate
         working-directory: artifacts/day-night-delivery
         run: pnpm run test:admin-order-crud-v3
+
+      - name: Canonical Admin create CRUD v3 gate
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run test:admin-order-create-v3
 
       - name: Final order lifecycle gate
         working-directory: artifacts/day-night-delivery
@@ -96,23 +110,33 @@ jobs:
 
           git rm .github/scripts/finalize-admin-order-crud-v3.mjs
           git rm .github/scripts/patch-admin-order-crud-finalizer.mjs
+          git rm .github/scripts/finalize-admin-order-create-v3.mjs
+          git rm .github/scripts/finalize-admin-order-create-v3-ui.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
 
           git add \
             supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql \
             artifacts/day-night-delivery/package.json \
             artifacts/day-night-delivery/scripts/admin-order-crud-v3-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-order-create-v3-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-lifecycle-final-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs \
             artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs \
             artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs \
             artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs \
+            artifacts/day-night-delivery/scripts/production-core-rescue-gate.mjs \
             artifacts/day-night-delivery/src/lib/adminOrderMutations.ts \
             artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts \
             artifacts/day-night-delivery/src/lib/adminOrderDeleteData.ts \
+            artifacts/day-night-delivery/src/lib/adminOperationsData.ts \
+            artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts \
+            artifacts/day-night-delivery/src/lib/personalOrderOperations.ts \
             artifacts/day-night-delivery/src/supabaseAdminOps.ts \
-            artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx
+            artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminNewOrderFlexible.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminPersonalOrderForm.tsx
 
           git diff --cached --check
           git commit -m "fix(admin): make canonical order CRUD non-blocking"
