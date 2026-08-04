@@ -1,44 +1,107 @@
-name: Diagnose Admin Order CRUD v3
+name: Finalize Admin Order CRUD v3
 
 on:
   push:
     branches:
       - fix/admin-order-crud-v3-nonblocking-20260804
     paths:
+      - ".github/scripts/finalize-admin-order-crud-v3.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
+      - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
   pull_request:
     branches: [main]
     paths:
+      - ".github/scripts/finalize-admin-order-crud-v3.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
+      - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: finalize-admin-order-crud-v3-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  diagnose:
+  finalize-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
         with:
           ref: fix/admin-order-crud-v3-nonblocking-20260804
           fetch-depth: 0
-      - name: Locate restrictive order paths
+
+      - name: Apply canonical CRUD v3 frontend and gates
+        run: node .github/scripts/finalize-admin-order-crud-v3.mjs
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Canonical Admin CRUD v3 gate
+        working-directory: artifacts/day-night-delivery
+        run: pnpm run test:admin-order-crud-v3
+
+      - name: Final order lifecycle gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/admin-order-lifecycle-final-gate.mjs
+
+      - name: Complete order editor gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/admin-complete-order-edit-gate.mjs
+
+      - name: Operations order-control gate
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/operations-order-control-gate.mjs
+
+      - name: TypeScript
+        run: pnpm run web:typecheck
+
+      - name: Full production gate
+        run: pnpm run web:gate
+
+      - name: Production build
+        run: pnpm run web:build
+
+      - name: Commit verified implementation and remove temporary automation
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== merchant_portal_account_not_linked ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git 'merchant_portal_account_not_linked' . || true
-          echo '=== complete update RPC callers and definitions ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'admin_update_order_complete_verified_v2|admin_update_order_complete_verified\(' . || true
-          echo '=== status RPC callers and definitions ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'admin_update_order_status_verified|admin_update_order_status\(' . || true
-          echo '=== merchant linkage checks around orders ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'portal_account_not_linked|merchant.*account.*linked|linked.*merchant.*account' supabase artifacts/day-night-delivery/src || true
-          echo '=== order triggers ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'create trigger|before update|after update' supabase/migrations | grep -Ei 'order|merchant|coupon|financial|statement' || true
-          echo '=== recent order migrations ==='
-          find supabase/migrations -maxdepth 1 -type f | sort | tail -n 120
-          echo '=== order mutation frontend files ==='
-          grep -RIl --exclude-dir=node_modules --exclude-dir=.git -E 'from\("orders"\).*update|\.from\("orders"\)|updateExistingOrderStatus|saveAdminOrderEdit|admin_update_order_' artifacts/day-night-delivery/src | sort || true
+          git config user.name "DAY NIGHT CI"
+          git config user.email "actions@users.noreply.github.com"
+
+          git rm .github/scripts/finalize-admin-order-crud-v3.mjs
+          git rm .github/workflows/diagnose-admin-order-crud-v3.yml
+
+          git add \
+            supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql \
+            artifacts/day-night-delivery/package.json \
+            artifacts/day-night-delivery/scripts/admin-order-crud-v3-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-order-lifecycle-final-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs \
+            artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs \
+            artifacts/day-night-delivery/src/lib/adminOrderMutations.ts \
+            artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts \
+            artifacts/day-night-delivery/src/lib/adminOrderDeleteData.ts \
+            artifacts/day-night-delivery/src/supabaseAdminOps.ts \
+            artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx
+
+          git diff --cached --check
+          git commit -m "fix(admin): make canonical order CRUD non-blocking"
+          git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
