@@ -1,310 +1,356 @@
 === PRODUCTION GATE FAILURE SUMMARY ===
-15:AssertionError [ERR_ASSERTION]: New financial orders must be checked before the create RPC is called.
-21:  code: 'ERR_ASSERTION',
-303: ELIFECYCLE  Command failed with exit code 1.
-304: ELIFECYCLE  Command failed with exit code 1.
+13:PASS destination location formatter (16 assertions)
+1670:FAIL personal runtime does not require sender phone
+1689: ELIFECYCLE  Command failed with exit code 1.
+1690: ELIFECYCLE  Command failed with exit code 1.
 === PRODUCTION GATE LOG TAIL ===
+CREATE INDEX
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+DROP TRIGGER
+CREATE TRIGGER
+DROP TRIGGER
+CREATE TRIGGER
+DROP TRIGGER
+CREATE TRIGGER
+INSERT 0 38
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+INSERT 0 1
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+DO
+COMMIT
+Applying supabase/migrations/20260723140500_customer_experience_runtime_health.sql
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
 
-> workspace@0.0.0 web:gate /home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1
-> pnpm --dir artifacts/day-night-delivery run production:gate
+COMMIT
+Applying supabase/migrations/20260723141000_customer_experience_privacy_actions.sql
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723141500_customer_experience_rls_storage_hardening.sql
+BEGIN
+DROP POLICY
+DROP POLICY
+DROP POLICY
+CREATE POLICY
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723142000_customer_experience_pii_hash_hardening.sql
+BEGIN
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723143000_customer_experience_pgcrypto_runtime_hotfix.sql
+BEGIN
+CREATE EXTENSION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723143500_customer_experience_notification_enum_lint_hotfix.sql
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/migrations/20260723144000_customer_experience_utf8_template_repair.sql
+BEGIN
+CREATE FUNCTION
+REVOKE
+UPDATE 31
+UPDATE 16
+UPDATE 0
+CREATE FUNCTION
+REVOKE
+DROP TRIGGER
+CREATE TRIGGER
+DO
+ pg_notify 
+-----------
+ 
+(1 row)
+
+COMMIT
+Applying supabase/tests/customer_experience_verify.sql
+DO
+DAY NIGHT Customer Experience PostgreSQL verification: PASS
+DAY NIGHT Customer Experience PostgreSQL 17 gate: PASS
 
 
-> @workspace/day-night-delivery@0.0.0 production:gate /home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery
-> node scripts/global-order-merchant-integrity-gate.mjs && node scripts/search-integrity-gate.mjs && node scripts/global-coupon-integrity-gate.mjs && node scripts/destination-location-tests.mjs && node scripts/production-hardening-gate.mjs && node scripts/pwa-production-gate.mjs && node scripts/admin-deep-audit-gate.mjs && node scripts/coupon-camera-production-gate.mjs && node scripts/admin-final-closure-gate.mjs && node scripts/merchant-final-closure-gate.mjs && node scripts/runtime-live-feature-gate.mjs && node scripts/production-core-rescue-gate.mjs && node scripts/operations-order-control-gate.mjs && node scripts/order-financial-matrix-gate.mjs && node scripts/biometric-security-gate.mjs && node scripts/driver-chat-payroll-production-gate.mjs && node scripts/employee-hr-payroll-production-gate.mjs && node scripts/merchant-statement-order-edit-gate.mjs && node scripts/export-language-policy-gate.mjs && node scripts/customer-experience-tests.mjs && node scripts/customer-experience-production-gate.mjs && node scripts/customer-experience-sql-docker-gate.mjs && node scripts/multi-party-ratings-production-gate.mjs && node scripts/delivered-financial-adjustment-gate.mjs && node scripts/personal-orders-admin-gate.mjs && node scripts/driver-bank-payment-center-gate.mjs && node scripts/real-driver-navigation-gate.mjs && node scripts/international-tracking-production-gate.mjs && node scripts/international-tracking-visual-gate.mjs && node scripts/p1-production-hardening-gate.mjs && node scripts/admin-order-save-localization-gate.mjs && node scripts/admin-order-delete-edit-flexibility-gate.mjs && node scripts/admin-uae-smart-suggestions-currency-gate.mjs && node scripts/admin-order-create-v3-gate.mjs
+--- DAY NIGHT multi-party ratings gate ---
+PASS: ../../supabase/migrations/20260727183000_multi_party_ratings_center.sql
+PASS: src/services/multiPartyRatingsService.ts
+PASS: src/components/MultiPartyRatingPage.tsx
+PASS: src/components/admin/AdminRatingsCenter.tsx
+PASS: src/components/admin/AdminRatingsLauncher.tsx
+PASS: src/components/driver/DriverOrderCard.tsx
+PASS: src/components/driver/DriverCustomerCommunication.tsx
+PASS: src/services/driverActionMessageService.ts
+PASS: src/main.tsx
+PASS: Database distinguishes customer, merchant and driver raters
+PASS: One independent rating per party and order
+PASS: Secure role-bound rating links are created by RPC
+PASS: Public context is token-scoped
+PASS: Ratings persist through a dedicated security-definer RPC
+PASS: Frontend can create role-specific links
+PASS: The public page explains the one-to-five rating scale
+PASS: One star is explicitly the lowest rating
+PASS: Five stars is explicitly the best rating
+PASS: Customer can flag a complaint for administration
+PASS: Successful submission transitions from spinner to check mark
+PASS: Success screen thanks the customer
+PASS: Administration has a dedicated Ratings Center
+PASS: Ratings Center identifies complaint submissions
+PASS: Administration sees a complaint KPI
+PASS: Complaints are visibly escalated in the list
+PASS: Ratings Center creates order-linked requests
+PASS: Ratings Center is mounted as an admin section
+PASS: Driver card exposes one authoritative delivery callback to communication
+PASS: Driver sees a single deliver-and-send-rating action
+PASS: Delivery is persisted before the rating link is generated
+PASS: Customer rating link is created after delivery confirmation
+PASS: The one-click delivery action opens the customer WhatsApp request
+PASS: Delivered message carries the secure rating link
+PASS: Public rating routes mount the role-aware page
+PASS: Admin Ratings section is globally mounted
+Multi-party ratings gate PASSED.
 
-PASS global order/merchant ownership, visibility and integrity gate
-PASS system-wide admin and merchant search integrity gate
-node:internal/modules/run_main:123
-    triggerUncaughtException(
-    ^
 
-AssertionError [ERR_ASSERTION]: New financial orders must be checked before the create RPC is called.
-    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/.global-coupon-integrity-gate-2622.mjs?run=1785868930766:100:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
-    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
-    at async file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/global-coupon-integrity-gate-base.mjs:17:3 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 'import { supabase } from "../supabase";\n' +
-    'import type { Merchant, Order } from "../types";\n' +
-    'import {\n' +
-    '  calculateOpsOrderPrice,\n' +
-    '  getOpsOrderReference,\n' +
-    '  opsErrorDetail,\n' +
-    '  type OpsCreateResult,\n' +
-    '  type OpsOrderInput,\n' +
-    '  type OpsOrderUpdateInput,\n' +
-    '} from "./adminOperationsData";\n' +
-    'import { createDayNightInvoiceNumber } from "./printableDocuments";\n' +
-    'import { createAdminOrder } from "./adminOrderMutations";\n' +
-    'import {\n' +
-    '  calculateOrderFinancials,\n' +
-    '  financialNumber,\n' +
-    '  normalizeDeliveryFeeMode,\n' +
-    '  orderFinancialValidation,\n' +
-    '  type DeliveryFeeMode,\n' +
-    '  type OrderFinancialBreakdown,\n' +
-    '} from "./orderFinancials";\n' +
-    'import {\n' +
-    '  resolveCanonicalMerchantForOrder,\n' +
-    '  verifySavedOrderMerchant,\n' +
-    '} from "./orderMerchantResolver";\n' +
-    '\n' +
-    'export type FinancialOpsOrderInput = OpsOrderInput & {\n' +
-    '  goods_value: number | string;\n' +
-    '  discount_amount?: number | string;\n' +
-    '  delivery_fee_mode: DeliveryFeeMode;\n' +
-    '};\n' +
-    '\n' +
-    'export type FinancialOpsOrderUpdateInput = Omit<OpsOrderUpdateInput, keyof OpsOrderInput> &\n' +
-    '  FinancialOpsOrderInput;\n' +
-    '\n' +
-    'export type CouponConflict = {\n' +
-    '  coupon_number: string;\n' +
-    '  order_id: string;\n' +
-    '  tracking_number: string;\n' +
-    '  merchant_name: string;\n' +
-    '  receiver_name: string;\n' +
-    '  receiver_phone: string;\n' +
-    '};\n' +
-    '\n' +
-    'export const EXPLICIT_ZERO_MANUAL_DELIVERY_FEE = 25;\n' +
-    '\n' +
-    'const clean = (value: unknown) => String(value ?? "").trim();\n' +
-    'const normalizeCouponForComparison = (value: unknown) =>\n' +
-    '  clean(value)\n' +
-    '    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))\n' +
-    '    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))\n' +
-    '    .replace(/\\s+/g, "")\n' +
-    '    .toLowerCase();\n' +
-    'const numberValue = (value: unknown, fallback = 0) => {\n' +
-    '  const parsed = Number(value);\n' +
-    '  return Number.isFinite(parsed) ? parsed : fallback;\n' +
-    '};\n' +
-    '\n' +
-    'function composeAddress(parts: unknown[]) {\n' +
-    '  return parts.map(clean).filter(Boolean).join(" - ");\n' +
-    '}\n' +
-    '\n' +
-    'function normalizePaymentMethod(value: unknown) {\n' +
-    '  const normalized = clean(value || "cod").toLowerCase();\n' +
-    '  if (normalized === "merchant_pays") return "sender_pays";\n' +
-    '  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) return normalized;\n' +
-    '  return "cod";\n' +
-    '}\n' +
-    '\n' +
-    'export function hasExplicitZeroManualDelivery(input: FinancialOpsOrderInput) {\n' +
-    '  const raw = input.manual_delivery_price;\n' +
-    '  return (\n' +
-    '    input.price_mode === "manual" &&\n' +
-    '    raw !== "" &&\n' +
-    '    raw !== null &&\n' +
-    '    raw !== undefined &&\n' +
-    '    Number.isFinite(Number(raw)) &&\n' +
-    '    Number(raw) === 0\n' +
-    '  );\n' +
-    '}\n' +
-    '\n' +
-    '/**\n' +
-    ' * Manual price rules are intentionally explicit:\n' +
-    ' * - any positive manual value is used exactly as entered, including 1000 AED;\n' +
-    ' * - an explicitly entered manual zero is a settlement instruction, not free\n' +
-    ' *   delivery: the official 25 AED fee is charged to the merchant.\n' +
-    ' */\n' +
-    'export function effectiveDeliveryFeeMode(input: FinancialOpsOrderInput): DeliveryFeeMode {\n' +
-    '  const paymentMethod = clean(input.payment_method).toLowerCase();\n' +
-    '  if (paymentMethod === "merchant_pays" || paymentMethod === "sender_pays") {\n' +
-    '    return "deduct_from_merchant";\n' +
-    '  }\n' +
-    '  if (hasExplicitZeroManualDelivery(input)) {\n' +
-    '    return "deduct_from_merchant";\n' +
-    '  }\n' +
-    '  return normalizeDeliveryFeeMode(input.delivery_fee_mode);\n' +
-    '}\n' +
-    '\n' +
-    'function operationError(error: unknown, fallback: string) {\n' +
-    '  const detail = opsErrorDetail(error);\n' +
-    '  const wrapped = new Error(detail || fallback) as Error & { dbDetail?: string };\n' +
-    '  wrapped.dbDetail = detail;\n' +
-    '  return wrapped;\n' +
-    '}\n' +
-    '\n' +
-    'function couponIntegrityUnavailable(error: unknown) {\n' +
-    '  const detail = opsErrorDetail(error);\n' +
-    '  if (detail) console.warn("Coupon integrity preflight unavailable:", detail);\n' +
-    '  const wrapped = new Error(\n' +
-    '    "تعذر التحقق من تكرار رقم الكوبون بأمان. لم يتم حفظ الطلب. تأكد من تطبيق Migration حماية الكوبونات ثم أعد المحاولة.",\n' +
-    '  ) as Error & { code?: string };\n' +
-    '  wrapped.name = "CouponIntegrityCheckUnavailable";\n' +
-    '  wrapped.code = "coupon_integrity_check_unavailable";\n' +
-    '  return wrapped;\n' +
-    '}\n' +
-    '\n' +
-    'function duplicateCouponError(conflict: CouponConflict, requestedCoupon: unknown) {\n' +
-    '  const coupon = clean(conflict.coupon_number || requestedCoupon) || "غير محدد";\n' +
-    '  const tracking = clean(conflict.tracking_number || conflict.order_id) || "غير محدد";\n' +
-    '  const merchant = clean(conflict.merchant_name) || "غير محدد";\n' +
-    '  const receiver = clean(conflict.receiver_name);\n' +
-    '  const receiverSuffix = receiver ? `، والمستلم ${receiver}` : "";\n' +
-    '  const wrapped = new Error(\n' +
-    '    `رقم الكوبون «${coupon}» مسجل بالفعل على الطلب ${tracking} للتاجر ${merchant}${receiverSuffix}. لا يمكن تكرار رقم الكوبون. افتح الطلب الموجود من صفحة كافة الطلبات أو استخدم رقم كوبون جديدًا.`,\n' +
-    '  ) as Error & { code?: string; conflict?: CouponConflict };\n' +
-    '  wrapped.name = "DuplicateCouponError";\n' +
-    '  wrapped.code = "coupon_number_already_exists";\n' +
-    '  wrapped.conflict = conflict;\n' +
-    '  return wrapped;\n' +
-    '}\n' +
-    '\n' +
-    'export async function findCouponConflict(\n' +
-    '  couponNumber: unknown,\n' +
-    '  excludeOrderId: string | null = null,\n' +
-    '): Promise<CouponConflict | null> {\n' +
-    '  if (!supabase) throw couponIntegrityUnavailable(null);\n' +
-    '  const coupon = clean(couponNumber);\n' +
-    '  if (!coupon) return null;\n' +
-    '\n' +
-    '  const { data, error } = await supabase.rpc("admin_find_coupon_conflict", {\n' +
-    '    p_coupon: coupon,\n' +
-    '    p_exclude_order_id: excludeOrderId,\n' +
-    '  });\n' +
-    '  if (error) throw couponIntegrityUnavailable(error);\n' +
-    '\n' +
-    '  const value = Array.isArray(data) ? data[0] : data;\n' +
-    '  if (!value || typeof value !== "object") return null;\n' +
-    '  const row = value as Record<string, unknown>;\n' +
-    '  const conflict: CouponConflict = {\n' +
-    '    coupon_number: clean(row.coupon_number || coupon),\n' +
-    '    order_id: clean(row.order_id),\n' +
-    '    tracking_number: clean(row.tracking_number),\n' +
-    '    merchant_name: clean(row.merchant_name),\n' +
-    '    receiver_name: clean(row.receiver_name),\n' +
-    '    receiver_phone: clean(row.receiver_phone),\n' +
-    '  };\n' +
-    '\n' +
-    '  if (!conflict.order_id && !conflict.tracking_number) return null;\n' +
-    '  return conflict;\n' +
-    '}\n' +
-    '\n' +
-    'async function recoverCouponConflict(\n' +
-    '  couponNumber: unknown,\n' +
-    '  excludeOrderId: string | null = null,\n' +
-    ') {\n' +
-    '  try {\n' +
-    '    return await findCouponConflict(couponNumber, excludeOrderId);\n' +
-    '  } catch (error) {\n' +
-    '    console.warn("Could not recover precise coupon conflict after database rejection:", opsErrorDetail(error));\n' +
-    '    return null;\n' +
-    '  }\n' +
-    '}\n' +
-    '\n' +
-    'function buildFinanceNote(financials: OrderFinancialBreakdown) {\n' +
-    '  const settlementLine =\n' +
-    '    financials.merchantDue <= 0\n' +
-    '      ? `Due from merchant ${Math.abs(financials.merchantDue).toFixed(2)} AED`\n' +
-    '      : `Merchant net ${financials.merchantDue.toFixed(2)} AED`;\n' +
-    '  const lines = [\n' +
-    '    `Goods value ${financials.goodsValue.toFixed(2)} AED`,\n' +
-    '    `Delivery fee ${financials.deliveryFee.toFixed(2)} AED`,\n' +
-    '  ];\n' +
-    '  if (financials.discountAmount > 0) {\n' +
-    '    lines.push(`Discount ${financials.discountAmount.toFixed(2)} AED`);\n' +
-    '  }\n' +
-    '  lines.push(\n' +
-    '    `Customer total ${financials.customerTotal.toFixed(2)} AED`,\n' +
-    '    settlementLine,\n' +
-    '    `DAY NIGHT revenue ${financials.companyRevenue.toFixed(2)} AED`,\n' +
-    '    `Delivery fee mode ${financials.deliveryFeeMode}`,\n' +
-    '  );\n' +
-    '  return lines.join(" | ");\n' +
-    '}\n' +
-    '\n' +
-    'export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): OrderFinancialBreakdown & {\n' +
-    '  systemDeliveryFee: number;\n' +
-    '  priceSource: "system" | "manual";\n' +
-    '} {\n' +
-    '  const pricing = calculateOpsOrderPrice(input);\n' +
-    '  const explicitZero = hasExplicitZeroManualDelivery(input);\n' +
-    '  const deliveryFee = explicitZero\n' +
-    '    ? EXPLICIT_ZERO_MANUAL_DELIVERY_FEE\n' +
-    '    : pricing.total;\n' +
-    '  const deliveryFeeMode = effectiveDeliveryFeeMode(input);\n' +
-    '  const validation = orderFinancialValidation({\n' +
-    '    goodsValue: input.goods_value,\n' +
-    '    deliveryFee,\n' +
-    '    discountAmount: input.discount_amount,\n' +
-    '    deliveryFeeMode,\n' +
-    '  });\n' +
-    '  if (validation) throw new Error(validation);\n' +
-    '\n' +
-    '  return {\n' +
-    '    ...calculateOrderFinancials({\n' +
-    '      goodsValue: input.goods_value,\n' +
-    '      deliveryFee,\n' +
-    '      discountAmount: input.discount_amount,\n' +
-    '      deliveryFeeMode,\n' +
-    '    }),\n' +
-    '    systemDeliveryFee: pricing.systemTotal,\n' +
-    '    priceSource: input.price_mode === "manual" ? "manual" : pricing.priceSource,\n' +
-    '  };\n' +
-    '}\n' +
-    '\n' +
-    'function persistedManualDeliveryPrice(\n' +
-    '  input: FinancialOpsOrderInput,\n' +
-    '  financials: ReturnType<typeof calculateFinancialOpsOrder>,\n' +
-    ') {\n' +
-    '  if (hasExplicitZeroManualDelivery(input)) return 0;\n' +
-    '  return financials.priceSource === "manual" ? financials.deliveryFee : null;\n' +
-    '}\n' +
-    '\n' +
-    'function buildFinancialOrderPayload(\n' +
-    '  input: FinancialOpsOrderInput,\n' +
-    '  merchant: Merchant | null,\n' +
-    '  financials: ReturnType<typeof calculateFinancialOpsOrder>,\n' +
-    '  trackingNumber: string,\n' +
-    '  createdAt: string,\n' +
-    ') {\n' +
-    '  const isInternational = input.shipping_scope === "international";\n' +
-    '  const receiverCity = isInternational\n' +
-    '    ? clean(input.destination_country || input.delivery_city || "WORLD")\n' +
-    '    : clean(input.delivery_city || "Abu Dhabi");\n' +
-    '  const senderCity = clean(input.pickup_city || merchant?.emirate || "Abu Dhabi");\n' +
-    '  const senderAddress = composeAddress([\n' +
-    '    input.pickup_area,\n' +
-    '    input.pickup_street,\n' +
-    '    merchant?.pickup_address || merchant?.address || senderCity,\n' +
-    '  ]);\n' +
-    '  const receiverAddress = composeAddress([\n' +
-    '    input.delivery_area,\n' +
-    '    input.delivery_street,\n' +
-    '    input.receiver_address || receiverCity,\n' +
-    '  ]);\n' +
-    '  const packageValue = clean(input.package_description || input.package_type || "Shipment");\n' +
-    '  const paymentMethod = normalizePaymentMethod(input.payment_method);\n' +
-    '  const count = Math.max(1, Math.ceil(numberValue(input.order_count, 1)));\n' +
-    '  const codAmount = paymentMethod === "cod" ? financials.customerTotal : 0;\n' +
-    '  const financeNote = buildFinanceNote(financials);\n' +
-    '\n' +
-    '  return {\n' +
-    '    tracking_number: trackingNumber,\n' +
-    '    tracking_code: trackingNumber,\n' +
-    '    invoice_number: trackingNumber,\n' +
-    '    coupon_number: clean(input.coupon_number),\n' +
-    '    merchant_id: merchant?.id || clean(input.merchant_id) || null,\n' +
-    '    merchant_name: merchant?.trade_name || clean(input.merchant_name) || null,\n' +
-    '    merchant_code: merchant?.merchant_code || clean(input.merchant_code) || null,\n' +
-    '    order_count: count,\n' +
-    '    shipping_scope: input.shipping_scope,\n' +
-    '    destination_country: isInternational ? receiverCity : null,\n' +
-    '    source_channel: "admin_financial_order",\n' +
-    '    source_domain: "daynightae.com",\n' +
-    '    sender_name: merchant?.trade_name || clean(input.sender_name) || "DAY NIGHT Admin",\n' +
-    '    sender_phone: clean(merchant?.phone || input.sender_phone),\n' +
-    '    s'... 7082 more characters,
-  expected: /const existingConflict = await findCouponConflict\(input\.coupon_number\)/,
-  operator: 'match',
-  diff: 'simple'
-}
+--- DAY NIGHT audited delivered financial adjustment gate ---
+PASS: ../../supabase/migrations/20260728233000_admin_delivered_financial_adjustment.sql
+PASS: src/lib/adminDeliveredFinancialAdjustment.ts
+PASS: src/components/admin/AdminDeliveredFinancialAdjustment.tsx
+PASS: src/components/admin/AdminOrderEditModalComplete.tsx
+PASS: Database keeps a permanent before/after adjustment ledger
+PASS: Database exposes an exact-order audited adjustment RPC
+PASS: Financial correction locks the exact order row
+PASS: Database verifies persisted financial values
+PASS: Financial version increments on correction
+PASS: Delivered collection is recalculated with the corrected customer total
+PASS: Adjustment reason is stored on the order
+PASS: Database uses only the production payment modes
+PASS: PL/pgSQL CASE comparison is parenthesized and parse-safe
+PASS: Migration cannot regress to the invalid unparenthesized CASE comparison
+PASS: Frontend uses a dedicated audited adjustment client
+PASS: Frontend verifies returned totals
+PASS: Delivered order panel exposes an editable manual delivery amount
+PASS: Panel supports charging delivery to the customer
+PASS: Panel supports deducting delivery from the merchant
+PASS: Panel requires an audit reason
+PASS: Panel exposes a direct correction save action
+PASS: Live order editor mounts the delivered financial correction panel
+PASS: Correction panel is limited to posted or delivered orders
+Delivered financial adjustment gate PASSED.
 
-Node.js v22.23.1
+PASS edit modal has visible save action
+PASS edit modal is viewport constrained
+PASS personal edit saves without merchant
+PASS personal edit uses canonical v3 patch semantics with merchant_id null
+PASS canonical v3 applies schema-aware patches without browser PostgREST fallbacks
+PASS personal edit contains no legacy optional-column retry or direct table fallback
+PASS missing personal edit coupon becomes a non-blocking reconciliation warning
+PASS bulk selector is generic and visible
+PASS all visible results export exists
+PASS order selector stays open
+PASS bulk export is not merchant-only
+PASS bulk export receives section identity
+PASS selection no longer hides unselected rows
+PASS new order defines personal purpose option
+PASS merchant selector exposes personal purpose
+PASS personal form renders inside new-order route
+PASS unified new-order route reuses protected personal save flow
+PASS personal order form is present
+PASS personal order UI shows the fixed fee in the active language
+PASS personal coupon is visibly optional for Admin creation
+PASS Admin personal-order coupon is not a native blocking requirement
+PASS sender phone is explicitly optional
+PASS detailed pickup address is explicitly optional
+PASS detailed delivery address is explicitly optional
+PASS personal notes are explicitly optional
+PASS personal reference remains ready for optional entry
+PASS personal save action is browser-testable
+PASS Al Ain is a standalone top-level location
+PASS Al Ain operational area list is populated
+PASS personal financial display detects true personal orders
+PASS personal financial display never creates merchant due
+PASS personal order runtime fixes fee at 25
+PASS personal order has no merchant linkage
+PASS Admin personal-order runtime does not reject a missing coupon
+FAIL personal runtime does not require sender phone
+PASS personal coupon is stored when supplied and remains nullable otherwise
+PASS personal order uses canonical Admin create v3 service
+PASS personal order has no direct insert fallback
+PASS personal orders have explicit detection
+PASS standalone personal section is removed from registry
+PASS standalone personal section is removed from command center
+PASS standalone personal section is removed from legacy sidebar
+PASS standalone personal workspace is removed
+PASS personal order RPC migration exists
+PASS database enforces 25 AED delivery
+PASS database enforces null merchant
+PASS missing manual delivery column is restored
+PASS PostgREST schema cache is reloaded
+PASS database creation RPC requires a personal-order coupon
+PASS database creation RPC does not require sender phone
+PASS runtime health marks sender phone optional
+PASS global coupon trigger still protects ordinary non-v3 personal creation
+PASS new personal-order coupons remain globally duplicate protected
  ELIFECYCLE  Command failed with exit code 1.
  ELIFECYCLE  Command failed with exit code 1.
