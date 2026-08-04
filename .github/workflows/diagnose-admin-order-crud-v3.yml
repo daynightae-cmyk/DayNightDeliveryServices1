@@ -98,7 +98,24 @@ jobs:
         run: node scripts/operations-order-control-gate.mjs
 
       - name: TypeScript
-        run: pnpm run web:typecheck
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:typecheck 2>&1 | tee .github/admin-order-crud-v3-typecheck.log
+
+      - name: Preserve focused TypeScript diagnostics
+        if: steps.typecheck.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/admin-order-crud-v3-typecheck.log
+          git commit -m "ci(admin): capture CRUD v3 typecheck diagnostics"
+          git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
+          exit 1
 
       - name: Full production gate
         run: pnpm run web:gate
@@ -119,6 +136,7 @@ jobs:
           git rm .github/scripts/finalize-admin-order-create-v3-ui.mjs
           git rm .github/scripts/patch-admin-order-create-v3-ui.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
+          git rm -f .github/admin-order-crud-v3-typecheck.log || true
 
           git add \
             supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql \
