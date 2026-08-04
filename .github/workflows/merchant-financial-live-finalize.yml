@@ -1,0 +1,193 @@
+name: Finalize Live Merchant Financial Summary
+
+on:
+  push:
+    branches:
+      - fix/merchant-debit-red-authoritative-20260805
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/merchant-debit-red-authoritative-20260805
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply final live financial layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const file = "artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx";
+          let source = fs.readFileSync(file, "utf8");
+
+          function replaceRequired(pattern, replacement, label) {
+            const next = source.replace(pattern, replacement);
+            if (next === source) throw new Error(`Patch failed: ${label}`);
+            source = next;
+          }
+
+          replaceRequired(
+            /  function setField<K extends keyof FinancialOpsOrderInput>\(key: K, value: FinancialOpsOrderInput\[K\]\) \{\n    setForm\(\(current\) => \(\{ \.\.\.current, \[key\]: value \}\)\);\n    setSource\("pending"\);\n    setMessage\(""\);\n    setError\(""\);\n  \}/,
+            `  function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
+              setForm((current) => {
+                const next = { ...current, [key]: value } as FinancialOpsOrderInput;
+                if (
+                  key === "goods_value" &&
+                  value !== "" &&
+                  value !== null &&
+                  value !== undefined &&
+                  Number.isFinite(Number(value)) &&
+                  Number(value) === 0
+                ) {
+                  next.delivery_fee_mode = "deduct_from_merchant";
+                  next.payment_method = "merchant_pays";
+                }
+                return next;
+              });
+              setSource("pending");
+              setMessage("");
+              setError("");
+            }`,
+            "explicit zero goods immediately selects merchant debit",
+          );
+
+          replaceRequired(
+            /\n  function setPaymentMethod\(value: string\) \{[\s\S]*?\n  \}\n\n  function setDeliveryFeeMode/,
+            `
+
+            function setDeliveryFeeMode`,
+            "remove obsolete collection method handler",
+          );
+
+          replaceRequired(
+            /<div className=\{`mt-4 grid gap-3 sm:grid-cols-2 \$\{financials\.discountAmount > 0 \? "lg:grid-cols-6" : "lg:grid-cols-5"\}`}\>/,
+            `<div className={\`mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 \${financials.discountAmount > 0 ? "2xl:grid-cols-7" : "2xl:grid-cols-6"}\`}>`,
+            "financial row includes live final total",
+          );
+
+          replaceRequired(
+            /            <FinancialMetric isArabic=\{isArabic\} label=\{isArabic \? "دخل داي نايت" : "DAY NIGHT revenue"\} value=\{financials\.companyRevenue\} \/>/,
+            `            <FinancialMetric isArabic={isArabic} label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
+                        <FinancialMetric
+                          isArabic={isArabic}
+                          label={
+                            financials.merchantDue < 0
+                              ? isArabic
+                                ? "إجمالي المستحق على التاجر"
+                                : "Merchant debit total"
+                              : isArabic
+                                ? "الإجمالي النهائي المطلوب من العميل"
+                                : "Final customer total"
+                          }
+                          value={
+                            financials.merchantDue < 0
+                              ? financials.merchantDue
+                              : financials.customerTotal
+                          }
+                          tone={financials.merchantDue < 0 ? "danger" : "gold"}
+                        />`,
+            "append authoritative live total card",
+          );
+
+          replaceRequired(
+            /\n      <section className="mt-4 grid gap-4 xl:grid-cols-\[1fr_360px\]">[\s\S]*?\n      <\/section>\n    <\/form>/,
+            `
+
+                  <div className="mt-5 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={saving || !financials}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-6 py-4 text-sm font-black text-brand-deep disabled:opacity-60 sm:w-auto sm:min-w-[280px]"
+                    >
+                      {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                      {saving
+                        ? isArabic
+                          ? "جارٍ الحفظ..."
+                          : "Saving..."
+                        : isArabic
+                          ? "حفظ وبدء طلب جديد"
+                          : "Save and start next order"}
+                    </button>
+                  </div>
+                </form>`,
+            "remove collection details and duplicate confirmation panel",
+          );
+
+          fs.writeFileSync(file, source);
+
+          const gate = `import fs from "node:fs";
+
+          const source = fs.readFileSync(
+            "artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx",
+            "utf8",
+          );
+
+          const checks = [
+            [!source.includes("طريقة التحصيل والتفاصيل"), "collection/details section removed"],
+            [!source.includes("Collection method and details"), "English collection/details section removed"],
+            [!source.includes("function setPaymentMethod"), "obsolete payment handler removed"],
+            [source.includes('key === "goods_value"') && source.includes('Number(value) === 0'), "explicit zero goods is reactive"],
+            [source.includes('next.delivery_fee_mode = "deduct_from_merchant"'), "zero goods selects merchant mode"],
+            [source.includes('next.payment_method = "merchant_pays"'), "zero goods synchronizes payment owner"],
+            [source.includes('label: isArabic ? "مستحق على التاجر"'), "exact debit label preserved"],
+            [source.includes('"إجمالي المستحق على التاجر"'), "live final debit total label"],
+            [source.includes('tone={financials.merchantDue < 0 ? "danger" : "gold"}'), "final total tone is reactive"],
+            [source.includes('financials.merchantDue < 0') && source.includes('financials.customerTotal'), "final total reads current financial result"],
+            [source.includes('type="submit"') && source.includes('حفظ وبدء طلب جديد'), "save action preserved"],
+          ];
+
+          for (const [ok, label] of checks) {
+            if (!ok) throw new Error(`live financial finalize gate failed: ${label}`);
+          }
+
+          console.log("live financial finalize gate: PASS");
+          console.log("explicit goods=0 => merchant mode; customer=0; مستحق على التاجر=-25; final total=-25 red");
+          `;
+          fs.writeFileSync(
+            "artifacts/day-night-delivery/scripts/live-financial-finalize-gate.mjs",
+            gate,
+          );
+
+          fs.unlinkSync(".github/workflows/merchant-financial-live-finalize.yml");
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify live financial contract
+        run: node artifacts/day-night-delivery/scripts/live-financial-finalize-gate.mjs
+
+      - name: Build production application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Commit verified finalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT DELIVERY SERVICES"
+          git config user.email "daynight.ae@gmail.com"
+          git add artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx \
+                  artifacts/day-night-delivery/scripts/live-financial-finalize-gate.mjs \
+                  .github/workflows/merchant-financial-live-finalize.yml
+          git commit -m "fix(admin): finalize live merchant debit summary"
+          git push origin HEAD:fix/merchant-debit-red-authoritative-20260805
