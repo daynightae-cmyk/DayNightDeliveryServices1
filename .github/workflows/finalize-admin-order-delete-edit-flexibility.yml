@@ -7,13 +7,18 @@ on:
     paths:
       - ".github/scripts/finalize-admin-order-delete-edit-flexibility.mjs"
       - ".github/workflows/finalize-admin-order-delete-edit-flexibility.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/scripts/finalize-admin-order-delete-edit-flexibility.mjs"
+      - ".github/workflows/finalize-admin-order-delete-edit-flexibility.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: finalize-admin-order-delete-edit-flexibility
+  group: finalize-admin-order-delete-edit-flexibility-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,6 +74,7 @@ jobs:
         run: pnpm run web:build
 
       - name: Commit verified implementation only
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         shell: bash
         run: |
           set -euo pipefail
