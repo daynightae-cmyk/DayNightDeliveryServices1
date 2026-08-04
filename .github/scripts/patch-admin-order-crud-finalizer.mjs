@@ -13,6 +13,11 @@ const replacements = [
     'assert(!persistence.includes(\'.from("orders")\'), "complete editor has direct table fallback");',
     "generated gate orders-table string",
   ],
+  [
+    'assert(/admin_update_order_complete_verified\\(p_payload jsonb\\)[\\\\s\\\\S]+admin_update_order_complete_v3/.test(migration), "legacy complete RPC does not redirect to v3");',
+    'assert(migration.includes("create or replace function public.admin_update_order_complete_verified(p_payload jsonb)") && migration.includes("select public.admin_update_order_complete_v3("), "legacy complete RPC does not redirect to v3");',
+    "legacy complete redirect gate",
+  ],
 ];
 
 for (const [from, to, label] of replacements) {
@@ -21,4 +26,4 @@ for (const [from, to, label] of replacements) {
 }
 
 fs.writeFileSync(file, content);
-console.log("Patched generated JSX and gate string escaping.");
+console.log("Patched generated JSX, gate strings and legacy redirect assertion.");
