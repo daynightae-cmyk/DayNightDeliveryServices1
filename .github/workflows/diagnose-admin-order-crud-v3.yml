@@ -10,6 +10,7 @@ on:
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
+      - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -18,6 +19,7 @@ on:
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
+      - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
   workflow_dispatch:
 
 permissions:
@@ -105,6 +107,7 @@ jobs:
             artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs \
             artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs \
             artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs \
+            artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs \
             artifacts/day-night-delivery/src/lib/adminOrderMutations.ts \
             artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts \
             artifacts/day-night-delivery/src/lib/adminOrderDeleteData.ts \
