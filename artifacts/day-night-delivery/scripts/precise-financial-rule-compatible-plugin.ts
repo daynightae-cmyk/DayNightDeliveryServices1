@@ -26,8 +26,15 @@ export function preciseFinancialRuleCompatiblePlugin(): Plugin {
         source.includes('data-admin-complete-order-merchant="true"') &&
         source.includes("calculateFinancialOpsOrder") &&
         source.includes("saveAdminOrderEdit");
+      const isAuthoritativeNewOrder =
+        normalized.endsWith(
+          "/src/components/admin/AdminNewOrderComplete.tsx",
+        ) &&
+        source.includes("effectiveDeliveryFeeMode") &&
+        source.includes("calculateFinancialOpsOrder") &&
+        source.includes('data-admin-new-order-form="merchant"');
 
-      if (isAuditedCompleteEditor) {
+      if (isAuditedCompleteEditor || isAuthoritativeNewOrder) {
         return { code: source, map: null };
       }
 

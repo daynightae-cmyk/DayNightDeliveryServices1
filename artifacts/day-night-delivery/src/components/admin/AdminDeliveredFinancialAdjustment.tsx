@@ -36,7 +36,7 @@ function MoneyMetric({ label, value, accent = false }: { label: string; value: n
       }`}
     >
       {label}
-      <b className="mt-1 block text-base" dir="ltr">{Math.abs(value).toFixed(2)} AED</b>
+      <b className="mt-1 block text-base" dir="ltr">{value.toFixed(2)} AED</b>
     </span>
   );
 }
@@ -201,7 +201,7 @@ export default function AdminDeliveredFinancialAdjustment({
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-[11px] font-black text-white/65">
               <span>{isArabic ? "قيمة البضاعة" : "Goods value"}</span>
-              <input type="number" min={0} step="0.01" value={goodsValue} onChange={(event) => setGoodsValue(event.target.value)} className={inputClass} dir="ltr" />
+              <input type="number" min={0} step="0.01" name="dn_delivered_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" value={goodsValue} onChange={(event) => setGoodsValue(event.target.value)} className={inputClass} dir="ltr" />
             </label>
             <label className="space-y-1 text-[11px] font-black text-white/65">
               <span>{isArabic ? "سعر التوصيل اليدوي" : "Manual delivery fee"}</span>
@@ -238,7 +238,7 @@ export default function AdminDeliveredFinancialAdjustment({
               <MoneyMetric label={isArabic ? "التوصيل" : "Delivery"} value={preview.deliveryFee} />
               <MoneyMetric label={isArabic ? "الخصم" : "Discount"} value={preview.discountAmount} />
               <MoneyMetric label={isArabic ? "المطلوب من العميل" : "Customer total"} value={preview.customerTotal} accent />
-              <MoneyMetric label={preview.merchantDue < 0 ? (isArabic ? "مستحق على التاجر" : "Due from merchant") : (isArabic ? "مستحق للتاجر" : "Due to merchant")} value={preview.merchantDue} />
+              <MoneyMetric label={preview.merchantDue < 0 ? (isArabic ? "على التاجر" : "Merchant debit") : (isArabic ? "للتاجر" : "Due to merchant")} value={preview.merchantDue} />
               <MoneyMetric label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={preview.companyRevenue} />
             </div>
           )}
