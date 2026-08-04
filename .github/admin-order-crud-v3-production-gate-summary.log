@@ -1,0 +1,407 @@
+exit_status=1
+=== FAILURE LINES ===
+13:AssertionError [ERR_ASSERTION]: The input did not match the regular expression /admin_create_canonical_merchant_order/. Input:
+393:  code: 'ERR_ASSERTION',
+772: ELIFECYCLE  Command failed with exit code 1.
+773: ELIFECYCLE  Command failed with exit code 1.
+=== LOG TAIL ===
+  '  if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };\n' +
+  '\n' +
+  '  const { data, error } = await supabase\n' +
+  '    .from("merchants")\n' +
+  '    .insert(payload)\n' +
+  '    .select("*")\n' +
+  '    .single();\n' +
+  '  if (error)\n' +
+  '    throw operationsError(\n' +
+  '      error,\n' +
+  '      "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.",\n' +
+  '    );\n' +
+  '  return { row: data as Merch'... 14011 more characters
+
+    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs:71:10
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import { supabase } from "../supabase";\n' +
+    'import type { Merchant, Order } from "../types";\n' +
+    'import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";\n' +
+    'import { createDayNightInvoiceNumber } from "./printableDocuments";\n' +
+    'import { currentUiIsArabic, friendlyDatabaseErrorMessage } from "./friendlyErrorMessage";\n' +
+    'import { createAdminOrder, type AdminOrderWarning } from "./adminOrderMutations";\n' +
+    'import {\n' +
+    '  resolveCanonicalMerchantForOrder,\n' +
+    '  verifySavedOrderMerchant,\n' +
+    '} from "./orderMerchantResolver";\n' +
+    '\n' +
+    'export type OpsDataSource = "rpc" | "db";\n' +
+    'export type OpsPriceMode = "system" | "manual";\n' +
+    '\n' +
+    'export type OpsMerchantInput = {\n' +
+    '  trade_name: string;\n' +
+    '  owner_name?: string;\n' +
+    '  phone: string;\n' +
+    '  alt_phone?: string;\n' +
+    '  email?: string;\n' +
+    '  emirate?: string;\n' +
+    '  city?: string;\n' +
+    '  area?: string;\n' +
+    '  street_details?: string;\n' +
+    '  address?: string;\n' +
+    '  pickup_address?: string;\n' +
+    '  license_number?: string;\n' +
+    '  trn?: string;\n' +
+    '  tax_number?: string;\n' +
+    '  logo_url?: string;\n' +
+    '  bank_name?: string;\n' +
+    '  iban?: string;\n' +
+    '  settlement_cycle?: string;\n' +
+    '  commission_type?: string;\n' +
+    '  default_payment_method?: string;\n' +
+    '  notes?: string;\n' +
+    '  status?: string;\n' +
+    '};\n' +
+    '\n' +
+    'export type OpsOrderInput = {\n' +
+    '  merchant?: Merchant | null;\n' +
+    '  merchant_id?: string;\n' +
+    '  merchant_name?: string;\n' +
+    '  merchant_code?: string;\n' +
+    '  sender_name?: string;\n' +
+    '  sender_phone?: string;\n' +
+    '  coupon_number?: string;\n' +
+    '  shipping_scope: "local" | "international";\n' +
+    '  order_count: number;\n' +
+    '  pickup_city: string;\n' +
+    '  pickup_area?: string;\n' +
+    '  pickup_street?: string;\n' +
+    '  delivery_city: string;\n' +
+    '  delivery_area?: string;\n' +
+    '  delivery_street?: string;\n' +
+    '  destination_country?: string;\n' +
+    '  receiver_name: string;\n' +
+    '  receiver_phone: string;\n' +
+    '  receiver_address: string;\n' +
+    '  package_type: string;\n' +
+    '  package_description?: string;\n' +
+    '  weight?: number;\n' +
+    '  payment_method: string;\n' +
+    '  cod_amount?: number | string | null;\n' +
+    '  notes?: string;\n' +
+    '  status?: string;\n' +
+    '  price_mode?: OpsPriceMode;\n' +
+    '  manual_delivery_price?: number | string | null;\n' +
+    '};\n' +
+    '\n' +
+    'export type OpsOrderUpdateInput = OpsOrderInput & {\n' +
+    '  order: Order;\n' +
+    '  edit_reason?: string;\n' +
+    '};\n' +
+    '\n' +
+    'export type OpsCreateResult<T> = {\n' +
+    '  row: T;\n' +
+    '  source: OpsDataSource;\n' +
+    '  warnings?: AdminOrderWarning[];\n' +
+    '  reconciliationRequired?: boolean;\n' +
+    '  requestId?: string;\n' +
+    '};\n' +
+    'export type OpsDeleteResult = {\n' +
+    '  deleted: boolean;\n' +
+    '  reference: string;\n' +
+    '  source: "rpc";\n' +
+    '};\n' +
+    'export type OpsSnapshot = {\n' +
+    '  merchants: Merchant[];\n' +
+    '  orders: Order[];\n' +
+    '  source: OpsDataSource;\n' +
+    '};\n' +
+    '\n' +
+    'function clean(value: unknown) {\n' +
+    '  return String(value ?? "").trim();\n' +
+    '}\n' +
+    '\n' +
+    'function numberValue(value: unknown, fallback = 0) {\n' +
+    '  const parsed = Number(value);\n' +
+    '  return Number.isFinite(parsed) ? parsed : fallback;\n' +
+    '}\n' +
+    '\n' +
+    'function optionalPositiveNumber(value: unknown) {\n' +
+    '  if (value === "" || value === null || value === undefined) return null;\n' +
+    '  const parsed = Number(value);\n' +
+    '  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;\n' +
+    '}\n' +
+    '\n' +
+    'function removeEmptyUndefined<T extends Record<string, unknown>>(payload: T): T {\n' +
+    '  return Object.fromEntries(\n' +
+    '    Object.entries(payload).filter(\n' +
+    '      ([, value]) => value !== undefined && value !== "",\n' +
+    '    ),\n' +
+    '  ) as T;\n' +
+    '}\n' +
+    '\n' +
+    'function merchantCode(seed?: string) {\n' +
+    '  const suffix =\n' +
+    '    clean(seed)\n' +
+    '      .replace(/[^a-zA-Z0-9]/g, "")\n' +
+    '      .toUpperCase()\n' +
+    '      .slice(0, 4) || "SHOP";\n' +
+    '  const serial = Date.now().toString(36).toUpperCase().slice(-5);\n' +
+    '  return `DN-MER-${suffix}-${serial}`;\n' +
+    '}\n' +
+    '\n' +
+    'function composeLocationAddress(\n' +
+    '  parts: Array<string | undefined | null>,\n' +
+    ') {\n' +
+    '  return parts.map(clean).filter(Boolean).join(" - ");\n' +
+    '}\n' +
+    '\n' +
+    'export function opsErrorDetail(error: unknown) {\n' +
+    '  const record = error as {\n' +
+    '    message?: string;\n' +
+    '    details?: string;\n' +
+    '    hint?: string;\n' +
+    '    code?: string;\n' +
+    '    constraint?: string;\n' +
+    '    dbDetail?: string;\n' +
+    '    cause?: unknown;\n' +
+    '  };\n' +
+    '  const cause = record?.cause as {\n' +
+    '    message?: string;\n' +
+    '    details?: string;\n' +
+    '    hint?: string;\n' +
+    '    code?: string;\n' +
+    '    constraint?: string;\n' +
+    '    dbDetail?: string;\n' +
+    '  } | undefined;\n' +
+    '  const technicalDetail = [\n' +
+    '    record?.dbDetail,\n' +
+    '    record?.message,\n' +
+    '    record?.details,\n' +
+    '    record?.hint,\n' +
+    '    record?.code,\n' +
+    '    record?.constraint,\n' +
+    '    cause?.dbDetail,\n' +
+    '    cause?.message,\n' +
+    '    cause?.details,\n' +
+    '    cause?.hint,\n' +
+    '    cause?.code,\n' +
+    '    cause?.constraint,\n' +
+    '  ]\n' +
+    '    .map(clean)\n' +
+    '    .filter(Boolean)\n' +
+    '    .filter((value, index, all) => all.indexOf(value) === index)\n' +
+    '    .join(" | ");\n' +
+    '\n' +
+    '  return technicalDetail || friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation");\n' +
+    '}\n' +
+    '\n' +
+    'function operationsError(error: unknown, fallback: string) {\n' +
+    '  const technicalDetail = opsErrorDetail(error);\n' +
+    '  if (technicalDetail) console.warn("Admin operations DB detail:", technicalDetail);\n' +
+    '\n' +
+    '  const wrapped = new Error(\n' +
+    '    friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation", fallback),\n' +
+    '  ) as Error & { dbDetail?: string; cause?: unknown };\n' +
+    '  wrapped.dbDetail = technicalDetail;\n' +
+    '  wrapped.cause = error;\n' +
+    '  return wrapped;\n' +
+    '}\n' +
+    '\n' +
+    'async function rpcOne<T>(\n' +
+    '  fn: string,\n' +
+    '  args: Record<string, unknown>,\n' +
+    '): Promise<T | null> {\n' +
+    '  if (!supabase) return null;\n' +
+    '  const { data, error } = await supabase.rpc(fn, args);\n' +
+    '  if (error) {\n' +
+    '    console.warn(\n' +
+    '      `${fn} unavailable, using compatibility fallback when possible:`,\n' +
+    '      error.message,\n' +
+    '    );\n' +
+    '    return null;\n' +
+    '  }\n' +
+    '  if (Array.isArray(data)) return (data[0] || null) as T | null;\n' +
+    '  return (data || null) as T | null;\n' +
+    '}\n' +
+    '\n' +
+    'async function rpcRequired<T>(\n' +
+    '  fn: string,\n' +
+    '  args: Record<string, unknown>,\n' +
+    '  fallback: string,\n' +
+    '): Promise<T> {\n' +
+    '  if (!supabase)\n' +
+    '    throw operationsError(\n' +
+    '      null,\n' +
+    '      "Supabase is not configured for order operations.",\n' +
+    '    );\n' +
+    '  const { data, error } = await supabase.rpc(fn, args);\n' +
+    '  if (error) throw operationsError(error, fallback);\n' +
+    '  if (Array.isArray(data)) {\n' +
+    '    if (!data[0]) throw operationsError(null, fallback);\n' +
+    '    return data[0] as T;\n' +
+    '  }\n' +
+    '  if (!data) throw operationsError(null, fallback);\n' +
+    '  return data as T;\n' +
+    '}\n' +
+    '\n' +
+    'export function getOpsOrderReference(order: Order) {\n' +
+    '  return clean(\n' +
+    '    order.id ||\n' +
+    '      order.tracking_number ||\n' +
+    '      order.invoice_number ||\n' +
+    '      order.coupon_number,\n' +
+    '  );\n' +
+    '}\n' +
+    '\n' +
+    'function normalizeInitialOrderStatus(status: unknown) {\n' +
+    '  const normalized = clean(status)\n' +
+    '    .toLowerCase()\n' +
+    '    .replace(/[\\s-]+/g, "_");\n' +
+    '  if (\n' +
+    '    [\n' +
+    '      "pending",\n' +
+    '      "confirmed",\n' +
+    '      "assigned",\n' +
+    '      "picked_up",\n' +
+    '      "in_transit",\n' +
+    '      "delivered",\n' +
+    '      "cancelled",\n' +
+    '      "returned",\n' +
+    '    ].includes(normalized)\n' +
+    '  ) {\n' +
+    '    return normalized;\n' +
+    '  }\n' +
+    '  return "pending";\n' +
+    '}\n' +
+    '\n' +
+    'function normalizedPaymentMethod(value: unknown) {\n' +
+    '  const normalized = clean(value || "merchant_pays").toLowerCase();\n' +
+    '  if (normalized === "merchant_pays") return "sender_pays";\n' +
+    '  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) {\n' +
+    '    return normalized;\n' +
+    '  }\n' +
+    '  return "sender_pays";\n' +
+    '}\n' +
+    '\n' +
+    'export async function fetchOpsMerchants(): Promise<Merchant[]> {\n' +
+    '  if (!supabase)\n' +
+    '    throw operationsError(\n' +
+    '      null,\n' +
+    '      "Supabase is not configured for merchant operations.",\n' +
+    '    );\n' +
+    '  const { data, error } = await supabase\n' +
+    '    .from("merchants")\n' +
+    '    .select("*")\n' +
+    '    .order("created_at", { ascending: false });\n' +
+    '  if (error)\n' +
+    '    throw operationsError(\n' +
+    '      error,\n' +
+    '      "Merchants table is not ready. Apply the admin operations migration.",\n' +
+    '    );\n' +
+    '  return (data || []) as Merchant[];\n' +
+    '}\n' +
+    '\n' +
+    'export async function fetchOpsOrders(limit = 1000): Promise<Order[]> {\n' +
+    '  if (!supabase)\n' +
+    '    throw operationsError(\n' +
+    '      null,\n' +
+    '      "Supabase is not configured for order operations.",\n' +
+    '    );\n' +
+    '  const { data, error } = await supabase\n' +
+    '    .from("orders")\n' +
+    '    .select("*")\n' +
+    '    .order("created_at", { ascending: false })\n' +
+    '    .limit(limit);\n' +
+    '  if (error)\n' +
+    '    throw operationsError(\n' +
+    '      error,\n' +
+    '      "Orders table is not ready. Apply the admin operations migration.",\n' +
+    '    );\n' +
+    '  return (data || []) as Order[];\n' +
+    '}\n' +
+    '\n' +
+    'export async function fetchOpsSnapshot(): Promise<OpsSnapshot> {\n' +
+    '  const [merchants, orders] = await Promise.all([\n' +
+    '    fetchOpsMerchants(),\n' +
+    '    fetchOpsOrders(),\n' +
+    '  ]);\n' +
+    '  return { merchants, orders, source: "db" };\n' +
+    '}\n' +
+    '\n' +
+    'export async function createOpsMerchant(\n' +
+    '  input: OpsMerchantInput,\n' +
+    '): Promise<OpsCreateResult<Merchant>> {\n' +
+    '  if (!supabase)\n' +
+    '    throw operationsError(\n' +
+    '      null,\n' +
+    '      "Supabase is not configured for merchant operations.",\n' +
+    '    );\n' +
+    '  const now = new Date().toISOString();\n' +
+    '  const emirate = clean(input.emirate || "Abu Dhabi");\n' +
+    '  const area = clean(input.area || input.city || emirate);\n' +
+    '  const address = composeLocationAddress([\n' +
+    '    area,\n' +
+    '    input.street_details,\n' +
+    '    input.address,\n' +
+    '  ]);\n' +
+    '  const pickupAddress = composeLocationAddress([\n' +
+    '    area,\n' +
+    '    input.street_details,\n' +
+    '    input.pickup_address || input.address,\n' +
+    '  ]);\n' +
+    '  const payload = removeEmptyUndefined({\n' +
+    '    merchant_code: merchantCode(input.trade_name),\n' +
+    '    trade_name: clean(input.trade_name),\n' +
+    '    owner_name: clean(input.owner_name),\n' +
+    '    phone: clean(input.phone),\n' +
+    '    alt_phone: clean(input.alt_phone),\n' +
+    '    email: clean(input.email).toLowerCase(),\n' +
+    '    emirate,\n' +
+    '    city: area,\n' +
+    '    address,\n' +
+    '    pickup_address: pickupAddress || address,\n' +
+    '    license_number: clean(input.license_number),\n' +
+    '    trn: clean(input.trn || input.tax_number),\n' +
+    '    tax_number: clean(input.tax_number || input.trn),\n' +
+    '    logo_url: clean(input.logo_url),\n' +
+    '    bank_name: clean(input.bank_name),\n' +
+    '    iban: clean(input.iban),\n' +
+    '    settlement_cycle: clean(input.settlement_cycle || "weekly"),\n' +
+    '    commission_type: clean(\n' +
+    '      input.commission_type || "fixed_delivery_fee",\n' +
+    '    ),\n' +
+    '    default_payment_method: clean(\n' +
+    '      input.default_payment_method || "merchant_pays",\n' +
+    '    ),\n' +
+    '    notes: clean(input.notes),\n' +
+    '    status: clean(input.status || "active"),\n' +
+    '    created_at: now,\n' +
+    '    updated_at: now,\n' +
+    '  });\n' +
+    '\n' +
+    '  const rpcMerchant = await rpcOne<Merchant>("admin_create_merchant", {\n' +
+    '    p_merchant: payload,\n' +
+    '  });\n' +
+    '  if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };\n' +
+    '\n' +
+    '  const { data, error } = await supabase\n' +
+    '    .from("merchants")\n' +
+    '    .insert(payload)\n' +
+    '    .select("*")\n' +
+    '    .single();\n' +
+    '  if (error)\n' +
+    '    throw operationsError(\n' +
+    '      error,\n' +
+    '      "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.",\n' +
+    '    );\n' +
+    '  return { row: data as Merch'... 14011 more characters,
+  expected: /admin_create_canonical_merchant_order/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v22.23.1
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.
