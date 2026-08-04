@@ -1,0 +1,65 @@
+name: Admin Order History Schema Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/admin-order-history-schema-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Dump and publish the production history-table contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          work="$RUNNER_TEMP/daynight-history-schema"
+          mkdir -p "$work/supabase"
+          cp supabase/config.toml "$work/supabase/config.toml"
+          supabase --workdir "$work" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$work" db dump --linked --schema public -f /tmp/public-schema.sql
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('/tmp/public-schema.sql').read_text(encoding='utf-8', errors='replace')
+          needles = ['CREATE TABLE IF NOT EXISTS "public"."order_status_history"', 'CREATE TABLE "public"."order_status_history"']
+          start = next((text.find(n) for n in needles if text.find(n) >= 0), -1)
+          if start < 0:
+              raise SystemExit('order_status_history_create_table_not_found')
+          end = text.find(';', start)
+          block = text[start:end + 1]
+          related = [line for line in text.splitlines() if 'order_status_history' in line and ('CONSTRAINT' in line or 'ALTER TABLE' in line or 'CREATE INDEX' in line)]
+          output = block + '\n' + '\n'.join(related[:80])
+          Path('/tmp/order-status-history-schema.txt').write_text(output, encoding='utf-8')
+          PY
+          body=$(cat <<EOF
+          ### 🔎 Production `order_status_history` schema
+
+          \`\`\`sql
+          $(cat /tmp/order-status-history-schema.txt)
+          \`\`\`
+
+          Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          )
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="$body"
