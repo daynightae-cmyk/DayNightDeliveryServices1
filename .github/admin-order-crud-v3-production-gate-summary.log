@@ -1,173 +1,11 @@
 === PRODUCTION GATE FAILURE SUMMARY ===
 13:PASS destination location formatter (16 assertions)
-1670:FAIL personal runtime does not require sender phone
-1689: ELIFECYCLE  Command failed with exit code 1.
-1690: ELIFECYCLE  Command failed with exit code 1.
+1834:International tracking visual gate passed (76 assertions).
+1842:  if (!pattern.test(source)) throw new Error(`FAIL ${label}`);
+1845:Error: FAIL every edited order requires a coupon
+1853: ELIFECYCLE  Command failed with exit code 1.
+1854: ELIFECYCLE  Command failed with exit code 1.
 === PRODUCTION GATE LOG TAIL ===
-CREATE INDEX
-CREATE FUNCTION
-DROP TRIGGER
-CREATE TRIGGER
-DROP TRIGGER
-CREATE TRIGGER
-DROP TRIGGER
-CREATE TRIGGER
-DROP TRIGGER
-CREATE TRIGGER
-INSERT 0 38
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-INSERT 0 1
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-DROP POLICY
-CREATE POLICY
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-GRANT
-DO
-COMMIT
-Applying supabase/migrations/20260723140500_customer_experience_runtime_health.sql
-BEGIN
-CREATE FUNCTION
-REVOKE
-GRANT
-CREATE FUNCTION
-REVOKE
-GRANT
- pg_notify 
------------
- 
-(1 row)
-
-COMMIT
-Applying supabase/migrations/20260723141000_customer_experience_privacy_actions.sql
-BEGIN
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-DROP POLICY
-CREATE POLICY
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-GRANT
-GRANT
-GRANT
-GRANT
- pg_notify 
------------
- 
-(1 row)
-
-COMMIT
-Applying supabase/migrations/20260723141500_customer_experience_rls_storage_hardening.sql
-BEGIN
-DROP POLICY
-DROP POLICY
-DROP POLICY
-CREATE POLICY
-REVOKE
-GRANT
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-DROP POLICY
-CREATE POLICY
-CREATE FUNCTION
-REVOKE
-REVOKE
-REVOKE
-REVOKE
-GRANT
-GRANT
-GRANT
-GRANT
- pg_notify 
------------
- 
-(1 row)
-
-COMMIT
-Applying supabase/migrations/20260723142000_customer_experience_pii_hash_hardening.sql
-BEGIN
-ALTER TABLE
-CREATE FUNCTION
-CREATE FUNCTION
-REVOKE
-REVOKE
-GRANT
-GRANT
- pg_notify 
------------
- 
-(1 row)
 
 COMMIT
 Applying supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql
@@ -333,7 +171,7 @@ PASS personal financial display never creates merchant due
 PASS personal order runtime fixes fee at 25
 PASS personal order has no merchant linkage
 PASS Admin personal-order runtime does not reject a missing coupon
-FAIL personal runtime does not require sender phone
+PASS personal runtime does not require sender phone
 PASS personal coupon is stored when supplied and remains nullable otherwise
 PASS personal order uses canonical Admin create v3 service
 PASS personal order has no direct insert fallback
@@ -352,5 +190,169 @@ PASS database creation RPC does not require sender phone
 PASS runtime health marks sender phone optional
 PASS global coupon trigger still protects ordinary non-v3 personal creation
 PASS new personal-order coupons remain globally duplicate protected
+DAY NIGHT personal orders and admin controls gate PASSED
+PASS src/config/bankTransfer.ts
+PASS src/components/BankTransferCenter.tsx
+PASS src/components/tracking/CustomerPaymentActions.tsx
+PASS src/components/Tracking.tsx
+PASS src/services/driverActionMessageService.ts
+PASS src/components/driver/DriverCustomerCommunication.tsx
+PASS src/components/NotFound.tsx
+PASS src/components/Footer.tsx
+PASS vercel.json
+PASS ADIB account contract is present
+PASS ADCB account contract is present
+PASS unified customer payment link builder exists
+PASS cash confirmation WhatsApp link exists
+PASS transfer receipt WhatsApp link exists
+PASS on-the-way has an independent message
+PASS request-location has an independent message
+PASS arrived has an independent message
+PASS unreachable has an independent message
+PASS delivered-feedback has an independent message
+PASS deterministic driver message runtime exists
+PASS every driver message receives the customer payment options link
+PASS driver messages explicitly offer both payment methods
+PASS driver UI bypasses stale shared template bodies
+PASS driver can select cash or online payment
+PASS driver can select either company bank account
+PASS all message actions remain available
+PASS customer can choose cash on delivery
+PASS customer can choose online payment
+PASS customer can choose ADIB or ADCB
+PASS customer cash choice has a ready confirmation message
+PASS customer online choice opens the secure payment center
+PASS tracking page permanently mounts customer payment actions
+PASS tracking uses the recorded order amount
+PASS public premium payment center is present
+PASS payment center exposes cash and online buttons
+PASS IBAN copy action is present
+PASS receipt sharing action is present
+PASS cash confirmation action is present
+PASS payment center states the secure handoff boundary
+PASS payment route resolves to the payment center
+PASS bank-transfer alias resolves
+PASS payment center is linked site-wide
+PASS footer points to the live payment route
+PASS CSP allows the official ADIB logo
+PASS CSP allows the official ADCB logo
+DAY NIGHT driver messages and customer payment gate PASSED
+
+--- DAY NIGHT real driver navigation gate ---
+PASS: src/components/tracking/TrackingMap.tsx
+PASS: src/components/maps/DayNightVehicleMarker.tsx
+PASS: src/services/realDriverNavigationService.ts
+PASS: src/styles/dn-real-driver-navigation.css
+PASS: vercel.json
+PASS: repository vercel.json
+PASS: Null database coordinates are rejected instead of becoming 0,0
+PASS: Road geometry is fetched from a routing engine
+PASS: Routing requests return full road geometry
+PASS: Live GPS can be visually aligned to the road within a bounded threshold
+PASS: Rapid GPS updates coalesce in-flight routing requests
+PASS: Rerouting is throttled to meaningful road movement
+PASS: The active route is rendered in Google-style blue
+PASS: Driver navigation uses the blue directional arrow
+PASS: Routing failures explicitly suppress fake straight lines
+PASS: No direct point-to-point fallback line exists
+PASS: No JSX straight-line route fallback exists
+PASS: The marker system has a dedicated navigation-arrow appearance
+PASS: Navigation arrow is blue with its own SVG geometry
+PASS: Blue arrow rotation and smoothing are styled
+PASS: Phone GPS requests high-accuracy fixes
+PASS: Operations tracking still consumes the authoritative Supabase location RPC
+PASS: Realtime driver location updates remain connected
+PASS: Root production CSP allows UAE address geocoding
+PASS: App production CSP allows UAE address geocoding
+Real driver navigation gate PASSED.
+
+
+--- DAY NIGHT international Aramex tracking gate ---
+PASS: repository supabase/migrations/20260729010000_aramex_17track_international_tracking.sql
+PASS: repository supabase/config.toml
+PASS: repository supabase/functions/track17-webhook/index.ts
+PASS: repository supabase/functions/register-track17-shipment/index.ts
+PASS: repository supabase/functions/sync-track17-shipment/index.ts
+PASS: repository supabase/functions/public-international-tracking/index.ts
+PASS: repository supabase/functions/track17-admin/index.ts
+PASS: repository supabase/functions/_shared/track17-signature.ts
+PASS: repository supabase/functions/_shared/track17-client.ts
+PASS: src/components/InternationalTrackingPage.tsx
+PASS: src/components/admin/AdminInternationalOrdersWorkspace.tsx
+PASS: src/components/admin/AdminInternationalOrderTrackingActions.tsx
+PASS: src/components/merchant/MerchantInternationalTrackingLauncher.tsx
+PASS: src/components/InternationalTrackingEntryLauncher.tsx
+PASS: src/main.tsx
+PASS: src/components/admin/AdminSectionWorkspace.tsx
+PASS: src/lib/internationalTrackingApi.ts
+PASS: src/styles/dn-international-tracking.css
+PASS: External webhook bypasses Supabase JWT only at gateway level
+PASS: Public tracking endpoint is callable without a user session
+PASS: Functions are pinned to the approved DAY NIGHT Supabase project
+PASS: Webhook signature uses raw body slash API key contract
+PASS: Webhook signature uses SHA-256
+PASS: Webhook signature comparison is constant-time
+PASS: Webhook preserves raw request body before JSON parsing
+PASS: Webhook reads the official sign header
+PASS: Webhook acknowledges successful and ignored callbacks with HTTP 200
+PASS: Webhook handles tracking stopped events
+PASS: Webhook persists normalized shipment events
+PASS: Registration explicitly selects Aramex
+PASS: Manual synchronization is protected by a cooldown
+PASS: 17TRACK token is sent only by the server client
+PASS: Public endpoint reads the safe database RPC instead of polling 17TRACK
+PASS: Public tracking endpoint has rate limiting
+PASS: Admin integration exposes quota monitoring
+PASS: International shipment table is migrated
+PASS: International event table is migrated
+PASS: International tracking tables use RLS
+PASS: Official Aramex carrier code is enforced by the database
+PASS: Duplicate provider registrations are blocked by a unique constraint
+PASS: Premium Arabic customer hero is implemented
+PASS: International route is clearly described as checkpoint-based
+PASS: QR scanning has a progressive browser implementation
+PASS: Customer can export a tracking summary PDF
+PASS: Customer sharing is implemented
+PASS: Customer data automatically refreshes from Supabase without carrier polling
+PASS: Admin can register Aramex AWBs from each international order
+PASS: Admin can prepare a customer WhatsApp tracking message
+PASS: Admin can prepare a merchant WhatsApp tracking message
+PASS: Admin can export one international order as PDF
+PASS: Admin can export all international orders as PDF
+PASS: Native international orders workspace reads registered shipments
+PASS: International Orders opens the native order workspace
+PASS: Merchant view uses the public-safe tracking payload
+PASS: Public pages link to the dedicated international tracking center
+PASS: Dedicated international tracking route is mounted
+PASS: Legacy floating admin tracking launchers are removed
+PASS: Merchant tracking viewer is mounted
+PASS: Tracking page has dedicated phone layout
+PASS: Tracking result has print layout
+PASS: Frontend uses a Supabase Edge Function for public tracking
+PASS: Frontend never reads or injects the server secret
+PASS: Frontend source never sends the 17TRACK authentication header
+PASS: Frontend never calls 17TRACK directly
+PASS: Customer tracking never redirects to a carrier website
+International Aramex tracking gate PASSED.
+
+International tracking visual gate passed (76 assertions).
+P1 PRODUCTION HARDENING GATE: PASS
+PASS Kuwait has a full Arabic label
+PASS Saudi Arabia has a professional Arabic label
+PASS country values are canonicalized
+PASS edit modal uses localized country selector
+PASS edit modal does not expose a raw country-code text input
+file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:7
+  if (!pattern.test(source)) throw new Error(`FAIL ${label}`);
+                                   ^
+
+Error: FAIL every edited order requires a coupon
+    at expect (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:7:36)
+    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:29:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.23.1
  ELIFECYCLE  Command failed with exit code 1.
  ELIFECYCLE  Command failed with exit code 1.
