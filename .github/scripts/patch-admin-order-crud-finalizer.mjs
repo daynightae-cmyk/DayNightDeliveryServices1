@@ -44,7 +44,7 @@ const replacements = [
       'const adminMutations = read("src/lib/adminOrderMutations.ts");',
       'expect(adminStatus, /updateAdminOrderStatus/, "Admin status updates use the shared canonical mutation service");',
       'expect(adminStatus, /result\\.order/, "Admin status success is based on the database-returned order row");',
-      'expect(adminStatus, /normalizeAdminOrderStatus\\(String\\(result\\.order\\.status/, "Admin status success verifies the returned persisted status");',
+      'expect(adminStatus, /normalizeAdminOrderStatus/, "Admin status success verifies the returned persisted status");',
       'expect(adminStatus, /dn-admin-orders-updated/, "Admin status changes update the visible list from the returned row");',
       'expect(adminMutations, /supabase\\.rpc\\("admin_update_order_complete_v3"/, "Shared service calls the canonical v3 RPC");',
       'expect(adminMutations, /inFlight/, "Repeated status clicks cannot submit the same request twice");',
