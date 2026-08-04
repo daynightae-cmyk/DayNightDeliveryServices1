@@ -24,7 +24,11 @@ assert(!edit.includes('data-admin-complete-order-confirm="true"'), "manual confi
 assert(deleteData.includes("INTERNAL_DELETE_REASON"), "internal delete audit reason is missing");
 assert(deleteData.includes('import { softDeleteAdminOrder }'), "canonical soft-delete service is not imported");
 assert(deleteData.includes("await softDeleteAdminOrder(orderId"), "normal Admin deletion does not use the canonical soft-delete operation");
-assert(deleteData.includes("result.order.is_deleted") && deleteData.includes("result.order.deleted_at"), "soft-delete database readback is not verified");
+assert(
+  (deleteData.includes("result.order.is_deleted") && deleteData.includes("result.order.deleted_at")) ||
+    (deleteData.includes("saved.is_deleted") && deleteData.includes("saved.deleted_at")),
+  "soft-delete database readback is not verified",
+);
 assert(deleteData.includes('operation: "soft_delete"'), "soft-delete mutation event is not emitted");
 assert(!deleteData.includes("admin_delete_order_flexible_v2"), "legacy v2 delete RPC remains in the active client");
 assert(!/\.from\(["']orders["']\)[\s\S]*\.delete\(/.test(deleteData), "direct destructive table deletion remains");
