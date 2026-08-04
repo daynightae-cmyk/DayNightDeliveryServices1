@@ -122,7 +122,7 @@ async function invokeMutation(
   const existing = inFlight.get(submissionKey);
   if (existing) return existing;
 
-  const promise = (async () => {
+  const promise: Promise<AdminOrderMutationResult> = (async (): Promise<AdminOrderMutationResult> => {
     const payload = {
       order_id: normalizedOrderId,
       operation,
@@ -155,7 +155,7 @@ async function invokeMutation(
         ? envelope.changed_fields.map(clean).filter(Boolean)
         : [],
       replayed: Boolean(envelope.replayed),
-      source: "rpc" as const,
+      source: "rpc",
     };
   })();
 
