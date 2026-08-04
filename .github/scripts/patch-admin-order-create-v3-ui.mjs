@@ -45,4 +45,41 @@ const couponReplacement =
 content = content.slice(0, lineStart) + couponReplacement + content.slice(lineEnd);
 
 fs.writeFileSync(file, content);
-console.log("Scoped create assertions and personal coupon input-tag verification.");
+
+const financialPath = "artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts";
+let financial = fs.readFileSync(financialPath, "utf8");
+const merchantTarget = `  const merchant = input.merchant || null;
+  const financials = calculateFinancialOpsOrder(input);`;
+const merchantReplacement = `  const merchant = input.merchant || null;
+
+  const existingConflict = await findCouponConflict(input.coupon_number);
+  if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
+
+  const financials = calculateFinancialOpsOrder(input);`;
+if (!financial.includes(merchantTarget)) {
+  throw new Error("create_v3_financial_coupon_preflight_target_missing");
+}
+financial = financial.replace(merchantTarget, merchantReplacement);
+
+const createTarget = `  const result = await createAdminOrder(payload, {
+    sourcePage: "admin_new_order_complete",
+    reason: "Admin financially complete order creation",
+  });`;
+const createReplacement = `  let result;
+  try {
+    result = await createAdminOrder(payload, {
+      sourcePage: "admin_new_order_complete",
+      reason: "Admin financially complete order creation",
+    });
+  } catch (error) {
+    const conflict = await recoverCouponConflict(input.coupon_number);
+    if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
+    throw error;
+  }`;
+if (!financial.includes(createTarget)) {
+  throw new Error("create_v3_financial_coupon_recovery_target_missing");
+}
+financial = financial.replace(createTarget, createReplacement);
+fs.writeFileSync(financialPath, financial);
+
+console.log("Scoped create assertions, personal coupon input verification, and preserved authoritative coupon preflight/recovery.");
