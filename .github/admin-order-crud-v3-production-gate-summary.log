@@ -1,60 +1,9 @@
-exit_status=1
-=== FAILURE LINES ===
+=== PRODUCTION GATE FAILURE SUMMARY ===
 13:AssertionError [ERR_ASSERTION]: The input did not match the regular expression /admin_create_canonical_merchant_order/. Input:
 393:  code: 'ERR_ASSERTION',
 772: ELIFECYCLE  Command failed with exit code 1.
 773: ELIFECYCLE  Command failed with exit code 1.
-=== LOG TAIL ===
-  '  if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };\n' +
-  '\n' +
-  '  const { data, error } = await supabase\n' +
-  '    .from("merchants")\n' +
-  '    .insert(payload)\n' +
-  '    .select("*")\n' +
-  '    .single();\n' +
-  '  if (error)\n' +
-  '    throw operationsError(\n' +
-  '      error,\n' +
-  '      "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.",\n' +
-  '    );\n' +
-  '  return { row: data as Merch'... 14011 more characters
-
-    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs:71:10
-    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
-    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: 'import { supabase } from "../supabase";\n' +
-    'import type { Merchant, Order } from "../types";\n' +
-    'import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";\n' +
-    'import { createDayNightInvoiceNumber } from "./printableDocuments";\n' +
-    'import { currentUiIsArabic, friendlyDatabaseErrorMessage } from "./friendlyErrorMessage";\n' +
-    'import { createAdminOrder, type AdminOrderWarning } from "./adminOrderMutations";\n' +
-    'import {\n' +
-    '  resolveCanonicalMerchantForOrder,\n' +
-    '  verifySavedOrderMerchant,\n' +
-    '} from "./orderMerchantResolver";\n' +
-    '\n' +
-    'export type OpsDataSource = "rpc" | "db";\n' +
-    'export type OpsPriceMode = "system" | "manual";\n' +
-    '\n' +
-    'export type OpsMerchantInput = {\n' +
-    '  trade_name: string;\n' +
-    '  owner_name?: string;\n' +
-    '  phone: string;\n' +
-    '  alt_phone?: string;\n' +
-    '  email?: string;\n' +
-    '  emirate?: string;\n' +
-    '  city?: string;\n' +
-    '  area?: string;\n' +
-    '  street_details?: string;\n' +
-    '  address?: string;\n' +
-    '  pickup_address?: string;\n' +
-    '  license_number?: string;\n' +
-    '  trn?: string;\n' +
-    '  tax_number?: string;\n' +
-    '  logo_url?: string;\n' +
+=== PRODUCTION GATE LOG TAIL ===
     '  bank_name?: string;\n' +
     '  iban?: string;\n' +
     '  settlement_cycle?: string;\n' +
