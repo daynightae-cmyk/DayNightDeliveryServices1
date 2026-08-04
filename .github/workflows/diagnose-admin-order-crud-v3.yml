@@ -23,6 +23,7 @@ on:
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
+      - "supabase/migrations/20260804211500_admin-order-crud-v3-nonblocking.sql"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
       - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
@@ -118,7 +119,24 @@ jobs:
           exit 1
 
       - name: Full production gate
-        run: pnpm run web:gate
+        id: production_gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run web:gate 2>&1 | tee .github/admin-order-crud-v3-production-gate.log
+
+      - name: Preserve focused production-gate diagnostics
+        if: steps.production_gate.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/admin-order-crud-v3-production-gate.log
+          git commit -m "ci(admin): capture CRUD v3 production-gate diagnostics"
+          git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
+          exit 1
 
       - name: Production build
         run: pnpm run web:build
@@ -137,6 +155,7 @@ jobs:
           git rm .github/scripts/patch-admin-order-create-v3-ui.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
           git rm -f .github/admin-order-crud-v3-typecheck.log || true
+          git rm -f .github/admin-order-crud-v3-production-gate.log || true
 
           git add \
             supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql \
