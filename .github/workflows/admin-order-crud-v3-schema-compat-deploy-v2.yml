@@ -1,0 +1,107 @@
+name: Admin Order CRUD v3 Schema Compatibility Deploy v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/admin-order-crud-v3-schema-compat-deploy-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: admin-order-crud-v3-production-verification
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Build corrected release migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source='supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql';
+          let sql=fs.readFileSync(source,'utf8');
+          const specs=[
+            ['trg_orders_canonical_merchant_link','dn_enforce_canonical_order_merchant_link'],
+            ['trg_admin_enforce_order_coupon_policy','admin_enforce_order_coupon_policy'],
+            ['trg_daynight_normalize_financial_order','daynight_normalize_financial_order'],
+            ['dn_guard_admin_order_required_fields','dn_guard_admin_order_required_fields'],
+            ['trg_daynight_post_delivered_financials','daynight_post_delivered_financials'],
+            ['trg_dn_project_delivered_order_dependencies','dn_project_delivered_order_dependencies'],
+            ['merchant_order_notification_sync','merchant_order_notification_trigger'],
+            ['trg_portal_notify_order_lifecycle','portal_notify_order_lifecycle'],
+          ];
+          for(let i=0;i<specs.length;i+=1){
+            const [trigger,fn]=specs[i];
+            const pattern=new RegExp(`drop trigger if exists ${trigger} on public\\.orders;\\n(create trigger ${trigger}\\n[\\s\\S]*?execute function public\\.${fn}\\(\\);)`);
+            const match=sql.match(pattern);
+            if(!match)throw new Error(`trigger_block_missing_${trigger}`);
+            sql=sql.replace(pattern,()=>`do $dn_trigger_${i}$\nbegin\n  if to_regprocedure('public.${fn}()') is not null then\n    execute 'drop trigger if exists ${trigger} on public.orders';\n    execute $dn_ddl_${i}$\n${match[1]}\n$dn_ddl_${i}$;\n  end if;\nend;\n$dn_trigger_${i}$;`);
+          }
+          const wrapper=/create or replace function public\.admin_update_order_status\(\n  p_order_id text,[\s\S]*?\n\$\$;\n\ncreate or replace function public\.admin_soft_delete_order_v3/;
+          if(!wrapper.test(sql))throw new Error('legacy_status_wrapper_block_missing');
+          sql=sql.replace(wrapper,()=>`-- Preserve the existing production legacy status signature.\ncreate or replace function public.admin_soft_delete_order_v3`);
+          const badStart="set search_path = public, auth, extensions, pg_temp\nas $\ndeclare\n  v_actor uuid := auth.uid();";
+          const goodStart="set search_path = public, auth, extensions, pg_temp\nas $$\ndeclare\n  v_actor uuid := auth.uid();";
+          if(!sql.includes(badStart))throw new Error('create_rpc_opening_delimiter_missing');
+          sql=sql.replace(badStart,()=>goodStart);
+          const badEnd="\nend;\n$;\n\nrevoke all on function public.admin_create_order_v3(jsonb)";
+          const goodEnd="\nend;\n$$;\n\nrevoke all on function public.admin_create_order_v3(jsonb)";
+          if(!sql.includes(badEnd))throw new Error('create_rpc_closing_delimiter_missing');
+          sql=sql.replace(badEnd,()=>goodEnd);
+          if(!sql.includes('as $$\ndeclare\n  v_actor uuid := auth.uid();'))throw new Error('corrected_opening_delimiter_not_written');
+          if(!sql.includes('\nend;\n$$;\n\nrevoke all on function public.admin_create_order_v3'))throw new Error('corrected_closing_delimiter_not_written');
+          fs.writeFileSync('/tmp/20260804211500_admin_order_crud_v3_nonblocking.sql',sql);
+          NODE
+
+      - name: Apply corrected migration to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          target="20260804211500_admin_order_crud_v3_nonblocking.sql"
+          release_dir="$RUNNER_TEMP/daynight-admin-order-crud-v3-schema-compat-v2"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
+            cp "/tmp/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+          supabase --workdir "$release_dir" migration list --linked | grep -F "20260804211500"
+
+      - name: Publish successful schema deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="### ✅ Admin Order CRUD v3 schema deployed\n\nMigration \`20260804211500\` is recorded on production. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      - name: Publish schema deployment failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="### ❌ Admin Order CRUD v3 schema deployment v2 failed\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
