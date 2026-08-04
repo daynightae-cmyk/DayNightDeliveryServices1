@@ -9,6 +9,7 @@ on:
       - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
       - ".github/scripts/finalize-admin-order-create-v3.mjs"
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
+      - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
@@ -20,6 +21,7 @@ on:
       - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
       - ".github/scripts/finalize-admin-order-create-v3.mjs"
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
+      - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
@@ -52,6 +54,9 @@ jobs:
 
       - name: Apply canonical create CRUD v3 backend
         run: node .github/scripts/finalize-admin-order-create-v3.mjs
+
+      - name: Patch canonical create UI finalizer
+        run: node .github/scripts/patch-admin-order-create-v3-ui.mjs
 
       - name: Apply canonical create CRUD v3 UI and gates
         run: node .github/scripts/finalize-admin-order-create-v3-ui.mjs
@@ -112,6 +117,7 @@ jobs:
           git rm .github/scripts/patch-admin-order-crud-finalizer.mjs
           git rm .github/scripts/finalize-admin-order-create-v3.mjs
           git rm .github/scripts/finalize-admin-order-create-v3-ui.mjs
+          git rm .github/scripts/patch-admin-order-create-v3-ui.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
 
           git add \
