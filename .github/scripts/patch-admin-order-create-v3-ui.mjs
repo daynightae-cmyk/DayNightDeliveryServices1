@@ -33,10 +33,16 @@ assert(!flexibleValidateSegment.includes("!selectedMerchant"), "flexible create 
 if (!content.includes(from)) throw new Error("create_v3_gate_scope_target_missing");
 content = content.replace(from, to);
 
-const couponFrom = 'assert(personalForm.includes(\\"اختياري ويمكن مراجعته لاحقًا\\") && !/data-admin-personal-coupon=\\"true\\"[\\\\s\\\\S]{0,180}required/.test(personalForm), \\"personal form coupon remains required\\");';
-const couponTo = 'const personalCouponInput = personalForm.match(/<input[^>]*data-admin-personal-coupon=\\"true\\"[^>]*>/)?.[0] || \\"\\";\nassert(personalForm.includes(\\"اختياري ويمكن مراجعته لاحقًا\\") && personalCouponInput && !/\\\\brequired\\\\b|aria-required/.test(personalCouponInput), \\"personal form coupon remains required\\");';
-if (!content.includes(couponFrom)) throw new Error("create_v3_personal_coupon_gate_target_missing");
-content = content.replace(couponFrom, couponTo);
+const couponMarker = "personal form coupon remains required";
+const markerIndex = content.indexOf(couponMarker);
+if (markerIndex < 0) throw new Error("create_v3_personal_coupon_gate_marker_missing");
+const lineStart = content.lastIndexOf("\n", markerIndex) + 1;
+const nextNewline = content.indexOf("\n", markerIndex);
+const lineEnd = nextNewline < 0 ? content.length : nextNewline;
+const couponReplacement =
+  'const personalCouponInput = personalForm.match(/<input[^>]*data-admin-personal-coupon=\\"true\\"[^>]*>/)?.[0] || \\"\\";\n' +
+  'assert(personalForm.includes(\\"اختياري ويمكن مراجعته لاحقًا\\") && personalCouponInput && !/\\\\brequired\\\\b|aria-required/.test(personalCouponInput), \\"personal form coupon remains required\\");';
+content = content.slice(0, lineStart) + couponReplacement + content.slice(lineEnd);
 
 fs.writeFileSync(file, content);
 console.log("Scoped create assertions and personal coupon input-tag verification.");
