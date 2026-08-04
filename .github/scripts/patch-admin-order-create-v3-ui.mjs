@@ -1,6 +1,7 @@
 import fs from "node:fs";
 const file = ".github/scripts/finalize-admin-order-create-v3-ui.mjs";
 let content = fs.readFileSync(file, "utf8");
+
 const from = `assert(adminData.includes("createAdminOrder(payload") && !/createOpsOrder[\\\\s\\\\S]*admin_create_canonical_merchant_order/.test(adminData), "flexible create still uses restrictive merchant RPC");
 assert(financial.includes("createAdminOrder(payload") && !/createFinancialOpsOrder[\\\\s\\\\S]*resolveCanonicalMerchantForOrder/.test(financial), "financial create still requires portal-linked merchant");
 assert(personal.includes("createAdminOrder(payload") && !personal.includes("coupon_number_required_for_personal_order"), "personal create remains coupon-blocked");
@@ -31,5 +32,11 @@ assert(!completeValidateSegment.toLowerCase().includes("coupon number"), "comple
 assert(!flexibleValidateSegment.includes("!selectedMerchant"), "flexible create still blocks missing merchant");`;
 if (!content.includes(from)) throw new Error("create_v3_gate_scope_target_missing");
 content = content.replace(from, to);
+
+const couponFrom = 'assert(personalForm.includes(\\"اختياري ويمكن مراجعته لاحقًا\\") && !/data-admin-personal-coupon=\\"true\\"[\\\\s\\\\S]{0,180}required/.test(personalForm), \\"personal form coupon remains required\\");';
+const couponTo = 'const personalCouponInput = personalForm.match(/<input[^>]*data-admin-personal-coupon=\\"true\\"[^>]*>/)?.[0] || \\"\\";\nassert(personalForm.includes(\\"اختياري ويمكن مراجعته لاحقًا\\") && personalCouponInput && !/\\\\brequired\\\\b|aria-required/.test(personalCouponInput), \\"personal form coupon remains required\\");';
+if (!content.includes(couponFrom)) throw new Error("create_v3_personal_coupon_gate_target_missing");
+content = content.replace(couponFrom, couponTo);
+
 fs.writeFileSync(file, content);
-console.log("Scoped canonical create gate assertions to create and validation functions.");
+console.log("Scoped create assertions and personal coupon input-tag verification.");
