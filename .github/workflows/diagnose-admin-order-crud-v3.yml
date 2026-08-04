@@ -10,6 +10,7 @@ on:
       - ".github/scripts/finalize-admin-order-create-v3.mjs"
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
+      - ".github/scripts/patch-admin-order-v3-localization-gate.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs"
@@ -23,6 +24,7 @@ on:
       - ".github/scripts/finalize-admin-order-create-v3.mjs"
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
+      - ".github/scripts/patch-admin-order-v3-localization-gate.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs"
@@ -62,6 +64,9 @@ jobs:
 
       - name: Apply canonical create CRUD v3 UI and gates
         run: node .github/scripts/finalize-admin-order-create-v3-ui.mjs
+
+      - name: Patch localization gate for canonical v3 warnings
+        run: node .github/scripts/patch-admin-order-v3-localization-gate.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -178,6 +183,7 @@ jobs:
           git rm .github/scripts/finalize-admin-order-create-v3.mjs
           git rm .github/scripts/finalize-admin-order-create-v3-ui.mjs
           git rm .github/scripts/patch-admin-order-create-v3-ui.mjs
+          git rm .github/scripts/patch-admin-order-v3-localization-gate.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
           git rm -f .github/admin-order-crud-v3-typecheck-summary.log || true
           git rm -f .github/admin-order-crud-v3-production-gate-summary.log || true
