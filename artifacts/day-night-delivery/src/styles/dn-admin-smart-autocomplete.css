@@ -1,0 +1,93 @@
+.dn-admin-smart-suggestion-menu {
+  position: fixed;
+  z-index: 2147483000;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(5, 24, 47, 0.985), rgba(3, 15, 31, 0.995));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255, 255, 255, 0.035) inset;
+  color: #fff;
+  backdrop-filter: blur(18px);
+}
+
+.dn-admin-smart-suggestion-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dn-admin-smart-suggestion-head span {
+  color: #f6d774;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.dn-admin-smart-suggestion-head small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dn-admin-smart-suggestion-results {
+  max-height: min(360px, 46vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+.dn-admin-smart-suggestion-results button {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 9px 11px;
+  color: rgba(255, 255, 255, 0.88);
+  text-align: start;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.dn-admin-smart-suggestion-results button:hover,
+.dn-admin-smart-suggestion-results button:focus-visible,
+.dn-admin-smart-suggestion-results button.is-selected {
+  outline: none;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(212, 175, 55, 0.12));
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.dn-admin-smart-suggestion-results button.is-selected {
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.28) inset;
+}
+
+@media (max-width: 640px) {
+  .dn-admin-smart-suggestion-menu {
+    border-radius: 15px;
+  }
+
+  .dn-admin-smart-suggestion-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .dn-admin-smart-suggestion-results {
+    max-height: min(310px, 42vh);
+  }
+
+  .dn-admin-smart-suggestion-results button {
+    min-height: 46px;
+    font-size: 14px;
+  }
+}
