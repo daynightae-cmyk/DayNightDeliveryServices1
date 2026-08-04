@@ -2,7 +2,11 @@ import type { Order } from "../types";
 import { normalizeInternationalDestination } from "../data/internationalDestinations";
 import { isPersonalAdminOrder } from "./adminOrderLogic";
 import { PERSONAL_ORDER_DELIVERY_FEE } from "./personalOrderOperations";
-import type { FinancialOpsOrderUpdateInput } from "./orderFinancialOperations";
+import {
+  EXPLICIT_ZERO_MANUAL_DELIVERY_FEE,
+  hasExplicitZeroManualDelivery,
+  type FinancialOpsOrderUpdateInput,
+} from "./orderFinancialOperations";
 import {
   updateAdminOrder,
   type AdminOrderWarning,
@@ -53,7 +57,12 @@ function buildCanonicalPatch(input: FinancialOpsOrderUpdateInput) {
   const personal = isPersonalAdminOrder(order);
   const merchant = personal ? null : input.merchant || null;
   const paymentMethod = normalizePaymentMethod(input.payment_method || order.payment_method);
-  const mode = personal ? "customer_pays" : deliveryFeeMode(input);
+  const explicitZeroManual = !personal && hasExplicitZeroManualDelivery(input);
+  const mode = personal
+    ? "customer_pays"
+    : explicitZeroManual
+      ? "deduct_from_merchant"
+      : deliveryFeeMode(input);
   const goodsValue = Math.max(0, numberValue(input.goods_value, numberValue(order.goods_value, 0)));
   const discountAmount = Math.max(
     0,
@@ -71,9 +80,11 @@ function buildCanonicalPatch(input: FinancialOpsOrderUpdateInput) {
   );
   const deliveryFee = personal
     ? PERSONAL_ORDER_DELIVERY_FEE
-    : input.price_mode === "manual" && manualValue !== null
-      ? manualValue
-      : savedDelivery;
+    : explicitZeroManual
+      ? EXPLICIT_ZERO_MANUAL_DELIVERY_FEE
+      : input.price_mode === "manual" && manualValue !== null
+        ? manualValue
+        : savedDelivery;
   const customerTotal = Math.max(
     0,
     mode === "deduct_from_merchant"
