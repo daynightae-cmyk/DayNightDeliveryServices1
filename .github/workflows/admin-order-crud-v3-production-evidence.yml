@@ -1,0 +1,252 @@
+name: Admin Order CRUD v3 Production Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/admin-order-crud-v3-production-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: admin-order-crud-v3-production-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-runtime-tests
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+      TARGET_ORDER_ID: bbf1c55c-941c-41c1-857a-54c0c3b897a1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply the exact canonical v3 migration idempotently
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          target="20260804211500_admin_order_crud_v3_nonblocking.sql"
+          release_dir="$RUNNER_TEMP/daynight-admin-order-crud-v3-evidence"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          schema_pending=false
+          if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            schema_pending=true
+          fi
+          supabase --workdir "$release_dir" db push --dry-run
+          if [ "$schema_pending" = "true" ]; then
+            supabase --workdir "$release_dir" db push --yes
+          fi
+          supabase --workdir "$release_dir" migration list --linked | grep -F "20260804211500"
+
+      - name: Verify fresh-session persistence, timeline, audit, and restoration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const root = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const anon = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const service = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+          const email = String(process.env.RUNTIME_ADMIN_EMAIL || '').trim().toLowerCase();
+          const password = String(process.env.RUNTIME_ADMIN_PASSWORD || '');
+          const orderId = String(process.env.TARGET_ORDER_ID || '');
+          for (const [name, value] of Object.entries({ root, anon, service, email, password, orderId })) {
+            if (!value) throw new Error(`missing_protected_value_${name}`);
+          }
+          const projectRef = new URL(root).hostname.split('.')[0];
+          if (projectRef !== 'ngdwybpgacauorygoedi') throw new Error(`unexpected_production_project_${projectRef}`);
+
+          const norm = (value) => {
+            const raw = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            const aliases = {
+              waiting: 'pending', order_pending: 'pending', accepted: 'confirmed', approved: 'confirmed',
+              driver_assigned: 'assigned', pickup: 'picked_up', collected: 'picked_up',
+              out_for_delivery: 'in_transit', on_the_way: 'in_transit', complete: 'delivered',
+              completed: 'delivered', return: 'returned', canceled: 'cancelled', failed: 'cancelled'
+            };
+            return aliases[raw] || raw;
+          };
+          const headers = (key, token = key) => ({
+            apikey: key,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache'
+          });
+          async function parse(response, label) {
+            const payload = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(`${label}_${response.status}_${JSON.stringify(payload)}`);
+            return payload;
+          }
+          async function login(label) {
+            return parse(await fetch(`${root}/auth/v1/token?grant_type=password`, {
+              method: 'POST',
+              headers: { apikey: anon, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+              body: JSON.stringify({ email, password }),
+              cache: 'no-store'
+            }), label);
+          }
+          async function readOrder(token, label) {
+            const query = new URLSearchParams({ select: 'id,status,updated_at,status_history', id: `eq.${orderId}`, limit: '1' });
+            const rows = await parse(await fetch(`${root}/rest/v1/orders?${query}`, {
+              headers: headers(anon, token), cache: 'no-store'
+            }), label);
+            if (!Array.isArray(rows) || rows.length !== 1) throw new Error(`${label}_exact_order_missing`);
+            return rows[0];
+          }
+          async function serviceRows(table, filters, label) {
+            const query = new URLSearchParams(filters);
+            return parse(await fetch(`${root}/rest/v1/${table}?${query}`, {
+              headers: headers(service), cache: 'no-store'
+            }), label);
+          }
+          async function mutate(token, payload, label) {
+            const result = await parse(await fetch(`${root}/rest/v1/rpc/admin_update_order_complete_v3`, {
+              method: 'POST', headers: headers(anon, token),
+              body: JSON.stringify({ p_payload: payload }), cache: 'no-store'
+            }), label);
+            if (result?.ok !== true || result?.success !== true || result?.order?.id !== orderId) {
+              throw new Error(`${label}_invalid_response_${JSON.stringify(result)}`);
+            }
+            return result;
+          }
+          async function history(status, reason, label) {
+            const rows = await serviceRows('order_status_history', {
+              select: 'id,order_id,status,note,created_at', order_id: `eq.${orderId}`,
+              status: `eq.${status}`, note: `eq.${reason}`, order: 'created_at.desc', limit: '5'
+            }, label);
+            const row = Array.isArray(rows) ? rows.find((x) => x.order_id === orderId && norm(x.status) === status && x.note === reason) : null;
+            if (!row) throw new Error(`${label}_row_missing`);
+            return row;
+          }
+          async function audit(requestId, oldStatus, newStatus, label) {
+            const rows = await serviceRows('admin_order_mutation_audit_v3', {
+              select: 'id,order_id,operation,request_id,old_status,new_status,changed_fields,created_at',
+              order_id: `eq.${orderId}`, operation: 'eq.status', request_id: `eq.${requestId}`,
+              order: 'created_at.desc', limit: '5'
+            }, label);
+            const row = Array.isArray(rows) ? rows.find((x) => x.order_id === orderId && x.request_id === requestId) : null;
+            if (!row) throw new Error(`${label}_row_missing`);
+            if (norm(row.old_status) !== oldStatus || norm(row.new_status) !== newStatus) throw new Error(`${label}_status_mismatch`);
+            if (!Array.isArray(row.changed_fields) || !row.changed_fields.includes('status')) throw new Error(`${label}_status_not_audited`);
+            return row;
+          }
+
+          const session = await login('admin_login_failed');
+          if (!session?.access_token) throw new Error('admin_session_missing');
+          const before = await readOrder(session.access_token, 'initial_read_failed');
+          const originalStatus = norm(before.status);
+          const temporaryStatus = originalStatus === 'confirmed' ? 'pending' : 'confirmed';
+          const token = `${process.env.GITHUB_SHA || 'manual'}-${Date.now()}`;
+          const forwardRequest = `crud-v3-forward-${token}`;
+          const restoreRequest = `crud-v3-restore-${token}`;
+          const forwardReason = `Production persistence verification ${forwardRequest}`;
+          const restoreReason = `Production status restoration ${restoreRequest}`;
+          let changed = false;
+          let caught = null;
+          let evidence = {};
+
+          try {
+            const forward = await mutate(session.access_token, {
+              order_id: orderId, operation: 'status', status: temporaryStatus,
+              reason: forwardReason, note: forwardReason,
+              source_page: 'github_production_evidence', request_id: forwardRequest
+            }, 'forward_mutation_failed');
+            changed = true;
+            if (norm(forward.order.status) !== temporaryStatus) throw new Error('forward_rpc_readback_mismatch');
+            const freshSession = await login('fresh_session_login_failed');
+            const freshRead = await readOrder(freshSession.access_token, 'fresh_session_read_failed');
+            if (norm(freshRead.status) !== temporaryStatus) throw new Error(`status_not_persisted_after_refresh_${freshRead.status}`);
+            const historyRow = await history(temporaryStatus, forwardReason, 'forward_history');
+            const auditRow = await audit(forwardRequest, originalStatus, temporaryStatus, 'forward_audit');
+            evidence = {
+              order_id: orderId,
+              original_status: originalStatus,
+              verified_status: temporaryStatus,
+              persisted_after_fresh_session: true,
+              order_status_history_id: historyRow.id,
+              admin_order_mutation_audit_v3_id: auditRow.id
+            };
+          } catch (error) {
+            caught = error;
+          } finally {
+            if (changed) {
+              const restoreSession = await login('restore_session_login_failed');
+              const restore = await mutate(restoreSession.access_token, {
+                order_id: orderId, operation: 'status', status: originalStatus,
+                reason: restoreReason, note: restoreReason,
+                source_page: 'github_production_evidence', request_id: restoreRequest
+              }, 'restore_mutation_failed');
+              if (norm(restore.order.status) !== originalStatus) throw new Error('restore_rpc_readback_mismatch');
+              const finalSession = await login('final_session_login_failed');
+              const finalRead = await readOrder(finalSession.access_token, 'final_fresh_session_read_failed');
+              if (norm(finalRead.status) !== originalStatus) throw new Error(`original_status_not_restored_${finalRead.status}`);
+              const restoreHistory = await history(originalStatus, restoreReason, 'restore_history');
+              const restoreAudit = await audit(restoreRequest, temporaryStatus, originalStatus, 'restore_audit');
+              evidence = {
+                ...evidence,
+                restored_after_fresh_session: true,
+                restored_status: originalStatus,
+                restore_history_id: restoreHistory.id,
+                restore_audit_id: restoreAudit.id
+              };
+            }
+          }
+          if (caught) throw caught;
+          const output = { result: 'PASS', production_project: projectRef, ...evidence };
+          fs.writeFileSync('/tmp/admin-order-crud-v3-production-evidence.json', JSON.stringify(output, null, 2));
+          console.log(JSON.stringify(output, null, 2));
+          NODE
+
+      - name: Publish sanitized production evidence to PR 344
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$(cat /tmp/admin-order-crud-v3-production-evidence.json)"
+          body=$(cat <<EOF
+          ### ✅ Admin Order CRUD v3 — Production Evidence
+
+          Production migration and exact-order verification completed successfully for commit \`${GITHUB_SHA}\`.
+
+          \`\`\`json
+          $evidence
+          \`\`\`
+
+          Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          )
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="$body"
+
+      - name: Publish protected failure pointer
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" \
+            -f body="### ❌ Admin Order CRUD v3 production verification failed\n\nProtected run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
