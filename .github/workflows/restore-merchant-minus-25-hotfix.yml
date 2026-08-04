@@ -1,0 +1,201 @@
+name: Restore Merchant Minus 25 Hotfix
+
+on:
+  push:
+    branches: [fix/restore-merchant-minus-25-20260805]
+    paths:
+      - .github/workflows/restore-merchant-minus-25-hotfix.yml
+      - artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts
+      - supabase/migrations/20260805030500_restore_manual_zero_merchant_charge.sql
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/restore-merchant-minus-25-hotfix.yml
+      - artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts
+      - supabase/migrations/20260805030500_restore_manual_zero_merchant_charge.sql
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-merchant-minus-25-production-hotfix
+  cancel-in-progress: false
+
+jobs:
+  build-deploy-verify:
+    name: Build, deploy and verify merchant debit
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production-runtime-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Admin application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify protected production configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL); process.stdout.write(u.hostname.split('.')[0])")"
+          test -n "$project_ref"
+          echo "SUPABASE_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+          echo "Production project resolved safely."
+
+      - name: Build isolated reviewed migration release
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/day-night-merchant-minus-25-hotfix"
+          rm -rf "$workdir"
+          mkdir -p "$workdir/supabase/migrations"
+          cp supabase/config.toml "$workdir/supabase/config.toml"
+          supabase --workdir "$workdir" link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$workdir" migration fetch --linked
+
+          target="20260805030500_restore_manual_zero_merchant_charge.sql"
+          test -f "supabase/migrations/$target"
+          if find "$workdir/supabase/migrations" -maxdepth 1 -type f -name "${target%%_*}_*.sql" | grep -q .; then
+            pending=0
+            echo "$target already recorded in production."
+          else
+            cp "supabase/migrations/$target" "$workdir/supabase/migrations/$target"
+            pending=1
+          fi
+
+          echo "HOTFIX_WORKDIR=$workdir" >> "$GITHUB_ENV"
+          echo "HOTFIX_PENDING=$pending" >> "$GITHUB_ENV"
+          echo "Pending reviewed hotfix migrations: $pending"
+
+      - name: Validate and apply production migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$HOTFIX_PENDING" -gt 0 ]; then
+            supabase --workdir "$HOTFIX_WORKDIR" db push --dry-run
+            supabase --workdir "$HOTFIX_WORKDIR" db push --yes
+          else
+            echo "No database write required; migration is already recorded."
+          fi
+          supabase --workdir "$HOTFIX_WORKDIR" migration list --linked | tee /tmp/merchant-minus-25-migrations.txt
+          grep -Fq '20260805030500' /tmp/merchant-minus-25-migrations.txt
+
+      - name: Authenticate production Admin session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { apikey: key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: process.env.RUNTIME_ADMIN_EMAIL,
+              password: process.env.RUNTIME_ADMIN_PASSWORD,
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.access_token) {
+            throw new Error(`admin_auth_failed_http_${response.status}`);
+          }
+          console.log(`::add-mask::${payload.access_token}`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `HOTFIX_ADMIN_TOKEN=${payload.access_token}\n`);
+          NODE
+
+      - name: Verify production merchant debit invariant
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '');
+          const token = String(process.env.HOTFIX_ADMIN_TOKEN || '');
+          const response = await fetch(`${url}/rest/v1/rpc/admin_manual_zero_merchant_charge_health`, {
+            method: 'POST',
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          });
+          const payload = await response.json().catch(() => ({}));
+          const valid =
+            response.ok &&
+            payload?.ok === true &&
+            Number(payload?.effective_delivery_fee) === 25 &&
+            Number(payload?.expected_zero_goods_customer_total) === 0 &&
+            Number(payload?.expected_zero_goods_merchant_due) === -25 &&
+            Number(payload?.expected_company_revenue) === 25;
+          if (!valid) {
+            console.error('merchant_minus_25_health_failed', response.status, payload);
+            process.exit(1);
+          }
+          console.log('admin_manual_zero_merchant_charge_health: OK');
+          console.log('goods=0 manual=0 => customer=0 merchant=-25 company=25');
+          NODE
+
+      - name: Publish hotfix result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Restore merchant -25 AED settlement'
+            echo
+            echo '- Manual delivery value 0 remains stored as the explicit operator marker.'
+            echo '- Effective delivery fee is restored to 25 AED.'
+            echo '- Goods 0 and discount 0 produce customer total 0 AED.'
+            echo '- Merchant due is restored to -25 AED and statement direction is debit.'
+            echo '- DAY NIGHT revenue is restored to 25 AED.'
+            echo "- Checked at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
