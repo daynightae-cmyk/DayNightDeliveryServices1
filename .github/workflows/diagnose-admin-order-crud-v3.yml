@@ -14,6 +14,7 @@ on:
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs"
+      - "artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
       - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
   pull_request:
@@ -28,6 +29,7 @@ on:
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs"
+      - "artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
       - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
   workflow_dispatch:
@@ -195,6 +197,7 @@ jobs:
             artifacts/day-night-delivery/scripts/admin-order-crud-v3-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-create-v3-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-lifecycle-final-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs \
             artifacts/day-night-delivery/scripts/operations-order-control-gate.mjs \
