@@ -6,11 +6,13 @@ on:
       - fix/admin-order-delete-edit-flexibility-20260804
     paths:
       - ".github/scripts/finalize-admin-order-delete-edit-flexibility.mjs"
+      - ".github/scripts/fix-admin-order-flexibility-gate-compat.mjs"
       - ".github/workflows/finalize-admin-order-delete-edit-flexibility.yml"
   pull_request:
     branches: [main]
     paths:
       - ".github/scripts/finalize-admin-order-delete-edit-flexibility.mjs"
+      - ".github/scripts/fix-admin-order-flexibility-gate-compat.mjs"
       - ".github/workflows/finalize-admin-order-delete-edit-flexibility.yml"
   workflow_dispatch:
 
@@ -18,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: finalize-admin-order-delete-edit-flexibility-${{ github.ref }}
+  group: finalize-admin-order-delete-edit-flexibility
   cancel-in-progress: true
 
 jobs:
@@ -35,6 +37,9 @@ jobs:
 
       - name: Apply focused implementation
         run: node .github/scripts/finalize-admin-order-delete-edit-flexibility.mjs
+
+      - name: Align localization gate with automatic audit
+        run: node .github/scripts/fix-admin-order-flexibility-gate-compat.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -82,12 +87,15 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
 
           git rm .github/scripts/finalize-admin-order-delete-edit-flexibility.mjs
+          git rm .github/scripts/fix-admin-order-flexibility-gate-compat.mjs
           git rm .github/workflows/finalize-admin-order-delete-edit-flexibility.yml
+          git rm -f .github/KEEP
 
           git add \
             artifacts/day-night-delivery/package.json \
             artifacts/day-night-delivery/scripts/admin-complete-order-edit-gate.mjs \
             artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs \
+            artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs \
             artifacts/day-night-delivery/src/components/admin/AdminOrderDeleteModal.tsx \
             artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx \
             artifacts/day-night-delivery/src/lib/adminOrderDeleteData.ts \
