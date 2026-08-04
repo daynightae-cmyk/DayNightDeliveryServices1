@@ -248,49 +248,24 @@ export default function AdminNewOrderFlexible({
   }
 
   function validate() {
-    const missing = [
-      !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !clean(form.receiver_name)
-        ? isArabic
-          ? "اسم المستلم"
-          : "receiver name"
-        : "",
-      !clean(form.receiver_phone)
-        ? isArabic
-          ? "هاتف المستلم"
-          : "receiver phone"
-        : "",
-    ].filter(Boolean);
-
-    if (missing.length) {
-      return isArabic
-        ? `الحقول الأساسية المطلوبة: ${missing.join("، ")}`
-        : `Required core fields: ${missing.join(", ")}`;
+    const numericFields: Array<[string, unknown]> = [
+      [isArabic ? "مبلغ التحصيل" : "COD amount", form.cod_amount],
+      [isArabic ? "سعر التوصيل اليدوي" : "manual delivery price", form.manual_delivery_price],
+      [isArabic ? "الوزن" : "weight", form.weight],
+      [isArabic ? "عدد القطع" : "piece count", form.order_count],
+    ];
+    for (const [label, value] of numericFields) {
+      if (value === "" || value === null || value === undefined) continue;
+      if (!Number.isFinite(Number(value))) {
+        return isArabic ? `قيمة غير صحيحة في حقل ${label}.` : `Invalid value in ${label}.`;
+      }
     }
-
-    if (
-      form.price_mode === "manual" &&
-      (form.manual_delivery_price === "" ||
-        !Number.isFinite(Number(form.manual_delivery_price)) ||
-        Number(form.manual_delivery_price) < 0)
-    ) {
-      return isArabic
-        ? "أدخل سعراً يدوياً صحيحاً أو استخدم سعر النظام."
-        : "Enter a valid manual price or use system pricing.";
+    if (form.price_mode === "manual" && Number(form.manual_delivery_price || 0) < 0) {
+      return isArabic ? "سعر التوصيل لا يمكن أن يكون سالبًا." : "Delivery price cannot be negative.";
     }
-
-    if (form.payment_method === "cod" && Number(form.cod_amount || 0) <= 0) {
-      return isArabic
-        ? "مبلغ التحصيل مطلوب عند اختيار COD."
-        : "COD amount is required.";
-    }
-
     if (entryMode === "coupon" && couponReview && !reviewConfirmed) {
-      return isArabic
-        ? "أكد المراجعة اليدوية قبل الحفظ."
-        : "Confirm manual review before saving.";
+      return isArabic ? "أكد المراجعة اليدوية قبل الحفظ." : "Confirm manual review before saving.";
     }
-
     return "";
   }
 
@@ -331,11 +306,22 @@ export default function AdminNewOrderFlexible({
         }
       }
 
+      const warningCodes = (result.warnings || [])
+        .map((warning) => String(warning.code || ""))
+        .filter(Boolean);
+      const ownerLabel =
+        selectedMerchant?.owner_name || selectedMerchant?.trade_name ||
+        (isArabic ? "طلب إداري دون ربط حساب تاجر" : "unlinked Admin order");
+      const warningSuffix = warningCodes.length
+        ? isArabic
+          ? ` تم حفظ الطلب، وتوجد ملاحظة تحتاج مراجعة دون إلغاء الحفظ: ${warningCodes.join("، ")}.`
+          : ` Saved with non-blocking review notes: ${warningCodes.join(", ")}.`
+        : "";
       setSource(result.source);
       setMessage(
         isArabic
-          ? `تم حفظ الطلب وربطه بصاحب المتجر ${selectedMerchant?.owner_name || selectedMerchant?.trade_name || ""}. رقم التتبع: ${reference}. السعر: ${price.total.toFixed(2)} درهم.${auditSuffix}`
-          : `Order saved and linked to ${selectedMerchant?.owner_name || selectedMerchant?.trade_name || "merchant"}. Tracking: ${reference}. Price: ${price.total.toFixed(2)} AED.${auditSuffix}`,
+          ? `تم حفظ الطلب لصاحب السجل ${ownerLabel}. رقم التتبع: ${reference}. السعر: ${price.total.toFixed(2)} درهم.${warningSuffix}${auditSuffix}`
+          : `Order saved for ${ownerLabel}. Tracking: ${reference}. Price: ${price.total.toFixed(2)} AED.${warningSuffix}${auditSuffix}`,
       );
       onSaved?.(saved);
       setForm({
@@ -467,7 +453,6 @@ export default function AdminNewOrderFlexible({
             value={form.merchant_id || ""}
             onChange={(event) => chooseMerchant(event.target.value)}
             className={inputClass()}
-            required
           >
             <option value="">
               {isArabic ? "ابحث واختر باسم المالك" : "Find and select by owner name"}
@@ -499,17 +484,15 @@ export default function AdminNewOrderFlexible({
             <input
               value={form.receiver_name}
               onChange={(event) => setField("receiver_name", event.target.value)}
-              placeholder={isArabic ? "اسم المستلم *" : "Receiver name *"}
+              placeholder={isArabic ? "اسم المستلم — اختياري" : "Receiver name — optional"}
               className={inputClass()}
-              required
             />
             <input
               value={form.receiver_phone}
               onChange={(event) => setField("receiver_phone", event.target.value)}
-              placeholder={isArabic ? "هاتف المستلم *" : "Receiver phone *"}
+              placeholder={isArabic ? "هاتف المستلم — اختياري" : "Receiver phone — optional"}
               className={inputClass()}
               dir="ltr"
-              required
             />
           </div>
           <select

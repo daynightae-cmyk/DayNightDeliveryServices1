@@ -7,6 +7,7 @@ export type AdminOrderWarning = {
 };
 
 export type AdminOrderMutationOperation =
+  | "create"
   | "update"
   | "status"
   | "archive"
@@ -146,6 +147,55 @@ async function invokeMutation(
     return {
       success: true,
       operation: envelope.operation || operation,
+      order: envelope.order,
+      warnings: normalizeWarnings(envelope.warnings),
+      reconciliationRequired: Boolean(envelope.reconciliation_required),
+      auditId: clean(envelope.audit_id) || null,
+      requestId: clean(envelope.request_id) || mutationRequestId,
+      changedFields: Array.isArray(envelope.changed_fields)
+        ? envelope.changed_fields.map(clean).filter(Boolean)
+        : [],
+      replayed: Boolean(envelope.replayed),
+      source: "rpc",
+    };
+  })();
+
+  inFlight.set(submissionKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlight.delete(submissionKey);
+  }
+}
+
+export async function createAdminOrder(
+  patch: Record<string, unknown>,
+  options: MutationOptions = {},
+): Promise<AdminOrderMutationResult> {
+  if (!supabase) throw new Error("supabase_unavailable");
+  const mutationRequestId = clean(options.requestId) || requestId("create");
+  const submissionKey = `create:${mutationRequestId}`;
+  const existing = inFlight.get(submissionKey);
+  if (existing) return existing;
+
+  const promise: Promise<AdminOrderMutationResult> = (async () => {
+    const { data, error } = await supabase.rpc("admin_create_order_v3", {
+      p_payload: {
+        operation: "create",
+        request_id: mutationRequestId,
+        source_page: clean(options.sourcePage) || "admin_new_order",
+        reason: clean(options.reason || options.note) || "DAY NIGHT Admin order creation",
+        order: patch,
+      },
+    });
+    if (error) throw new Error(diagnostic(error) || "admin_create_order_v3_failed");
+    const envelope = normalizeEnvelope(data);
+    if (envelope.ok !== true || envelope.success !== true || !envelope.order?.id) {
+      throw new Error("admin_order_v3_create_not_confirmed");
+    }
+    return {
+      success: true,
+      operation: "create",
       order: envelope.order,
       warnings: normalizeWarnings(envelope.warnings),
       reconciliationRequired: Boolean(envelope.reconciliation_required),

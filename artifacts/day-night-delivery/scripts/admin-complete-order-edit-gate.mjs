@@ -72,7 +72,7 @@ assert(
 );
 assert(
   persistence.includes("updateAdminOrder") &&
-    !persistence.includes("admin_update_order_complete_verified_v2") &&
+    !persistence.includes("admin_update_order_complete_v3") &&
     !persistence.includes(".from(\"orders\")"),
   "complete editor is not exclusively routed through the shared v3 mutation service",
 );

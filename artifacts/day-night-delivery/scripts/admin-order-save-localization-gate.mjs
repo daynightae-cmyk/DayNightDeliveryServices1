@@ -20,14 +20,16 @@ const trackingActions = read("src/components/admin/AdminInternationalOrderTracki
 const launcher = read("src/components/admin/AdminInternationalTrackingLauncher.tsx");
 const exportLocalization = read("src/lib/exportLocalization.ts");
 const plugin = read("scripts/friendly-error-message-plugin.ts");
+const mutations = read("src/lib/adminOrderMutations.ts");
+const v3Migration = read("../../supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql");
 
 expect(destinations, /value: "KW"[\s\S]*ar: "الكويت"/, "Kuwait has a full Arabic label");
 expect(destinations, /value: "SA"[\s\S]*ar: "المملكة العربية السعودية"/, "Saudi Arabia has a professional Arabic label");
 expect(destinations, /normalizeInternationalDestination/, "country values are canonicalized");
 expect(modal, /INTERNATIONAL_DESTINATIONS[\s\S]*دولة الوجهة/, "edit modal uses localized country selector");
 reject(modal, /value=\{form\.destination_country \|\| ""\}[\s\S]{0,180}<input/, "edit modal does not expose a raw country-code text input");
-expect(modal, /!clean\(currentForm\.coupon_number\)/, "every edited order requires a coupon");
-reject(modal, /رقم الكوبون — اختياري/, "personal edit no longer marks coupon optional");
+reject(modal, /!clean\(currentForm\.coupon_number\)/, "missing coupon does not block the core order edit");
+expect(modal, /رقم الكوبون — اختياري/, "Admin edit identifies coupon as optional and reviewable");
 expect(modal, /هاتف المرسل — اختياري/, "sender phone is explicitly optional");
 expect(
   modal,
@@ -41,8 +43,14 @@ reject(
 );
 expect(modal, /orderStatusLabel\(order\.status, isArabic\)/, "raw database status is localized");
 reject(modal, /(اتلغت|مفيش|بيتسجل|بتتسجل|مش هيتم|الرسالة دي|اتساب|اتزامنوا)/, "complete editor contains no colloquial failure wording");
-expect(persistence, /admin_update_order_complete_verified_v2/, "save calls corrected complete-edit RPC");
-expect(persistence, /coupon_number_required_for_personal_order/, "personal edit rejects a missing coupon");
+expect(persistence, /updateAdminOrder/, "save calls the unified canonical Admin mutation service");
+reject(persistence, /coupon_number_required_for_personal_order/, "personal edit does not reject a missing coupon");
+expect(mutations, /admin_update_order_complete_v3/, "unified mutation service calls the canonical v3 RPC");
+expect(
+  v3Migration,
+  /coupon_reconciliation_required[\s\S]*coupon_missing_or_blank/,
+  "database converts a missing coupon into a non-blocking reconciliation warning",
+);
 expect(persistence, /normalizeInternationalDestination/, "edit persistence stores canonical country values");
 expect(workspace, /destinationLabel\(order, isArabic\)/, "international queue localizes country names");
 expect(trackingActions, /INTERNATIONAL_DESTINATIONS/, "tracking action editor uses country-name selectors");

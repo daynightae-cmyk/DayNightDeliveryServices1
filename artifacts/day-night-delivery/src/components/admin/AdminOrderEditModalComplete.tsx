@@ -19,10 +19,7 @@ import {
 } from "lucide-react";
 import { opsErrorDetail } from "../../lib/adminOperationsData";
 import { formatAdminMoney } from "../../lib/adminLocale";
-import {
-  saveAdminLockedMerchantCoreEdit,
-  saveAdminOrderEdit,
-} from "../../lib/adminOrderEditPersistence";
+import { saveAdminOrderEdit } from "../../lib/adminOrderEditPersistence";
 import {
   calculateFinancialOpsOrder,
   type FinancialOpsOrderInput,
@@ -73,6 +70,19 @@ const numberOrBlank = (value: unknown) => {
 
 const orderReference = (order: Order) =>
   order.tracking_number || order.invoice_number || order.coupon_number || order.id || "—";
+
+const EDITABLE_ORDER_STATUSES = [
+  "pending",
+  "review",
+  "confirmed",
+  "assigned",
+  "picked_up",
+  "in_transit",
+  "delivered",
+  "postponed",
+  "returned",
+  "cancelled",
+] as const;
 
 const ORDER_STATUS_LABELS: Record<string, { ar: string; en: string }> = {
   pending: { ar: "قيد الانتظار", en: "Pending" },
@@ -332,6 +342,7 @@ export default function AdminOrderEditModalComplete({
   const [form, setForm] = useState<FinancialOpsOrderInput | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [errorReference, setErrorReference] = useState("");
   const [errorDiagnostic, setErrorDiagnostic] = useState("");
@@ -342,6 +353,7 @@ export default function AdminOrderEditModalComplete({
     setForm(initialForm(order, merchants));
     setBusy(false);
     setMessage("");
+    setWarnings([]);
     setError("");
     setErrorReference("");
     setErrorDiagnostic("");
@@ -370,7 +382,41 @@ export default function AdminOrderEditModalComplete({
           deliveryFee: PERSONAL_ORDER_DELIVERY_FEE,
         });
       }
-      if (!selectedMerchant) return null;
+      if (!selectedMerchant) {
+        const goodsValue = Math.max(0, Number(form.goods_value || 0));
+        const deliveryFee = Math.max(
+          0,
+          Number(
+            form.manual_delivery_price === "" || form.manual_delivery_price == null
+              ? order?.delivery_fee || order?.delivery_price || 0
+              : form.manual_delivery_price,
+          ),
+        );
+        const discountAmount = Math.max(0, Number(form.discount_amount || 0));
+        const feeMode = form.delivery_fee_mode === "deduct_from_merchant"
+          ? "deduct_from_merchant"
+          : "customer_pays";
+        const customerTotal = Math.max(
+          0,
+          feeMode === "deduct_from_merchant"
+            ? goodsValue - discountAmount
+            : goodsValue + deliveryFee - discountAmount,
+        );
+        return {
+          goodsValue,
+          deliveryFee,
+          discountAmount,
+          deliveryFeeMode: feeMode,
+          customerTotal,
+          merchantDue:
+            feeMode === "deduct_from_merchant"
+              ? goodsValue - discountAmount - deliveryFee
+              : goodsValue - discountAmount,
+          companyRevenue: deliveryFee,
+          systemDeliveryFee: deliveryFee,
+          priceSource: "manual" as const,
+        };
+      }
       return calculateFinancialOpsOrder({ ...form, merchant: selectedMerchant });
     } catch {
       return null;
@@ -408,6 +454,7 @@ export default function AdminOrderEditModalComplete({
 
   function clearFeedback() {
     setMessage("");
+    setWarnings([]);
     setError("");
     setErrorReference("");
     setErrorDiagnostic("");
@@ -444,38 +491,23 @@ export default function AdminOrderEditModalComplete({
   }
 
   function validate() {
-    const missing = [
-      !personalOrder && !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !clean(currentForm.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
-      personalOrder && !clean(currentForm.sender_name)
-        ? isArabic
-          ? "اسم المرسل"
-          : "sender name"
-        : "",
-      !clean(currentForm.receiver_name) ? (isArabic ? "اسم المستلم" : "recipient name") : "",
-      !clean(currentForm.receiver_phone) ? (isArabic ? "هاتف المستلم" : "recipient phone") : "",
-      currentForm.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
-    ].filter(Boolean);
-
-    if (missing.length) {
-      return isArabic
-        ? `الحقول المطلوبة: ${missing.join("، ")}`
-        : `Required fields: ${missing.join(", ")}`;
+    const numericFields: Array<[string, unknown]> = [
+      [isArabic ? "قيمة البضاعة" : "goods value", currentForm.goods_value],
+      [isArabic ? "الخصم" : "discount", currentForm.discount_amount],
+      [isArabic ? "مبلغ التحصيل" : "COD amount", currentForm.cod_amount],
+    ];
+    if (currentForm.price_mode === "manual") {
+      numericFields.push([
+        isArabic ? "رسوم التوصيل" : "delivery fee",
+        currentForm.manual_delivery_price,
+      ]);
     }
-    if (
-      !personalOrder &&
-      currentForm.price_mode === "manual" &&
-      (currentForm.manual_delivery_price === "" ||
-        Number(currentForm.manual_delivery_price) < 0)
-    ) {
-      return isArabic
-        ? "أدخل رسوم توصيل يدوية صحيحة. الصفر له قاعدة 25 درهم على حساب التاجر."
-        : "Enter a valid manual delivery fee. Explicit zero applies the 25 AED merchant-debit rule.";
-    }
-    if (!financials) {
-      return isArabic
-        ? "راجع قيمة البضاعة والتوصيل والخصم وطريقة تحمل الرسوم."
-        : "Check goods, delivery, discount, and fee mode.";
+    for (const [label, value] of numericFields) {
+      if (value === "" || value === null || value === undefined) continue;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return isArabic ? `قيمة غير صحيحة في حقل ${label}.` : `Invalid value in ${label}.`;
+      }
     }
     return "";
   }
@@ -527,10 +559,7 @@ export default function AdminOrderEditModalComplete({
         order: currentOrder,
         edit_reason: automaticEditReason,
       };
-      const result =
-        financialLocked && !personalOrder && !sensitiveChange
-          ? await saveAdminLockedMerchantCoreEdit(saveInput)
-          : await saveAdminOrderEdit(saveInput);
+      const result = await saveAdminOrderEdit(saveInput);
 
       window.dispatchEvent(
         new CustomEvent("dn-admin-orders-updated", {
@@ -538,34 +567,39 @@ export default function AdminOrderEditModalComplete({
             order: result.row,
             source: result.source,
             auditId: result.auditId,
+            warnings: result.warnings || [],
+            reconciliationRequired: Boolean(result.reconciliationRequired),
+            requestId: result.requestId,
           },
         }),
       );
       await onSaved?.(result.row);
 
-      const auditSuffix = result.auditId
-        ? isArabic
-          ? ` رقم سجل التدقيق: ${result.auditId}`
-          : ` Audit: ${result.auditId}`
-        : "";
-      const fieldsSuffix = result.changedFields?.length
-        ? isArabic
-          ? ` الحقول المتغيرة: ${result.changedFields.join("، ")}.`
-          : ` Changed fields: ${result.changedFields.join(", ")}.`
-        : "";
+      const warningCodes = (result.warnings || [])
+        .map((warning) => String(warning.code || ""))
+        .filter(Boolean);
+      setWarnings(warningCodes);
       setMessage(
-        result.financialsLocked
-          ? personalOrder
-            ? isArabic
-              ? `تم تحديث بيانات الطلب الشخصي ${orderReference(result.row)}. ظل الحساب المُرحَّل محميًا، واستخدم صندوق التصحيح المالي المنفصل لتغييره.`
-              : `Personal order ${orderReference(result.row)} was updated. Posted financials remain protected and use the separate audited adjustment panel.`
-            : isArabic
-              ? `تم تحديث بيانات الطلب ${orderReference(result.row)} وحفظها فعليًا. ظل الحساب المُرحَّل بقيمة ${originalFinancials.deliveryFee.toFixed(2)} درهم محميًا دون إعادة ترحيل أو تغيير.`
-              : `Order ${orderReference(result.row)} details were saved. Posted financials remained protected without reposting or recalculation.`
+        warningCodes.length
+          ? isArabic
+            ? `تم حفظ الطلب ${orderReference(result.row)}، وتوجد ملاحظة تحتاج مراجعة دون إلغاء الحفظ.`
+            : `Order ${orderReference(result.row)} was saved with non-blocking reconciliation notes.`
           : isArabic
-            ? `تم تحديث الطلب ${orderReference(result.row)} بالكامل وحفظه فعليًا. تمت مزامنة التاجر والكشوف والحسابات بأمان.${auditSuffix}${fieldsSuffix}`
-            : `Order ${orderReference(result.row)} was completely updated and verified. Merchant ownership, statements, and accounting were synchronized safely.${auditSuffix}${fieldsSuffix}`,
+            ? `تم حفظ الطلب ${orderReference(result.row)} وتأكيد القيم من قاعدة البيانات.`
+            : `Order ${orderReference(result.row)} was saved and confirmed by the database.`,
       );
+      window.dispatchEvent(
+        new CustomEvent("dn-admin-order-operation-result", {
+          detail: {
+            success: true,
+            operation: "update",
+            order: result.row,
+            warnings: result.warnings || [],
+            reconciliationRequired: Boolean(result.reconciliationRequired),
+          },
+        }),
+      );
+      window.setTimeout(onClose, warningCodes.length ? 1200 : 450);
     } catch (cause) {
       const detail = opsErrorDetail(cause);
       console.error("DAY NIGHT complete order save rejected:", detail || cause);
@@ -613,7 +647,7 @@ export default function AdminOrderEditModalComplete({
           <div className="flex items-center gap-2">
             <button
               type="submit"
-              disabled={busy || !financials}
+              disabled={busy}
               className="!inline-flex !items-center !gap-2 !rounded-2xl !bg-brand-gold !px-4 !py-3 !text-xs !font-black !text-brand-deep shadow-[0_12px_30px_rgba(212,175,55,0.18)] transition hover:!-translate-y-0.5 disabled:opacity-40"
             >
               {busy ? (
@@ -652,6 +686,24 @@ export default function AdminOrderEditModalComplete({
                     {isArabic ? "تم حفظ الطلب بنجاح" : "Order saved successfully"}
                   </strong>
                   <p className="mt-1 text-xs font-bold leading-6 text-emerald-50/85">{message}</p>
+                </div>
+              </div>
+            </section>
+          )}
+          {warnings.length > 0 && (
+            <section className="sticky top-0 z-40 mb-4 rounded-[1.4rem] border border-amber-300/35 bg-[linear-gradient(135deg,rgba(100,60,8,0.92),rgba(45,27,4,0.97))] p-4 text-amber-50 shadow-[0_18px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
+                <div>
+                  <strong className="block text-sm font-black">
+                    {isArabic ? "تم الحفظ وتوجد ملاحظات مراجعة" : "Saved with review notes"}
+                  </strong>
+                  <p className="mt-1 text-xs font-bold leading-6 text-amber-50/85">
+                    {isArabic
+                      ? "لم تُلغِ هذه الملاحظات حفظ الطلب. رموز المراجعة: "
+                      : "These notes did not roll the order back. Review codes: "}
+                    <span dir="ltr">{warnings.join("، ")}</span>
+                  </p>
                 </div>
               </div>
             </section>
@@ -752,12 +804,39 @@ export default function AdminOrderEditModalComplete({
             </div>
           </div>
 
+          <section className={`${sectionClass} mb-4 border-cyan-300/25 bg-cyan-300/[0.055]`}>
+            <h3 className="flex items-center gap-2 font-black text-cyan-100">
+              <PackageCheck className="h-4 w-4" />
+              {isArabic ? "الحالة التشغيلية" : "Operational status"}
+            </h3>
+            <label className={labelClass}>
+              <span>{isArabic ? "اختر الحالة الجديدة" : "Select the new status"}</span>
+              <select
+                value={form.status || order.status || "pending"}
+                onChange={(event) => setField("status", event.target.value)}
+                className={inputClass()}
+                data-admin-order-v3-status="true"
+              >
+                {EDITABLE_ORDER_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {orderStatusLabel(status, isArabic)}
+                  </option>
+                ))}
+              </select>
+              <small className="text-[10px] font-bold leading-5 text-white/45">
+                {isArabic
+                  ? "يمكن للمدير تصحيح الحالة من أي حالة سابقة. الحفظ لا يتوقف بسبب ربط التاجر أو الكوبون أو حساب المندوب."
+                  : "Admins can correct any previous status. Merchant, coupon, or driver-account linkage cannot block the core save."}
+              </small>
+            </label>
+          </section>
+
           {financialLocked && !personalOrder && (
             <div className="mb-4 flex gap-3 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-xs font-bold leading-6 text-cyan-50">
               <ShieldCheck className="h-5 w-5 shrink-0 text-brand-gold" />
               {isArabic
-                ? "الطلب مُسلّم أو حسابه مُرحّل، لكن محرر الإدارة المُدقّق يسمح بتعديل التاجر والعميل والعنوان والشحنة والمبالغ. تغيير التاجر يزامن ملكية COD وكشف التاجر والقيود التابعة، ويُسجَّل التعديل المالي بالقيم السابقة واللاحقة ضمن عملية واحدة قابلة للمراجعة."
-                : "This order is delivered or financially posted. The audited editor still permits merchant, customer, address, shipment, and financial changes. Merchant ownership dependencies and delivered accounting are synchronized atomically with before/after audit evidence."}
+                ? "الطلب مُسلّم أو حسابه مُرحّل، لكن محرر الإدارة المُدقّق يسمح بتعديل التاجر والعميل والعنوان والشحنة والمبالغ. يحفظ مسار الإدارة القيم الأساسية أولًا، ثم يعرض أي مزامنة مالية أو ربط ناقص كملاحظة مراجعة دون التراجع عن الحفظ."
+                : "This order is delivered or financially posted. The audited editor still permits merchant, customer, address, shipment, and financial changes. Core values are saved first; optional ownership or accounting work is returned as a review warning without rolling the order back."}
             </div>
           )}
 
@@ -765,8 +844,8 @@ export default function AdminOrderEditModalComplete({
             <div className="mb-4 flex gap-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-xs font-bold leading-6 text-amber-100">
               <Store className="h-5 w-5 shrink-0" />
               {isArabic
-                ? `أنت تنقل الطلب من التاجر الحالي إلى ${merchantOptionLabel(selectedMerchant!)}. لن يتم الحفظ إلا بعد التحقق من التاجر الجديد وعدم وجود تعارض في ملكية القيود التابعة.`
-                : `You are moving this order to ${merchantOptionLabel(selectedMerchant!)}. Save is allowed only for a canonical portal-linked merchant with no dependent ownership conflict.`}
+                ? `أنت تنقل الطلب من التاجر الحالي إلى ${merchantOptionLabel(selectedMerchant!)}. سيُحفظ الطلب أولًا، وأي نقص في ربط حساب التاجر سيظهر كملاحظة مراجعة غير مانعة.`
+                : `You are moving this order to ${merchantOptionLabel(selectedMerchant!)}. The order is saved first; missing portal linkage is returned as a non-blocking review warning.`}
             </div>
           )}
 
@@ -801,14 +880,13 @@ export default function AdminOrderEditModalComplete({
                       ? "نوع الطلب"
                       : "Order type"
                     : isArabic
-                      ? "التاجر القانوني *"
-                      : "Canonical merchant *"}
+                      ? "التاجر — اختياري"
+                      : "Merchant — optional"}
                 </span>
                 <select
                   value={form.merchant_id || ""}
                   onChange={(event) => chooseMerchant(event.target.value)}
                   className={inputClass()}
-                  required={!personalOrder}
                   disabled={personalOrder}
                   data-admin-complete-order-merchant="true"
                 >
@@ -818,8 +896,8 @@ export default function AdminOrderEditModalComplete({
                         ? "طلب شخصي بدون تاجر"
                         : "Personal order without merchant"
                       : isArabic
-                        ? "اختر التاجر"
-                        : "Select merchant"}
+                        ? "اختر التاجر أو اترك الطلب دون ربط"
+                        : "Select a merchant or leave unlinked"}
                   </option>
                   {merchants.map((merchant) => (
                     <option key={merchant.id} value={merchant.id}>
@@ -834,8 +912,8 @@ export default function AdminOrderEditModalComplete({
                   <span>
                     {personalOrder
                       ? isArabic
-                        ? "اسم المرسل *"
-                        : "Sender name *"
+                        ? "اسم المرسل — اختياري"
+                        : "Sender name — optional"
                       : isArabic
                         ? "اسم المرسل — يُستكمل تلقائيًا عند الحاجة"
                         : "Sender name — completed automatically when needed"}
@@ -844,7 +922,6 @@ export default function AdminOrderEditModalComplete({
                     value={form.sender_name || ""}
                     onChange={(event) => setField("sender_name", event.target.value)}
                     className={inputClass()}
-                    required={personalOrder}
                   />
                 </label>
                 <label className={labelClass}>
@@ -921,21 +998,19 @@ export default function AdminOrderEditModalComplete({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className={labelClass}>
-                  <span>{isArabic ? "اسم العميل *" : "Customer name *"}</span>
+                  <span>{isArabic ? "اسم العميل — اختياري" : "Customer name — optional"}</span>
                   <input
                     value={form.receiver_name}
                     onChange={(event) => setField("receiver_name", event.target.value)}
                     className={inputClass()}
-                    required
                   />
                 </label>
                 <label className={labelClass}>
-                  <span>{isArabic ? "هاتف العميل *" : "Customer phone *"}</span>
+                  <span>{isArabic ? "هاتف العميل — اختياري" : "Customer phone — optional"}</span>
                   <input
                     value={form.receiver_phone}
                     onChange={(event) => setField("receiver_phone", event.target.value)}
                     className={inputClass()}
-                    required
                     dir="ltr"
                     inputMode="tel"
                   />
@@ -1071,18 +1146,16 @@ export default function AdminOrderEditModalComplete({
                 <span>
                   {personalOrder
                     ? isArabic
-                      ? "رقم الكوبون *"
-                      : "Coupon number *"
+                      ? "رقم الكوبون — اختياري"
+                      : "Coupon number — optional"
                     : isArabic
-                      ? "رقم الكوبون *"
-                      : "Coupon number *"}
+                      ? "رقم الكوبون — اختياري"
+                      : "Coupon number — optional"}
                 </span>
                 <input
                   value={form.coupon_number || ""}
                   onChange={(event) => setField("coupon_number", event.target.value)}
                   className={inputClass()}
-                  required
-                  aria-required="true"
                   dir="ltr"
                   data-admin-complete-order-coupon="true"
                 />

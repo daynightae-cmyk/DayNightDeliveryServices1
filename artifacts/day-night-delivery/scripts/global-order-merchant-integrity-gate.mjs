@@ -122,20 +122,112 @@ for (const token of [
 assert.match(migration, /lock table public\.orders in share row exclusive mode/i);
 assert.match(migration, /lock table public\.merchants in share mode/i);
 assert.match(migration, /lock table public\.merchant_user_links in share mode/i);
-assert.match(migration, /set constraints all immediate/i);
-assert.match(migration, /set constraints all deferred/i);
-assert.match(migration, /returning\s+\*/i);
-assert.match(dryRunTimeoutMigration, /statement_timeout/i);
-assert.match(unlinkedMerchantFinanceMigration, /merchant_portal_account_not_linked/i);
-assert.match(reviewedReconciliationMigration, /apply_reviewed/i);
-assert.match(statementEntryTypeMigration, /entry_type/i);
-assert.match(customerE2eCleanupMigration, /customer/i);
-assert.match(customerE2e, /customer/i);
-assert.match(projectionBackfillGuardMigration, /projection/i);
-assert.match(orderStatusCompatMigration, /status/i);
-assert.match(privilegedDbExecutorMigration, /security definer/i);
-assert.match(productionAudit, /readonly|read-only/i);
-assert.match(p1Workflow, /runtime/i);
-assert.match(integrityWorkflow, /global-order-merchant/i);
+assert.match(migration, /perform set_config\('daynight\.order_merchant_reconciliation', 'backfill', true\)/i);
+assert.match(migration, /old\.coupon_number|coupon_number is distinct from/i);
+assert.match(migration, /old\.status|status is distinct from/i);
+assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_EMAIL/);
+assert.match(migration, /EXACT_UNIQUE_CONFIRMED_AUTH_PHONE/);
+assert.match(migration, /MISSING_AUTHORITATIVE_ROW_FROM_REVIEWED_ORDER_SNAPSHOT/);
+assert.match(migration, /order_financial_values_changed_financial_repair_rolled_back/);
+assert.match(migration, /future_financial_projection_ready/);
+assert.match(migration, /Authoritative merchant statement projected from delivered order snapshot/);
+assert.match(productionAudit, /financial_dependency_gap_rows/);
+assert.match(productionAudit, /INSERT_MISSING_DEPENDENCY_FROM_UNCHANGED_ORDER_SNAPSHOT/);
+assert.match(productionAudit, /ownership_classification/);
+assert.match(migration, /'ALREADY_CORRECT','AUTO_REPAIR_SAFE','MISSING_PORTAL_LINK'/);
+assert.doesNotMatch(migration, /^\s*(delete\s+from|truncate\s|drop\s+table).*$/gim);
+assert.doesNotMatch(migration, /\bon delete cascade\b/i);
+assert.doesNotMatch(
+  migration,
+  /is\s+distinct\s+from\s+case\b/i,
+  "PL/pgSQL CASE operands for IS DISTINCT FROM must be parenthesized",
+);
+assert.match(
+  dryRunTimeoutMigration,
+  /alter\s+function\s+public\.admin_run_order_merchant_dry_run\(\)\s+set\s+statement_timeout\s*=\s*'120s'/i,
+);
+for (const workflow of [p1Workflow, integrityWorkflow]) {
+  assert.match(workflow, /20260802033000_order_merchant_dry_run_timeout\.sql/);
+  assert.match(workflow, /20260802034000_financial_reconciliation_without_portal_link\.sql/);
+  assert.match(workflow, /20260802034500_customer_e2e_dependency_cleanup\.sql/);
+  assert.match(workflow, /20260802034700_defer_projection_during_merchant_backfill\.sql/);
+  assert.match(workflow, /20260802034800_order_status_snapshot_type_compat\.sql/);
+  assert.match(workflow, /20260802034900_privileged_db_reconciliation_executor\.sql/);
+  assert.match(workflow, /20260802035500_delivered_statement_entry_type_integrity\.sql/);
+}
+assert.match(integrityWorkflow, /supabase\/production-reconciliation\/20260802035000_apply_reviewed_order_merchant_reconciliation\.sql/);
+assert.equal(
+  fs.existsSync(
+    path.join(
+      repoRoot,
+      "supabase/migrations/20260802035000_apply_reviewed_order_merchant_reconciliation.sql",
+    ),
+  ),
+  false,
+  "production-only reviewed reconciliation must not block portable migration chains",
+);
+assert.match(unlinkedMerchantFinanceMigration, /pg_get_functiondef/);
+assert.match(unlinkedMerchantFinanceMigration, /financial_reconciliation_eligibility_contract_not_found/);
+assert.doesNotMatch(
+  unlinkedMerchantFinanceMigration.match(/v_new text := \$new\$([\s\S]*?)\$new\$/)?.[1] || "",
+  /dn_merchant_portal_link_count/,
+);
+assert.match(reviewedReconciliationMigration, /37348f9e-60d8-4f6b-8cdf-b9181464f2b7/);
+assert.match(reviewedReconciliationMigration, /set local statement_timeout = '10min'/);
+assert.match(reviewedReconciliationMigration, /request\.jwt\.claim\.role.*service_role/);
+assert.match(reviewedReconciliationMigration, /request\.jwt\.claims.*service_role/);
+assert.match(reviewedReconciliationMigration, /migration_privileged_session_required/);
+assert.match(reviewedReconciliationMigration, /safe_order_repair_audit_count_%_expected_3/);
+assert.match(reviewedReconciliationMigration, /merchant_statement_rows_inserted'[\s\S]*<> 43/);
+assert.match(reviewedReconciliationMigration, /cod_rows_inserted'[\s\S]*<> 21/);
+assert.match(reviewedReconciliationMigration, /driver_statement_rows_inserted'[\s\S]*<> 1/);
+assert.match(reviewedReconciliationMigration, /post_reconciliation_missing_dependencies_failed/);
+assert.match(reviewedReconciliationMigration, /remaining_missing_dependencies/);
+assert.doesNotMatch(reviewedReconciliationMigration, /admin_finance_reconciliation_health/);
+for (const fragment of [
+  "dn_missing_financial_dependencies_snapshot",
+  "admin_apply_safe_missing_financial_dependencies",
+  "dn_project_delivered_order_dependencies",
+  "m.entry_type = ''order_cod''",
+  "d.entry_type = ''delivery_earning''",
+  "delivered_statement_entry_type_integrity_install_failed",
+]) {
+  assert.ok(statementEntryTypeMigration.includes(fragment), `statement entry migration contains ${fragment}`);
+}
+assert.match(customerE2eCleanupMigration, /CUSTOMER_EXPERIENCE_E2E:%/);
+assert.match(customerE2eCleanupMigration, /production_test_dependency_cleanup_audit/);
+assert.match(customerE2eCleanupMigration, /customer_e2e_cleanup_changed_order_financial_integrity/);
+assert.match(customerE2eCleanupMigration, /v_current - 'dependent_tables'/);
+assert.match(customerE2eCleanupMigration, /missing_dependencies/);
+assert.match(projectionBackfillGuardMigration, /pg_get_functiondef/);
+assert.match(projectionBackfillGuardMigration, /daynight\.order_merchant_reconciliation/);
+assert.match(projectionBackfillGuardMigration, /delivered_projection_backfill_guard_contract_not_found/);
+assert.match(orderStatusCompatMigration, /v_order\.status::text is distinct from v_snapshot\.status::text/);
+assert.match(orderStatusCompatMigration, /o\.status::text is distinct from s\.status::text/);
+assert.match(orderStatusCompatMigration, /order_backfill_status_guard_contract_not_found/);
+assert.match(orderStatusCompatMigration, /finance_backfill_status_guard_contract_not_found/);
+assert.match(privilegedDbExecutorMigration, /session_user not in \('postgres', 'supabase_admin'\)/);
+assert.match(privilegedDbExecutorMigration, /privileged_db_reconciliation_executor_contract_not_found/);
+assert.match(privilegedDbExecutorMigration, /admin_apply_order_merchant_safe_backfill/);
+assert.match(privilegedDbExecutorMigration, /admin_apply_safe_missing_financial_dependencies/);
+for (const table of [
+  "financial_account_entries",
+  "cod_collections",
+  "merchant_statement_entries",
+  "driver_statement_entries",
+  "order_financial_settlements",
+]) {
+  assert.match(customerE2e, new RegExp(`\\[\\"${table}\\", \\"order_id\\"`));
+}
+assert.match(customerE2e, /Notification cleanup failed/);
+assert.equal((migration.match(/\$\$/g) || []).length % 2, 0, "balanced SQL dollar quotes");
+assert.equal((migration.match(/\(/g) || []).length, (migration.match(/\)/g) || []).length, "balanced SQL parentheses");
+assert.match(productionAudit, /order:\s*["']id\.asc["']/);
+assert.match(productionAudit, /٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹/);
+assert.match(productionAudit, /\[\^\\p\{L\}\\p\{N\}\]/);
+for (const coupon of ["010505", "010503", "003860"]) assert.ok(productionAudit.includes(coupon));
+assert.match(productionAudit, /DN-MER-SHOP-ILYTK/);
+assert.match(productionAudit, /971501050516/);
+assert.match(productionAudit, /DIAGNOSTIC_ONLY_NO_REASSIGNMENT/);
 
-console.log("global order merchant integrity gate passed");
+console.log("PASS global order/merchant ownership, visibility and integrity gate");

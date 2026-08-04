@@ -81,13 +81,13 @@ expect(
   /formatAdminMoney\(PERSONAL_ORDER_DELIVERY_FEE, isArabic\)/,
   "personal order UI shows the fixed fee in the active language",
 );
-expect(personal, /رقم الكوبون \* — إجباري/, "personal coupon is visibly required during new personal-order creation");
-expect(personal, /data-admin-personal-coupon="true"[\s\S]*required[\s\S]*aria-required="true"/, "new personal-order coupon uses native required semantics");
+expect(personal, /رقم الكوبون — اختياري ويمكن مراجعته لاحقًا/, "personal coupon is visibly optional for Admin creation");
+reject(personal, /data-admin-personal-coupon="true"[\s\S]{0,180}required/, "Admin personal-order coupon is not a native blocking requirement");
 expect(personal, /هاتف المرسل — اختياري/, "sender phone is explicitly optional");
 expect(personal, /عنوان الاستلام التفصيلي — اختياري/, "detailed pickup address is explicitly optional");
 expect(personal, /عنوان التسليم التفصيلي — اختياري/, "detailed delivery address is explicitly optional");
 expect(personal, /ملاحظات الطلب — اختياري/, "personal notes are explicitly optional");
-expect(personal, /data-admin-next-order-focus="true"/, "personal coupon uses global duplicate preflight during creation");
+expect(personal, /data-admin-next-order-focus="true"/, "personal reference remains ready for optional entry");
 expect(personal, /data-admin-personal-order-save="true"/, "personal save action is browser-testable");
 expect(personal, /value: "Al Ain"[\s\S]*areas: AL_AIN_AREAS/, "Al Ain is a standalone top-level location");
 expect(personal, /Al Jimi[\s\S]*Al Hili[\s\S]*Al Yahar[\s\S]*Al Wagan/, "Al Ain operational area list is populated");
@@ -97,10 +97,10 @@ expect(orderFinancials, /merchantDue: 0/, "personal financial display never crea
 const operations = read("src/lib/personalOrderOperations.ts");
 expect(operations, /PERSONAL_ORDER_DELIVERY_FEE = 25/, "personal order runtime fixes fee at 25");
 expect(operations, /merchant_id: null/, "personal order has no merchant linkage");
-expect(operations, /coupon_number_required_for_personal_order/, "new personal-order runtime rejects a missing coupon");
+reject(operations, /coupon_number_required_for_personal_order/, "Admin personal-order runtime does not reject a missing coupon");
 expect(operations, /if \(!senderName \|\| !receiverName \|\| !receiverPhone\)/, "personal runtime does not require sender phone");
-expect(operations, /coupon_number: couponNumber/, "personal coupon is stored in coupon_number during creation");
-expect(operations, /admin_create_personal_order/, "personal order uses protected RPC");
+expect(operations, /coupon_number: couponNumber \|\| null/, "personal coupon is stored when supplied and remains nullable otherwise");
+expect(operations, /createAdminOrder/, "personal order uses canonical Admin create v3 service");
 reject(operations, /\.from\(["']orders["']\)\.insert/, "personal order has no direct insert fallback");
 const logic = read("src/lib/adminOrderLogic.ts");
 expect(logic, /isPersonalAdminOrder/, "personal orders have explicit detection");

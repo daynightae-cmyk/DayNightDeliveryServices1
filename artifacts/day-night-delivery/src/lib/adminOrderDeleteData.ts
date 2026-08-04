@@ -43,7 +43,8 @@ export async function deleteAdminOrderImmediately(
     sourcePage: "admin_order_manager",
   });
 
-  if (!result.order.is_deleted && !result.order.deleted_at) {
+  const saved = result.order as Order & { is_deleted?: boolean; deleted_at?: string | null };
+  if (!saved.is_deleted && !saved.deleted_at) {
     throw new Error("admin_soft_delete_readback_not_confirmed");
   }
 
