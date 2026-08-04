@@ -21,9 +21,10 @@ import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import {
   calculateFinancialOpsOrder,
   createFinancialOpsOrder,
+  effectiveDeliveryFeeMode,
   type FinancialOpsOrderInput,
 } from "../../lib/orderFinancialOperations";
-import { calculateOrderFinancials, orderFinancialValidation } from "../../lib/orderFinancials";
+import { orderFinancialValidation } from "../../lib/orderFinancials";
 import { createAdminCouponIntakeSession } from "../../lib/couponIntakeData";
 import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
 import { INTERNATIONAL_DESTINATIONS } from "../../data/internationalDestinations";
@@ -110,16 +111,15 @@ function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boole
 }
 
 function merchantSettlement(value: number, isArabic: boolean) {
-  if (value < 0) {
-    return {
-      label: isArabic ? "مستحق على التاجر" : "Due from merchant",
-      amount: Math.abs(value),
-    };
-  }
-  return {
-    label: isArabic ? "مستحق للتاجر" : "Due to merchant",
-    amount: value,
-  };
+  return value < 0
+    ? {
+        label: isArabic ? "على التاجر" : "Merchant debit",
+        amount: value,
+      }
+    : {
+        label: isArabic ? "للتاجر" : "Due to merchant",
+        amount: value,
+      };
 }
 
 function FinancialMetric({ label, value, isArabic, accent = false }: { label: string; value: number; isArabic: boolean; accent?: boolean }) {
@@ -163,22 +163,20 @@ export default function AdminNewOrderComplete({
     () => calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }),
     [form, selectedMerchant],
   );
-  const authoritativeDeliveryFeeMode =
-    form.payment_method === "merchant_pays" || form.payment_method === "sender_pays"
-      ? "deduct_from_merchant"
-      : form.delivery_fee_mode;
+  const authoritativeDeliveryFeeMode = effectiveDeliveryFeeMode({
+    ...form,
+    merchant: selectedMerchant,
+  });
   const financials = useMemo(() => {
     try {
-      return calculateOrderFinancials({
-        goodsValue: form.goods_value,
-        deliveryFee: pricing.total,
-        discountAmount: form.discount_amount,
-        deliveryFeeMode: authoritativeDeliveryFeeMode,
+      return calculateFinancialOpsOrder({
+        ...form,
+        merchant: selectedMerchant,
       });
     } catch {
       return null;
     }
-  }, [form.goods_value, form.discount_amount, authoritativeDeliveryFeeMode, pricing.total]);
+  }, [form, selectedMerchant]);
   const settlement = financials ? merchantSettlement(financials.merchantDue, isArabic) : null;
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
@@ -416,7 +414,7 @@ export default function AdminNewOrderComplete({
   }
 
   return (
-    <form data-admin-new-order-form="merchant" onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
+    <form data-admin-new-order-form="merchant" autoComplete="off" onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
       <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold"><PackagePlus className="h-6 w-6" /></span>
@@ -507,7 +505,7 @@ export default function AdminNewOrderComplete({
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
-            <input type="number" min={0} step="0.01" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
+            <input type="number" min={0} step="0.01" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>
           <label className="space-y-2">
@@ -575,7 +573,32 @@ export default function AdminNewOrderComplete({
           <div>
             <h3 className="text-sm font-black text-brand-gold">{isArabic ? "تأكيد الحساب" : "Calculation confirmation"}</h3>
             <p className="mt-3 leading-6">{isArabic ? "عند الحفظ تُسجل كل القيم داخل الطلب، ثم تُنظف الخانات تلقائيًا مع الاحتفاظ بالتاجر المختار لتسريع إدخال الطلب التالي." : "Saving records every value, then clears the fields automatically while keeping the selected merchant for the next order."}</p>
-            {financials && <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4"><span className="block text-white/45">{isArabic ? "الإجمالي النهائي المطلوب" : "Final customer total"}</span><strong className="mt-1 block text-3xl font-black text-brand-gold" dir="ltr">{financials.customerTotal.toFixed(2)} AED</strong></div>}
+            {financials && (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4">
+                <span className="block text-white/45">
+                  {financials.merchantDue < 0
+                    ? isArabic
+                      ? "الإجمالي على التاجر"
+                      : "Merchant account total"
+                    : isArabic
+                      ? "الإجمالي النهائي المطلوب من العميل"
+                      : "Final customer total"}
+                </span>
+                <strong className="mt-1 block text-3xl font-black text-brand-gold" dir="ltr">
+                  {formatAdminMoney(
+                    financials.merchantDue < 0 ? financials.merchantDue : financials.customerTotal,
+                    isArabic,
+                  )}
+                </strong>
+                {financials.merchantDue < 0 && (
+                  <small className="mt-2 block leading-6 text-white/50">
+                    {isArabic
+                      ? `المطلوب من العميل ${formatAdminMoney(financials.customerTotal, true)} — رسوم التوصيل ${formatAdminMoney(financials.deliveryFee, true)} على التاجر`
+                      : `Customer total ${formatAdminMoney(financials.customerTotal, false)} — delivery ${formatAdminMoney(financials.deliveryFee, false)} charged to merchant`}
+                  </small>
+                )}
+              </div>
+            )}
           </div>
           <button type="submit" disabled={saving || !financials} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-4 text-sm font-black text-brand-deep disabled:opacity-60">
             {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}

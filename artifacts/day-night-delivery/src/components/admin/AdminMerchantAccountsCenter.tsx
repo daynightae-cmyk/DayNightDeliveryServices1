@@ -242,7 +242,7 @@ export default function AdminMerchantAccountsCenter({
                   <span><b className="block text-sm text-emerald-200">{delivered}</b><small className="text-[9px] font-bold text-white/38">{isArabic ? "مُسلّم" : "delivered"}</small></span>
                   <span><b className="block text-sm text-brand-gold">{merchantLedger.length}</b><small className="text-[9px] font-bold text-white/38">{isArabic ? "حركة" : "entries"}</small></span>
                 </div>
-                <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-[10px] font-black text-white/55">{due < 0 ? (isArabic ? "مستحق على التاجر" : "Due from merchant") : (isArabic ? "مستحق للتاجر" : "Due to merchant")}: <b className="text-brand-gold" dir="ltr">{money(Math.abs(due), isArabic)}</b></p>
+                <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-[10px] font-black text-white/55">{due < 0 ? (isArabic ? "على التاجر" : "Merchant debit") : (isArabic ? "للتاجر" : "Due to merchant")}: <b className="text-brand-gold" dir="ltr">{money(due, isArabic)}</b></p>
                 <button type="button" onClick={() => selectMerchant(merchant.id)} className="mt-3 w-full rounded-xl border border-brand-gold/35 bg-brand-gold/10 px-4 py-2.5 text-xs font-black text-brand-gold">{isArabic ? "فتح الحساب والطلبيات" : "Open account and orders"}</button>
               </article>
             );
@@ -352,7 +352,7 @@ export default function AdminMerchantAccountsCenter({
         <article className="rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.07] p-4"><span className="text-[10px] font-black text-emerald-200/70">{isArabic ? "تم التسليم" : "Delivered"}</span><strong className="mt-2 block text-xl text-emerald-200">{deliveredOrders.length}</strong></article>
         <article className="rounded-2xl border border-white/10 bg-[#031226] p-4"><span className="text-[10px] font-black text-white/45">{isArabic ? "قيمة البضاعة" : "Goods value"}</span><strong className="mt-2 block text-sm text-white" dir="ltr">{money(goodsTotal, isArabic)}</strong></article>
         <article className="rounded-2xl border border-brand-sky/25 bg-brand-sky/[0.07] p-4"><span className="text-[10px] font-black text-brand-sky/70">{isArabic ? "رسوم التوصيل" : "Delivery fees"}</span><strong className="mt-2 block text-sm text-brand-sky" dir="ltr">{money(deliveryTotal, isArabic)}</strong></article>
-        <article className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.07] p-4"><span className="text-[10px] font-black text-brand-gold/70">{merchantDue < 0 ? (isArabic ? "مستحق على التاجر" : "Due from merchant") : (isArabic ? "مستحق للتاجر" : "Due to merchant")}</span><strong className="mt-2 block text-sm text-brand-gold" dir="ltr">{money(Math.abs(merchantDue), isArabic)}</strong></article>
+        <article className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.07] p-4"><span className="text-[10px] font-black text-brand-gold/70">{merchantDue < 0 ? (isArabic ? "على التاجر" : "Merchant debit") : (isArabic ? "للتاجر" : "Due to merchant")}</span><strong className="mt-2 block text-sm text-brand-gold" dir="ltr">{money(merchantDue, isArabic)}</strong></article>
         <article className="rounded-2xl border border-white/10 bg-[#031226] p-4"><span className="text-[10px] font-black text-white/45">{isArabic ? "حركات مكررة مطوية" : "Collapsed duplicate rows"}</span><strong className="mt-2 block text-xl text-white">{collapsedDuplicates}</strong></article>
       </div>
 

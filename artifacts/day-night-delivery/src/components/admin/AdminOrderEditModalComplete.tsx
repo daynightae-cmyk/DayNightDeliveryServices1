@@ -1377,10 +1377,10 @@ export default function AdminOrderEditModalComplete({
                     label={
                       financials.merchantDue < 0
                         ? isArabic
-                          ? "مستحق على التاجر"
-                          : "Due from merchant"
+                          ? "على التاجر"
+                          : "Merchant debit"
                         : isArabic
-                          ? "مستحق للتاجر"
+                          ? "للتاجر"
                           : "Due to merchant"
                     }
                     value={financials.merchantDue}

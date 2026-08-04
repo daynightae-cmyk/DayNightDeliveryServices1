@@ -158,8 +158,8 @@ function csvCell(value: unknown) {
 function merchantSettlement(value: number, language: MerchantStatementLanguage) {
   if (value < 0) {
     return language === "ar"
-      ? `على التاجر ${money(Math.abs(value), language)}`
-      : `Due from merchant ${money(Math.abs(value), language)}`;
+      ? `على التاجر ${money(value, language)}`
+      : `Merchant debit ${money(value, language)}`;
   }
   return language === "ar"
     ? `للتاجر ${money(value, language)}`

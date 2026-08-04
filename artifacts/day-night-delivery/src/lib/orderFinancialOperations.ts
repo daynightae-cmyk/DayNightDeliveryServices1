@@ -172,8 +172,8 @@ async function recoverCouponConflict(
 
 function buildFinanceNote(financials: OrderFinancialBreakdown) {
   const settlementLine =
-    financials.merchantDue <= 0
-      ? `Due from merchant ${Math.abs(financials.merchantDue).toFixed(2)} AED`
+    financials.merchantDue < 0
+      ? `Merchant debit ${financials.merchantDue.toFixed(2)} AED`
       : `Merchant net ${financials.merchantDue.toFixed(2)} AED`;
   const lines = [
     `Goods value ${financials.goodsValue.toFixed(2)} AED`,
