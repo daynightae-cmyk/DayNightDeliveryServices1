@@ -29,8 +29,16 @@ reject(modal, /value=\{form\.destination_country \|\| ""\}[\s\S]{0,180}<input/, 
 expect(modal, /!clean\(currentForm\.coupon_number\)/, "every edited order requires a coupon");
 reject(modal, /رقم الكوبون — اختياري/, "personal edit no longer marks coupon optional");
 expect(modal, /هاتف المرسل — اختياري/, "sender phone is explicitly optional");
-expect(modal, /sensitiveChange && !confirmed/, "confirmation is limited to sensitive changes");
-expect(modal, /تحديث بيانات الطلب من لوحة الإدارة/, "ordinary edits receive an automatic audit reason");
+expect(
+  modal,
+  /automaticEditReason[\s\S]*edit_reason: automaticEditReason/,
+  "all edits receive an automatic audit reason",
+);
+reject(
+  modal,
+  /data-admin-complete-order-reason|data-admin-complete-order-confirm|sensitiveChange && !confirmed/,
+  "manual reason and confirmation controls are removed",
+);
 expect(modal, /orderStatusLabel\(order\.status, isArabic\)/, "raw database status is localized");
 reject(modal, /(اتلغت|مفيش|بيتسجل|بتتسجل|مش هيتم|الرسالة دي|اتساب|اتزامنوا)/, "complete editor contains no colloquial failure wording");
 expect(persistence, /admin_update_order_complete_verified_v2/, "save calls corrected complete-edit RPC");

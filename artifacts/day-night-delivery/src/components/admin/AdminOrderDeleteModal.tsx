@@ -31,6 +31,7 @@ export default function AdminOrderDeleteModal({
   isArabic,
   open,
   onClose,
+  onDeleted,
 }: Props) {
   const startedReference = useRef("");
   const [busy, setBusy] = useState(false);
@@ -69,6 +70,8 @@ export default function AdminOrderDeleteModal({
           }),
         );
 
+        await onDeleted?.(result.reference);
+
         // Close immediately. The current section, filters, pagination and scroll
         // position remain mounted while the deleted row disappears locally.
         onClose();
@@ -79,7 +82,7 @@ export default function AdminOrderDeleteModal({
         setError(`${feedback.message} ${isArabic ? "رمز العملية" : "Operation code"}: ${feedback.code}`);
       }
     })();
-  }, [isArabic, onClose, open, order, retryToken]);
+  }, [isArabic, onClose, onDeleted, open, order, retryToken]);
 
   if (!open || !order) return null;
 

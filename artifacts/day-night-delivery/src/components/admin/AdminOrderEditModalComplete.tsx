@@ -330,8 +330,6 @@ export default function AdminOrderEditModalComplete({
   onSaved,
 }: Props) {
   const [form, setForm] = useState<FinancialOpsOrderInput | null>(null);
-  const [editReason, setEditReason] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -342,8 +340,6 @@ export default function AdminOrderEditModalComplete({
   useEffect(() => {
     if (!open || !order) return;
     setForm(initialForm(order, merchants));
-    setEditReason("");
-    setConfirmed(false);
     setBusy(false);
     setMessage("");
     setError("");
@@ -466,16 +462,6 @@ export default function AdminOrderEditModalComplete({
         ? `الحقول المطلوبة: ${missing.join("، ")}`
         : `Required fields: ${missing.join(", ")}`;
     }
-    if (sensitiveChange && clean(editReason).length < 6) {
-      return isArabic
-        ? "اكتب سببًا واضحًا للتعديل المالي أو نقل الطلب، على ألا يقل عن 6 أحرف."
-        : "Enter a clear reason of at least 6 characters for the financial or merchant change.";
-    }
-    if (sensitiveChange && !confirmed) {
-      return isArabic
-        ? "أكد مراجعة أثر التعديل على التاجر والعميل والحسابات."
-        : "Confirm that you reviewed the merchant, customer, and accounting impact.";
-    }
     if (
       !personalOrder &&
       currentForm.price_mode === "manual" &&
@@ -513,6 +499,21 @@ export default function AdminOrderEditModalComplete({
       const packageValue =
         clean(currentForm.package_description || currentForm.package_type) ||
         originalPackage;
+      const automaticEditReason = isArabic
+        ? merchantChanged && financialChanged
+          ? "تعديل إداري تلقائي موثّق: تحديث التاجر والقيم المالية"
+          : merchantChanged
+            ? "تعديل إداري تلقائي موثّق: تحديث التاجر وربط ملكية الطلب"
+            : financialChanged
+              ? "تعديل إداري تلقائي موثّق: تحديث القيم المالية والتحصيل"
+              : "تعديل إداري تلقائي موثّق: تحديث بيانات الطلب"
+        : merchantChanged && financialChanged
+          ? "Automatic audited admin edit: merchant and financial values updated"
+          : merchantChanged
+            ? "Automatic audited admin edit: merchant ownership updated"
+            : financialChanged
+              ? "Automatic audited admin edit: financial and collection values updated"
+              : "Automatic audited admin edit: order details updated";
       const saveInput = {
         ...currentForm,
         coupon_number: clean(currentForm.coupon_number),
@@ -524,11 +525,7 @@ export default function AdminOrderEditModalComplete({
         package_type: packageValue,
         package_description: packageValue,
         order: currentOrder,
-        edit_reason:
-          clean(editReason) ||
-          (isArabic
-            ? "تحديث بيانات الطلب من لوحة الإدارة"
-            : "Order details updated from the admin panel"),
+        edit_reason: automaticEditReason,
       };
       const result =
         financialLocked && !personalOrder && !sensitiveChange
@@ -569,7 +566,6 @@ export default function AdminOrderEditModalComplete({
             ? `تم تحديث الطلب ${orderReference(result.row)} بالكامل وحفظه فعليًا. تمت مزامنة التاجر والكشوف والحسابات بأمان.${auditSuffix}${fieldsSuffix}`
             : `Order ${orderReference(result.row)} was completely updated and verified. Merchant ownership, statements, and accounting were synchronized safely.${auditSuffix}${fieldsSuffix}`,
       );
-      setConfirmed(false);
     } catch (cause) {
       const detail = opsErrorDetail(cause);
       console.error("DAY NIGHT complete order save rejected:", detail || cause);
@@ -1337,54 +1333,17 @@ export default function AdminOrderEditModalComplete({
               className={inputClass()}
               placeholder={isArabic ? "ملاحظات الطلب — اختياري" : "Order notes — optional"}
             />
-            <label className={labelClass}>
+            <div
+              className="flex items-start gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.06] p-4 text-xs font-bold leading-6 text-emerald-50/85"
+              data-admin-automatic-audit-reason="true"
+            >
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
               <span>
-                {sensitiveChange
-                  ? isArabic
-                    ? "سبب التعديل — إجباري للتعديلات المالية أو نقل الطلب"
-                    : "Edit reason — required for financial or merchant changes"
-                  : isArabic
-                    ? "سبب التعديل — اختياري، ويُضاف وصف مهني تلقائيًا عند تركه فارغًا"
-                    : "Edit reason — optional; a professional audit note is added automatically"}
+                {isArabic
+                  ? "لا تحتاج إلى كتابة سبب أو تفعيل تأكيد إضافي. ينشئ النظام وصف تدقيق مهنيًا تلقائيًا وفق الحقول التي غيّرتها، ثم يحفظ القيم السابقة واللاحقة واسم المسؤول."
+                  : "No manual reason or extra confirmation is required. The system automatically creates a professional audit description from the changed fields and records before/after values with the acting administrator."}
               </span>
-              <textarea
-                rows={3}
-                minLength={sensitiveChange ? 6 : undefined}
-                maxLength={600}
-                value={editReason}
-                onChange={(event) => {
-                  setEditReason(event.target.value);
-                  clearFeedback();
-                }}
-                className={inputClass()}
-                placeholder={
-                  isArabic
-                    ? "مثال: نقل الطلب للتاجر الصحيح بعد مراجعة الكود، وتصحيح عنوان العميل وقيمة التوصيل."
-                    : "Example: Moved the order to the verified merchant and corrected customer address and delivery fee."
-                }
-                required={sensitiveChange}
-                data-admin-complete-order-reason="true"
-              />
-            </label>
-            {sensitiveChange && (
-              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 text-xs font-bold leading-6 text-white/75">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) => {
-                    setConfirmed(event.target.checked);
-                    clearFeedback();
-                  }}
-                  className="mt-1 h-4 w-4 accent-[#d4af37]"
-                  data-admin-complete-order-confirm="true"
-                />
-                <span>
-                  {isArabic
-                    ? "أؤكد أنني راجعت التاجر والعميل والكوبون والعنوان والقيم المالية، وأنني أوافق على مزامنة الملكية والكشوف وتسجيل القيم السابقة واللاحقة."
-                    : "I confirm that I reviewed the merchant, customer, coupon, address, and financial values, and approve synchronization of ownership and ledgers with before/after audit records."}
-                </span>
-              </label>
-            )}
+            </div>
           </section>
         </div>
 

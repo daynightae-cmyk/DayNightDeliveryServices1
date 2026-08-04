@@ -106,12 +106,15 @@ assert(
   "coupon edit control missing",
 );
 assert(
-  modal.includes('data-admin-complete-order-reason="true"'),
-  "required audit reason control missing",
+  modal.includes("automaticEditReason") &&
+    modal.includes('edit_reason: automaticEditReason') &&
+    modal.includes('data-admin-automatic-audit-reason="true"'),
+  "automatic audited edit reason is missing",
 );
 assert(
-  modal.includes('data-admin-complete-order-confirm="true"'),
-  "explicit impact confirmation missing",
+  !modal.includes('data-admin-complete-order-reason="true"') &&
+    !modal.includes('data-admin-complete-order-confirm="true"'),
+  "manual reason or impact confirmation still burdens the operator",
 );
 assert(
   modal.includes("sender_name") && modal.includes("sender_phone"),
