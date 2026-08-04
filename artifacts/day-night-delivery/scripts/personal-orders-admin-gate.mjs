@@ -37,13 +37,29 @@ expect(
 );
 expect(modal, /personalOrder[\s\S]*merchant: personalOrder \? null/, "personal edit saves without merchant");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
-expect(persistence, /isPersonalAdminOrder[\s\S]*personalFullPatch/, "personal edit persistence bypasses merchant requirement");
-expect(persistence, /ORDERS_SCHEMA_COLUMN_RE/, "order edit recognizes missing PostgREST schema columns");
-expect(persistence, /Retrying order edit without unavailable orders/, "order edit retries without unavailable optional columns");
+const crudV3Migration = read(
+  "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql",
+  true,
+);
 expect(
   persistence,
-  /const couponNumber = clean\(input\.coupon_number\)[\s\S]*coupon_number_required_for_personal_order[\s\S]*coupon_number: couponNumber/,
-  "personal edits require and persist coupon numbers",
+  /isPersonalAdminOrder[\s\S]*merchant_id: personal \? null[\s\S]*updateAdminOrder\(orderId, patch/,
+  "personal edit uses canonical v3 patch semantics with merchant_id null",
+);
+expect(
+  crudV3Migration,
+  /information_schema\.columns[\s\S]*jsonb_populate_record\(null::public\.orders/,
+  "canonical v3 applies schema-aware patches without browser PostgREST fallbacks",
+);
+reject(
+  persistence,
+  /ORDERS_SCHEMA_COLUMN_RE|Retrying order edit without unavailable orders|\.from\(["']orders["']\)/,
+  "personal edit contains no legacy optional-column retry or direct table fallback",
+);
+expect(
+  crudV3Migration,
+  /coupon_reconciliation_required[\s\S]*coupon_missing_or_blank[\s\S]*v_reconciliation := true/,
+  "missing personal edit coupon becomes a non-blocking reconciliation warning",
 );
 const bulk = read("src/components/admin/AdminOrderBulkOperations.tsx");
 expect(bulk, /تحديد الطلبات والتصدير الجماعي/, "bulk selector is generic and visible");
@@ -65,13 +81,13 @@ expect(
   /formatAdminMoney\(PERSONAL_ORDER_DELIVERY_FEE, isArabic\)/,
   "personal order UI shows the fixed fee in the active language",
 );
-expect(personal, /رقم الكوبون \* — إجباري/, "personal coupon is visibly required");
-expect(personal, /data-admin-personal-coupon="true"[\s\S]*required[\s\S]*aria-required="true"/, "personal coupon uses native required semantics");
+expect(personal, /رقم الكوبون \* — إجباري/, "personal coupon is visibly required during new personal-order creation");
+expect(personal, /data-admin-personal-coupon="true"[\s\S]*required[\s\S]*aria-required="true"/, "new personal-order coupon uses native required semantics");
 expect(personal, /هاتف المرسل — اختياري/, "sender phone is explicitly optional");
 expect(personal, /عنوان الاستلام التفصيلي — اختياري/, "detailed pickup address is explicitly optional");
 expect(personal, /عنوان التسليم التفصيلي — اختياري/, "detailed delivery address is explicitly optional");
 expect(personal, /ملاحظات الطلب — اختياري/, "personal notes are explicitly optional");
-expect(personal, /data-admin-next-order-focus="true"/, "personal coupon uses global duplicate preflight");
+expect(personal, /data-admin-next-order-focus="true"/, "personal coupon uses global duplicate preflight during creation");
 expect(personal, /data-admin-personal-order-save="true"/, "personal save action is browser-testable");
 expect(personal, /value: "Al Ain"[\s\S]*areas: AL_AIN_AREAS/, "Al Ain is a standalone top-level location");
 expect(personal, /Al Jimi[\s\S]*Al Hili[\s\S]*Al Yahar[\s\S]*Al Wagan/, "Al Ain operational area list is populated");
@@ -81,9 +97,9 @@ expect(orderFinancials, /merchantDue: 0/, "personal financial display never crea
 const operations = read("src/lib/personalOrderOperations.ts");
 expect(operations, /PERSONAL_ORDER_DELIVERY_FEE = 25/, "personal order runtime fixes fee at 25");
 expect(operations, /merchant_id: null/, "personal order has no merchant linkage");
-expect(operations, /coupon_number_required_for_personal_order/, "personal runtime rejects a missing coupon");
+expect(operations, /coupon_number_required_for_personal_order/, "new personal-order runtime rejects a missing coupon");
 expect(operations, /if \(!senderName \|\| !receiverName \|\| !receiverPhone\)/, "personal runtime does not require sender phone");
-expect(operations, /coupon_number: couponNumber/, "personal coupon is always stored in coupon_number");
+expect(operations, /coupon_number: couponNumber/, "personal coupon is stored in coupon_number during creation");
 expect(operations, /admin_create_personal_order/, "personal order uses protected RPC");
 reject(operations, /\.from\(["']orders["']\)\.insert/, "personal order has no direct insert fallback");
 const logic = read("src/lib/adminOrderLogic.ts");
@@ -104,10 +120,10 @@ const compatibilityMigration = read("supabase/migrations/20260725054500_orders_e
 expect(compatibilityMigration, /add column if not exists manual_delivery_price/, "missing manual delivery column is restored");
 expect(compatibilityMigration, /pg_notify\('pgrst', 'reload schema'\)/, "PostgREST schema cache is reloaded");
 const fieldPolicyMigration = read("supabase/migrations/20260803023500_personal_order_required_coupon_optional_details.sql", true);
-expect(fieldPolicyMigration, /coupon_number_required_for_personal_order/, "database RPC requires a personal-order coupon");
-reject(fieldPolicyMigration, /message = 'sender_phone_required'/, "database RPC does not require sender phone");
+expect(fieldPolicyMigration, /coupon_number_required_for_personal_order/, "database creation RPC requires a personal-order coupon");
+reject(fieldPolicyMigration, /message = 'sender_phone_required'/, "database creation RPC does not require sender phone");
 expect(fieldPolicyMigration, /'sender_phone_required', false/, "runtime health marks sender phone optional");
-expect(fieldPolicyMigration, /if v_policy_write and v_core_changed and v_coupon is null then/, "global coupon trigger also requires personal coupons");
-expect(fieldPolicyMigration, /pg_advisory_xact_lock/, "required personal coupons remain globally duplicate protected");
+expect(fieldPolicyMigration, /if v_policy_write and v_core_changed and v_coupon is null then/, "global coupon trigger still protects ordinary non-v3 personal creation");
+expect(fieldPolicyMigration, /pg_advisory_xact_lock/, "new personal-order coupons remain globally duplicate protected");
 if (failed) process.exit(1);
 console.log("DAY NIGHT personal orders and admin controls gate PASSED");
