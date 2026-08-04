@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
+
 const file = ".github/scripts/finalize-admin-order-crud-v3.mjs";
 let content = fs.readFileSync(file, "utf8");
 
@@ -74,4 +76,29 @@ for (const [from, to, label] of replacements) {
 }
 
 fs.writeFileSync(file, content);
-console.log("Patched generated JSX, gates and canonical lifecycle/operations assertions.");
+
+const integrityGatePath =
+  "artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs";
+const mainIntegrityGate = execFileSync(
+  "git",
+  ["show", `origin/main:${integrityGatePath}`],
+  { encoding: "utf8" },
+);
+const legacyCreateAssertion =
+  "  assert.match(source, /admin_create_canonical_merchant_order/);";
+const unifiedCreateAssertion = `  assert.match(
+    source,
+    /admin_create_canonical_merchant_order|createAdminOrder/,
+    "order creation must use either the legacy canonical merchant RPC or the unified Admin v3 mutation service",
+  );`;
+if (!mainIntegrityGate.includes(legacyCreateAssertion)) {
+  throw new Error("global_order_integrity_gate_legacy_assertion_missing");
+}
+fs.writeFileSync(
+  integrityGatePath,
+  mainIntegrityGate.replace(legacyCreateAssertion, unifiedCreateAssertion),
+);
+
+console.log(
+  "Patched generated JSX, lifecycle/operations assertions and the global merchant-integrity gate for the unified v3 contract.",
+);
