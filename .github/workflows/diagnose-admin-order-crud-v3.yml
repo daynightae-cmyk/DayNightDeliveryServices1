@@ -6,12 +6,14 @@ on:
       - fix/admin-order-crud-v3-nonblocking-20260804
     paths:
       - ".github/scripts/finalize-admin-order-crud-v3.mjs"
+      - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
   pull_request:
     branches: [main]
     paths:
       - ".github/scripts/finalize-admin-order-crud-v3.mjs"
+      - ".github/scripts/patch-admin-order-crud-finalizer.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
   workflow_dispatch:
@@ -33,6 +35,9 @@ jobs:
         with:
           ref: fix/admin-order-crud-v3-nonblocking-20260804
           fetch-depth: 0
+
+      - name: Patch generated JSX placeholder
+        run: node .github/scripts/patch-admin-order-crud-finalizer.mjs
 
       - name: Apply canonical CRUD v3 frontend and gates
         run: node .github/scripts/finalize-admin-order-crud-v3.mjs
@@ -86,6 +91,7 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
 
           git rm .github/scripts/finalize-admin-order-crud-v3.mjs
+          git rm .github/scripts/patch-admin-order-crud-finalizer.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
 
           git add \
