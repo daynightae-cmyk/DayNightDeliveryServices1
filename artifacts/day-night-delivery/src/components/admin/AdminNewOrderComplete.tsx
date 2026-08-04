@@ -110,30 +110,68 @@ function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boole
   return isArabic ? "جاهز للحفظ" : "Ready to save";
 }
 
-function merchantSettlement(value: number, isArabic: boolean) {
-  return value < 0
-    ? {
-        label: isArabic ? "على التاجر" : "Merchant debit",
-        amount: value,
-      }
-    : {
-        label: isArabic ? "للتاجر" : "Due to merchant",
-        amount: value,
-      };
-}
+function merchantSettlement(
+    value: number,
+    isArabic: boolean,
+    deliveryFeeMode: "customer_pays" | "deduct_from_merchant",
+  ) {
+    const chargedToMerchant =
+      deliveryFeeMode === "deduct_from_merchant" || value < 0;
+    return chargedToMerchant
+      ? {
+          label: isArabic ? "مستحق على التاجر" : "Merchant debit",
+          amount: value,
+        }
+      : {
+          label: isArabic ? "مستحق للتاجر" : "Due to merchant",
+          amount: value,
+        };
+  }
 
-function FinancialMetric({ label, value, isArabic, accent = false }: { label: string; value: number; isArabic: boolean; accent?: boolean }) {
-  return (
-    <div className={`rounded-2xl border p-3 ${accent ? "border-brand-gold/40 bg-brand-gold/10" : "border-white/10 bg-black/10"}`}>
-      <span className="block text-[10px] font-black text-white/50">{label}</span>
-      <strong className={`mt-1 block text-lg font-black ${accent ? "text-brand-gold" : "text-white"}`} dir={isArabic ? "rtl" : "ltr"}>
-        {formatAdminMoney(value, isArabic)}
-      </strong>
-    </div>
-  );
-}
+  type FinancialMetricTone = "neutral" | "gold" | "danger";
 
-export default function AdminNewOrderComplete({
+  function signedAdminMoney(value: number, isArabic: boolean) {
+    const absolute = formatAdminMoney(Math.abs(value), isArabic);
+    return value < 0 ? `-${absolute}` : absolute;
+  }
+
+  function FinancialMetric({
+    label,
+    value,
+    isArabic,
+    tone = "neutral",
+  }: {
+    label: string;
+    value: number;
+    isArabic: boolean;
+    tone?: FinancialMetricTone;
+  }) {
+    const containerClass =
+      tone === "danger"
+        ? "border-rose-400/55 bg-rose-500/15 shadow-[0_0_24px_rgba(244,63,94,0.12)]"
+        : tone === "gold"
+          ? "border-brand-gold/40 bg-brand-gold/10"
+          : "border-white/10 bg-black/10";
+    const labelClass =
+      tone === "danger" ? "text-rose-200/90" : "text-white/50";
+    const valueClass =
+      tone === "danger"
+        ? "text-rose-300"
+        : tone === "gold"
+          ? "text-brand-gold"
+          : "text-white";
+
+    return (
+      <div className={`rounded-2xl border p-3 ${containerClass}`}>
+        <span className={`block text-[10px] font-black ${labelClass}`}>{label}</span>
+        <strong className={`mt-1 block text-lg font-black ${valueClass}`} dir="ltr">
+          {signedAdminMoney(value, isArabic)}
+        </strong>
+      </div>
+    );
+  }
+
+  export default function AdminNewOrderComplete({
   isArabic,
   merchants,
   onSaved,
@@ -167,17 +205,35 @@ export default function AdminNewOrderComplete({
     ...form,
     merchant: selectedMerchant,
   });
+  const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => {
+    const chargedToMerchant =
+      authoritativeDeliveryFeeMode === "deduct_from_merchant";
+    return {
+      ...form,
+      merchant: selectedMerchant,
+      delivery_fee_mode: authoritativeDeliveryFeeMode,
+      payment_method: chargedToMerchant
+        ? "merchant_pays"
+        : form.payment_method === "merchant_pays" ||
+            form.payment_method === "sender_pays"
+          ? "cod"
+          : form.payment_method,
+    };
+  }, [form, selectedMerchant, authoritativeDeliveryFeeMode]);
   const financials = useMemo(() => {
     try {
-      return calculateFinancialOpsOrder({
-        ...form,
-        merchant: selectedMerchant,
-      });
+      return calculateFinancialOpsOrder(resolvedFinancialInput);
     } catch {
       return null;
     }
-  }, [form, selectedMerchant]);
-  const settlement = financials ? merchantSettlement(financials.merchantDue, isArabic) : null;
+  }, [resolvedFinancialInput]);
+  const settlement = financials
+    ? merchantSettlement(
+        financials.merchantDue,
+        isArabic,
+        financials.deliveryFeeMode,
+      )
+    : null;
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
@@ -204,10 +260,14 @@ export default function AdminNewOrderComplete({
   function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
     setForm((current) => ({
       ...current,
-      delivery_fee_mode:
-        current.payment_method === "merchant_pays" || current.payment_method === "sender_pays"
-          ? "deduct_from_merchant"
-          : value,
+      delivery_fee_mode: value,
+      payment_method:
+        value === "deduct_from_merchant"
+          ? "merchant_pays"
+          : current.payment_method === "merchant_pays" ||
+              current.payment_method === "sender_pays"
+            ? "cod"
+            : current.payment_method,
     }));
     setSource("pending");
     setMessage("");
@@ -322,16 +382,16 @@ export default function AdminNewOrderComplete({
     try {
       const packageValue = clean(form.package_description || form.package_type);
       const couponNumber = clean(form.coupon_number);
-      const calculated = calculateFinancialOpsOrder({ ...form, merchant: selectedMerchant });
-      const result = await createFinancialOpsOrder({
-        ...form,
-        coupon_number: couponNumber,
-        merchant: selectedMerchant,
-        receiver_address: clean(form.receiver_address),
-        delivery_street: clean(form.delivery_street),
-        package_type: packageValue || "Shipment",
-        package_description: packageValue || "Shipment",
-      });
+      const submissionInput: FinancialOpsOrderInput = {
+      ...resolvedFinancialInput,
+      coupon_number: couponNumber,
+      receiver_address: clean(form.receiver_address),
+      delivery_street: clean(form.delivery_street),
+      package_type: packageValue || "Shipment",
+      package_description: packageValue || "Shipment",
+    };
+    const calculated = calculateFinancialOpsOrder(submissionInput);
+    const result = await createFinancialOpsOrder(submissionInput);
       const saved = result.row;
       const reference = clean(saved.tracking_number || saved.invoice_number || saved.id);
       let auditSuffix = "";
@@ -344,7 +404,11 @@ export default function AdminNewOrderComplete({
         if (audit.warning) auditSuffix = isArabic ? ` ملاحظة الأرشفة: ${audit.warning}` : ` Archive note: ${audit.warning}`;
       }
 
-      const savedSettlement = merchantSettlement(calculated.merchantDue, isArabic);
+      const savedSettlement = merchantSettlement(
+      calculated.merchantDue,
+      isArabic,
+      calculated.deliveryFeeMode,
+    );
       prepareNextOrder(selectedMerchant);
       const warningCodes = (result.warnings || [])
         .map((warning) => String(warning.code || ""))
@@ -539,8 +603,26 @@ export default function AdminNewOrderComplete({
             <FinancialMetric isArabic={isArabic} label={isArabic ? "قيمة البضاعة" : "Goods"} value={financials.goodsValue} />
             <FinancialMetric isArabic={isArabic} label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
             {financials.discountAmount > 0 && <FinancialMetric isArabic={isArabic} label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />}
-            <FinancialMetric isArabic={isArabic} label={isArabic ? "المطلوب من العميل" : "Customer total"} value={financials.customerTotal} accent />
-            <FinancialMetric isArabic={isArabic} label={settlement.label} value={settlement.amount} />
+            <FinancialMetric
+                isArabic={isArabic}
+                label={isArabic ? "المطلوب من العميل" : "Customer total"}
+                value={financials.customerTotal}
+                tone={
+                  financials.deliveryFeeMode === "deduct_from_merchant"
+                    ? "neutral"
+                    : "gold"
+                }
+              />
+              <FinancialMetric
+                isArabic={isArabic}
+                label={settlement.label}
+                value={settlement.amount}
+                tone={
+                  financials.deliveryFeeMode === "deduct_from_merchant"
+                    ? "danger"
+                    : "neutral"
+                }
+              />
             <FinancialMetric isArabic={isArabic} label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
           </div>
         ) : (
@@ -574,19 +656,40 @@ export default function AdminNewOrderComplete({
             <h3 className="text-sm font-black text-brand-gold">{isArabic ? "تأكيد الحساب" : "Calculation confirmation"}</h3>
             <p className="mt-3 leading-6">{isArabic ? "عند الحفظ تُسجل كل القيم داخل الطلب، ثم تُنظف الخانات تلقائيًا مع الاحتفاظ بالتاجر المختار لتسريع إدخال الطلب التالي." : "Saving records every value, then clears the fields automatically while keeping the selected merchant for the next order."}</p>
             {financials && (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4">
-                <span className="block text-white/45">
+              <div
+                  className={`mt-4 rounded-2xl border p-4 ${
+                    financials.merchantDue < 0
+                      ? "border-rose-400/55 bg-rose-500/15 shadow-[0_0_28px_rgba(244,63,94,0.14)]"
+                      : "border-white/10 bg-black/10"
+                  }`}
+                >
+                <span
+                    className={`block ${
+                      financials.merchantDue < 0
+                        ? "font-black text-rose-200"
+                        : "text-white/45"
+                    }`}
+                  >
                   {financials.merchantDue < 0
                     ? isArabic
-                      ? "الإجمالي على التاجر"
-                      : "Merchant account total"
+                      ? "إجمالي المستحق على التاجر"
+                      : "Merchant debit total"
                     : isArabic
                       ? "الإجمالي النهائي المطلوب من العميل"
                       : "Final customer total"}
                 </span>
-                <strong className="mt-1 block text-3xl font-black text-brand-gold" dir="ltr">
-                  {formatAdminMoney(
-                    financials.merchantDue < 0 ? financials.merchantDue : financials.customerTotal,
+                <strong
+                    className={`mt-1 block text-3xl font-black ${
+                      financials.merchantDue < 0
+                        ? "text-rose-300"
+                        : "text-brand-gold"
+                    }`}
+                    dir="ltr"
+                  >
+                  {signedAdminMoney(
+                    financials.merchantDue < 0
+                      ? financials.merchantDue
+                      : financials.customerTotal,
                     isArabic,
                   )}
                 </strong>
