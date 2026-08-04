@@ -124,7 +124,7 @@ jobs:
           set -euo pipefail
           git config user.name "DAY NIGHT CI"
           git config user.email "actions@users.noreply.github.com"
-          git add .github/admin-order-crud-v3-typecheck-summary.log
+          git add -f .github/admin-order-crud-v3-typecheck-summary.log
           git commit -m "ci(admin): capture CRUD v3 typecheck diagnostics"
           git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
           exit 1
@@ -156,7 +156,7 @@ jobs:
           set -euo pipefail
           git config user.name "DAY NIGHT CI"
           git config user.email "actions@users.noreply.github.com"
-          git add .github/admin-order-crud-v3-production-gate-summary.log
+          git add -f .github/admin-order-crud-v3-production-gate-summary.log
           git commit -m "ci(admin): capture CRUD v3 production-gate diagnostics"
           git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
           exit 1
