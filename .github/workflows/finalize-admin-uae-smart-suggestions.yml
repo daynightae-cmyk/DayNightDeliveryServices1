@@ -5,13 +5,14 @@ on:
     branches:
       - feat/admin-uae-smart-suggestions-arabic-currency-20260804
     paths:
-      - ".github/scripts/finalize-admin-uae-smart-suggestions.mjs"
       - ".github/workflows/finalize-admin-uae-smart-suggestions.yml"
   pull_request:
     branches: [main]
     paths:
-      - ".github/scripts/finalize-admin-uae-smart-suggestions.mjs"
       - ".github/workflows/finalize-admin-uae-smart-suggestions.yml"
+      - "artifacts/day-night-delivery/package.json"
+      - "artifacts/day-night-delivery/scripts/admin-uae-smart-suggestions-currency-gate.mjs"
+      - "artifacts/day-night-delivery/src/data/uaeLocations.ts"
       - "artifacts/day-night-delivery/src/components/admin/AdminHistoryAutocomplete.tsx"
       - "artifacts/day-night-delivery/src/lib/adminLocale.ts"
       - "artifacts/day-night-delivery/src/styles/dn-admin-smart-autocomplete.css"
@@ -35,9 +36,6 @@ jobs:
         with:
           ref: feat/admin-uae-smart-suggestions-arabic-currency-20260804
           fetch-depth: 0
-
-      - name: Apply UAE areas and production gate
-        run: node .github/scripts/finalize-admin-uae-smart-suggestions.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -76,25 +74,14 @@ jobs:
       - name: Production build
         run: pnpm run web:build
 
-      - name: Commit verified implementation only
+      - name: Remove temporary verification workflow
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "DAY NIGHT CI"
           git config user.email "actions@users.noreply.github.com"
-
-          git rm .github/scripts/finalize-admin-uae-smart-suggestions.mjs
           git rm .github/workflows/finalize-admin-uae-smart-suggestions.yml
-
-          git add \
-            artifacts/day-night-delivery/package.json \
-            artifacts/day-night-delivery/scripts/admin-uae-smart-suggestions-currency-gate.mjs \
-            artifacts/day-night-delivery/src/data/uaeLocations.ts \
-            artifacts/day-night-delivery/src/components/admin/AdminHistoryAutocomplete.tsx \
-            artifacts/day-night-delivery/src/lib/adminLocale.ts \
-            artifacts/day-night-delivery/src/styles/dn-admin-smart-autocomplete.css
-
           git diff --cached --check
-          git commit -m "feat(admin): expand UAE areas and smart Arabic suggestions"
+          git commit -m "ci(admin): finalize UAE suggestion verification"
           git push origin HEAD:feat/admin-uae-smart-suggestions-arabic-currency-20260804
