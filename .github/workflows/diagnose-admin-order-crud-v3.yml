@@ -23,7 +23,6 @@ on:
       - ".github/scripts/finalize-admin-order-create-v3-ui.mjs"
       - ".github/scripts/patch-admin-order-create-v3-ui.mjs"
       - ".github/workflows/diagnose-admin-order-crud-v3.yml"
-      - "supabase/migrations/20260804211500_admin-order-crud-v3-nonblocking.sql"
       - "supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql"
       - "artifacts/day-night-delivery/scripts/merchant-statement-order-edit-gate.mjs"
       - "artifacts/day-night-delivery/scripts/personal-orders-admin-gate.mjs"
@@ -104,7 +103,18 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          pnpm run web:typecheck 2>&1 | tee .github/admin-order-crud-v3-typecheck.log
+          pnpm run web:typecheck > /tmp/typecheck.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "=== TYPECHECK FAILURE SUMMARY ==="
+              grep -nE "error TS|Error:|ERR_|failed" /tmp/typecheck.log | tail -n 250 || true
+              echo "=== TYPECHECK LOG TAIL ==="
+              tail -n 300 /tmp/typecheck.log
+            } > .github/admin-order-crud-v3-typecheck-summary.log
+          fi
+          cat /tmp/typecheck.log
+          exit "$status"
 
       - name: Preserve focused TypeScript diagnostics
         if: steps.typecheck.outcome == 'failure'
@@ -113,7 +123,7 @@ jobs:
           set -euo pipefail
           git config user.name "DAY NIGHT CI"
           git config user.email "actions@users.noreply.github.com"
-          git add .github/admin-order-crud-v3-typecheck.log
+          git add .github/admin-order-crud-v3-typecheck-summary.log
           git commit -m "ci(admin): capture CRUD v3 typecheck diagnostics"
           git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
           exit 1
@@ -124,7 +134,18 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          pnpm run web:gate 2>&1 | tee .github/admin-order-crud-v3-production-gate.log
+          pnpm run web:gate > /tmp/production-gate.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "=== PRODUCTION GATE FAILURE SUMMARY ==="
+              grep -nE "FAIL|failed|Error:|ERR_|gate_failed|assert" /tmp/production-gate.log | tail -n 300 || true
+              echo "=== PRODUCTION GATE LOG TAIL ==="
+              tail -n 350 /tmp/production-gate.log
+            } > .github/admin-order-crud-v3-production-gate-summary.log
+          fi
+          cat /tmp/production-gate.log
+          exit "$status"
 
       - name: Preserve focused production-gate diagnostics
         if: steps.production_gate.outcome == 'failure'
@@ -133,7 +154,7 @@ jobs:
           set -euo pipefail
           git config user.name "DAY NIGHT CI"
           git config user.email "actions@users.noreply.github.com"
-          git add .github/admin-order-crud-v3-production-gate.log
+          git add .github/admin-order-crud-v3-production-gate-summary.log
           git commit -m "ci(admin): capture CRUD v3 production-gate diagnostics"
           git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
           exit 1
@@ -154,8 +175,8 @@ jobs:
           git rm .github/scripts/finalize-admin-order-create-v3-ui.mjs
           git rm .github/scripts/patch-admin-order-create-v3-ui.mjs
           git rm .github/workflows/diagnose-admin-order-crud-v3.yml
-          git rm -f .github/admin-order-crud-v3-typecheck.log || true
-          git rm -f .github/admin-order-crud-v3-production-gate.log || true
+          git rm -f .github/admin-order-crud-v3-typecheck-summary.log || true
+          git rm -f .github/admin-order-crud-v3-production-gate-summary.log || true
 
           git add \
             supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql \
