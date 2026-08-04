@@ -24,20 +24,29 @@ if (!gate.includes(legacyCouponAssertions)) {
 }
 gate = gate.replace(legacyCouponAssertions, v3CouponAssertions);
 
-const legacyPersistenceAssertions = `expect(persistence, /admin_update_order_complete_verified_v2/, "save calls corrected complete-edit RPC");
-expect(persistence, /coupon_number_required_for_personal_order/, "personal edit rejects a missing coupon");`;
-const v3PersistenceAssertions = `expect(persistence, /updateAdminOrder/, "save calls the unified canonical Admin mutation service");
-reject(persistence, /coupon_number_required_for_personal_order/, "personal edit does not reject a missing coupon");
+const saveAssertionPattern = /^expect\(persistence,\s*\/[^\n]+\/,[^\n]*"save calls[^\n]*\);$/m;
+const personalCouponAssertionPattern =
+  /^expect\(persistence,\s*\/[^\n]+\/,[^\n]*"personal edit rejects a missing coupon"\);$/m;
+if (!saveAssertionPattern.test(gate)) {
+  throw new Error("localization_gate_save_assertion_missing");
+}
+if (!personalCouponAssertionPattern.test(gate)) {
+  throw new Error("localization_gate_personal_coupon_assertion_missing");
+}
+gate = gate.replace(
+  saveAssertionPattern,
+  'expect(persistence, /updateAdminOrder/, "save calls the unified canonical Admin mutation service");',
+);
+gate = gate.replace(
+  personalCouponAssertionPattern,
+  `reject(persistence, /coupon_number_required_for_personal_order/, "personal edit does not reject a missing coupon");
 expect(mutations, /admin_update_order_complete_v3/, "unified mutation service calls the canonical v3 RPC");
 expect(
   v3Migration,
   /coupon_reconciliation_required[\\s\\S]*coupon_missing_or_blank/,
   "database converts a missing coupon into a non-blocking reconciliation warning",
-);`;
-if (!gate.includes(legacyPersistenceAssertions)) {
-  throw new Error("localization_gate_persistence_assertions_target_missing");
-}
-gate = gate.replace(legacyPersistenceAssertions, v3PersistenceAssertions);
+);`,
+);
 
 fs.writeFileSync(gatePath, gate);
 console.log(
