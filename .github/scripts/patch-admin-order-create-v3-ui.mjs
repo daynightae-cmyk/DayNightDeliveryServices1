@@ -82,4 +82,26 @@ if (!financial.includes(createTarget)) {
 financial = financial.replace(createTarget, createReplacement);
 fs.writeFileSync(financialPath, financial);
 
-console.log("Scoped create assertions, personal coupon input verification, and preserved authoritative coupon preflight/recovery.");
+const personalPath = "artifacts/day-night-delivery/src/lib/personalOrderOperations.ts";
+let personal = fs.readFileSync(personalPath, "utf8");
+const personalValidationTarget = `  if (!supabase) throw new Error("Supabase is not configured.");
+  const couponNumber = clean(input.reference);`;
+const personalValidationReplacement = `  if (!supabase) throw new Error("Supabase is not configured.");
+  const senderName = clean(input.sender_name);
+  const receiverName = clean(input.receiver_name);
+  const receiverPhone = clean(input.receiver_phone);
+  if (!senderName || !receiverName || !receiverPhone) {
+    throw new Error("personal_order_core_fields_required");
+  }
+  const couponNumber = clean(input.reference);`;
+if (!personal.includes(personalValidationTarget)) {
+  throw new Error("create_v3_personal_core_validation_target_missing");
+}
+personal = personal.replace(personalValidationTarget, personalValidationReplacement);
+personal = personal
+  .replace("    sender_name: clean(input.sender_name),", "    sender_name: senderName,")
+  .replace("    receiver_name: clean(input.receiver_name),", "    receiver_name: receiverName,")
+  .replace("    receiver_phone: clean(input.receiver_phone),", "    receiver_phone: receiverPhone,");
+fs.writeFileSync(personalPath, personal);
+
+console.log("Scoped create assertions, preserved coupon integrity, and kept personal sender phone optional while validating core names and receiver phone.");
