@@ -1,0 +1,104 @@
+name: Merchant Negative Settlement UI Hotfix V3
+
+on:
+  push:
+    branches: [fix/merchant-negative-ui-20260805]
+    paths:
+      - .github/workflows/merchant-negative-ui-hotfix-v3.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: merchant-negative-ui-hotfix-v3
+  cancel-in-progress: false
+
+jobs:
+  patch-build-commit:
+    name: Patch, verify and commit production-compatible merchant totals
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/merchant-negative-ui-20260805
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Reuse exact verified source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/merchant-negative-ui-hotfix-v2.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Apply exact UI and statement corrections'
+          start = source.index(marker)
+          run_index = next(i for i in range(start + 1, len(source)) if source[i] == '        run: |')
+          body = []
+          for line in source[run_index + 1:]:
+              if line.startswith('      - name: '):
+                  break
+              body.append(line[10:] if line.startswith('          ') else line)
+          Path('/tmp/apply-merchant-ui.sh').write_text('\n'.join(body) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/apply-merchant-ui.sh
+
+      - name: Mark authoritative new-order finance source as build-compatible
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'artifacts/day-night-delivery/scripts/precise-financial-rule-compatible-plugin.ts';
+          let source = fs.readFileSync(file, 'utf8');
+          const before = `      const isAuditedCompleteEditor =\n        normalized.endsWith(\n          "/src/components/admin/AdminOrderEditModalComplete.tsx",\n        ) &&\n        source.includes('data-admin-complete-order-merchant="true"') &&\n        source.includes("calculateFinancialOpsOrder") &&\n        source.includes("saveAdminOrderEdit");\n\n      if (isAuditedCompleteEditor) {\n        return { code: source, map: null };\n      }`;
+          const after = `      const isAuditedCompleteEditor =\n        normalized.endsWith(\n          "/src/components/admin/AdminOrderEditModalComplete.tsx",\n        ) &&\n        source.includes('data-admin-complete-order-merchant="true"') &&\n        source.includes("calculateFinancialOpsOrder") &&\n        source.includes("saveAdminOrderEdit");\n      const isAuthoritativeNewOrder =\n        normalized.endsWith(\n          "/src/components/admin/AdminNewOrderComplete.tsx",\n        ) &&\n        source.includes("effectiveDeliveryFeeMode") &&\n        source.includes("calculateFinancialOpsOrder") &&\n        source.includes('data-admin-new-order-form="merchant"');\n\n      if (isAuditedCompleteEditor || isAuthoritativeNewOrder) {\n        return { code: source, map: null };\n      }`;
+          const matches = source.split(before).length - 1;
+          if (matches !== 1) throw new Error(`compatible plugin patch expected one match, found ${matches}`);
+          source = source.replace(before, after);
+          fs.writeFileSync(file, source);
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify signed UI gate
+        run: node artifacts/day-night-delivery/scripts/merchant-negative-ui-gate.mjs
+
+      - name: Build Admin application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Commit verified hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT Automation"
+          git config user.email "actions@daynightae.com"
+          git add \
+            artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminMerchantAccountsCenter.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminDeliveredFinancialAdjustment.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx \
+            artifacts/day-night-delivery/src/lib/merchantStatementExport.ts \
+            artifacts/day-night-delivery/src/lib/orderFinancialOperations.ts \
+            artifacts/day-night-delivery/scripts/precise-financial-rule-compatible-plugin.ts \
+            artifacts/day-night-delivery/scripts/merchant-negative-ui-gate.mjs
+          git diff --cached --check
+          git commit -m "fix(admin): show signed merchant debit and disable goods autofill"
+          git push origin HEAD:fix/merchant-negative-ui-20260805
