@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: admin-order-crud-v3-production-verification
@@ -86,3 +88,18 @@ jobs:
             supabase --workdir "$release_dir" db push --yes
           fi
           supabase --workdir "$release_dir" migration list --linked | grep -F "20260804211500"
+
+      - name: Publish successful schema deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="### ✅ Admin Order CRUD v3 schema deployed\n\nMigration \`20260804211500\` is recorded on production. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      - name: Publish schema deployment failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/344/comments" -f body="### ❌ Admin Order CRUD v3 schema deployment failed\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
