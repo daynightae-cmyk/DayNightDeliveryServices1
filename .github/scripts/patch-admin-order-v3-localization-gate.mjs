@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const gatePath =
   "artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs";
@@ -49,6 +50,18 @@ expect(
 );
 
 fs.writeFileSync(gatePath, gate);
+
+execFileSync(
+  "git",
+  [
+    "checkout",
+    "--",
+    ".github/scripts/finalize-admin-order-crud-v3.mjs",
+    ".github/scripts/finalize-admin-order-create-v3-ui.mjs",
+  ],
+  { stdio: "inherit" },
+);
+
 console.log(
-  "Patched localization verification for the canonical v3 non-blocking coupon contract.",
+  "Patched localization verification and restored temporary generators before their verified removal.",
 );
