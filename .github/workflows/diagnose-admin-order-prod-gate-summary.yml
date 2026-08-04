@@ -1,0 +1,57 @@
+name: Diagnose Admin Order Production Gate
+
+on:
+  push:
+    branches:
+      - fix/admin-order-crud-v3-nonblocking-20260804
+    paths:
+      - ".github/workflows/diagnose-admin-order-prod-gate-summary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-order-crud-v3-nonblocking-20260804
+          fetch-depth: 0
+      - run: node .github/scripts/patch-admin-order-crud-finalizer.mjs
+      - run: node .github/scripts/finalize-admin-order-crud-v3.mjs
+      - run: node .github/scripts/finalize-admin-order-create-v3.mjs
+      - run: node .github/scripts/patch-admin-order-create-v3-ui.mjs
+      - run: node .github/scripts/finalize-admin-order-create-v3-ui.mjs
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Run and persist compact failure summary
+        shell: bash
+        run: |
+          set +e
+          pnpm run web:gate > /tmp/production-gate.log 2>&1
+          status=$?
+          set -e
+          {
+            echo "exit_status=$status"
+            echo "=== FAILURE LINES ==="
+            grep -nE "FAIL|failed|Error:|ERR_|gate_failed|assert" /tmp/production-gate.log | tail -n 350 || true
+            echo "=== LOG TAIL ==="
+            tail -n 400 /tmp/production-gate.log
+          } > .github/admin-order-crud-v3-production-gate-summary.log
+          git config user.name "DAY NIGHT CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f .github/admin-order-crud-v3-production-gate-summary.log
+          git commit -m "ci(admin): capture CRUD v3 production-gate summary"
+          git push origin HEAD:fix/admin-order-crud-v3-nonblocking-20260804
+          exit "$status"
