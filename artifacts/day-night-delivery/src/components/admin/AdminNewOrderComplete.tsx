@@ -237,25 +237,26 @@ function merchantSettlement(
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value } as FinancialOpsOrderInput;
+      if (
+        key === "goods_value" &&
+        value !== "" &&
+        value !== null &&
+        value !== undefined &&
+        Number.isFinite(Number(value)) &&
+        Number(value) === 0
+      ) {
+        next.delivery_fee_mode = "deduct_from_merchant";
+        next.payment_method = "merchant_pays";
+      }
+      return next;
+    });
     setSource("pending");
     setMessage("");
     setError("");
   }
 
-  function setPaymentMethod(value: string) {
-    setForm((current) => ({
-      ...current,
-      payment_method: value,
-      delivery_fee_mode:
-        value === "merchant_pays" || value === "sender_pays"
-          ? "deduct_from_merchant"
-          : "customer_pays",
-    }));
-    setSource("pending");
-    setMessage("");
-    setError("");
-  }
 
   function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
     setForm((current) => ({
@@ -599,7 +600,7 @@ function merchantSettlement(
         </div>
 
         {financials && settlement ? (
-          <div className={`mt-4 grid gap-3 sm:grid-cols-2 ${financials.discountAmount > 0 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
+          <div className={`mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${financials.discountAmount > 0 ? "2xl:grid-cols-7" : "2xl:grid-cols-6"}`}>
             <FinancialMetric isArabic={isArabic} label={isArabic ? "قيمة البضاعة" : "Goods"} value={financials.goodsValue} />
             <FinancialMetric isArabic={isArabic} label={isArabic ? "التوصيل" : "Delivery"} value={financials.deliveryFee} />
             {financials.discountAmount > 0 && <FinancialMetric isArabic={isArabic} label={isArabic ? "الخصم" : "Discount"} value={financials.discountAmount} />}
@@ -624,91 +625,47 @@ function merchantSettlement(
                 }
               />
             <FinancialMetric isArabic={isArabic} label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
+              <FinancialMetric
+                isArabic={isArabic}
+                label={
+                  financials.merchantDue < 0
+                    ? isArabic
+                      ? "إجمالي المستحق على التاجر"
+                      : "Merchant debit total"
+                    : isArabic
+                      ? "الإجمالي النهائي المطلوب من العميل"
+                      : "Final customer total"
+                }
+                value={
+                  financials.merchantDue < 0
+                    ? financials.merchantDue
+                    : financials.customerTotal
+                }
+                tone={financials.merchantDue < 0 ? "danger" : "gold"}
+              />
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/8 p-3 text-xs font-bold text-rose-100">{isArabic ? "راجع الخصم والقيم المالية لإظهار الإجمالي." : "Check the discount and financial values to display totals."}</div>
         )}
       </section>
 
-      <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-4 rounded-[1.5rem] border border-white/10 bg-brand-deep/35 p-4">
-          <h3 className="text-sm font-black text-white">{isArabic ? "طريقة التحصيل والتفاصيل" : "Collection method and details"}</h3>
-          <select value={form.payment_method} onChange={(event) => setPaymentMethod(event.target.value)} className={inputClass()}>
-            <option value="cod">{isArabic ? "تحصيل المبلغ النهائي من العميل عند التسليم" : "Collect final total from customer on delivery"}</option>
-            <option value="receiver_pays">{isArabic ? "مدفوع من المستلم" : "Receiver paid"}</option>
-            <option value="merchant_pays">{isArabic ? `على حساب التاجر — رسوم التوصيل ${pricing.total.toFixed(2)} درهم` : `Charge merchant account — ${pricing.total.toFixed(2)} AED delivery fee`}</option>
-          </select>
-          <details className="rounded-2xl border border-white/10 bg-black/10 p-4 text-white/70">
-            <summary className="cursor-pointer text-xs font-black text-brand-gold">{isArabic ? "بيانات الشحنة الاختيارية" : "Optional shipment details"}</summary>
-            <div className="mt-4 space-y-3">
-              <input value={form.package_type} onChange={(event) => { setField("package_type", event.target.value); setField("package_description", event.target.value); }} placeholder={isArabic ? "محتوى الشحنة" : "Package content"} className={inputClass()} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input type="number" min={1} value={form.order_count} onChange={(event) => setField("order_count", Math.max(1, Number(event.target.value) || 1))} placeholder={isArabic ? "عدد القطع" : "Pieces"} className={inputClass()} />
-                <input type="number" min={0.1} step="0.1" value={form.weight || 1} onChange={(event) => setField("weight", Math.max(0.1, Number(event.target.value) || 1))} placeholder={isArabic ? "الوزن" : "Weight"} className={inputClass()} />
-              </div>
-              <textarea rows={3} value={form.notes || ""} onChange={(event) => setField("notes", event.target.value)} placeholder={isArabic ? "ملاحظات" : "Notes"} className={inputClass()} />
-            </div>
-          </details>
-        </div>
 
-        <aside className="flex flex-col justify-between rounded-[1.5rem] border border-brand-gold/25 bg-brand-gold/5 p-4 text-xs font-bold text-white/70">
-          <div>
-            <h3 className="text-sm font-black text-brand-gold">{isArabic ? "تأكيد الحساب" : "Calculation confirmation"}</h3>
-            <p className="mt-3 leading-6">{isArabic ? "عند الحفظ تُسجل كل القيم داخل الطلب، ثم تُنظف الخانات تلقائيًا مع الاحتفاظ بالتاجر المختار لتسريع إدخال الطلب التالي." : "Saving records every value, then clears the fields automatically while keeping the selected merchant for the next order."}</p>
-            {financials && (
-              <div
-                  className={`mt-4 rounded-2xl border p-4 ${
-                    financials.merchantDue < 0
-                      ? "border-rose-400/55 bg-rose-500/15 shadow-[0_0_28px_rgba(244,63,94,0.14)]"
-                      : "border-white/10 bg-black/10"
-                  }`}
-                >
-                <span
-                    className={`block ${
-                      financials.merchantDue < 0
-                        ? "font-black text-rose-200"
-                        : "text-white/45"
-                    }`}
-                  >
-                  {financials.merchantDue < 0
-                    ? isArabic
-                      ? "إجمالي المستحق على التاجر"
-                      : "Merchant debit total"
-                    : isArabic
-                      ? "الإجمالي النهائي المطلوب من العميل"
-                      : "Final customer total"}
-                </span>
-                <strong
-                    className={`mt-1 block text-3xl font-black ${
-                      financials.merchantDue < 0
-                        ? "text-rose-300"
-                        : "text-brand-gold"
-                    }`}
-                    dir="ltr"
-                  >
-                  {signedAdminMoney(
-                    financials.merchantDue < 0
-                      ? financials.merchantDue
-                      : financials.customerTotal,
-                    isArabic,
-                  )}
-                </strong>
-                {financials.merchantDue < 0 && (
-                  <small className="mt-2 block leading-6 text-white/50">
-                    {isArabic
-                      ? `المطلوب من العميل ${formatAdminMoney(financials.customerTotal, true)} — رسوم التوصيل ${formatAdminMoney(financials.deliveryFee, true)} على التاجر`
-                      : `Customer total ${formatAdminMoney(financials.customerTotal, false)} — delivery ${formatAdminMoney(financials.deliveryFee, false)} charged to merchant`}
-                  </small>
-                )}
-              </div>
-            )}
-          </div>
-          <button type="submit" disabled={saving || !financials} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-4 py-4 text-sm font-black text-brand-deep disabled:opacity-60">
+        <div className="mt-5 flex justify-end">
+          <button
+            type="submit"
+            disabled={saving || !financials}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-gold px-6 py-4 text-sm font-black text-brand-deep disabled:opacity-60 sm:w-auto sm:min-w-[280px]"
+          >
             {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-            {saving ? (isArabic ? "جارٍ الحفظ..." : "Saving...") : (isArabic ? "حفظ وبدء طلب جديد" : "Save and start next order")}
+            {saving
+              ? isArabic
+                ? "جارٍ الحفظ..."
+                : "Saving..."
+              : isArabic
+                ? "حفظ وبدء طلب جديد"
+                : "Save and start next order"}
           </button>
-        </aside>
-      </section>
-    </form>
+        </div>
+      </form>
   );
 }
