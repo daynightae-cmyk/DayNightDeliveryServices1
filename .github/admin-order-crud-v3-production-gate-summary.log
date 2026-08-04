@@ -1,352 +1,352 @@
 === PRODUCTION GATE FAILURE SUMMARY ===
-13:AssertionError [ERR_ASSERTION]: The input did not match the regular expression /admin_create_canonical_merchant_order/. Input:
-393:  code: 'ERR_ASSERTION',
-772: ELIFECYCLE  Command failed with exit code 1.
-773: ELIFECYCLE  Command failed with exit code 1.
+13:AssertionError [ERR_ASSERTION]: The input did not match the regular expression /set constraints all immediate/i. Input:
+318:  code: 'ERR_ASSERTION',
+622: ELIFECYCLE  Command failed with exit code 1.
+623: ELIFECYCLE  Command failed with exit code 1.
 === PRODUCTION GATE LOG TAIL ===
-    '  bank_name?: string;\n' +
-    '  iban?: string;\n' +
-    '  settlement_cycle?: string;\n' +
-    '  commission_type?: string;\n' +
-    '  default_payment_method?: string;\n' +
-    '  notes?: string;\n' +
-    '  status?: string;\n' +
-    '};\n' +
+  '    new.cod_amount := old.cod_amount;\n' +
+  '    new.goods_value := old.goods_value;\n' +
+  '    new.delivery_fee := old.delivery_fee;\n' +
+  '    new.discount_amount := old.discount_amount;\n' +
+  '    new.customer_total := old.customer_total;\n' +
+  '    new.merchant_due := old.merchant_due;\n' +
+  '    new.company_revenue := old.company_revenue;\n' +
+  '    new.delivery_price := old.delivery_price;\n' +
+  '    new.base_price := old.base_price;\n' +
+  '    new.subtotal := old.subtotal;\n' +
+  '    new.total := old.total;\n' +
+  '    new.total_price := old.total_price;\n' +
+  '    new.amount := old.amount;\n' +
+  '    new.price := old.price;\n' +
+  '    new.collected_amount := old.collected_amount;\n' +
+  '    new.delivery_fee_mode := old.delivery_fee_mode;\n' +
+  '    new.manual_delivery_price := old.manual_delivery_price;\n' +
+  '    new.price_source := old.price_source;\n' +
+  '    new.payment_method := old.payment_method;\n' +
+  '    new.currency := old.currency;\n' +
+  '    new.financial_version := old.financial_version;\n' +
+  '    new.financial_posted_at := old.financial_posted_at;\n' +
+  '  end if;\n' +
+  '\n' +
+  '  if new.merchant_id is null then\n' +
+  "    if nullif(btrim(coalesce(new.merchant_code, '')), '') is not null\n" +
+  "       or nullif(btrim(coalesce(new.merchant_name, '')), '') is not null then\n" +
+  '      raise exception using\n' +
+  "        errcode = '23502',\n" +
+  "        message = 'merchant_id_required_for_selected_merchant',\n" +
+  "        hint = 'تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.';\n" +
+  '    end if;\n' +
+  '    return new;\n' +
+  '  end if;\n' +
+  '\n' +
+  '  v_resolved_id := public.dn_resolve_portal_merchant_uuid(new.merchant_id);\n' +
+  '  select * into v_merchant from public.merchants where id = v_resolved_id;\n' +
+  '  new.mercha'... 92510 more characters
+
+    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/global-order-merchant-integrity-gate.mjs:125:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '-- DAY NIGHT DELIVERY SERVICES\n' +
+    '-- Global order -> canonical merchant ownership, visibility and accounting repair.\n' +
+    '--\n' +
+    '-- This migration is intentionally two phase:\n' +
+    '--   1. install read-only Dry Run/audit contracts and future-write protections;\n' +
+    '--   2. expose an explicit transactional backfill RPC that updates only rows captured\n' +
+    '--      as AUTO_REPAIR_SAFE in a reviewed audit run.\n' +
+    '--\n' +
+    '-- Installing this migration DOES NOT backfill any historical order.\n' +
+    '-- No order, merchant, coupon, tracking number, status or financial value is deleted.\n' +
     '\n' +
-    'export type OpsOrderInput = {\n' +
-    '  merchant?: Merchant | null;\n' +
-    '  merchant_id?: string;\n' +
-    '  merchant_name?: string;\n' +
-    '  merchant_code?: string;\n' +
-    '  sender_name?: string;\n' +
-    '  sender_phone?: string;\n' +
-    '  coupon_number?: string;\n' +
-    '  shipping_scope: "local" | "international";\n' +
-    '  order_count: number;\n' +
-    '  pickup_city: string;\n' +
-    '  pickup_area?: string;\n' +
-    '  pickup_street?: string;\n' +
-    '  delivery_city: string;\n' +
-    '  delivery_area?: string;\n' +
-    '  delivery_street?: string;\n' +
-    '  destination_country?: string;\n' +
-    '  receiver_name: string;\n' +
-    '  receiver_phone: string;\n' +
-    '  receiver_address: string;\n' +
-    '  package_type: string;\n' +
-    '  package_description?: string;\n' +
-    '  weight?: number;\n' +
-    '  payment_method: string;\n' +
-    '  cod_amount?: number | string | null;\n' +
-    '  notes?: string;\n' +
-    '  status?: string;\n' +
-    '  price_mode?: OpsPriceMode;\n' +
-    '  manual_delivery_price?: number | string | null;\n' +
-    '};\n' +
+    'begin;\n' +
     '\n' +
-    'export type OpsOrderUpdateInput = OpsOrderInput & {\n' +
-    '  order: Order;\n' +
-    '  edit_reason?: string;\n' +
-    '};\n' +
+    'create extension if not exists pgcrypto with schema extensions;\n' +
     '\n' +
-    'export type OpsCreateResult<T> = {\n' +
-    '  row: T;\n' +
-    '  source: OpsDataSource;\n' +
-    '  warnings?: AdminOrderWarning[];\n' +
-    '  reconciliationRequired?: boolean;\n' +
-    '  requestId?: string;\n' +
-    '};\n' +
-    'export type OpsDeleteResult = {\n' +
-    '  deleted: boolean;\n' +
-    '  reference: string;\n' +
-    '  source: "rpc";\n' +
-    '};\n' +
-    'export type OpsSnapshot = {\n' +
-    '  merchants: Merchant[];\n' +
-    '  orders: Order[];\n' +
-    '  source: OpsDataSource;\n' +
-    '};\n' +
+    '-- This release is installed against a production history that predates one\n' +
+    '-- legacy helper migration. Keep every conversion used below self-contained.\n' +
+    'create or replace function public.dn_safe_uuid(value text)\n' +
+    'returns uuid\n' +
+    'language plpgsql\n' +
+    'immutable\n' +
+    'set search_path = public, pg_temp\n' +
+    'as $$\n' +
+    'begin\n' +
+    "  if value is null or btrim(value) = '' then return null; end if;\n" +
+    '  return value::uuid;\n' +
+    'exception when others then\n' +
+    '  return null;\n' +
+    'end;\n' +
+    '$$;\n' +
     '\n' +
-    'function clean(value: unknown) {\n' +
-    '  return String(value ?? "").trim();\n' +
-    '}\n' +
+    'create or replace function public.dn_safe_numeric(value text, fallback numeric default 0)\n' +
+    'returns numeric\n' +
+    'language plpgsql\n' +
+    'immutable\n' +
+    'set search_path = public, pg_temp\n' +
+    'as $$\n' +
+    'begin\n' +
+    "  if value is null or btrim(value) = '' then return fallback; end if;\n" +
+    '  return value::numeric;\n' +
+    'exception when others then\n' +
+    '  return fallback;\n' +
+    'end;\n' +
+    '$$;\n' +
     '\n' +
-    'function numberValue(value: unknown, fallback = 0) {\n' +
-    '  const parsed = Number(value);\n' +
-    '  return Number.isFinite(parsed) ? parsed : fallback;\n' +
-    '}\n' +
+    '-- Preserve historical rows while enforcing referential integrity for every future\n' +
+    '-- merchant_id write. NOT VALID deliberately avoids rewriting or hiding old rows.\n' +
+    'do $constraint$\n' +
+    'begin\n' +
+    '  if not exists (\n' +
+    '    select 1\n' +
+    '    from pg_constraint\n' +
+    "    where conrelid = 'public.orders'::regclass\n" +
+    "      and conname = 'orders_merchant_id_legal_fk'\n" +
+    '  ) then\n' +
+    '    alter table public.orders\n' +
+    '      add constraint orders_merchant_id_legal_fk\n' +
+    '      foreign key (merchant_id)\n' +
+    '      references public.merchants(id)\n' +
+    '      not valid;\n' +
+    '  end if;\n' +
+    'end\n' +
+    '$constraint$;\n' +
     '\n' +
-    'function optionalPositiveNumber(value: unknown) {\n' +
-    '  if (value === "" || value === null || value === undefined) return null;\n' +
-    '  const parsed = Number(value);\n' +
-    '  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;\n' +
-    '}\n' +
+    'create or replace function public.dn_effective_portal_user_ids(p_merchant_id uuid)\n' +
+    'returns uuid[]\n' +
+    'language sql\n' +
+    'stable\n' +
+    'security definer\n' +
+    'set search_path = public, auth, pg_temp\n' +
+    'as $$\n' +
+    "  select coalesce(array_agg(x.user_id order by x.user_id), '{}'::uuid[])\n" +
+    '  from (\n' +
+    '    select l.user_id\n' +
+    '    from public.merchant_user_links l\n' +
+    '    join public.merchants m on m.id = l.merchant_id\n' +
+    '    where l.merchant_id = p_merchant_id\n' +
+    '      and l.active\n' +
+    "      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')\n" +
     '\n' +
-    'function removeEmptyUndefined<T extends Record<string, unknown>>(payload: T): T {\n' +
-    '  return Object.fromEntries(\n' +
-    '    Object.entries(payload).filter(\n' +
-    '      ([, value]) => value !== undefined && value !== "",\n' +
-    '    ),\n' +
-    '  ) as T;\n' +
-    '}\n' +
+    '    union\n' +
     '\n' +
-    'function merchantCode(seed?: string) {\n' +
-    '  const suffix =\n' +
-    '    clean(seed)\n' +
-    '      .replace(/[^a-zA-Z0-9]/g, "")\n' +
-    '      .toUpperCase()\n' +
-    '      .slice(0, 4) || "SHOP";\n' +
-    '  const serial = Date.now().toString(36).toUpperCase().slice(-5);\n' +
-    '  return `DN-MER-${suffix}-${serial}`;\n' +
-    '}\n' +
+    '    select m.user_id\n' +
+    '    from public.merchants m\n' +
+    '    where m.id = p_merchant_id\n' +
+    '      and m.user_id is not null\n' +
+    "      and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')\n" +
+    '      and not exists (\n' +
+    '        select 1\n' +
+    '        from public.merchant_user_links l\n' +
+    '        where l.user_id = m.user_id\n' +
+    '          and l.active\n' +
+    '          and l.merchant_id <> m.id\n' +
+    '      )\n' +
+    '  ) x;\n' +
+    '$$;\n' +
     '\n' +
-    'function composeLocationAddress(\n' +
-    '  parts: Array<string | undefined | null>,\n' +
-    ') {\n' +
-    '  return parts.map(clean).filter(Boolean).join(" - ");\n' +
-    '}\n' +
+    'create or replace function public.dn_merchant_portal_link_count(p_merchant_id uuid)\n' +
+    'returns integer\n' +
+    'language sql\n' +
+    'stable\n' +
+    'security definer\n' +
+    'set search_path = public, auth, pg_temp\n' +
+    'as $$\n' +
+    '  select coalesce(cardinality(public.dn_effective_portal_user_ids(p_merchant_id)), 0);\n' +
+    '$$;\n' +
     '\n' +
-    'export function opsErrorDetail(error: unknown) {\n' +
-    '  const record = error as {\n' +
-    '    message?: string;\n' +
-    '    details?: string;\n' +
-    '    hint?: string;\n' +
-    '    code?: string;\n' +
-    '    constraint?: string;\n' +
-    '    dbDetail?: string;\n' +
-    '    cause?: unknown;\n' +
-    '  };\n' +
-    '  const cause = record?.cause as {\n' +
-    '    message?: string;\n' +
-    '    details?: string;\n' +
-    '    hint?: string;\n' +
-    '    code?: string;\n' +
-    '    constraint?: string;\n' +
-    '    dbDetail?: string;\n' +
-    '  } | undefined;\n' +
-    '  const technicalDetail = [\n' +
-    '    record?.dbDetail,\n' +
-    '    record?.message,\n' +
-    '    record?.details,\n' +
-    '    record?.hint,\n' +
-    '    record?.code,\n' +
-    '    record?.constraint,\n' +
-    '    cause?.dbDetail,\n' +
-    '    cause?.message,\n' +
-    '    cause?.details,\n' +
-    '    cause?.hint,\n' +
-    '    cause?.code,\n' +
-    '    cause?.constraint,\n' +
-    '  ]\n' +
-    '    .map(clean)\n' +
-    '    .filter(Boolean)\n' +
-    '    .filter((value, index, all) => all.indexOf(value) === index)\n' +
-    '    .join(" | ");\n' +
+    '-- A selected legal row may canonicalize only through its exact documented merchant\n' +
+    '-- code. Display name and phone are never ownership evidence.\n' +
+    'create or replace function public.dn_resolve_portal_merchant_uuid(p_merchant_id uuid)\n' +
+    'returns uuid\n' +
+    'language plpgsql\n' +
+    'security definer\n' +
+    'set search_path = public, auth, pg_temp\n' +
+    'as $$\n' +
+    'declare\n' +
+    '  v_selected public.merchants%rowtype;\n' +
+    '  v_code text;\n' +
+    "  v_candidates uuid[] := '{}'::uuid[];\n" +
+    'begin\n' +
+    '  if p_merchant_id is null then\n' +
+    "    raise exception using errcode = '23502', message = 'merchant_required';\n" +
+    '  end if;\n' +
     '\n' +
-    '  return technicalDetail || friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation");\n' +
-    '}\n' +
+    '  -- Keep merchant activity and every effective portal-link row stable until the\n' +
+    '  -- surrounding order transaction commits.  SHARE conflicts with the\n' +
+    '  -- ROW EXCLUSIVE lock required by inserts/updates/deletes on these tables.\n' +
+    '  lock table public.merchants in share mode;\n' +
+    '  lock table public.merchant_user_links in share mode;\n' +
     '\n' +
-    'function operationsError(error: unknown, fallback: string) {\n' +
-    '  const technicalDetail = opsErrorDetail(error);\n' +
-    '  if (technicalDetail) console.warn("Admin operations DB detail:", technicalDetail);\n' +
+    '  select * into v_selected\n' +
+    '  from public.merchants m\n' +
+    '  where m.id = p_merchant_id;\n' +
     '\n' +
-    '  const wrapped = new Error(\n' +
-    '    friendlyDatabaseErrorMessage(error, currentUiIsArabic(), "operation", fallback),\n' +
-    '  ) as Error & { dbDetail?: string; cause?: unknown };\n' +
-    '  wrapped.dbDetail = technicalDetail;\n' +
-    '  wrapped.cause = error;\n' +
-    '  return wrapped;\n' +
-    '}\n' +
+    '  if v_selected.id is null then\n' +
+    '    raise exception using\n' +
+    "      errcode = '23503',\n" +
+    "      message = 'merchant_not_found_for_order',\n" +
+    "      detail = jsonb_build_object('merchant_id', p_merchant_id)::text;\n" +
+    '  end if;\n' +
     '\n' +
-    'async function rpcOne<T>(\n' +
-    '  fn: string,\n' +
-    '  args: Record<string, unknown>,\n' +
-    '): Promise<T | null> {\n' +
-    '  if (!supabase) return null;\n' +
-    '  const { data, error } = await supabase.rpc(fn, args);\n' +
-    '  if (error) {\n' +
-    '    console.warn(\n' +
-    '      `${fn} unavailable, using compatibility fallback when possible:`,\n' +
-    '      error.message,\n' +
-    '    );\n' +
-    '    return null;\n' +
-    '  }\n' +
-    '  if (Array.isArray(data)) return (data[0] || null) as T | null;\n' +
-    '  return (data || null) as T | null;\n' +
-    '}\n' +
+    "  if lower(coalesce(v_selected.status, 'active')) in ('deleted','archived','blocked','suspended') then\n" +
+    '    raise exception using\n' +
+    "      errcode = '23514',\n" +
+    "      message = 'merchant_inactive_for_order',\n" +
+    "      detail = jsonb_build_object('merchant_id', v_selected.id, 'status', v_selected.status)::text;\n" +
+    '  end if;\n' +
     '\n' +
-    'async function rpcRequired<T>(\n' +
-    '  fn: string,\n' +
-    '  args: Record<string, unknown>,\n' +
-    '  fallback: string,\n' +
-    '): Promise<T> {\n' +
-    '  if (!supabase)\n' +
-    '    throw operationsError(\n' +
-    '      null,\n' +
-    '      "Supabase is not configured for order operations.",\n' +
-    '    );\n' +
-    '  const { data, error } = await supabase.rpc(fn, args);\n' +
-    '  if (error) throw operationsError(error, fallback);\n' +
-    '  if (Array.isArray(data)) {\n' +
-    '    if (!data[0]) throw operationsError(null, fallback);\n' +
-    '    return data[0] as T;\n' +
-    '  }\n' +
-    '  if (!data) throw operationsError(null, fallback);\n' +
-    '  return data as T;\n' +
-    '}\n' +
+    '  if public.dn_merchant_portal_link_count(v_selected.id) > 0 then\n' +
+    '    return v_selected.id;\n' +
+    '  end if;\n' +
     '\n' +
-    'export function getOpsOrderReference(order: Order) {\n' +
-    '  return clean(\n' +
-    '    order.id ||\n' +
-    '      order.tracking_number ||\n' +
-    '      order.invoice_number ||\n' +
-    '      order.coupon_number,\n' +
+    '  v_code := public.dn_normalized_merchant_identity(v_selected.merchant_code);\n' +
+    '  if v_code is null then\n' +
+    '    raise exception using\n' +
+    "      errcode = '23514',\n" +
+    "      message = 'merchant_portal_account_not_linked',\n" +
+    '      detail = jsonb_build_object(\n' +
+    "        'merchant_id', v_selected.id,\n" +
+    "        'merchant_code', v_selected.merchant_code,\n" +
+    "        'reason', 'missing_exact_merchant_code_evidence'\n" +
+    '      )::text;\n' +
+    '  end if;\n' +
+    '\n' +
+    "  select coalesce(array_agg(m.id order by m.id), '{}'::uuid[])\n" +
+    '  into v_candidates\n' +
+    '  from public.merchants m\n' +
+    '  where m.id <> v_selected.id\n' +
+    "    and lower(coalesce(m.status, 'active')) not in ('deleted','archived','blocked','suspended')\n" +
+    '    and public.dn_merchant_portal_link_count(m.id) > 0\n' +
+    '    and public.dn_normalized_merchant_identity(m.merchant_code) = v_code;\n' +
+    '\n' +
+    '  if cardinality(v_candidates) = 1 then\n' +
+    '    return v_candidates[1];\n' +
+    '  end if;\n' +
+    '\n' +
+    '  if cardinality(v_candidates) > 1 then\n' +
+    '    raise exception using\n' +
+    "      errcode = '23514',\n" +
+    "      message = 'merchant_portal_link_ambiguous',\n" +
+    '      detail = jsonb_build_object(\n' +
+    "        'selected_merchant_id', v_selected.id,\n" +
+    "        'merchant_code', v_selected.merchant_code,\n" +
+    "        'candidate_ids', v_candidates\n" +
+    '      )::text;\n' +
+    '  end if;\n' +
+    '\n' +
+    '  raise exception using\n' +
+    "    errcode = '23514',\n" +
+    "    message = 'merchant_portal_account_not_linked',\n" +
+    '    detail = jsonb_build_object(\n' +
+    "      'merchant_id', v_selected.id,\n" +
+    "      'merchant_code', v_selected.merchant_code\n" +
+    '    )::text;\n' +
+    'end;\n' +
+    '$$;\n' +
+    '\n' +
+    'create or replace function public.admin_resolve_order_merchant(p_merchant_id uuid)\n' +
+    'returns jsonb\n' +
+    'language plpgsql\n' +
+    'security definer\n' +
+    'set search_path = public, auth, pg_temp\n' +
+    'as $$\n' +
+    'declare\n' +
+    '  v_resolved_id uuid;\n' +
+    '  v_merchant public.merchants%rowtype;\n' +
+    '  v_users uuid[];\n' +
+    'begin\n' +
+    "  if auth.role() <> 'service_role'\n" +
+    '     and (auth.uid() is null or not public.is_admin_or_support()) then\n' +
+    "    raise exception 'not_authorized';\n" +
+    '  end if;\n' +
+    '\n' +
+    '  v_resolved_id := public.dn_resolve_portal_merchant_uuid(p_merchant_id);\n' +
+    '  select * into v_merchant from public.merchants where id = v_resolved_id;\n' +
+    '  v_users := public.dn_effective_portal_user_ids(v_resolved_id);\n' +
+    '\n' +
+    '  return jsonb_build_object(\n' +
+    "    'ok', true,\n" +
+    "    'selected_merchant_id', p_merchant_id,\n" +
+    "    'canonical_merchant_id', v_resolved_id,\n" +
+    "    'canonicalized', v_resolved_id is distinct from p_merchant_id,\n" +
+    "    'portal_link_count', cardinality(v_users),\n" +
+    "    'portal_user_ids', v_users,\n" +
+    "    'merchant', to_jsonb(v_merchant),\n" +
+    "    'resolution_source', case\n" +
+    "      when v_resolved_id = p_merchant_id then 'EXPLICIT_PORTAL_LINK'\n" +
+    "      else 'EXACT_MERCHANT_CODE_TO_SINGLE_PORTAL_CANONICAL'\n" +
+    '    end,\n' +
+    "    'ownership_rule', 'orders.merchant_id = canonical merchants.id'\n" +
     '  );\n' +
-    '}\n' +
+    'end;\n' +
+    '$$;\n' +
     '\n' +
-    'function normalizeInitialOrderStatus(status: unknown) {\n' +
-    '  const normalized = clean(status)\n' +
-    '    .toLowerCase()\n' +
-    '    .replace(/[\\s-]+/g, "_");\n' +
-    '  if (\n' +
-    '    [\n' +
-    '      "pending",\n' +
-    '      "confirmed",\n' +
-    '      "assigned",\n' +
-    '      "picked_up",\n' +
-    '      "in_transit",\n' +
-    '      "delivered",\n' +
-    '      "cancelled",\n' +
-    '      "returned",\n' +
-    '    ].includes(normalized)\n' +
-    '  ) {\n' +
-    '    return normalized;\n' +
-    '  }\n' +
-    '  return "pending";\n' +
-    '}\n' +
+    '-- Strict only when identity is inserted or actually changed. Historical rows can\n' +
+    '-- still receive unrelated operational edits without being rewritten.\n' +
+    'create or replace function public.dn_enforce_canonical_order_merchant_link()\n' +
+    'returns trigger\n' +
+    'language plpgsql\n' +
+    'security definer\n' +
+    'set search_path = public, auth, pg_temp\n' +
+    'as $$\n' +
+    'declare\n' +
+    '  v_resolved_id uuid;\n' +
+    '  v_merchant public.merchants%rowtype;\n' +
+    '  v_dependencies jsonb;\n' +
+    "  v_dependent_updates jsonb := '{}'::jsonb;\n" +
+    'begin\n' +
+    "  if tg_op = 'UPDATE'\n" +
+    '     and new.merchant_id is not distinct from old.merchant_id\n' +
+    '     and new.merchant_code is not distinct from old.merchant_code\n' +
+    '     and new.merchant_name is not distinct from old.merchant_name then\n' +
+    '    return new;\n' +
+    '  end if;\n' +
     '\n' +
-    'function normalizedPaymentMethod(value: unknown) {\n' +
-    '  const normalized = clean(value || "merchant_pays").toLowerCase();\n' +
-    '  if (normalized === "merchant_pays") return "sender_pays";\n' +
-    '  if (["sender_pays", "receiver_pays", "cod"].includes(normalized)) {\n' +
-    '    return normalized;\n' +
-    '  }\n' +
-    '  return "sender_pays";\n' +
-    '}\n' +
+    '  -- Merchant ownership changes must never recalculate or rewrite money. An older\n' +
+    '  -- financial normalization trigger runs before this trigger on UPDATE, so restore\n' +
+    '  -- every financial/legacy amount from OLD before changing canonical identity.\n' +
+    "  if tg_op = 'UPDATE' and new.merchant_id is distinct from old.merchant_id then\n" +
+    '    new.cod_amount := old.cod_amount;\n' +
+    '    new.goods_value := old.goods_value;\n' +
+    '    new.delivery_fee := old.delivery_fee;\n' +
+    '    new.discount_amount := old.discount_amount;\n' +
+    '    new.customer_total := old.customer_total;\n' +
+    '    new.merchant_due := old.merchant_due;\n' +
+    '    new.company_revenue := old.company_revenue;\n' +
+    '    new.delivery_price := old.delivery_price;\n' +
+    '    new.base_price := old.base_price;\n' +
+    '    new.subtotal := old.subtotal;\n' +
+    '    new.total := old.total;\n' +
+    '    new.total_price := old.total_price;\n' +
+    '    new.amount := old.amount;\n' +
+    '    new.price := old.price;\n' +
+    '    new.collected_amount := old.collected_amount;\n' +
+    '    new.delivery_fee_mode := old.delivery_fee_mode;\n' +
+    '    new.manual_delivery_price := old.manual_delivery_price;\n' +
+    '    new.price_source := old.price_source;\n' +
+    '    new.payment_method := old.payment_method;\n' +
+    '    new.currency := old.currency;\n' +
+    '    new.financial_version := old.financial_version;\n' +
+    '    new.financial_posted_at := old.financial_posted_at;\n' +
+    '  end if;\n' +
     '\n' +
-    'export async function fetchOpsMerchants(): Promise<Merchant[]> {\n' +
-    '  if (!supabase)\n' +
-    '    throw operationsError(\n' +
-    '      null,\n' +
-    '      "Supabase is not configured for merchant operations.",\n' +
-    '    );\n' +
-    '  const { data, error } = await supabase\n' +
-    '    .from("merchants")\n' +
-    '    .select("*")\n' +
-    '    .order("created_at", { ascending: false });\n' +
-    '  if (error)\n' +
-    '    throw operationsError(\n' +
-    '      error,\n' +
-    '      "Merchants table is not ready. Apply the admin operations migration.",\n' +
-    '    );\n' +
-    '  return (data || []) as Merchant[];\n' +
-    '}\n' +
+    '  if new.merchant_id is null then\n' +
+    "    if nullif(btrim(coalesce(new.merchant_code, '')), '') is not null\n" +
+    "       or nullif(btrim(coalesce(new.merchant_name, '')), '') is not null then\n" +
+    '      raise exception using\n' +
+    "        errcode = '23502',\n" +
+    "        message = 'merchant_id_required_for_selected_merchant',\n" +
+    "        hint = 'تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.';\n" +
+    '    end if;\n' +
+    '    return new;\n' +
+    '  end if;\n' +
     '\n' +
-    'export async function fetchOpsOrders(limit = 1000): Promise<Order[]> {\n' +
-    '  if (!supabase)\n' +
-    '    throw operationsError(\n' +
-    '      null,\n' +
-    '      "Supabase is not configured for order operations.",\n' +
-    '    );\n' +
-    '  const { data, error } = await supabase\n' +
-    '    .from("orders")\n' +
-    '    .select("*")\n' +
-    '    .order("created_at", { ascending: false })\n' +
-    '    .limit(limit);\n' +
-    '  if (error)\n' +
-    '    throw operationsError(\n' +
-    '      error,\n' +
-    '      "Orders table is not ready. Apply the admin operations migration.",\n' +
-    '    );\n' +
-    '  return (data || []) as Order[];\n' +
-    '}\n' +
-    '\n' +
-    'export async function fetchOpsSnapshot(): Promise<OpsSnapshot> {\n' +
-    '  const [merchants, orders] = await Promise.all([\n' +
-    '    fetchOpsMerchants(),\n' +
-    '    fetchOpsOrders(),\n' +
-    '  ]);\n' +
-    '  return { merchants, orders, source: "db" };\n' +
-    '}\n' +
-    '\n' +
-    'export async function createOpsMerchant(\n' +
-    '  input: OpsMerchantInput,\n' +
-    '): Promise<OpsCreateResult<Merchant>> {\n' +
-    '  if (!supabase)\n' +
-    '    throw operationsError(\n' +
-    '      null,\n' +
-    '      "Supabase is not configured for merchant operations.",\n' +
-    '    );\n' +
-    '  const now = new Date().toISOString();\n' +
-    '  const emirate = clean(input.emirate || "Abu Dhabi");\n' +
-    '  const area = clean(input.area || input.city || emirate);\n' +
-    '  const address = composeLocationAddress([\n' +
-    '    area,\n' +
-    '    input.street_details,\n' +
-    '    input.address,\n' +
-    '  ]);\n' +
-    '  const pickupAddress = composeLocationAddress([\n' +
-    '    area,\n' +
-    '    input.street_details,\n' +
-    '    input.pickup_address || input.address,\n' +
-    '  ]);\n' +
-    '  const payload = removeEmptyUndefined({\n' +
-    '    merchant_code: merchantCode(input.trade_name),\n' +
-    '    trade_name: clean(input.trade_name),\n' +
-    '    owner_name: clean(input.owner_name),\n' +
-    '    phone: clean(input.phone),\n' +
-    '    alt_phone: clean(input.alt_phone),\n' +
-    '    email: clean(input.email).toLowerCase(),\n' +
-    '    emirate,\n' +
-    '    city: area,\n' +
-    '    address,\n' +
-    '    pickup_address: pickupAddress || address,\n' +
-    '    license_number: clean(input.license_number),\n' +
-    '    trn: clean(input.trn || input.tax_number),\n' +
-    '    tax_number: clean(input.tax_number || input.trn),\n' +
-    '    logo_url: clean(input.logo_url),\n' +
-    '    bank_name: clean(input.bank_name),\n' +
-    '    iban: clean(input.iban),\n' +
-    '    settlement_cycle: clean(input.settlement_cycle || "weekly"),\n' +
-    '    commission_type: clean(\n' +
-    '      input.commission_type || "fixed_delivery_fee",\n' +
-    '    ),\n' +
-    '    default_payment_method: clean(\n' +
-    '      input.default_payment_method || "merchant_pays",\n' +
-    '    ),\n' +
-    '    notes: clean(input.notes),\n' +
-    '    status: clean(input.status || "active"),\n' +
-    '    created_at: now,\n' +
-    '    updated_at: now,\n' +
-    '  });\n' +
-    '\n' +
-    '  const rpcMerchant = await rpcOne<Merchant>("admin_create_merchant", {\n' +
-    '    p_merchant: payload,\n' +
-    '  });\n' +
-    '  if (rpcMerchant?.id) return { row: rpcMerchant, source: "rpc" };\n' +
-    '\n' +
-    '  const { data, error } = await supabase\n' +
-    '    .from("merchants")\n' +
-    '    .insert(payload)\n' +
-    '    .select("*")\n' +
-    '    .single();\n' +
-    '  if (error)\n' +
-    '    throw operationsError(\n' +
-    '      error,\n' +
-    '      "Could not create merchant. Apply the admin operations migration and confirm admin/support RLS access.",\n' +
-    '    );\n' +
-    '  return { row: data as Merch'... 14011 more characters,
-  expected: /admin_create_canonical_merchant_order/,
+    '  v_resolved_id := public.dn_resolve_portal_merchant_uuid(new.merchant_id);\n' +
+    '  select * into v_merchant from public.merchants where id = v_resolved_id;\n' +
+    '  new.mercha'... 92510 more characters,
+  expected: /set constraints all immediate/i,
   operator: 'match',
   diff: 'simple'
 }
