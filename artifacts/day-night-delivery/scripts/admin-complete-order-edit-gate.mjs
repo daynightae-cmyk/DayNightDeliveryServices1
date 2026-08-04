@@ -2,91 +2,85 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const read = (relative) =>
-  fs.readFileSync(path.resolve(root, relative), "utf8");
+const read = (relative) => fs.readFileSync(path.resolve(root, relative), "utf8");
 const assert = (condition, message) => {
   if (!condition) throw new Error(`admin_complete_order_edit_gate_failed: ${message}`);
 };
 
 const migration = read(
-  "../../supabase/migrations/20260802084500_admin_complete_order_edit.sql",
+  "../../supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql",
 );
-const probeMigration = read(
-  "../../supabase/migrations/20260802094000_admin_complete_order_save_probe.sql",
-);
+const service = read("src/lib/adminOrderMutations.ts");
 const persistence = read("src/lib/adminOrderEditPersistence.ts");
 const modal = read("src/components/admin/AdminOrderEditModalComplete.tsx");
-const friendlyPlugin = read("scripts/friendly-error-message-plugin.ts");
 
 assert(
-  migration.includes("create or replace function public.admin_update_order_complete_verified"),
-  "complete verified RPC missing",
+  migration.includes("create or replace function public.admin_update_order_complete_v3"),
+  "canonical complete-update v3 RPC missing",
 );
 assert(
-  migration.includes("create table if not exists public.order_admin_edit_audit"),
-  "before/after admin audit table missing",
+  migration.includes("admin_order_mutation_audit_v3") &&
+    migration.includes("before_data") &&
+    migration.includes("after_data"),
+  "before/after Admin audit evidence missing",
 );
 assert(
-  migration.includes("public.dn_resolve_portal_merchant_uuid"),
-  "canonical merchant UUID resolution missing",
+  migration.includes("dn_admin_order_override_active") &&
+    migration.includes("when (not public.dn_admin_order_override_active())"),
+  "authorized transaction-local trigger override missing",
 );
 assert(
-  migration.includes("public.admin_adjust_order_financials_verified"),
-  "delivered financial adjustment integration missing",
+  migration.includes("merchant_link_warning") &&
+    migration.includes("merchant_portal_account_not_linked"),
+  "missing merchant portal linkage is not converted to a warning",
 );
 assert(
-  migration.includes("v_financial_changed") &&
-    migration.includes("if v_posted and v_financial_changed then"),
-  "core-only delivered edits can create a no-op financial adjustment",
+  migration.includes("coupon_reconciliation_required"),
+  "coupon conflicts are not returned as reconciliation warnings",
 );
 assert(
-  migration.includes("price_source = v_price_source") &&
-    migration.includes("manual_delivery_price = v_desired_manual_delivery"),
-  "final system/manual price-source choice is not preserved",
+  migration.includes("financial_reconciliation_required") &&
+    migration.includes("notification_sync_queued"),
+  "secondary financial/notification work is not separated from the core save",
 );
 assert(
-  migration.includes("for update"),
-  "order row is not locked before complete edit",
-);
-assert(
-  migration.includes("merchant_changed") && migration.includes("changed_fields"),
-  "merchant and changed-field audit evidence missing",
-);
-assert(
-  migration.includes("- 'tracking_number'") && migration.includes("- 'invoice_number'"),
+  migration.includes("- 'tracking_number'") &&
+    migration.includes("- 'invoice_number'"),
   "immutable tracking/invoice protection missing",
 );
 assert(
-  migration.includes("grant execute on function public.admin_update_order_complete_verified(jsonb) to authenticated"),
-  "authenticated admin RPC grant missing",
+  migration.includes("for update") &&
+    migration.includes("admin_order_v3_update_affected_zero_rows"),
+  "exact order lock/readback verification missing",
+);
+assert(
+  migration.includes("grant execute on function public.admin_update_order_complete_v3(jsonb) to authenticated"),
+  "authenticated Admin RPC grant missing",
+);
+assert(
+  migration.includes("daynight_admin_or_support()"),
+  "Admin/support authorization check missing",
 );
 
 assert(
-  probeMigration.includes("public.admin_probe_order_complete_save") &&
-    probeMigration.includes("public.admin_update_order_complete_verified(p_payload)"),
-  "rollback-safe real-save probe is missing",
+  service.includes('supabase.rpc("admin_update_order_complete_v3"'),
+  "shared frontend service does not call canonical v3 RPC",
 );
 assert(
-  probeMigration.includes("complete_save_probe_order_rollback_failed") &&
-    probeMigration.includes("complete_save_probe_audit_rollback_failed"),
-  "save probe does not prove order and audit rollback",
-);
-
-assert(
-  /admin_update_order_complete_verified(?:_v2)?/.test(persistence),
-  "client does not use complete verified RPC",
+  service.includes("inFlight") && service.includes("requestId"),
+  "duplicate submission prevention or idempotency request ID missing",
 );
 assert(
-  persistence.includes("updateCompleteMerchantOrder"),
-  "complete merchant edit path missing",
+  persistence.includes("updateAdminOrder") &&
+    !persistence.includes("admin_update_order_complete_verified_v2") &&
+    !persistence.includes(".from(\"orders\")"),
+  "complete editor is not exclusively routed through the shared v3 mutation service",
 );
 assert(
-  persistence.includes("auditId") && persistence.includes("changedFields"),
-  "client does not expose audit result",
-);
-assert(
-  persistence.includes("admin_complete_order_edit_runtime_missing_apply_migration_20260802084500"),
-  "delivered edits can silently fall back to partial legacy save",
+  persistence.includes("warnings") &&
+    persistence.includes("reconciliationRequired") &&
+    persistence.includes("changedFields"),
+  "complete editor does not expose saved-row audit and warning metadata",
 );
 
 assert(
@@ -94,88 +88,77 @@ assert(
   "professional merchant editor control missing",
 );
 assert(
-  modal.includes("disabled={personalOrder}"),
-  "merchant selector is not limited only by personal-order semantics",
-);
-assert(
-  !modal.includes("disabled={financialLocked || personalOrder}"),
-  "merchant remains incorrectly locked for delivered orders",
-);
-assert(
   modal.includes('data-admin-complete-order-coupon="true"'),
   "coupon edit control missing",
 );
 assert(
-  modal.includes("automaticEditReason") &&
-    modal.includes('edit_reason: automaticEditReason') &&
-    modal.includes('data-admin-automatic-audit-reason="true"'),
-  "automatic audited edit reason is missing",
+  modal.includes('data-admin-order-v3-status="true"'),
+  "Admin status correction selector is missing",
+);
+assert(
+  modal.includes("saveAdminOrderEdit") &&
+    !modal.includes("saveAdminLockedMerchantCoreEdit"),
+  "editor still has split restrictive save routes",
+);
+assert(
+  modal.includes("تم حفظ الطلب") &&
+    modal.includes("ملاحظة تحتاج مراجعة") &&
+    modal.includes("دون إلغاء الحفظ"),
+  "non-blocking warning success language missing",
+);
+assert(
+  modal.includes("warnings") && modal.includes("reconciliationRequired"),
+  "warning metadata is not surfaced separately from core failure",
+);
+assert(
+  modal.includes("window.setTimeout(onClose"),
+  "modal does not close after confirmed core save",
 );
 assert(
   !modal.includes('data-admin-complete-order-reason="true"') &&
     !modal.includes('data-admin-complete-order-confirm="true"'),
-  "manual reason or impact confirmation still burdens the operator",
+  "manual reconciliation controls still block ordinary edits",
 );
 assert(
-  modal.includes("sender_name") && modal.includes("sender_phone"),
-  "sender identity fields are not editable",
+  !/required=\{!personalOrder\}|aria-required="true"/.test(modal),
+  "merchant/coupon relationship fields remain blocking requirements",
 );
 assert(
-  modal.includes("order_count") && modal.includes("weight"),
-  "package count/weight fields are not editable",
+  modal.includes("sender_name") && modal.includes("sender_phone") &&
+    modal.includes("receiver_name") && modal.includes("receiver_phone"),
+  "customer/sender identity fields are not editable",
 );
 assert(
-  modal.includes("personalFinancialLocked") &&
-    modal.includes("AdminDeliveredFinancialAdjustment"),
-  "personal delivered-order audited adjustment path was removed",
+  modal.includes("order_count") && modal.includes("weight") &&
+    modal.includes("manual_delivery_price") && modal.includes("cod_amount"),
+  "package and manual financial fields are not editable",
 );
 assert(
   modal.includes("لا يمكن تغيير رقم التتبع أو رقم الفاتورة من محرر البيانات"),
   "immutable order identity is not explained professionally in the UI",
 );
 assert(
-  modal.includes("الحفظ ذري") && modal.includes("دون حفظ جزئي"),
-  "atomic rollback messaging source contract missing",
-);
-
-assert(
   modal.includes("function professionalEditError") &&
-    modal.includes("انتهت جلسة الإدارة") &&
-    modal.includes("رقم الكوبون مستخدم في طلب آخر") &&
-    modal.includes("تعذر اعتماد التاجر المختار") &&
-    modal.includes("تعذر اعتماد القيم المالية") &&
-    modal.includes("تم تعديل الطلب من عملية أخرى"),
-  "specific professional Arabic save rejection categories are incomplete",
-);
-assert(
-  modal.includes('data-admin-order-error-card="true"') &&
-    modal.includes('data-admin-error-reference="true"') &&
-    modal.includes("safeEditDiagnostic") &&
-    modal.includes("editErrorReference") &&
-    modal.includes("عرض السبب التشخيصي الدقيق"),
-  "exact safe database diagnostics are not exposed in the editor",
-);
-assert(
-  modal.includes("رفضت قاعدة البيانات العملية لسبب لم يُصنَّف بعد") &&
-    modal.includes("أُلغيت العملية بالكامل دون حفظ جزئي"),
-  "unknown save rejection does not give a truthful diagnostic fallback",
+    modal.includes('data-admin-order-error-card="true"') &&
+    modal.includes("safeEditDiagnostic"),
+  "professional exact core-error diagnostics are missing",
 );
 
 console.log(
   JSON.stringify(
     {
       result: "PASS",
-      completeRpc: true,
-      canonicalMerchant: true,
-      deliveredFinancialAudit: true,
-      noOpFinancialAdjustmentPrevented: true,
-      priceSourcePreserved: true,
-      merchantEditableWhenPosted: true,
-      completeBusinessFields: true,
-      immutableIdentityProtected: true,
-      beforeAfterAudit: true,
-      rollbackSafeRealSaveProbe: true,
-      exactSaveRejectionMessages: true,
+      canonicalRpc: "admin_update_order_complete_v3",
+      adminAuthorization: true,
+      merchantLinkNonBlocking: true,
+      couponNonBlocking: true,
+      secondaryWarnings: true,
+      exactRowReadback: true,
+      unifiedFrontendMutation: true,
+      duplicateSubmissionPrevention: true,
+      statusCorrection: true,
+      warningSuccessUi: true,
+      closeAfterCoreSave: true,
     },
     null,
     2,
