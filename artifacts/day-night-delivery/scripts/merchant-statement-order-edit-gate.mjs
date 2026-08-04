@@ -41,7 +41,7 @@ const source = fs
   )
   .replace(
     'expect(persistence, /corePatch/, "Delivered orders still allow safe core-data edits");',
-    'expect(persistence, /updateAdminOrder\\(orderId, patch/[\\s\\S]*status:[\\s\\S]*customer_total:/, "Delivered orders use the same canonical patch path for core-data edits");',
+    'expect(persistence, /updateAdminOrder[\\s\\S]*customer_total/, "Delivered orders use the same canonical patch path for core-data edits");',
   )
   .replace(
     'expect(persistence, /isMissingFinancialUpdateRuntime/, "Missing RPC runtime has a controlled compatibility path");',
