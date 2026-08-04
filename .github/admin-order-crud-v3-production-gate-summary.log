@@ -1,30 +1,12 @@
 === PRODUCTION GATE FAILURE SUMMARY ===
 13:PASS destination location formatter (16 assertions)
 1834:International tracking visual gate passed (76 assertions).
-1842:  if (!pattern.test(source)) throw new Error(`FAIL ${label}`);
-1845:Error: FAIL every edited order requires a coupon
-1853: ELIFECYCLE  Command failed with exit code 1.
-1854: ELIFECYCLE  Command failed with exit code 1.
+1861:  if (!condition) throw new Error("admin_order_delete_edit_flexibility_gate_failed: " + message);
+1864:Error: admin_order_delete_edit_flexibility_gate_failed: v2 delete RPC is not preferred
+1865:    at assert (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:7:25)
+1872: ELIFECYCLE  Command failed with exit code 1.
+1873: ELIFECYCLE  Command failed with exit code 1.
 === PRODUCTION GATE LOG TAIL ===
-
-COMMIT
-Applying supabase/migrations/20260723142500_customer_experience_request_header_hotfix.sql
-BEGIN
-CREATE FUNCTION
-REVOKE
-GRANT
- pg_notify 
------------
- 
-(1 row)
-
-COMMIT
-Applying supabase/migrations/20260723143000_customer_experience_pgcrypto_runtime_hotfix.sql
-BEGIN
-CREATE EXTENSION
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
 REVOKE
 REVOKE
 REVOKE
@@ -342,13 +324,32 @@ PASS Saudi Arabia has a professional Arabic label
 PASS country values are canonicalized
 PASS edit modal uses localized country selector
 PASS edit modal does not expose a raw country-code text input
-file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:7
-  if (!pattern.test(source)) throw new Error(`FAIL ${label}`);
-                                   ^
+PASS missing coupon does not block the core order edit
+PASS Admin edit identifies coupon as optional and reviewable
+PASS sender phone is explicitly optional
+PASS all edits receive an automatic audit reason
+PASS manual reason and confirmation controls are removed
+PASS raw database status is localized
+PASS complete editor contains no colloquial failure wording
+PASS save calls the unified canonical Admin mutation service
+PASS personal edit does not reject a missing coupon
+PASS unified mutation service calls the canonical v3 RPC
+PASS database converts a missing coupon into a non-blocking reconciliation warning
+PASS edit persistence stores canonical country values
+PASS international queue localizes country names
+PASS tracking action editor uses country-name selectors
+PASS tracking launcher localizes countries
+PASS PDF/export localization handles ISO country codes
+PASS build plugin uses the authoritative professional source
+PASS build plugin no longer overwrites editor messages
+DAY NIGHT admin order save and Arabic localization gate PASSED
+file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:7
+  if (!condition) throw new Error("admin_order_delete_edit_flexibility_gate_failed: " + message);
+                        ^
 
-Error: FAIL every edited order requires a coupon
-    at expect (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:7:36)
-    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-save-localization-gate.mjs:29:1
+Error: admin_order_delete_edit_flexibility_gate_failed: v2 delete RPC is not preferred
+    at assert (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:7:25)
+    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:24:1
     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
