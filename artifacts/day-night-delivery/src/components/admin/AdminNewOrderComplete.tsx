@@ -268,34 +268,35 @@ export default function AdminNewOrderComplete({
   }
 
   function validate() {
-    const missing = [
-      !selectedMerchant ? (isArabic ? "التاجر" : "merchant") : "",
-      !clean(form.coupon_number) ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
-      !clean(form.receiver_name) ? (isArabic ? "اسم العميل" : "customer name") : "",
-      !clean(form.receiver_phone) ? (isArabic ? "رقم هاتف العميل" : "customer phone") : "",
-      form.shipping_scope === "local" && !clean(form.delivery_city) ? (isArabic ? "الإمارة" : "emirate") : "",
-      form.shipping_scope === "local" && !clean(form.delivery_area) ? (isArabic ? "المنطقة" : "area") : "",
-      form.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
-    ].filter(Boolean);
-    if (missing.length) {
-      return isArabic ? `الحقول المطلوبة: ${missing.join("، ")}` : `Required fields: ${missing.join(", ")}`;
+    const numericFields: Array<[string, unknown]> = [
+      [isArabic ? "قيمة البضاعة" : "goods value", form.goods_value],
+      [isArabic ? "الخصم" : "discount", form.discount_amount],
+      [isArabic ? "مبلغ التحصيل" : "COD amount", form.cod_amount],
+    ];
+    if (form.price_mode === "manual") {
+      numericFields.push([
+        isArabic ? "رسوم التوصيل" : "delivery fee",
+        form.manual_delivery_price,
+      ]);
     }
-    if (
-      form.price_mode === "manual" &&
-      (form.manual_delivery_price === "" || !Number.isFinite(Number(form.manual_delivery_price)) || Number(form.manual_delivery_price) < 0)
-    ) {
-      return isArabic ? "أدخل رسوم توصيل يدوية صحيحة أو استخدم سعر النظام." : "Enter a valid manual delivery fee or use system pricing.";
+    for (const [label, value] of numericFields) {
+      if (value === "" || value === null || value === undefined) continue;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return isArabic ? `قيمة غير صحيحة في حقل ${label}.` : `Invalid value in ${label}.`;
+      }
     }
     const financialError = orderFinancialValidation({
-      goodsValue: form.goods_value,
+      goodsValue: form.goods_value === "" ? 0 : form.goods_value,
       deliveryFee: pricing.total,
       discountAmount: form.discount_amount,
       deliveryFeeMode: authoritativeDeliveryFeeMode,
     });
-    if (financialError === "discount_exceeds_customer_total" || financialError === "discount_exceeds_goods_value") {
-      return isArabic ? "قيمة الخصم أكبر من المبلغ الذي يمكن خصمه في طريقة التحصيل المختارة." : "The discount exceeds the allowed amount for this settlement mode.";
+    if (financialError) {
+      return isArabic
+        ? "راجع القيم المالية المدخلة. يمكن إنشاء طلب بقيمة صفر، لكن لا يمكن إدخال قيمة رقمية غير صحيحة."
+        : "Review the entered financial values. Zero-value orders are allowed, but invalid numeric values are not.";
     }
-    if (financialError) return isArabic ? "راجع قيمة البضاعة ورسوم التوصيل والخصم." : "Check goods value, delivery fee, and discount.";
     if (entryMode === "coupon" && couponReview && !reviewConfirmed) {
       return isArabic ? "أكد المراجعة اليدوية قبل الحفظ." : "Confirm manual review before saving.";
     }
@@ -347,11 +348,19 @@ export default function AdminNewOrderComplete({
 
       const savedSettlement = merchantSettlement(calculated.merchantDue, isArabic);
       prepareNextOrder(selectedMerchant);
+      const warningCodes = (result.warnings || [])
+        .map((warning) => String(warning.code || ""))
+        .filter(Boolean);
+      const warningSuffix = warningCodes.length
+        ? isArabic
+          ? ` تم حفظ الطلب، وتوجد ملاحظة تحتاج مراجعة دون إلغاء الحفظ: ${warningCodes.join("، ")}.`
+          : ` The order was saved with non-blocking review notes: ${warningCodes.join(", ")}.`
+        : "";
       setSource(result.source);
       setMessage(
         isArabic
-          ? `تم حفظ الطلب وتنظيف الخانات للطلب التالي. الكوبون ${couponNumber} — المطلوب من العميل ${calculated.customerTotal.toFixed(2)} درهم — ${savedSettlement.label} ${savedSettlement.amount.toFixed(2)} درهم — دخل داي نايت ${calculated.companyRevenue.toFixed(2)} درهم.${auditSuffix}`
-          : `Order saved and the form is ready for the next order. Coupon ${couponNumber} — customer total ${calculated.customerTotal.toFixed(2)} AED — ${savedSettlement.label.toLowerCase()} ${savedSettlement.amount.toFixed(2)} AED — DAY NIGHT revenue ${calculated.companyRevenue.toFixed(2)} AED.${auditSuffix}`,
+          ? `تم حفظ الطلب وتنظيف الخانات للطلب التالي. المرجع ${couponNumber || reference} — المطلوب من العميل ${calculated.customerTotal.toFixed(2)} درهم — ${savedSettlement.label} ${savedSettlement.amount.toFixed(2)} درهم — دخل داي نايت ${calculated.companyRevenue.toFixed(2)} درهم.${warningSuffix}${auditSuffix}`
+          : `Order saved and the form is ready for the next order. Reference ${couponNumber || reference} — customer total ${calculated.customerTotal.toFixed(2)} AED — ${savedSettlement.label.toLowerCase()} ${savedSettlement.amount.toFixed(2)} AED — DAY NIGHT revenue ${calculated.companyRevenue.toFixed(2)} AED.${warningSuffix}${auditSuffix}`,
       );
       onSaved?.(saved);
     } catch (cause) {
@@ -446,14 +455,14 @@ export default function AdminNewOrderComplete({
             <option value={PERSONAL_ORDER_OPTION}>{isArabic ? "غرض شخصي — بدون تاجر" : "Personal purpose — no merchant"}</option>
             {merchants.map((merchant) => <option key={merchant.id} value={merchant.id}>{merchantOptionLabel(merchant)}</option>)}
           </select>
-          <input data-admin-next-order-focus="true" value={form.coupon_number || ""} onChange={(event) => setField("coupon_number", event.target.value)} placeholder={isArabic ? "رقم الكوبون *" : "Coupon number *"} className={inputClass()} required dir="ltr" />
+          <input data-admin-next-order-focus="true" value={form.coupon_number || ""} onChange={(event) => setField("coupon_number", event.target.value)} placeholder={isArabic ? "رقم الكوبون — اختياري" : "Coupon number — optional"} className={inputClass()} required dir="ltr" />
         </div>
 
         <div className="space-y-4 rounded-[1.5rem] border border-white/10 bg-brand-deep/35 p-4">
           <h3 className="flex items-center gap-2 text-sm font-black text-white"><MapPin className="h-4 w-4 text-brand-gold" />{isArabic ? "بيانات العميل ومكان التسليم" : "Customer and delivery location"}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input value={form.receiver_name} onChange={(event) => setField("receiver_name", event.target.value)} placeholder={isArabic ? "اسم العميل *" : "Customer name *"} className={inputClass()} required />
-            <input value={form.receiver_phone} onChange={(event) => setField("receiver_phone", event.target.value)} placeholder={isArabic ? "رقم تليفون العميل *" : "Customer phone *"} className={inputClass()} required dir="ltr" />
+            <input value={form.receiver_name} onChange={(event) => setField("receiver_name", event.target.value)} placeholder={isArabic ? "اسم العميل — اختياري" : "Customer name — optional"} className={inputClass()} required />
+            <input value={form.receiver_phone} onChange={(event) => setField("receiver_phone", event.target.value)} placeholder={isArabic ? "رقم تليفون العميل *" : "Customer phone — optional"} className={inputClass()} required dir="ltr" />
           </div>
           <select value={form.shipping_scope} onChange={(event) => setField("shipping_scope", event.target.value as "local" | "international")} className={inputClass()}>
             <option value="local">{isArabic ? "داخل الإمارات" : "Within UAE"}</option>
@@ -497,7 +506,7 @@ export default function AdminNewOrderComplete({
 
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
-            <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة *" : "Goods value *"}</span>
+            <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
             <input type="number" min={0} step="0.01" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>

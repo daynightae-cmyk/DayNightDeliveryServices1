@@ -3,6 +3,7 @@ import type { Merchant, Order } from "../types";
 import { calculateDomesticPrice, calculateInternationalPrice } from "./pricing";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
 import { currentUiIsArabic, friendlyDatabaseErrorMessage } from "./friendlyErrorMessage";
+import { createAdminOrder, type AdminOrderWarning } from "./adminOrderMutations";
 import {
   resolveCanonicalMerchantForOrder,
   verifySavedOrderMerchant,
@@ -72,7 +73,13 @@ export type OpsOrderUpdateInput = OpsOrderInput & {
   edit_reason?: string;
 };
 
-export type OpsCreateResult<T> = { row: T; source: OpsDataSource };
+export type OpsCreateResult<T> = {
+  row: T;
+  source: OpsDataSource;
+  warnings?: AdminOrderWarning[];
+  reconciliationRequired?: boolean;
+  requestId?: string;
+};
 export type OpsDeleteResult = {
   deleted: boolean;
   reference: string;
@@ -724,37 +731,26 @@ export async function createOpsOrder(
   input: OpsOrderInput,
 ): Promise<OpsCreateResult<Order>> {
   if (!supabase)
-    throw operationsError(
-      null,
-      "Supabase is not configured for order operations.",
-    );
-  const selectedMerchant = input.merchant || ({ id: clean(input.merchant_id) } as Merchant);
-  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
-  const merchant = resolution.merchant;
+    throw operationsError(null, "Supabase is not configured for order operations.");
+
+  const merchant = input.merchant || null;
   const createdAt = new Date().toISOString();
   const trackingSeed =
     clean(input.coupon_number) ||
-    `${merchant?.merchant_code || "ADMIN"}-${Date.now().toString(
-      36,
-    )}`;
-  const trackingNumber = createDayNightInvoiceNumber(
-    trackingSeed,
-    new Date(createdAt),
-  );
-  const payload = buildOrderPayload(
-    input,
-    merchant,
-    trackingNumber,
-    createdAt,
-  );
-
-  const rpcOrder = await rpcRequired<Order>(
-    "admin_create_canonical_merchant_order",
-    { p_order: payload },
-    "تعذر ربط الطلب بالتاجر المحدد بشكل آمن، ولذلك لم يتم حفظ الطلب. راجع ربط حساب التاجر ثم أعد المحاولة.",
-  );
-  const verified = await verifySavedOrderMerchant(rpcOrder, resolution.merchantId);
-  return { row: verified, source: "rpc" };
+    `${merchant?.merchant_code || clean(input.merchant_code) || "ADMIN"}-${Date.now().toString(36)}`;
+  const trackingNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
+  const payload = buildOrderPayload(input, merchant, trackingNumber, createdAt);
+  const result = await createAdminOrder(payload, {
+    sourcePage: "admin_new_order_flexible",
+    reason: "Admin order creation from flexible entry",
+  });
+  return {
+    row: result.order,
+    source: "rpc",
+    warnings: result.warnings,
+    reconciliationRequired: result.reconciliationRequired,
+    requestId: result.requestId,
+  };
 }
 
 export async function updateOpsOrder(

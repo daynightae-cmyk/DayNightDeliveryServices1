@@ -42,16 +42,19 @@ reject(adminMerchant, /localStorage|sessionStorage|Math\.random|mock|demo mercha
 
 const adminOrder = read("src/components/admin/AdminNewOrderFlexible.tsx");
 expect(adminOrder, /createOpsOrder/, "Admin order form calls the production order operation");
-expect(adminOrder, /!selectedMerchant/, "Admin order creation requires a real selected merchant");
+reject(adminOrder, /function validate\(\)[\s\S]*!selectedMerchant/, "Admin order creation does not require a linked merchant");
 expect(adminOrder, /onSaved\?\.\(saved\)/, "Admin order form refreshes from the returned saved row");
 reject(adminOrder, /localStorage|sessionStorage|Math\.random|mock order|demo order/i, "Admin order creation has no browser-only or mock persistence");
 
 const adminData = read("src/lib/adminOperationsData.ts");
 expect(adminData, /from\(["']merchants["']\)[\s\S]*insert/, "Merchant creation writes to the merchants table when RPC compatibility is needed");
 expect(adminData, /admin_create_merchant/, "Merchant creation uses the protected admin RPC");
-expect(adminData, /admin_create_canonical_merchant_order/, "Order creation uses the canonical protected admin order RPC");
+expect(adminData, /createAdminOrder/, "Order creation uses the shared canonical Admin mutation service");
+const createMutations = read("src/lib/adminOrderMutations.ts");
+expect(createMutations, /admin_create_order_v3/, "Order creation uses the non-blocking canonical v3 RPC");
 reject(adminData, /\.from\(["']orders["']\)\s*\.insert/, "Order creation has no direct-insert fallback that can bypass canonical ownership");
-expect(adminData, /merchant_id:/, "Orders persist the merchant relationship");
+expect(adminData, /merchant_id:/, "Orders preserve supplied merchant information when available");
+expect(adminData, /const merchant = input\.merchant \|\| null/, "Orders support merchant_id null");
 
 const financialAdminOrder = read("src/components/admin/AdminNewOrderComplete.tsx");
 expect(financialAdminOrder, /setPaymentMethod/, "Financial order form synchronizes payment and fee treatment");

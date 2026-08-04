@@ -68,7 +68,11 @@ assert.match(resolver, /verifySavedOrderMerchant/);
 assert.match(resolver, /saved_order_merchant_id_mismatch/);
 for (const source of creators) {
   assert.match(source, /resolveCanonicalMerchantForOrder/);
-  assert.match(source, /admin_create_canonical_merchant_order/);
+  assert.match(
+    source,
+    /admin_create_canonical_merchant_order|createAdminOrder/,
+    "order creation must use either the legacy canonical merchant RPC or the unified Admin v3 mutation service",
+  );
   assert.match(source, /verifySavedOrderMerchant/);
   assert.doesNotMatch(source, /admin_create_coupon_order/);
   assert.doesNotMatch(source, /createPublicOrder/);

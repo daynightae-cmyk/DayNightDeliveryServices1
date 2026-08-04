@@ -9,6 +9,7 @@ import {
   type OpsOrderUpdateInput,
 } from "./adminOperationsData";
 import { createDayNightInvoiceNumber } from "./printableDocuments";
+import { createAdminOrder } from "./adminOrderMutations";
 import {
   calculateOrderFinancials,
   financialNumber,
@@ -230,7 +231,7 @@ function persistedManualDeliveryPrice(
 
 function buildFinancialOrderPayload(
   input: FinancialOpsOrderInput,
-  merchant: Merchant,
+  merchant: Merchant | null,
   financials: ReturnType<typeof calculateFinancialOpsOrder>,
   trackingNumber: string,
   createdAt: string,
@@ -239,11 +240,11 @@ function buildFinancialOrderPayload(
   const receiverCity = isInternational
     ? clean(input.destination_country || input.delivery_city || "WORLD")
     : clean(input.delivery_city || "Abu Dhabi");
-  const senderCity = clean(input.pickup_city || merchant.emirate || "Abu Dhabi");
+  const senderCity = clean(input.pickup_city || merchant?.emirate || "Abu Dhabi");
   const senderAddress = composeAddress([
     input.pickup_area,
     input.pickup_street,
-    merchant.pickup_address || merchant.address || senderCity,
+    merchant?.pickup_address || merchant?.address || senderCity,
   ]);
   const receiverAddress = composeAddress([
     input.delivery_area,
@@ -261,16 +262,16 @@ function buildFinancialOrderPayload(
     tracking_code: trackingNumber,
     invoice_number: trackingNumber,
     coupon_number: clean(input.coupon_number),
-    merchant_id: merchant.id,
-    merchant_name: merchant.trade_name,
-    merchant_code: merchant.merchant_code || "",
+    merchant_id: merchant?.id || clean(input.merchant_id) || null,
+    merchant_name: merchant?.trade_name || clean(input.merchant_name) || null,
+    merchant_code: merchant?.merchant_code || clean(input.merchant_code) || null,
     order_count: count,
     shipping_scope: input.shipping_scope,
     destination_country: isInternational ? receiverCity : null,
     source_channel: "admin_financial_order",
     source_domain: "daynightae.com",
-    sender_name: merchant.trade_name,
-    sender_phone: clean(merchant.phone || "971568757331"),
+    sender_name: merchant?.trade_name || clean(input.sender_name) || "DAY NIGHT Admin",
+    sender_phone: clean(merchant?.phone || input.sender_phone),
     sender_city: senderCity,
     sender_address: senderAddress,
     receiver_name: clean(input.receiver_name),
@@ -322,35 +323,36 @@ export async function createFinancialOpsOrder(
   input: FinancialOpsOrderInput,
 ): Promise<OpsCreateResult<Order>> {
   if (!supabase) throw operationError(null, "Supabase is not configured.");
-  const selectedMerchant = input.merchant;
-  if (!selectedMerchant?.id) throw operationError(null, "merchant_required");
-  const resolution = await resolveCanonicalMerchantForOrder(selectedMerchant);
-  const merchant = resolution.merchant;
+  const merchant = input.merchant || null;
 
   const existingConflict = await findCouponConflict(input.coupon_number);
   if (existingConflict) throw duplicateCouponError(existingConflict, input.coupon_number);
 
   const financials = calculateFinancialOpsOrder(input);
   const createdAt = new Date().toISOString();
-  const trackingSeed = clean(input.coupon_number) || `${merchant.merchant_code || "ADMIN"}-${Date.now().toString(36)}`;
+  const trackingSeed =
+    clean(input.coupon_number) ||
+    `${merchant?.merchant_code || clean(input.merchant_code) || "ADMIN"}-${Date.now().toString(36)}`;
   const trackingNumber = createDayNightInvoiceNumber(trackingSeed, new Date(createdAt));
   const payload = buildFinancialOrderPayload(input, merchant, financials, trackingNumber, createdAt);
-
-  const { data, error } = await supabase.rpc("admin_create_canonical_merchant_order", { p_order: payload });
-  if (error) {
+  let result;
+  try {
+    result = await createAdminOrder(payload, {
+      sourcePage: "admin_new_order_complete",
+      reason: "Admin financially complete order creation",
+    });
+  } catch (error) {
     const conflict = await recoverCouponConflict(input.coupon_number);
     if (conflict) throw duplicateCouponError(conflict, input.coupon_number);
-    throw operationError(
-      error,
-      "Could not create the financially separated merchant order. Apply the order financial ledger migration.",
-    );
+    throw error;
   }
-  const row = (Array.isArray(data) ? data[0] : data) as Order | null;
-  if (!row?.id && !row?.tracking_number && !row?.invoice_number) {
-    throw operationError(null, "financial_order_creation_returned_no_row");
-  }
-  const verified = await verifySavedOrderMerchant(row, resolution.merchantId);
-  return { row: verified, source: "rpc" };
+  return {
+    row: result.order,
+    source: "rpc",
+    warnings: result.warnings,
+    reconciliationRequired: result.reconciliationRequired,
+    requestId: result.requestId,
+  };
 }
 
 function buildCorePatch(

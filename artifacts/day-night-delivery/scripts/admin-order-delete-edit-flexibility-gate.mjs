@@ -10,7 +10,8 @@ const assert = (condition, message) => {
 const edit = read("src/components/admin/AdminOrderEditModalComplete.tsx");
 const deleteModal = read("src/components/admin/AdminOrderDeleteModal.tsx");
 const deleteData = read("src/lib/adminOrderDeleteData.ts");
-const migration = read("../../supabase/migrations/20260804053000_admin_order_delete_flexible_v2.sql");
+const mutations = read("src/lib/adminOrderMutations.ts");
+const migration = read("../../supabase/migrations/20260804211500_admin_order_crud_v3_nonblocking.sql");
 
 assert(edit.includes("automaticEditReason"), "automatic edit reason is missing");
 assert(edit.includes('edit_reason: automaticEditReason'), "automatic reason is not persisted");
@@ -21,16 +22,29 @@ assert(!edit.includes('data-admin-complete-order-reason="true"'), "manual reason
 assert(!edit.includes('data-admin-complete-order-confirm="true"'), "manual confirmation remains");
 
 assert(deleteData.includes("INTERNAL_DELETE_REASON"), "internal delete audit reason is missing");
-assert(deleteData.includes('name: "admin_delete_order_flexible_v2"'), "v2 delete RPC is not preferred");
-assert(deleteData.includes("reason: INTERNAL_DELETE_REASON"), "legacy payload compatibility reason is missing");
-assert(deleteData.includes("p_reference: reference, p_reason: INTERNAL_DELETE_REASON"), "legacy text reason signature is missing");
-assert(deleteData.includes("throw deletionError(lastError)"), "exact deletion diagnostic is discarded");
+assert(deleteData.includes('import { softDeleteAdminOrder }'), "canonical soft-delete service is not imported");
+assert(deleteData.includes("await softDeleteAdminOrder(orderId"), "normal Admin deletion does not use the canonical soft-delete operation");
+assert(
+  (deleteData.includes("result.order.is_deleted") && deleteData.includes("result.order.deleted_at")) ||
+    (deleteData.includes("saved.is_deleted") && deleteData.includes("saved.deleted_at")),
+  "soft-delete database readback is not verified",
+);
+assert(deleteData.includes('operation: "soft_delete"'), "soft-delete mutation event is not emitted");
+assert(!deleteData.includes("admin_delete_order_flexible_v2"), "legacy v2 delete RPC remains in the active client");
+assert(!/\.from\(["']orders["']\)[\s\S]*\.delete\(/.test(deleteData), "direct destructive table deletion remains");
 assert(deleteModal.includes("await onDeleted?.(result.reference)"), "parent delete callback is not invoked");
 
-assert(migration.includes("admin_delete_order_flexible_v2"), "flexible v2 migration RPC is missing");
-assert(migration.includes("reason_required', false"), "migration does not declare reason-free deletion");
-assert(migration.includes("status_restricted', false"), "migration does not declare status flexibility");
-assert(migration.includes("assignment_restricted', false"), "migration does not declare assignment flexibility");
+assert(mutations.includes('return invokeMutation(orderId, "soft_delete"'), "shared mutation service has no soft-delete operation");
+assert(mutations.includes('return invokeMutation(orderId, "restore"'), "shared mutation service has no restore operation");
+assert(mutations.includes('supabase.rpc("admin_update_order_complete_v3"'), "soft delete is not routed through canonical v3");
+assert(mutations.includes('supabase.rpc("admin_permanently_delete_order_v3"'), "explicit Super Admin permanent-delete boundary is missing");
+assert(migration.includes("admin_order_mutation_audit_v3"), "permanent mutation audit table is missing");
+assert(migration.includes("'soft_delete'"), "v3 migration does not support soft deletion");
+assert(migration.includes("'restore'"), "v3 migration does not support restoration");
+assert(migration.includes("is_deleted"), "soft-delete persistence column is missing");
+assert(migration.includes("deleted_at"), "soft-delete timestamp is missing");
+assert(migration.includes("deletion_reason"), "soft-delete audit reason is missing");
+assert(migration.includes("admin_permanently_delete_order_v3"), "separate permanent-delete RPC is missing");
 assert(!migration.includes("active_or_completed_order_cannot_be_deleted"), "legacy status block remains");
 assert(!migration.includes("assigned_order_cannot_be_deleted"), "legacy assignment block remains");
 
@@ -39,8 +53,10 @@ console.log(JSON.stringify({
   automaticEditAudit: true,
   manualReasonRemoved: true,
   manualConfirmationRemoved: true,
-  backwardCompatibleDeleteReason: true,
-  exactDeleteDiagnostics: true,
+  canonicalSoftDelete: true,
+  exactDeleteReadback: true,
+  restoreSupported: true,
+  permanentDeleteSeparated: true,
   anyStatusDeleteRuntime: true,
   assignedOrderDeleteRuntime: true
 }, null, 2));

@@ -159,26 +159,11 @@ export default function AdminPersonalOrderForm({
     event.preventDefault();
     setMessage("");
     setError("");
-    const missing = [
-      !form.reference?.trim() ? (isArabic ? "رقم الكوبون" : "coupon number") : "",
-      !form.sender_name.trim() ? (isArabic ? "اسم المرسل" : "sender name") : "",
-      !form.receiver_name.trim() ? (isArabic ? "اسم المستلم" : "recipient name") : "",
-      !form.receiver_phone.trim() ? (isArabic ? "هاتف المستلم" : "recipient phone") : "",
-      form.goods_value === "" ? (isArabic ? "قيمة البضاعة" : "goods value") : "",
-    ].filter(Boolean);
-    if (missing.length) {
-      setError(
-        isArabic
-          ? `الحقول المطلوبة: ${missing.join("، ")}`
-          : `Required fields: ${missing.join(", ")}`,
-      );
-      return;
-    }
     if (!financials) {
       setError(
         isArabic
-          ? "الخصم لا يمكن أن يتجاوز قيمة البضاعة والتوصيل."
-          : "Discount cannot exceed goods plus delivery.",
+          ? "راجع القيم المالية. يمكن إنشاء الطلب بقيمة صفر، لكن لا يمكن أن يتجاوز الخصم الإجمالي."
+          : "Review the financial values. Zero-value orders are allowed, but discount cannot exceed the total.",
       );
       return;
     }
@@ -187,10 +172,18 @@ export default function AdminPersonalOrderForm({
     try {
       const result = await createPersonalOpsOrder(form);
       const ref = result.row.tracking_number || result.row.invoice_number || result.row.id;
+      const warningCodes = (result.warnings || [])
+        .map((warning) => String(warning.code || ""))
+        .filter(Boolean);
+      const warningSuffix = warningCodes.length
+        ? isArabic
+          ? ` تم حفظ الطلب، وتوجد ملاحظة تحتاج مراجعة دون إلغاء الحفظ: ${warningCodes.join("، ")}.`
+          : ` Saved with non-blocking review notes: ${warningCodes.join(", ")}.`
+        : "";
       setMessage(
         isArabic
-          ? `تم إنشاء الطلب الشخصي ${ref} بدون تاجر. التوصيل ثابت ${PERSONAL_ORDER_DELIVERY_FEE.toFixed(2)} درهم، والمطلوب من العميل ${financials.customerTotal.toFixed(2)} درهم.`
-          : `Personal order ${ref} was created without a merchant. Delivery is fixed at ${PERSONAL_ORDER_DELIVERY_FEE.toFixed(2)} AED and customer total is ${financials.customerTotal.toFixed(2)} AED.`,
+          ? `تم إنشاء الطلب الشخصي ${ref} بدون تاجر. التوصيل ثابت ${PERSONAL_ORDER_DELIVERY_FEE.toFixed(2)} درهم، والمطلوب من العميل ${financials.customerTotal.toFixed(2)} درهم.${warningSuffix}`
+          : `Personal order ${ref} was created without a merchant. Delivery is fixed at ${PERSONAL_ORDER_DELIVERY_FEE.toFixed(2)} AED and customer total is ${financials.customerTotal.toFixed(2)} AED.${warningSuffix}`,
       );
       setForm(emptyForm);
       window.setTimeout(() => {
@@ -229,8 +222,8 @@ export default function AdminPersonalOrderForm({
             </h2>
             <p className="mt-1 text-xs font-bold leading-6 text-white/60">
               {isArabic
-                ? "طلب مباشر بين مرسل ومستلم. رقم الكوبون إلزامي، ولا يُنشأ حساب تاجر، ورسوم التوصيل ثابتة 25 درهم."
-                : "Direct sender-to-recipient order. The coupon number is required, no merchant ledger is created, and delivery is fixed at 25 AED."}
+                ? "طلب مباشر صالح بدون تاجر. يمكن ترك الكوبون وبيانات الربط غير المكتملة للمراجعة لاحقًا، ورسوم التوصيل ثابتة 25 درهم."
+                : "Valid direct order without merchant. Coupon and incomplete relationship data can be reviewed later; delivery is fixed at 25 AED."}
             </p>
           </div>
         </div>
@@ -262,7 +255,7 @@ export default function AdminPersonalOrderForm({
 
       <section className="mb-4 rounded-3xl border border-brand-gold/25 bg-brand-gold/5 p-4">
         <label className="grid gap-2 text-xs font-black text-white/70">
-          <span>{isArabic ? "رقم الكوبون * — إجباري" : "Coupon number * — required"}</span>
+          <span>{isArabic ? "رقم الكوبون — اختياري ويمكن مراجعته لاحقًا" : "Coupon number — optional and reviewable later"}</span>
           <input
             data-admin-next-order-focus="true"
             data-admin-personal-coupon="true"
@@ -276,8 +269,6 @@ export default function AdminPersonalOrderForm({
             }
             dir="ltr"
             autoComplete="off"
-            required
-            aria-required="true"
           />
         </label>
       </section>
