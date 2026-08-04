@@ -1,0 +1,351 @@
+name: Merchant Debit Red Authoritative Fix
+
+on:
+  push:
+    branches:
+      - fix/merchant-debit-red-authoritative-20260805
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/merchant-debit-red-authoritative-20260805
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Apply authoritative merchant-debit UI fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const file = "artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx";
+          let source = fs.readFileSync(file, "utf8");
+
+          function replaceRequired(pattern, replacement, label) {
+            const next = source.replace(pattern, replacement);
+            if (next === source) {
+              throw new Error(`Patch failed: ${label}`);
+            }
+            source = next;
+          }
+
+          replaceRequired(
+            /function merchantSettlement\(value: number, isArabic: boolean\) \{[\s\S]*?\n\}\n\nfunction FinancialMetric\([\s\S]*?\n\}\n\nexport default function/,
+            `function merchantSettlement(
+              value: number,
+              isArabic: boolean,
+              deliveryFeeMode: "customer_pays" | "deduct_from_merchant",
+            ) {
+              const chargedToMerchant =
+                deliveryFeeMode === "deduct_from_merchant" || value < 0;
+              return chargedToMerchant
+                ? {
+                    label: isArabic ? "على التاجر" : "Merchant debit",
+                    amount: value,
+                  }
+                : {
+                    label: isArabic ? "للتاجر" : "Due to merchant",
+                    amount: value,
+                  };
+            }
+
+            type FinancialMetricTone = "neutral" | "gold" | "danger";
+
+            function signedAdminMoney(value: number, isArabic: boolean) {
+              const absolute = formatAdminMoney(Math.abs(value), isArabic);
+              return value < 0 ? \`-\${absolute}\` : absolute;
+            }
+
+            function FinancialMetric({
+              label,
+              value,
+              isArabic,
+              tone = "neutral",
+            }: {
+              label: string;
+              value: number;
+              isArabic: boolean;
+              tone?: FinancialMetricTone;
+            }) {
+              const containerClass =
+                tone === "danger"
+                  ? "border-rose-400/55 bg-rose-500/15 shadow-[0_0_24px_rgba(244,63,94,0.12)]"
+                  : tone === "gold"
+                    ? "border-brand-gold/40 bg-brand-gold/10"
+                    : "border-white/10 bg-black/10";
+              const labelClass =
+                tone === "danger" ? "text-rose-200/85" : "text-white/50";
+              const valueClass =
+                tone === "danger"
+                  ? "text-rose-300"
+                  : tone === "gold"
+                    ? "text-brand-gold"
+                    : "text-white";
+
+              return (
+                <div className={\`rounded-2xl border p-3 \${containerClass}\`}>
+                  <span className={\`block text-[10px] font-black \${labelClass}\`}>{label}</span>
+                  <strong className={\`mt-1 block text-lg font-black \${valueClass}\`} dir="ltr">
+                    {signedAdminMoney(value, isArabic)}
+                  </strong>
+                </div>
+              );
+            }
+
+            export default function`,
+            "signed merchant settlement and danger metric",
+          );
+
+          replaceRequired(
+            /  const authoritativeDeliveryFeeMode = effectiveDeliveryFeeMode\(\{\n    \.\.\.form,\n    merchant: selectedMerchant,\n  \}\);\n  const financials = useMemo\(\(\) => \{\n    try \{\n      return calculateFinancialOpsOrder\(\{\n        \.\.\.form,\n        merchant: selectedMerchant,\n      \}\);\n    \} catch \{\n      return null;\n    \}\n  \}, \[form, selectedMerchant\]\);\n  const settlement = financials \? merchantSettlement\(financials\.merchantDue, isArabic\) : null;/,
+            `  const authoritativeDeliveryFeeMode = effectiveDeliveryFeeMode({
+              ...form,
+              merchant: selectedMerchant,
+            });
+            const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => {
+              const chargedToMerchant =
+                authoritativeDeliveryFeeMode === "deduct_from_merchant";
+              return {
+                ...form,
+                merchant: selectedMerchant,
+                delivery_fee_mode: authoritativeDeliveryFeeMode,
+                payment_method: chargedToMerchant
+                  ? "merchant_pays"
+                  : form.payment_method === "merchant_pays" ||
+                      form.payment_method === "sender_pays"
+                    ? "cod"
+                    : form.payment_method,
+              };
+            }, [form, selectedMerchant, authoritativeDeliveryFeeMode]);
+            const financials = useMemo(() => {
+              try {
+                return calculateFinancialOpsOrder(resolvedFinancialInput);
+              } catch {
+                return null;
+              }
+            }, [resolvedFinancialInput]);
+            const settlement = financials
+              ? merchantSettlement(
+                  financials.merchantDue,
+                  isArabic,
+                  financials.deliveryFeeMode,
+                )
+              : null;`,
+            "authoritative preview payload",
+          );
+
+          replaceRequired(
+            /  function setDeliveryFeeMode\(value: "customer_pays" \| "deduct_from_merchant"\) \{\n    setForm\(\(current\) => \(\{\n      \.\.\.current,\n      delivery_fee_mode:\n        current\.payment_method === "merchant_pays" \|\| current\.payment_method === "sender_pays"\n          \? "deduct_from_merchant"\n          : value,\n    \}\)\);\n    setSource\("pending"\);\n    setMessage\(""\);\n    setError\(""\);\n  \}/,
+            `  function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
+              setForm((current) => ({
+                ...current,
+                delivery_fee_mode: value,
+                payment_method:
+                  value === "deduct_from_merchant"
+                    ? "merchant_pays"
+                    : current.payment_method === "merchant_pays" ||
+                        current.payment_method === "sender_pays"
+                      ? "cod"
+                      : current.payment_method,
+              }));
+              setSource("pending");
+              setMessage("");
+              setError("");
+            }`,
+            "synchronize payment owner controls",
+          );
+
+          replaceRequired(
+            /      const calculated = calculateFinancialOpsOrder\(\{ \.\.\.form, merchant: selectedMerchant \}\);\n      const result = await createFinancialOpsOrder\(\{\n        \.\.\.form,\n        coupon_number: couponNumber,\n        merchant: selectedMerchant,\n        receiver_address: clean\(form\.receiver_address\),\n        delivery_street: clean\(form\.delivery_street\),\n        package_type: packageValue \|\| "Shipment",\n        package_description: packageValue \|\| "Shipment",\n      \}\);/,
+            `      const submissionInput: FinancialOpsOrderInput = {
+                ...resolvedFinancialInput,
+                coupon_number: couponNumber,
+                receiver_address: clean(form.receiver_address),
+                delivery_street: clean(form.delivery_street),
+                package_type: packageValue || "Shipment",
+                package_description: packageValue || "Shipment",
+              };
+              const calculated = calculateFinancialOpsOrder(submissionInput);
+              const result = await createFinancialOpsOrder(submissionInput);`,
+            "save exact preview payload",
+          );
+
+          replaceRequired(
+            /      const savedSettlement = merchantSettlement\(calculated\.merchantDue, isArabic\);/,
+            `      const savedSettlement = merchantSettlement(
+                calculated.merchantDue,
+                isArabic,
+                calculated.deliveryFeeMode,
+              );`,
+            "saved settlement uses resolved owner",
+          );
+
+          replaceRequired(
+            /            <FinancialMetric isArabic=\{isArabic\} label=\{isArabic \? "المطلوب من العميل" : "Customer total"\} value=\{financials\.customerTotal\} accent \/>\n            <FinancialMetric isArabic=\{isArabic\} label=\{settlement\.label\} value=\{settlement\.amount\} \/>/,
+            `            <FinancialMetric
+                          isArabic={isArabic}
+                          label={isArabic ? "المطلوب من العميل" : "Customer total"}
+                          value={financials.customerTotal}
+                          tone={
+                            financials.deliveryFeeMode === "deduct_from_merchant"
+                              ? "neutral"
+                              : "gold"
+                          }
+                        />
+                        <FinancialMetric
+                          isArabic={isArabic}
+                          label={settlement.label}
+                          value={settlement.amount}
+                          tone={
+                            financials.deliveryFeeMode === "deduct_from_merchant"
+                              ? "danger"
+                              : "neutral"
+                          }
+                        />`,
+            "move emphasis from customer to merchant debit",
+          );
+
+          replaceRequired(
+            '<div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4">',
+            `<div
+                            className={\`mt-4 rounded-2xl border p-4 \${
+                              financials.merchantDue < 0
+                                ? "border-rose-400/55 bg-rose-500/15 shadow-[0_0_28px_rgba(244,63,94,0.14)]"
+                                : "border-white/10 bg-black/10"
+                            }\`}
+                          >`,
+            "red final total container",
+          );
+
+          replaceRequired(
+            '<span className="block text-white/45">',
+            `<span
+                              className={\`block \${
+                                financials.merchantDue < 0
+                                  ? "font-black text-rose-200"
+                                  : "text-white/45"
+                              }\`}
+                            >`,
+            "red final total label",
+          );
+
+          replaceRequired(
+            '? "الإجمالي على التاجر"',
+            '? "الإجمالي على التاجر — خصم"',
+            "explicit Arabic merchant debit title",
+          );
+
+          replaceRequired(
+            '? "Merchant account total"',
+            '? "Merchant debit total"',
+            "explicit English merchant debit title",
+          );
+
+          replaceRequired(
+            '<strong className="mt-1 block text-3xl font-black text-brand-gold" dir="ltr">',
+            `<strong
+                              className={\`mt-1 block text-3xl font-black \${
+                                financials.merchantDue < 0
+                                  ? "text-rose-300"
+                                  : "text-brand-gold"
+                              }\`}
+                              dir="ltr"
+                            >`,
+            "red final total value",
+          );
+
+          replaceRequired(
+            /\{formatAdminMoney\(\s*financials\.merchantDue < 0 \? financials\.merchantDue : financials\.customerTotal,\s*isArabic,\s*\)\}/,
+            `{signedAdminMoney(
+                              financials.merchantDue < 0
+                                ? financials.merchantDue
+                                : financials.customerTotal,
+                              isArabic,
+                            )}`,
+            "guaranteed visible signed final amount",
+          );
+
+          fs.writeFileSync(file, source);
+
+          const gate = `import fs from "node:fs";
+
+          const source = fs.readFileSync(
+            "artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx",
+            "utf8",
+          );
+
+          const checks = [
+            [source.includes("const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>"), "resolved preview payload"],
+            [source.includes('delivery_fee_mode: authoritativeDeliveryFeeMode'), "authoritative mode injected"],
+            [source.includes('? "merchant_pays"'), "merchant payment synchronized"],
+            [source.includes("calculateFinancialOpsOrder(resolvedFinancialInput)"), "preview uses resolved input"],
+            [source.includes("createFinancialOpsOrder(submissionInput)"), "save uses resolved input"],
+            [source.includes('type FinancialMetricTone = "neutral" | "gold" | "danger"'), "danger metric tone"],
+            [source.includes('financials.deliveryFeeMode === "deduct_from_merchant"'), "merchant mode drives emphasis"],
+            [source.includes('"border-rose-400/55 bg-rose-500/15'), "negative card is red"],
+            [source.includes("function signedAdminMoney") && source.includes("Math.abs(value)") && source.includes("value < 0"), "signed formatter"],
+            [source.includes('"الإجمالي على التاجر — خصم"'), "explicit Arabic debit total"],
+            [!source.includes('value={financials.customerTotal} accent'), "customer card no longer always gold"],
+          ];
+
+          for (const [ok, label] of checks) {
+            if (!ok) throw new Error(\`merchant debit authority gate failed: \${label}\`);
+          }
+
+          console.log("merchant debit authority gate: PASS");
+          console.log("goods=0, delivery=25, merchant mode => customer=0, merchant=-25, red debit total=-25");
+          `;
+          fs.writeFileSync(
+            "artifacts/day-night-delivery/scripts/merchant-debit-authority-gate.mjs",
+            gate,
+          );
+
+          fs.unlinkSync(
+            ".github/workflows/merchant-debit-red-authoritative-fix.yml",
+          );
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify merchant debit authority gate
+        run: node artifacts/day-night-delivery/scripts/merchant-debit-authority-gate.mjs
+
+      - name: Build production application
+        run: pnpm --dir artifacts/day-night-delivery run build
+
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT DELIVERY SERVICES"
+          git config user.email "daynight.ae@gmail.com"
+          git add artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx \
+                  artifacts/day-night-delivery/scripts/merchant-debit-authority-gate.mjs \
+                  .github/workflows/merchant-debit-red-authoritative-fix.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(admin): enforce red signed merchant debit totals"
+          git push origin HEAD:fix/merchant-debit-red-authoritative-20260805
