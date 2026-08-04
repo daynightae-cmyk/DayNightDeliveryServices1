@@ -2,7 +2,7 @@
 13:PASS destination location formatter (16 assertions)
 1834:International tracking visual gate passed (76 assertions).
 1861:  if (!condition) throw new Error("admin_order_delete_edit_flexibility_gate_failed: " + message);
-1864:Error: admin_order_delete_edit_flexibility_gate_failed: v2 delete RPC is not preferred
+1864:Error: admin_order_delete_edit_flexibility_gate_failed: soft-delete database readback is not verified
 1865:    at assert (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:7:25)
 1872: ELIFECYCLE  Command failed with exit code 1.
 1873: ELIFECYCLE  Command failed with exit code 1.
@@ -347,9 +347,9 @@ file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/art
   if (!condition) throw new Error("admin_order_delete_edit_flexibility_gate_failed: " + message);
                         ^
 
-Error: admin_order_delete_edit_flexibility_gate_failed: v2 delete RPC is not preferred
+Error: admin_order_delete_edit_flexibility_gate_failed: soft-delete database readback is not verified
     at assert (file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:7:25)
-    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:24:1
+    at file:///home/runner/work/DayNightDeliveryServices1/DayNightDeliveryServices1/artifacts/day-night-delivery/scripts/admin-order-delete-edit-flexibility-gate.mjs:27:1
     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
