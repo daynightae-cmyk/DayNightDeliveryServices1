@@ -1,0 +1,40 @@
+name: Diagnose Admin Order CRUD v3
+
+on:
+  push:
+    branches:
+      - fix/admin-order-crud-v3-nonblocking-20260804
+    paths:
+      - ".github/workflows/diagnose-admin-order-crud-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-order-crud-v3-nonblocking-20260804
+          fetch-depth: 0
+      - name: Locate restrictive order paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== merchant_portal_account_not_linked ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git 'merchant_portal_account_not_linked' . || true
+          echo '=== complete update RPC callers and definitions ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'admin_update_order_complete_verified_v2|admin_update_order_complete_verified\(' . || true
+          echo '=== status RPC callers and definitions ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'admin_update_order_status_verified|admin_update_order_status\(' . || true
+          echo '=== merchant linkage checks around orders ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'portal_account_not_linked|merchant.*account.*linked|linked.*merchant.*account' supabase artifacts/day-night-delivery/src || true
+          echo '=== order triggers ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git -E 'create trigger|before update|after update' supabase/migrations | grep -Ei 'order|merchant|coupon|financial|statement' || true
+          echo '=== recent order migrations ==='
+          find supabase/migrations -maxdepth 1 -type f | sort | tail -n 120
+          echo '=== order mutation frontend files ==='
+          grep -RIl --exclude-dir=node_modules --exclude-dir=.git -E 'from\("orders"\).*update|\.from\("orders"\)|updateExistingOrderStatus|saveAdminOrderEdit|admin_update_order_' artifacts/day-night-delivery/src | sort || true
