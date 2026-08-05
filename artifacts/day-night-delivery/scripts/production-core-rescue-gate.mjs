@@ -43,7 +43,7 @@ reject(adminMerchant, /localStorage|sessionStorage|Math\.random|mock|demo mercha
 const adminOrder = read("src/components/admin/AdminNewOrderFlexible.tsx");
 expect(adminOrder, /createOpsOrder/, "Admin order form calls the production order operation");
 reject(adminOrder, /function validate\(\)[\s\S]*!selectedMerchant/, "Admin order creation does not require a linked merchant");
-expect(adminOrder, /onSaved\?\.\(saved\)/, "Admin order form refreshes from the returned saved row");
+expect(adminOrder, /onSaved\?\.\(saved\)/, "Admin order form refreshes state from the returned saved row");
 reject(adminOrder, /localStorage|sessionStorage|Math\.random|mock order|demo order/i, "Admin order creation has no browser-only or mock persistence");
 
 const adminData = read("src/lib/adminOperationsData.ts");
@@ -68,7 +68,7 @@ expect(financialAdminOrder, /placeholder="25\.00"/, "Manual delivery field prese
 const financialInteractionState = read("src/lib/adminNewOrderFinancialState.ts");
 expect(
   financialInteractionState,
-  /updateAdminFinancialField[\s\S]*delivery_fee_mode:\s*"deduct_from_merchant"[\s\S]*payment_method:\s*"merchant_pays"/,
+  /updateAdminFinancialField[\s\S]*next\.delivery_fee_mode\s*=\s*"deduct_from_merchant"[\s\S]*next\.payment_method\s*=\s*"merchant_pays"/,
   "Zero financial input atomically selects merchant debit",
 );
 
