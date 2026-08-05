@@ -98,7 +98,7 @@ jobs:
           cd "$playwright_dir"
           npm init -y >/dev/null
           npm install --ignore-scripts playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
       - name: Test local exact build live financial inputs and merchant switching
