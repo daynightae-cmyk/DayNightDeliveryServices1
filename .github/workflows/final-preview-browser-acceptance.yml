@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: final-preview-browser-acceptance-${{ github.ref }}
@@ -32,7 +33,6 @@ jobs:
     timeout-minutes: 45
     environment: production-runtime-tests
     env:
-      DEPLOYED_PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
       TEST_BASE_URL: http://127.0.0.1:4173
       GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -101,32 +101,103 @@ jobs:
           npx playwright install --with-deps chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Test live financial inputs and merchant switching
+      - name: Test local exact build live financial inputs and merchant switching
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/final-preview-browser-acceptance-hardened.mjs
 
-      - name: Diagnose financial input event ownership
+      - name: Diagnose local financial input event ownership
         shell: bash
         run: |
           set -euo pipefail
           node --check .github/scripts/admin-financial-event-ownership-diagnostic.mjs
           node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
 
-      - name: Diagnose background fetch ownership
+      - name: Diagnose local background fetch ownership
         shell: bash
         run: |
           set -euo pipefail
           node --check .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
           node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
 
-      - name: Test save database readback reopen and cleanup
+      - name: Test local save database readback reopen and cleanup
         shell: bash
         run: |
           set -euo pipefail
           node --check .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
           node .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
+          mkdir -p preview-browser-evidence/local
+          find preview-browser-evidence -maxdepth 1 -type f ! -name 'local-web.pid' -exec cp {} preview-browser-evidence/local/ \;
+
+      - name: Resolve exact successful Vercel Preview for branch head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/$REPOSITORY"
+          preview_url=""
+          for attempt in $(seq 1 90); do
+            deployments="$(curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$api/deployments?sha=$GITHUB_HEAD_SHA&environment=Preview&per_page=30")"
+            deployment_id="$(printf '%s' "$deployments" | jq -r --arg sha "$GITHUB_HEAD_SHA" '[.[] | select(.sha == $sha and .environment == "Preview" and .creator.login == "vercel[bot]")][0].id // empty')"
+            if [ -n "$deployment_id" ]; then
+              statuses="$(curl -fsSL \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$api/deployments/$deployment_id/statuses")"
+              preview_url="$(printf '%s' "$statuses" | jq -r '[.[] | select(.state == "success")][0] | (.environment_url // .target_url // empty)')"
+            fi
+            if [ -n "$preview_url" ]; then
+              break
+            fi
+            sleep 5
+          done
+          test -n "$preview_url" || { echo "No successful Vercel Preview found for $GITHUB_HEAD_SHA" >&2; exit 1; }
+          preview_url="${preview_url%/}"
+          echo "EXACT_VERCEL_PREVIEW_URL=$preview_url" >> "$GITHUB_ENV"
+          echo "TEST_BASE_URL=$preview_url" >> "$GITHUB_ENV"
+          printf '%s\n' "$preview_url" > preview-browser-evidence/exact-vercel-preview-url.txt
+
+      - name: Verify Vercel Preview version matches branch head
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl -fsS --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o preview-browser-evidence/vercel-preview-version.json; then
+              break
+            fi
+            sleep 5
+          done
+          test -s preview-browser-evidence/vercel-preview-version.json
+          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('preview-browser-evidence/vercel-preview-version.json','utf8'));if(v.buildId!==process.env.GITHUB_HEAD_SHA){throw new Error('vercel_preview_commit_mismatch:'+v.buildId+':'+process.env.GITHUB_HEAD_SHA)}"
+
+      - name: Test exact Vercel Preview live financial inputs and merchant switching
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/final-preview-browser-acceptance-hardened.mjs
+
+      - name: Diagnose exact Vercel Preview event and fetch ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+          node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
+
+      - name: Test exact Vercel Preview save database readback reopen and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
+          mkdir -p preview-browser-evidence/vercel-preview
+          find preview-browser-evidence -maxdepth 1 -type f ! -name 'local-web.pid' -exec cp {} preview-browser-evidence/vercel-preview/ \;
 
       - name: Stop local application
         if: always()
