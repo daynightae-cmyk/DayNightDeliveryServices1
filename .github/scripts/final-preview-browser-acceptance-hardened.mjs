@@ -71,10 +71,6 @@ replaceRequired(
     assert((await statementsControl.count()) > 0, \`${'${label}'}: merchant PDF statements navigation control is missing.\`);
 
     if (/phone/i.test(label)) {
-      // The phone command rail is intentionally collapsed. The dedicated
-      // Merchant Accounts PDF workflow opens the mobile menu and performs the
-      // full accounts/PDF route acceptance. This generic preview smoke only
-      // verifies that the protected shell and registered controls are present.
       await page.screenshot({ path: \`preview-browser-evidence/${'${label}'}-admin-registered-routes.png\`, fullPage: true });
       return;
     }
@@ -140,3 +136,7 @@ try {
 } finally {
   fs.rmSync(temporaryPath, { force: true });
 }
+
+await import(
+  `${pathToFileURL(path.resolve('.github/scripts/admin-new-order-financial-browser-diagnostic.mjs')).href}?run=${Date.now()}`
+);
