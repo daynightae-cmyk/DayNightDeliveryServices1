@@ -5,6 +5,7 @@ import "../styles/dn-admin-executive-polish.css";
 
 const DECK_ID = "dn-admin-executive-polish";
 const POLISHED_ATTR = "data-dn-admin-polished";
+let executiveDeckRefreshPromise: Promise<void> | null = null;
 
 const textReplacements: Array<[string, string]> = [
   ["المصدر: قاعدة البيانات", "متزامن مع سجلات التشغيل"],
@@ -195,21 +196,31 @@ function renderDeck(snapshot: DeckSnapshot) {
   `;
 }
 
-async function refreshExecutiveDeck() {
-  if (!isAdminMounted()) return;
-  loadingDeck();
-  const [ordersResult, merchantsResult, financeResult] = await Promise.allSettled([
-    fetchAdminOrders(),
-    fetchMerchants(),
-    fetchFinanceSummary(),
-  ]);
+function refreshExecutiveDeck(): Promise<void> {
+  if (!isAdminMounted()) return Promise.resolve();
+  if (executiveDeckRefreshPromise) return executiveDeckRefreshPromise;
 
-  renderDeck({
-    orders: ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) ? ordersResult.value : [],
-    merchants: merchantsResult.status === "fulfilled" && Array.isArray(merchantsResult.value) ? merchantsResult.value : [],
-    financeSummary: financeResult.status === "fulfilled" ? financeResult.value.summary : null,
-    refreshedAt: new Date(),
+  loadingDeck();
+  ensureDeck()?.setAttribute(POLISHED_ATTR, "loading");
+
+  executiveDeckRefreshPromise = (async () => {
+    const [ordersResult, merchantsResult, financeResult] = await Promise.allSettled([
+      fetchAdminOrders(),
+      fetchMerchants(),
+      fetchFinanceSummary(),
+    ]);
+
+    renderDeck({
+      orders: ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) ? ordersResult.value : [],
+      merchants: merchantsResult.status === "fulfilled" && Array.isArray(merchantsResult.value) ? merchantsResult.value : [],
+      financeSummary: financeResult.status === "fulfilled" ? financeResult.value.summary : null,
+      refreshedAt: new Date(),
+    });
+  })().finally(() => {
+    executiveDeckRefreshPromise = null;
   });
+
+  return executiveDeckRefreshPromise;
 }
 
 function startAdminPolish() {
