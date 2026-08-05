@@ -423,10 +423,27 @@ export default function AdminHistoryAutocomplete({
         const textNode = node as Text;
         const parent = textNode.parentElement;
         if (parent && !["SCRIPT", "STYLE"].includes(parent.tagName)) {
-          if (!originalText.has(textNode)) originalText.set(textNode, textNode.nodeValue || "");
+          const current = textNode.nodeValue || "";
+          const previousOriginal = originalText.get(textNode);
+          const previousTranslated =
+            previousOriginal === undefined
+              ? undefined
+              : normalizeAdminCurrencyText(previousOriginal, true);
+
+          // A React render can reuse the same Text node with a new value. Only
+          // preserve the prior source while the current value is our own
+          // localized projection; otherwise adopt React's latest value as the
+          // new source of truth before translating it.
+          if (
+            previousOriginal === undefined ||
+            current !== previousTranslated
+          ) {
+            originalText.set(textNode, current);
+          }
+
           const original = originalText.get(textNode) || "";
           const translated = normalizeAdminCurrencyText(original, true);
-          if (translated !== textNode.nodeValue) textNode.nodeValue = translated;
+          if (translated !== current) textNode.nodeValue = translated;
         }
         node = walker.nextNode();
       }
@@ -440,8 +457,21 @@ export default function AdminHistoryAutocomplete({
         for (const attribute of attributes) {
           const value = element.getAttribute(attribute);
           if (!value) continue;
-          if (!stored.has(attribute)) stored.set(attribute, value);
-          const translated = normalizeAdminCurrencyText(stored.get(attribute) || value, true);
+          const previousOriginal = stored.get(attribute);
+          const previousTranslated =
+            previousOriginal === undefined
+              ? undefined
+              : normalizeAdminCurrencyText(previousOriginal, true);
+          if (
+            previousOriginal === undefined ||
+            value !== previousTranslated
+          ) {
+            stored.set(attribute, value);
+          }
+          const translated = normalizeAdminCurrencyText(
+            stored.get(attribute) || value,
+            true,
+          );
           if (translated !== value) element.setAttribute(attribute, translated);
         }
       }
