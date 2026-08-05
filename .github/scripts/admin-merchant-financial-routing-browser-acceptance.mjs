@@ -38,6 +38,32 @@ async function waitAttribute(locator, name, expected, label) {
   throw new Error(`${label}: expected ${name}=${expected}, received ${actual}`);
 }
 
+async function waitForRealMerchantOption(ownerSelect, page) {
+  const timeoutAt = Date.now() + 150000;
+  let lastOptions = [];
+  while (Date.now() < timeoutAt) {
+    lastOptions = await ownerSelect.locator("option").evaluateAll((nodes) =>
+      nodes.map((node) => ({ value: node.value, text: node.textContent || "" })),
+    );
+    const merchantOption = lastOptions.find(
+      (option) => option.value && option.value !== "__personal_order__",
+    );
+    if (merchantOption) return merchantOption;
+
+    const refreshButton = page.getByRole("button", { name: /تحديث|Refresh|تحميل البيانات الحية/i });
+    if (await refreshButton.first().isVisible().catch(() => false)) {
+      const disabled = await refreshButton.first().isDisabled().catch(() => true);
+      if (!disabled) await refreshButton.first().click().catch(() => {});
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  const body = await page.locator("body").innerText().catch(() => "body unavailable");
+  throw new Error(
+    `no_real_merchant_option_after_live_data_wait options=${JSON.stringify(lastOptions)} body=${body.slice(0, 1200)}`,
+  );
+}
+
 async function openAdmin(page) {
   await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_financial_routing`, {
     waitUntil: "domcontentloaded",
@@ -83,12 +109,7 @@ try {
 
   const ownerSelect = form.locator('[data-admin-order-owner-select="true"]').first();
   await ownerSelect.waitFor({ state: "visible", timeout: 30000 });
-  const options = await ownerSelect.locator("option").evaluateAll((nodes) =>
-    nodes.map((node) => ({ value: node.value, text: node.textContent || "" })),
-  );
-  const merchantOption = options.find(
-    (option) => option.value && option.value !== "__personal_order__",
-  );
+  const merchantOption = await waitForRealMerchantOption(ownerSelect, page);
   assert(merchantOption, "no_real_merchant_option_available");
 
   await ownerSelect.selectOption(merchantOption.value);
