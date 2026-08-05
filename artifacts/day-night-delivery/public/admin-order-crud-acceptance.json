@@ -1,0 +1,6 @@
+{
+  "purpose": "admin-order-edit-delete-restore-acceptance",
+  "version": "2026-08-05-v1",
+  "productionBehaviorChanged": false,
+  "mergeRequested": false
+}
