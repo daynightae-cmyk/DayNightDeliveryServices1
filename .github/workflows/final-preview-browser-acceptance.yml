@@ -7,6 +7,7 @@ on:
       - ".github/workflows/final-preview-browser-acceptance.yml"
       - ".github/scripts/final-preview-browser-acceptance.mjs"
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
+      - ".github/scripts/admin-new-order-save-reopen-browser.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -22,7 +23,7 @@ concurrency:
 
 jobs:
   authenticated-preview-source:
-    name: Admin accounts, PDF routes, and merchant shell acceptance
+    name: Admin financial browser acceptance and save/reopen verification
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -30,6 +31,8 @@ jobs:
     env:
       DEPLOYED_PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
       TEST_BASE_URL: http://127.0.0.1:4173
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -68,7 +71,9 @@ jobs:
           pnpm run web:typecheck
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
+          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('artifacts/day-night-delivery/dist/public/version.json','utf8'));if(v.buildId!==process.env.GITHUB_HEAD_SHA){throw new Error('local_build_commit_mismatch:'+v.buildId+':'+process.env.GITHUB_HEAD_SHA)}"
           mkdir -p preview-browser-evidence
+          cp artifacts/day-night-delivery/dist/public/version.json preview-browser-evidence/local-version.json
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > preview-browser-evidence/local-web.log 2>&1 &
           echo $! > preview-browser-evidence/local-web.pid
           for attempt in $(seq 1 60); do
@@ -93,11 +98,18 @@ jobs:
           npx playwright install --with-deps chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Test authenticated accounts, PDF routes, and merchant shell on desktop and phone
+      - name: Test live financial inputs and merchant switching
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/final-preview-browser-acceptance-hardened.mjs
+
+      - name: Test save database readback reopen and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/admin-new-order-save-reopen-browser.mjs
+          node .github/scripts/admin-new-order-save-reopen-browser.mjs
 
       - name: Stop local application
         if: always()
