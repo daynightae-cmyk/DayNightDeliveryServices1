@@ -92,8 +92,14 @@ replaceRequired(
 
     const customer = Number(await preview.getAttribute('data-customer-total'));
     const merchant = Number(await preview.getAttribute('data-merchant-due'));
-    assert(customer === expected.customer, \`${'${label}'}: ${'${caseLabel}'} customer expected ${'${expected.customer}'} received ${'${customer}'}.\`);
-    assert(merchant === expected.merchant, \`${'${label}'}: ${'${caseLabel}'} merchant expected ${'${expected.merchant}'} received ${'${merchant}'}.\`);
+    assert(
+      customer === expected.customer,
+      label + ': ' + caseLabel + ' customer expected ' + expected.customer + ' received ' + customer + '.',
+    );
+    assert(
+      merchant === expected.merchant,
+      label + ': ' + caseLabel + ' merchant expected ' + expected.merchant + ' received ' + merchant + '.',
+    );
   }
 
   async function typeFinancialValue(input, value, inputLabel) {
@@ -101,7 +107,10 @@ replaceRequired(
     await input.press('Control+A');
     await input.pressSequentially(String(value), { delay: 65 });
     const domValue = await input.inputValue();
-    assert(domValue === String(value), \`${'${label}'}: ${'${inputLabel}'} DOM expected ${'${value}'} received ${'${domValue}'}.\`);
+    assert(
+      domValue === String(value),
+      label + ': ' + inputLabel + ' DOM expected ' + value + ' received ' + domValue + '.',
+    );
   }
 
   try {
@@ -112,12 +121,15 @@ replaceRequired(
     const accountsControl = page.locator('[data-dn-command-section="accounts"]');
     const statementsControl = page.locator('[data-dn-command-section="merchant_statements"]');
     const newOrderControl = page.locator('[data-dn-command-section="new_order"]');
-    assert((await accountsControl.count()) > 0, \`${'${label}'}: accounts navigation control is missing.\`);
-    assert((await statementsControl.count()) > 0, \`${'${label}'}: merchant PDF statements navigation control is missing.\`);
-    assert((await newOrderControl.count()) > 0, \`${'${label}'}: new-order navigation control is missing.\`);
+    assert((await accountsControl.count()) > 0, label + ': accounts navigation control is missing.');
+    assert((await statementsControl.count()) > 0, label + ': merchant PDF statements navigation control is missing.');
+    assert((await newOrderControl.count()) > 0, label + ': new-order navigation control is missing.');
 
     if (/phone/i.test(label)) {
-      await page.screenshot({ path: \`preview-browser-evidence/${'${label}'}-admin-registered-routes.png\`, fullPage: true });
+      await page.screenshot({
+        path: 'preview-browser-evidence/' + label + '-admin-registered-routes.png',
+        fullPage: true,
+      });
       return;
     }
 
@@ -135,7 +147,7 @@ replaceRequired(
       });
       return match?.getAttribute('value') || '';
     });
-    assert(Boolean(merchantValue), \`${'${label}'}: no real merchant option is available.\`);
+    assert(Boolean(merchantValue), label + ': no real merchant option is available.');
     await merchantSelect.selectOption(merchantValue);
 
     await page.waitForFunction(
@@ -200,10 +212,13 @@ replaceRequired(
     report.cases['CASE 5'] = 'PASS';
 
     await fs.promises.writeFile(
-      `preview-browser-evidence/${'${label}'}-admin-financial-current-main.json`,
+      'preview-browser-evidence/' + label + '-admin-financial-current-main.json',
       JSON.stringify(report, null, 2),
     );
-    await page.screenshot({ path: `preview-browser-evidence/${'${label}'}-admin-financial-current-main.png`, fullPage: true });
+    await page.screenshot({
+      path: 'preview-browser-evidence/' + label + '-admin-financial-current-main.png',
+      fullPage: true,
+    });
 
     await clickVisibleSection(accountsControl, 'accounts');
     await page
@@ -217,11 +232,17 @@ replaceRequired(
       .first()
       .waitFor({ state: 'attached', timeout: 90000 });
 
-    await page.screenshot({ path: `preview-browser-evidence/${'${label}'}-admin-accounts-pdf-routes.png`, fullPage: true });
+    await page.screenshot({
+      path: 'preview-browser-evidence/' + label + '-admin-accounts-pdf-routes.png',
+      fullPage: true,
+    });
   } catch (error) {
-    await page.screenshot({ path: `preview-browser-evidence/${'${label}'}-admin-failure.png`, fullPage: true }).catch(() => {});
+    await page.screenshot({
+      path: 'preview-browser-evidence/' + label + '-admin-failure.png',
+      fullPage: true,
+    }).catch(() => {});
     await fs.promises.writeFile(
-      `preview-browser-evidence/${'${label}'}-admin-failure.txt`,
+      'preview-browser-evidence/' + label + '-admin-failure.txt',
       await bodyText(page).catch(() => 'body unavailable'),
     ).catch(() => {});
     throw error;
