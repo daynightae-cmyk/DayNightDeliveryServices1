@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -220,21 +220,62 @@ function merchantSettlement(
           : form.payment_method,
     };
   }, [form, selectedMerchant, authoritativeDeliveryFeeMode]);
+  const merchantDebitActive =
+    authoritativeDeliveryFeeMode === "deduct_from_merchant";
   const financials = useMemo(() => {
     try {
-      return calculateFinancialOpsOrder(resolvedFinancialInput);
+      const calculated = calculateFinancialOpsOrder(resolvedFinancialInput);
+      if (!merchantDebitActive) return calculated;
+
+      const customerTotal = Math.round(
+        (calculated.goodsValue - calculated.discountAmount + Number.EPSILON) * 100,
+      ) / 100;
+      const merchantDue = Math.round(
+        (customerTotal - calculated.deliveryFee + Number.EPSILON) * 100,
+      ) / 100;
+
+      return {
+        ...calculated,
+        deliveryFeeMode: "deduct_from_merchant" as const,
+        customerTotal,
+        merchantDue,
+      };
     } catch {
       return null;
     }
-  }, [resolvedFinancialInput]);
+  }, [resolvedFinancialInput, merchantDebitActive]);
   const settlement = financials
     ? merchantSettlement(
         financials.merchantDue,
         isArabic,
-        financials.deliveryFeeMode,
+        merchantDebitActive ? "deduct_from_merchant" : "customer_pays",
       )
     : null;
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
+
+  useEffect(() => {
+    const rawGoodsValue = form.goods_value;
+    const explicitZeroGoods =
+      rawGoodsValue !== "" &&
+      rawGoodsValue !== null &&
+      rawGoodsValue !== undefined &&
+      Number.isFinite(Number(rawGoodsValue)) &&
+      Number(rawGoodsValue) === 0;
+
+    if (!explicitZeroGoods) return;
+    if (
+      form.delivery_fee_mode === "deduct_from_merchant" &&
+      form.payment_method === "merchant_pays"
+    ) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      delivery_fee_mode: "deduct_from_merchant",
+      payment_method: "merchant_pays",
+    }));
+  }, [form.goods_value, form.delivery_fee_mode, form.payment_method]);
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
     setForm((current) => {
@@ -609,7 +650,7 @@ function merchantSettlement(
                 label={isArabic ? "المطلوب من العميل" : "Customer total"}
                 value={financials.customerTotal}
                 tone={
-                  financials.deliveryFeeMode === "deduct_from_merchant"
+                  merchantDebitActive
                     ? "neutral"
                     : "gold"
                 }
@@ -619,7 +660,7 @@ function merchantSettlement(
                 label={settlement.label}
                 value={settlement.amount}
                 tone={
-                  financials.deliveryFeeMode === "deduct_from_merchant"
+                  merchantDebitActive
                     ? "danger"
                     : "neutral"
                 }
@@ -628,7 +669,7 @@ function merchantSettlement(
               <FinancialMetric
                 isArabic={isArabic}
                 label={
-                  financials.merchantDue < 0
+                  merchantDebitActive
                     ? isArabic
                       ? "إجمالي المستحق على التاجر"
                       : "Merchant debit total"
@@ -637,11 +678,11 @@ function merchantSettlement(
                       : "Final customer total"
                 }
                 value={
-                  financials.merchantDue < 0
+                  merchantDebitActive
                     ? financials.merchantDue
                     : financials.customerTotal
                 }
-                tone={financials.merchantDue < 0 ? "danger" : "gold"}
+                tone={merchantDebitActive ? "danger" : "gold"}
               />
           </div>
         ) : (
