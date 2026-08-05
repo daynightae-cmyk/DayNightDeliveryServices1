@@ -93,6 +93,8 @@ function freshOrderForMerchant(merchant: Merchant | null): FinancialOpsOrderInpu
     pickup_city: merchant?.emirate || emptyOrder.pickup_city,
     pickup_area: merchant?.city || emptyOrder.pickup_area,
     pickup_street: merchant?.pickup_address || merchant?.address || "",
+    payment_method: merchant ? "merchant_pays" : emptyOrder.payment_method,
+    delivery_fee_mode: merchant ? "deduct_from_merchant" : emptyOrder.delivery_fee_mode,
   };
 }
 
@@ -320,6 +322,8 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
       merchant_id: merchant?.id || "",
       merchant_name: merchant?.trade_name || "",
       merchant_code: merchant?.merchant_code || "",
+      payment_method: merchant ? "merchant_pays" : "cod",
+      delivery_fee_mode: merchant ? "deduct_from_merchant" : "customer_pays",
       pickup_city: merchant?.emirate || current.pickup_city,
       pickup_area: merchant?.city || current.pickup_area,
       pickup_street: merchant?.pickup_address || merchant?.address || current.pickup_street,
@@ -341,6 +345,8 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
       merchant_id: merchant?.id || current.merchant_id,
       merchant_name: merchant?.trade_name || imported.merchant_name || current.merchant_name,
       merchant_code: merchant?.merchant_code || imported.merchant_code || current.merchant_code,
+      payment_method: merchant ? "merchant_pays" : current.payment_method,
+      delivery_fee_mode: merchant ? "deduct_from_merchant" : current.delivery_fee_mode,
       coupon_number: clean(imported.coupon_number || current.coupon_number),
       receiver_address: clean(imported.receiver_address || imported.delivery_street || current.receiver_address),
       delivery_street: clean(imported.delivery_street || imported.receiver_address || current.delivery_street),
@@ -584,7 +590,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         </div>
       </section>
 
-      <section data-admin-financial-preview-version="6" data-customer-total={financials?.customerTotal ?? ""} data-merchant-due={financials?.merchantDue ?? ""} className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
+      <section data-admin-financial-preview-version="7" data-selected-merchant-id={form.merchant_id || ""} data-delivery-fee-mode={financials?.deliveryFeeMode ?? ""} data-customer-total={financials?.customerTotal ?? ""} data-merchant-due={financials?.merchantDue ?? ""} className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="flex items-center gap-2 text-base font-black text-white"><WalletCards className="h-5 w-5 text-brand-gold" />{isArabic ? "التقسيم المالي للطلب" : "Order financial breakdown"}</h3>
