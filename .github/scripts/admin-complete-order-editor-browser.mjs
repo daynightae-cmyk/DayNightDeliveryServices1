@@ -135,19 +135,30 @@ async function verifyEditor(page, label) {
   await dialog.waitFor({ state: 'visible', timeout: 30000 });
   const merchant = dialog.locator('[data-admin-complete-order-merchant="true"]');
   const coupon = dialog.locator('[data-admin-complete-order-coupon="true"]');
-  const reason = dialog.locator('[data-admin-complete-order-reason="true"]');
-  const confirmation = dialog.locator('[data-admin-complete-order-confirm="true"]');
+  const legacyReason = dialog.locator('[data-admin-complete-order-reason="true"]');
+  const legacyConfirmation = dialog.locator('[data-admin-complete-order-confirm="true"]');
+  const save = dialog.getByRole('button', { name: /حفظ التعديلات|Save changes/ });
 
   await merchant.waitFor({ state: 'visible', timeout: 30000 });
   await coupon.waitFor({ state: 'visible', timeout: 30000 });
-  await reason.waitFor({ state: 'visible', timeout: 30000 });
-  await confirmation.waitFor({ state: 'visible', timeout: 30000 });
+  await save.waitFor({ state: 'visible', timeout: 30000 });
 
   assert(!(await merchant.isDisabled()), `${label}: merchant selector is disabled.`);
   assert((await merchant.inputValue()) === ilytkId, `${label}: merchant UUID is not ILYTK.`);
   assert((await coupon.inputValue()).trim() === '003860', `${label}: coupon is not 003860.`);
-  assert(!(await reason.isDisabled()), `${label}: edit reason is disabled.`);
-  assert(!(await confirmation.isDisabled()), `${label}: confirmation is disabled.`);
+  assert(!(await save.isDisabled()), `${label}: save action is disabled.`);
+  assert(
+    (await legacyReason.count()) === 0,
+    `${label}: obsolete manual edit-reason control is still rendered.`,
+  );
+  assert(
+    (await legacyConfirmation.count()) === 0,
+    `${label}: obsolete manual confirmation control is still rendered.`,
+  );
+  assert(
+    (await dialog.getByText(/تعديل آمن ومُدقّق|Secure audited edit/).count()) > 0,
+    `${label}: automatic audited-edit identity is missing.`,
+  );
   assert(
     (await dialog.getByText(
       /رقم التتبع والفاتورة لا بيتغيروش|Tracking and invoice identifiers are immutable/,
@@ -195,11 +206,23 @@ try {
   await signInAdmin(page);
   await prepareReviewedOrder(page);
   await verifyEditor(page, 'desktop');
-  report.push({ scenario: 'desktop', completeOrderEditor: 'PASS', savedOrder: false });
+  report.push({
+    scenario: 'desktop',
+    completeOrderEditor: 'PASS',
+    automaticAudit: true,
+    saveActionVisible: true,
+    savedOrder: false,
+  });
 
   await page.setViewportSize({ width: 412, height: 915 });
   await verifyEditor(page, 'phone');
-  report.push({ scenario: 'phone', completeOrderEditor: 'PASS', savedOrder: false });
+  report.push({
+    scenario: 'phone',
+    completeOrderEditor: 'PASS',
+    automaticAudit: true,
+    saveActionVisible: true,
+    savedOrder: false,
+  });
 
   fs.writeFileSync(
     'admin-complete-order-editor-evidence/report.json',
@@ -210,6 +233,8 @@ try {
         coupon: '003860',
         realAdminUiLogin: true,
         sameSessionAcrossViewports: true,
+        automaticAuditReason: true,
+        obsoleteManualReasonControlsAbsent: true,
         saveButtonNeverClicked: true,
         scenarios: report,
       },
