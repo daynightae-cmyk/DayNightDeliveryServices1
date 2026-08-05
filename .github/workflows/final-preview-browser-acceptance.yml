@@ -170,7 +170,7 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 30); do
-            if curl -fsS --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o preview-browser-evidence/vercel-preview-version.json; then
+            if curl -fsSL --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o preview-browser-evidence/vercel-preview-version.json; then
               break
             fi
             sleep 5
