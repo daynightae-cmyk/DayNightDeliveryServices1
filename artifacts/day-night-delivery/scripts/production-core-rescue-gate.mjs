@@ -43,7 +43,7 @@ reject(adminMerchant, /localStorage|sessionStorage|Math\.random|mock|demo mercha
 const adminOrder = read("src/components/admin/AdminNewOrderFlexible.tsx");
 expect(adminOrder, /createOpsOrder/, "Admin order form calls the production order operation");
 reject(adminOrder, /function validate\(\)[\s\S]*!selectedMerchant/, "Admin order creation does not require a linked merchant");
-expect(adminOrder, /onSaved\?\.\(saved\)/, "Admin order form refreshes from the returned saved row");
+expect(adminOrder, /onSaved\?\.\(saved\)/, "Admin order form refreshes state from the returned saved row");
 reject(adminOrder, /localStorage|sessionStorage|Math\.random|mock order|demo order/i, "Admin order creation has no browser-only or mock persistence");
 
 const adminData = read("src/lib/adminOperationsData.ts");
@@ -57,9 +57,20 @@ expect(adminData, /merchant_id:/, "Orders preserve supplied merchant information
 expect(adminData, /const merchant = input\.merchant \|\| null/, "Orders support merchant_id null");
 
 const financialAdminOrder = read("src/components/admin/AdminNewOrderComplete.tsx");
-expect(financialAdminOrder, /setPaymentMethod/, "Financial order form synchronizes payment and fee treatment");
+expect(
+  financialAdminOrder,
+  /function setDeliveryFeeMode[\s\S]*delivery_fee_mode:[\s\S]*payment_method:[\s\S]*merchant_pays/,
+  "Financial order form synchronizes payment and fee treatment",
+);
 expect(financialAdminOrder, /deduct_from_merchant/, "Merchant-paid selection deducts delivery from merchant");
 expect(financialAdminOrder, /placeholder="25\.00"/, "Manual delivery field presents the official 25 AED fee");
+
+const financialInteractionState = read("src/lib/adminNewOrderFinancialState.ts");
+expect(
+  financialInteractionState,
+  /updateAdminFinancialField[\s\S]*next\.delivery_fee_mode\s*=\s*"deduct_from_merchant"[\s\S]*next\.payment_method\s*=\s*"merchant_pays"/,
+  "Zero financial input atomically selects merchant debit",
+);
 
 const financialOperations = read("src/lib/orderFinancialOperations.ts");
 expect(financialOperations, /effectiveDeliveryFeeMode/, "Financial payload enforces merchant-paid delivery mode below the UI");

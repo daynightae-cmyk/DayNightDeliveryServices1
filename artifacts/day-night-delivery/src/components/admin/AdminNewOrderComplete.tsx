@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -24,6 +24,11 @@ import {
   type FinancialOpsOrderInput,
 } from "../../lib/orderFinancialOperations";
 import { orderFinancialValidation } from "../../lib/orderFinancials";
+import {
+  selectAdminPriceMode,
+  updateAdminFinancialField,
+  type AdminFinancialField,
+} from "../../lib/adminNewOrderFinancialState";
 import { createAdminCouponIntakeSession } from "../../lib/couponIntakeData";
 import { UAE_LOCATIONS, getAreasForEmirate, getDefaultAreaForEmirate } from "../../data/uaeLocations";
 import { INTERNATIONAL_DESTINATIONS } from "../../data/internationalDestinations";
@@ -244,74 +249,26 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
       : "neutral";
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
-  useEffect(() => {
-    const rawGoodsValue = form.goods_value;
-    const explicitZeroGoods =
-      rawGoodsValue !== "" &&
-      rawGoodsValue !== null &&
-      rawGoodsValue !== undefined &&
-      Number.isFinite(Number(rawGoodsValue)) &&
-      Number(rawGoodsValue) === 0;
-    const rawManualDelivery = form.manual_delivery_price;
-    const explicitZeroManualDelivery =
-      form.price_mode === "manual" &&
-      rawManualDelivery !== "" &&
-      rawManualDelivery !== null &&
-      rawManualDelivery !== undefined &&
-      Number.isFinite(Number(rawManualDelivery)) &&
-      Number(rawManualDelivery) === 0;
 
-    if (!explicitZeroGoods && !explicitZeroManualDelivery) return;
-    if (
-      form.delivery_fee_mode === "deduct_from_merchant" &&
-      form.payment_method === "merchant_pays"
-    ) {
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      delivery_fee_mode: "deduct_from_merchant",
-      payment_method: "merchant_pays",
-    }));
-  }, [
-    form.goods_value,
-    form.price_mode,
-    form.manual_delivery_price,
-    form.delivery_fee_mode,
-    form.payment_method,
-  ]);
-
-  function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
-    setForm((current) => {
-      const next = { ...current, [key]: value } as FinancialOpsOrderInput;
-      const rawGoodsValue = key === "goods_value" ? value : current.goods_value;
-      const explicitZeroGoods =
-        rawGoodsValue !== "" &&
-        rawGoodsValue !== null &&
-        rawGoodsValue !== undefined &&
-        Number.isFinite(Number(rawGoodsValue)) &&
-        Number(rawGoodsValue) === 0;
-      const nextPriceMode = key === "price_mode" ? value : current.price_mode;
-      const rawManualDelivery =
-        key === "manual_delivery_price" ? value : current.manual_delivery_price;
-      const explicitZeroManualDelivery =
-        nextPriceMode === "manual" &&
-        rawManualDelivery !== "" &&
-        rawManualDelivery !== null &&
-        rawManualDelivery !== undefined &&
-        Number.isFinite(Number(rawManualDelivery)) &&
-        Number(rawManualDelivery) === 0;
-
-      if (explicitZeroGoods || explicitZeroManualDelivery) {
-        next.delivery_fee_mode = "deduct_from_merchant";
-        next.payment_method = "merchant_pays";
-      }
-      return next;
-    });
+  function markFinancialChange() {
     setSource("pending");
     setMessage("");
     setError("");
+  }
+
+  function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    markFinancialChange();
+  }
+
+  function setFinancialField(field: AdminFinancialField, rawValue: string) {
+    setForm((current) => updateAdminFinancialField(current, field, rawValue));
+    markFinancialChange();
+  }
+
+  function setPriceMode(mode: "system" | "manual") {
+    setForm((current) => selectAdminPriceMode(current, mode));
+    markFinancialChange();
   }
 
   function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
@@ -613,7 +570,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         </div>
       </section>
 
-      <section className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
+      <section data-admin-financial-preview-version="5" data-customer-total={financials?.customerTotal ?? ""} data-merchant-due={financials?.merchantDue ?? ""} className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="flex items-center gap-2 text-base font-black text-white"><WalletCards className="h-5 w-5 text-brand-gold" />{isArabic ? "التقسيم المالي للطلب" : "Order financial breakdown"}</h3>
@@ -625,20 +582,20 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
-            <input type="number" min={0} step="0.01" data-admin-financial-input="true" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onInput={(event) => setFinancialField("goods_value", event.currentTarget.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><Calculator className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة التوصيل" : "Delivery fee"}</span>
             <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 p-2">
-              <button type="button" onClick={() => { setField("price_mode", "system"); setField("manual_delivery_price", ""); }} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button>
-              <button type="button" onClick={() => setField("price_mode", "manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button>
+              <button type="button" onClick={() => setPriceMode("system")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button>
+              <button type="button" onClick={() => setPriceMode("manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button>
             </div>
-            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
+            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.manual_delivery_price ?? ""} onInput={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
           </label>
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><Landmark className="h-4 w-4 text-brand-sky" />{isArabic ? "الخصم — اختياري" : "Discount — optional"}</span>
-            <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.discount_amount ?? ""} onChange={(event) => setField("discount_amount", event.target.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.discount_amount ?? ""} onInput={(event) => setFinancialField("discount_amount", event.currentTarget.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "لا يظهر في الملخص عندما تكون قيمته صفرًا" : "Hidden from the summary when its value is zero"}</small>
           </label>
         </div>
