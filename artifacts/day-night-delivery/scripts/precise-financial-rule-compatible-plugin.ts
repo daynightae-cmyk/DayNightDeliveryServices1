@@ -30,8 +30,8 @@ export function preciseFinancialRuleCompatiblePlugin(): Plugin {
         normalized.endsWith(
           "/src/components/admin/AdminNewOrderComplete.tsx",
         ) &&
-        source.includes("effectiveDeliveryFeeMode") &&
         source.includes("calculateFinancialOpsOrder") &&
+        source.includes("resolvedFinancialInput") &&
         source.includes('data-admin-new-order-form="merchant"');
 
       if (isAuditedCompleteEditor || isAuthoritativeNewOrder) {

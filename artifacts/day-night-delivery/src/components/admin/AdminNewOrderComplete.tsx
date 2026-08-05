@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -21,7 +21,6 @@ import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import {
   calculateFinancialOpsOrder,
   createFinancialOpsOrder,
-  effectiveDeliveryFeeMode,
   type FinancialOpsOrderInput,
 } from "../../lib/orderFinancialOperations";
 import { orderFinancialValidation } from "../../lib/orderFinancials";
@@ -110,25 +109,19 @@ function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boole
   return isArabic ? "جاهز للحفظ" : "Ready to save";
 }
 
-function merchantSettlement(
-    value: number,
-    isArabic: boolean,
-    deliveryFeeMode: "customer_pays" | "deduct_from_merchant",
-  ) {
-    const chargedToMerchant =
-      deliveryFeeMode === "deduct_from_merchant" || value < 0;
-    return chargedToMerchant
-      ? {
-          label: isArabic ? "مستحق على التاجر" : "Merchant debit",
-          amount: value,
-        }
-      : {
-          label: isArabic ? "مستحق للتاجر" : "Due to merchant",
-          amount: value,
-        };
-  }
+function merchantSettlement(value: number, isArabic: boolean) {
+  return value < 0
+    ? {
+        label: isArabic ? "مستحق على التاجر" : "Merchant debit",
+        amount: value,
+      }
+    : {
+        label: isArabic ? "مستحق للتاجر" : "Due to merchant",
+        amount: value,
+      };
+}
 
-  type FinancialMetricTone = "neutral" | "gold" | "danger";
+type FinancialMetricTone = "neutral" | "gold" | "danger";
 
   function signedAdminMoney(value: number, isArabic: boolean) {
     const absolute = formatAdminMoney(Math.abs(value), isArabic);
@@ -201,81 +194,43 @@ function merchantSettlement(
     () => calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }),
     [form, selectedMerchant],
   );
-  const authoritativeDeliveryFeeMode = effectiveDeliveryFeeMode({
+  const explicitManualZero =
+    form.price_mode === "manual" &&
+    form.manual_delivery_price !== "" &&
+    form.manual_delivery_price !== null &&
+    form.manual_delivery_price !== undefined &&
+    Number.isFinite(Number(form.manual_delivery_price)) &&
+    Number(form.manual_delivery_price) === 0;
+  const authoritativeDeliveryFeeMode = explicitManualZero
+    ? "deduct_from_merchant"
+    : form.delivery_fee_mode;
+  const merchantFeeModeActive =
+    authoritativeDeliveryFeeMode === "deduct_from_merchant";
+  const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => ({
     ...form,
     merchant: selectedMerchant,
-  });
-  const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => {
-    const chargedToMerchant =
-      authoritativeDeliveryFeeMode === "deduct_from_merchant";
-    return {
-      ...form,
-      merchant: selectedMerchant,
-      delivery_fee_mode: authoritativeDeliveryFeeMode,
-      payment_method: chargedToMerchant
-        ? "merchant_pays"
-        : form.payment_method === "merchant_pays" ||
-            form.payment_method === "sender_pays"
-          ? "cod"
-          : form.payment_method,
-    };
-  }, [form, selectedMerchant, authoritativeDeliveryFeeMode]);
-  const merchantDebitActive =
-    authoritativeDeliveryFeeMode === "deduct_from_merchant";
+    delivery_fee_mode: authoritativeDeliveryFeeMode,
+    payment_method: merchantFeeModeActive
+      ? "merchant_pays"
+      : form.payment_method === "merchant_pays" ||
+          form.payment_method === "sender_pays"
+        ? "cod"
+        : form.payment_method,
+  }), [form, selectedMerchant, authoritativeDeliveryFeeMode, merchantFeeModeActive]);
   const financials = useMemo(() => {
     try {
-      const calculated = calculateFinancialOpsOrder(resolvedFinancialInput);
-      if (!merchantDebitActive) return calculated;
-
-      const customerTotal = Math.round(
-        (calculated.goodsValue - calculated.discountAmount + Number.EPSILON) * 100,
-      ) / 100;
-      const merchantDue = Math.round(
-        (customerTotal - calculated.deliveryFee + Number.EPSILON) * 100,
-      ) / 100;
-
-      return {
-        ...calculated,
-        deliveryFeeMode: "deduct_from_merchant" as const,
-        customerTotal,
-        merchantDue,
-      };
+      return calculateFinancialOpsOrder(resolvedFinancialInput);
     } catch {
       return null;
     }
-  }, [resolvedFinancialInput, merchantDebitActive]);
+  }, [resolvedFinancialInput]);
   const settlement = financials
-    ? merchantSettlement(
-        financials.merchantDue,
-        isArabic,
-        merchantDebitActive ? "deduct_from_merchant" : "customer_pays",
-      )
+    ? merchantSettlement(financials.merchantDue, isArabic)
     : null;
+  const merchantDebitActive = Boolean(
+    financials && financials.merchantDue < 0,
+  );
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
-
-  useEffect(() => {
-    const rawGoodsValue = form.goods_value;
-    const explicitZeroGoods =
-      rawGoodsValue !== "" &&
-      rawGoodsValue !== null &&
-      rawGoodsValue !== undefined &&
-      Number.isFinite(Number(rawGoodsValue)) &&
-      Number(rawGoodsValue) === 0;
-
-    if (!explicitZeroGoods) return;
-    if (
-      form.delivery_fee_mode === "deduct_from_merchant" &&
-      form.payment_method === "merchant_pays"
-    ) {
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      delivery_fee_mode: "deduct_from_merchant",
-      payment_method: "merchant_pays",
-    }));
-  }, [form.goods_value, form.delivery_fee_mode, form.payment_method]);
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
     setForm((current) => {
@@ -447,10 +402,9 @@ function merchantSettlement(
       }
 
       const savedSettlement = merchantSettlement(
-      calculated.merchantDue,
-      isArabic,
-      calculated.deliveryFeeMode,
-    );
+        calculated.merchantDue,
+        isArabic,
+      );
       prepareNextOrder(selectedMerchant);
       const warningCodes = (result.warnings || [])
         .map((warning) => String(warning.code || ""))
@@ -611,7 +565,7 @@ function merchantSettlement(
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
-            <input type="number" min={0} step="0.01" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>
           <label className="space-y-2">
@@ -620,11 +574,11 @@ function merchantSettlement(
               <button type="button" onClick={() => { setField("price_mode", "system"); setField("manual_delivery_price", ""); }} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button>
               <button type="button" onClick={() => setField("price_mode", "manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button>
             </div>
-            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
+            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
           </label>
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><Landmark className="h-4 w-4 text-brand-sky" />{isArabic ? "الخصم — اختياري" : "Discount — optional"}</span>
-            <input type="number" min={0} step="0.01" value={form.discount_amount ?? ""} onChange={(event) => setField("discount_amount", event.target.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.discount_amount ?? ""} onChange={(event) => setField("discount_amount", event.target.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "لا يظهر في الملخص عندما تكون قيمته صفرًا" : "Hidden from the summary when its value is zero"}</small>
           </label>
         </div>
@@ -649,11 +603,7 @@ function merchantSettlement(
                 isArabic={isArabic}
                 label={isArabic ? "المطلوب من العميل" : "Customer total"}
                 value={financials.customerTotal}
-                tone={
-                  merchantDebitActive
-                    ? "neutral"
-                    : "gold"
-                }
+                tone={merchantFeeModeActive ? "neutral" : "gold"}
               />
               <FinancialMetric
                 isArabic={isArabic}
@@ -669,20 +619,24 @@ function merchantSettlement(
               <FinancialMetric
                 isArabic={isArabic}
                 label={
-                  merchantDebitActive
+                  financials.merchantDue < 0
                     ? isArabic
                       ? "إجمالي المستحق على التاجر"
                       : "Merchant debit total"
-                    : isArabic
-                      ? "الإجمالي النهائي المطلوب من العميل"
-                      : "Final customer total"
+                    : merchantFeeModeActive
+                      ? isArabic
+                        ? "الإجمالي النهائي للتاجر"
+                        : "Final merchant total"
+                      : isArabic
+                        ? "الإجمالي النهائي المطلوب من العميل"
+                        : "Final customer total"
                 }
                 value={
-                  merchantDebitActive
+                  merchantFeeModeActive
                     ? financials.merchantDue
                     : financials.customerTotal
                 }
-                tone={merchantDebitActive ? "danger" : "gold"}
+                tone={financials.merchantDue < 0 ? "danger" : "gold"}
               />
           </div>
         ) : (

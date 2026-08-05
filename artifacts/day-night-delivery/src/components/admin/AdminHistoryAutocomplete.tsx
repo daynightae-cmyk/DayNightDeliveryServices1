@@ -319,9 +319,17 @@ export default function AdminHistoryAutocomplete({
 
     const bind = () => {
       const inputs = root.querySelectorAll<HTMLInputElement>(
-        'input:not([type="hidden"]):not([type="password"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="datetime-local"]):not([readonly]):not([disabled])',
+        'input:not([type="hidden"]):not([type="password"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="datetime-local"]):not([type="number"]):not([inputmode="decimal"]):not([inputmode="numeric"]):not([data-admin-financial-input="true"]):not([readonly]):not([disabled])',
       );
       for (const input of inputs) {
+        if (
+          input.dataset.adminFinancialInput === "true" ||
+          input.type === "number" ||
+          input.inputMode === "decimal" ||
+          input.inputMode === "numeric"
+        ) {
+          continue;
+        }
         if (bound.has(input)) continue;
         const focus = () => openFor(input);
         const handleInput = () => openFor(input);
