@@ -625,7 +625,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
-            <input type="number" min={0} step="0.01" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setField("goods_value", event.target.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>
           <label className="space-y-2">
@@ -634,11 +634,11 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
               <button type="button" onClick={() => { setField("price_mode", "system"); setField("manual_delivery_price", ""); }} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button>
               <button type="button" onClick={() => setField("price_mode", "manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button>
             </div>
-            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
+            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.manual_delivery_price ?? ""} onChange={(event) => setField("manual_delivery_price", event.target.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
           </label>
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><Landmark className="h-4 w-4 text-brand-sky" />{isArabic ? "الخصم — اختياري" : "Discount — optional"}</span>
-            <input type="number" min={0} step="0.01" value={form.discount_amount ?? ""} onChange={(event) => setField("discount_amount", event.target.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.discount_amount ?? ""} onChange={(event) => setField("discount_amount", event.target.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "لا يظهر في الملخص عندما تكون قيمته صفرًا" : "Hidden from the summary when its value is zero"}</small>
           </label>
         </div>
