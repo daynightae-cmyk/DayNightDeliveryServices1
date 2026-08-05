@@ -1,0 +1,142 @@
+name: Admin Merchant Financial Routing Bootstrap
+
+on:
+  push:
+    branches:
+      - fix/admin-financial-real-browser-sync-20260805
+    paths:
+      - ".github/workflows/admin-merchant-financial-routing-bootstrap.yml"
+      - ".github/scripts/apply-admin-merchant-default-and-live-routing.mjs"
+      - ".github/scripts/admin-merchant-financial-routing-browser-acceptance.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-merchant-financial-routing-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  repair-verify-and-commit:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    env:
+      TEST_BASE_URL: http://127.0.0.1:4173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/admin-financial-real-browser-sync-20260805
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Verify protected browser credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Apply merchant-default and live-routing repair
+        run: node .github/scripts/apply-admin-merchant-default-and-live-routing.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify source, calculations, typecheck, gate, and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run web:typecheck
+          node artifacts/day-night-delivery/scripts/admin-new-order-live-financial-gate.mjs
+          pnpm run web:gate
+          pnpm run web:build
+
+      - name: Serve exact repaired application
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p admin-merchant-financial-browser-evidence
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > admin-merchant-financial-browser-evidence/local-web.log 2>&1 &
+          echo $! > admin-merchant-financial-browser-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat admin-merchant-financial-browser-evidence/local-web.log >&2
+          exit 1
+
+      - name: Install isolated Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-merchant-financial-playwright"
+          rm -rf "$playwright_dir"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Prove exact merchant financial routing in a real browser
+        run: node .github/scripts/admin-merchant-financial-routing-browser-acceptance.mjs
+
+      - name: Stop local application
+        if: always()
+        shell: bash
+        run: |
+          if [ -f admin-merchant-financial-browser-evidence/local-web.pid ]; then
+            kill "$(cat admin-merchant-financial-browser-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Admin-Merchant-Financial-Routing-Evidence
+          path: admin-merchant-financial-browser-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Remove one-shot files and transient evidence
+        shell: bash
+        run: |
+          rm -f .github/scripts/apply-admin-merchant-default-and-live-routing.mjs
+          rm -f .github/scripts/admin-merchant-financial-routing-browser-acceptance.mjs
+          rm -f .github/workflows/admin-merchant-financial-routing-bootstrap.yml
+          rm -rf admin-merchant-financial-browser-evidence
+
+      - name: Commit only the verified permanent repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "daynight-financial-repair-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No verified changes to commit"; exit 3; }
+          git commit -m "fix(admin): default merchant orders to merchant charge with live routing"
+          git push origin HEAD:fix/admin-financial-real-browser-sync-20260805
