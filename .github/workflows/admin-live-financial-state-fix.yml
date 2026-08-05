@@ -29,7 +29,25 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Apply repair
-        run: python .github/scripts/admin_live_financial_state_patch.py
+        run: |
+          python .github/scripts/admin_live_financial_state_patch.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx")
+          source = path.read_text(encoding="utf-8")
+          old = '''      const savedSettlement = merchantSettlement(
+                calculated.merchantDue,
+                isArabic,
+                calculated.deliveryFeeMode,
+              );'''
+          new = '''      const savedSettlement = merchantSettlement(
+                calculated.merchantDue,
+                isArabic,
+              );'''
+          if old not in source:
+              raise RuntimeError("saved merchant settlement signature was not found")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
 
       - name: Install
         run: pnpm install --frozen-lockfile
