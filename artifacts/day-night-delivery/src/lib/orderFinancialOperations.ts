@@ -11,6 +11,7 @@ import {
 import { createDayNightInvoiceNumber } from "./printableDocuments";
 import { createAdminOrder } from "./adminOrderMutations";
 import {
+  calculateOrderFinancials,
   financialNumber,
   normalizeDeliveryFeeMode,
   orderFinancialValidation,
@@ -53,8 +54,6 @@ const numberValue = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
-const roundMoney = (value: number) =>
-  Math.round((value + Number.EPSILON) * 100) / 100;
 
 function composeAddress(parts: unknown[]) {
   return parts.map(clean).filter(Boolean).join(" - ");
@@ -210,32 +209,13 @@ export function calculateFinancialOpsOrder(input: FinancialOpsOrderInput): Order
   });
   if (validation) throw new Error(validation);
 
-  const goodsValue = roundMoney(
-    Math.max(0, financialNumber(input.goods_value, 0)),
-  );
-  const discountAmount = roundMoney(
-    Math.max(0, financialNumber(input.discount_amount, 0)),
-  );
-  const resolvedDeliveryFee = roundMoney(Math.max(0, deliveryFee));
-  const customerTotal = roundMoney(
-    deliveryFeeMode === "deduct_from_merchant"
-      ? goodsValue - discountAmount
-      : goodsValue + resolvedDeliveryFee - discountAmount,
-  );
-  const merchantDue = roundMoney(
-    deliveryFeeMode === "deduct_from_merchant"
-      ? goodsValue - discountAmount - resolvedDeliveryFee
-      : goodsValue - discountAmount,
-  );
-
   return {
-    goodsValue,
-    deliveryFee: resolvedDeliveryFee,
-    discountAmount,
-    deliveryFeeMode,
-    customerTotal,
-    merchantDue,
-    companyRevenue: resolvedDeliveryFee,
+    ...calculateOrderFinancials({
+      goodsValue: input.goods_value,
+      deliveryFee,
+      discountAmount: input.discount_amount,
+      deliveryFeeMode,
+    }),
     systemDeliveryFee: pricing.systemTotal,
     priceSource: input.price_mode === "manual" ? "manual" : pricing.priceSource,
   };

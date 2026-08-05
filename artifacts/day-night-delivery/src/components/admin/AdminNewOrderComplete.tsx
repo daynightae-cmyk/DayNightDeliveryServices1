@@ -21,7 +21,6 @@ import { adminOrderActionFeedback } from "../../lib/adminOrderActionFeedback";
 import {
   calculateFinancialOpsOrder,
   createFinancialOpsOrder,
-  effectiveDeliveryFeeMode,
   type FinancialOpsOrderInput,
 } from "../../lib/orderFinancialOperations";
 import { orderFinancialValidation } from "../../lib/orderFinancials";
@@ -110,25 +109,19 @@ function sourceLabel(source: OpsDataSource | "pending" | "none", isArabic: boole
   return isArabic ? "جاهز للحفظ" : "Ready to save";
 }
 
-function merchantSettlement(
-    value: number,
-    isArabic: boolean,
-    deliveryFeeMode: "customer_pays" | "deduct_from_merchant",
-  ) {
-    const chargedToMerchant =
-      deliveryFeeMode === "deduct_from_merchant" || value < 0;
-    return chargedToMerchant
-      ? {
-          label: isArabic ? "مستحق على التاجر" : "Merchant debit",
-          amount: value,
-        }
-      : {
-          label: isArabic ? "مستحق للتاجر" : "Due to merchant",
-          amount: value,
-        };
-  }
+function merchantSettlement(value: number, isArabic: boolean) {
+  return value < 0
+    ? {
+        label: isArabic ? "مستحق على التاجر" : "Merchant debit",
+        amount: value,
+      }
+    : {
+        label: isArabic ? "مستحق للتاجر" : "Due to merchant",
+        amount: value,
+      };
+}
 
-  type FinancialMetricTone = "neutral" | "gold" | "danger";
+type FinancialMetricTone = "neutral" | "gold" | "danger";
 
   function signedAdminMoney(value: number, isArabic: boolean) {
     const absolute = formatAdminMoney(Math.abs(value), isArabic);
@@ -201,56 +194,54 @@ function merchantSettlement(
     () => calculateOpsOrderPrice({ ...form, merchant: selectedMerchant }),
     [form, selectedMerchant],
   );
-  const authoritativeDeliveryFeeMode = effectiveDeliveryFeeMode({
+  const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => ({
     ...form,
     merchant: selectedMerchant,
-  });
-  const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>(() => {
-    const chargedToMerchant =
-      authoritativeDeliveryFeeMode === "deduct_from_merchant";
-    return {
-      ...form,
-      merchant: selectedMerchant,
-      delivery_fee_mode: authoritativeDeliveryFeeMode,
-      payment_method: chargedToMerchant
+    delivery_fee_mode: form.delivery_fee_mode,
+    payment_method:
+      form.delivery_fee_mode === "deduct_from_merchant"
         ? "merchant_pays"
         : form.payment_method === "merchant_pays" ||
             form.payment_method === "sender_pays"
           ? "cod"
           : form.payment_method,
-    };
-  }, [form, selectedMerchant, authoritativeDeliveryFeeMode]);
-  const merchantDebitActive =
-    authoritativeDeliveryFeeMode === "deduct_from_merchant";
+  }), [form, selectedMerchant]);
   const financials = useMemo(() => {
     try {
-      const calculated = calculateFinancialOpsOrder(resolvedFinancialInput);
-      if (!merchantDebitActive) return calculated;
-
-      const customerTotal = Math.round(
-        (calculated.goodsValue - calculated.discountAmount + Number.EPSILON) * 100,
-      ) / 100;
-      const merchantDue = Math.round(
-        (customerTotal - calculated.deliveryFee + Number.EPSILON) * 100,
-      ) / 100;
-
-      return {
-        ...calculated,
-        deliveryFeeMode: "deduct_from_merchant" as const,
-        customerTotal,
-        merchantDue,
-      };
+      return calculateFinancialOpsOrder(resolvedFinancialInput);
     } catch {
       return null;
     }
-  }, [resolvedFinancialInput, merchantDebitActive]);
+  }, [resolvedFinancialInput]);
   const settlement = financials
-    ? merchantSettlement(
-        financials.merchantDue,
-        isArabic,
-        merchantDebitActive ? "deduct_from_merchant" : "customer_pays",
-      )
+    ? merchantSettlement(financials.merchantDue, isArabic)
     : null;
+  const merchantIsDebtor = Boolean(financials && financials.merchantDue < 0);
+  const finalFinancialLabel = financials
+    ? merchantIsDebtor
+      ? isArabic
+        ? "إجمالي المستحق على التاجر"
+        : "Merchant debit total"
+      : financials.deliveryFeeMode === "customer_pays"
+        ? isArabic
+          ? "الإجمالي النهائي المطلوب من العميل"
+          : "Final customer total"
+        : isArabic
+          ? "الإجمالي النهائي للتاجر"
+          : "Final merchant total"
+    : "";
+  const finalFinancialValue = financials
+    ? merchantIsDebtor
+      ? financials.merchantDue
+      : financials.deliveryFeeMode === "customer_pays"
+        ? financials.customerTotal
+        : financials.merchantDue
+    : 0;
+  const finalFinancialTone: FinancialMetricTone = merchantIsDebtor
+    ? "danger"
+    : financials?.deliveryFeeMode === "customer_pays"
+      ? "gold"
+      : "neutral";
   const ownerSelectionValue = ownerMode === "personal" ? PERSONAL_ORDER_OPTION : form.merchant_id || "";
 
   useEffect(() => {
@@ -261,8 +252,16 @@ function merchantSettlement(
       rawGoodsValue !== undefined &&
       Number.isFinite(Number(rawGoodsValue)) &&
       Number(rawGoodsValue) === 0;
+    const rawManualDelivery = form.manual_delivery_price;
+    const explicitZeroManualDelivery =
+      form.price_mode === "manual" &&
+      rawManualDelivery !== "" &&
+      rawManualDelivery !== null &&
+      rawManualDelivery !== undefined &&
+      Number.isFinite(Number(rawManualDelivery)) &&
+      Number(rawManualDelivery) === 0;
 
-    if (!explicitZeroGoods) return;
+    if (!explicitZeroGoods && !explicitZeroManualDelivery) return;
     if (
       form.delivery_fee_mode === "deduct_from_merchant" &&
       form.payment_method === "merchant_pays"
@@ -275,19 +274,36 @@ function merchantSettlement(
       delivery_fee_mode: "deduct_from_merchant",
       payment_method: "merchant_pays",
     }));
-  }, [form.goods_value, form.delivery_fee_mode, form.payment_method]);
+  }, [
+    form.goods_value,
+    form.price_mode,
+    form.manual_delivery_price,
+    form.delivery_fee_mode,
+    form.payment_method,
+  ]);
 
   function setField<K extends keyof FinancialOpsOrderInput>(key: K, value: FinancialOpsOrderInput[K]) {
     setForm((current) => {
       const next = { ...current, [key]: value } as FinancialOpsOrderInput;
-      if (
-        key === "goods_value" &&
-        value !== "" &&
-        value !== null &&
-        value !== undefined &&
-        Number.isFinite(Number(value)) &&
-        Number(value) === 0
-      ) {
+      const rawGoodsValue = key === "goods_value" ? value : current.goods_value;
+      const explicitZeroGoods =
+        rawGoodsValue !== "" &&
+        rawGoodsValue !== null &&
+        rawGoodsValue !== undefined &&
+        Number.isFinite(Number(rawGoodsValue)) &&
+        Number(rawGoodsValue) === 0;
+      const nextPriceMode = key === "price_mode" ? value : current.price_mode;
+      const rawManualDelivery =
+        key === "manual_delivery_price" ? value : current.manual_delivery_price;
+      const explicitZeroManualDelivery =
+        nextPriceMode === "manual" &&
+        rawManualDelivery !== "" &&
+        rawManualDelivery !== null &&
+        rawManualDelivery !== undefined &&
+        Number.isFinite(Number(rawManualDelivery)) &&
+        Number(rawManualDelivery) === 0;
+
+      if (explicitZeroGoods || explicitZeroManualDelivery) {
         next.delivery_fee_mode = "deduct_from_merchant";
         next.payment_method = "merchant_pays";
       }
@@ -297,7 +313,6 @@ function merchantSettlement(
     setMessage("");
     setError("");
   }
-
 
   function setDeliveryFeeMode(value: "customer_pays" | "deduct_from_merchant") {
     setForm((current) => ({
@@ -388,9 +403,9 @@ function merchantSettlement(
     }
     const financialError = orderFinancialValidation({
       goodsValue: form.goods_value === "" ? 0 : form.goods_value,
-      deliveryFee: pricing.total,
-      discountAmount: form.discount_amount,
-      deliveryFeeMode: authoritativeDeliveryFeeMode,
+      deliveryFee: financials?.deliveryFee ?? pricing.total,
+      discountAmount: resolvedFinancialInput.discount_amount,
+      deliveryFeeMode: resolvedFinancialInput.delivery_fee_mode,
     });
     if (financialError) {
       return isArabic
@@ -447,10 +462,9 @@ function merchantSettlement(
       }
 
       const savedSettlement = merchantSettlement(
-      calculated.merchantDue,
-      isArabic,
-      calculated.deliveryFeeMode,
-    );
+        calculated.merchantDue,
+        isArabic,
+      );
       prepareNextOrder(selectedMerchant);
       const warningCodes = (result.warnings || [])
         .map((warning) => String(warning.code || ""))
@@ -630,11 +644,11 @@ function merchantSettlement(
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <button type="button" onClick={() => setDeliveryFeeMode("customer_pays")} className={`rounded-2xl border p-4 text-start transition ${authoritativeDeliveryFeeMode === "customer_pays" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}>
+          <button type="button" onClick={() => setDeliveryFeeMode("customer_pays")} className={`rounded-2xl border p-4 text-start transition ${form.delivery_fee_mode === "customer_pays" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}>
             <strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل تُضاف على العميل" : "Customer pays delivery fee"}</strong>
             <small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "الإجمالي = البضاعة + التوصيل − الخصم" : "Total = goods + delivery − discount"}</small>
           </button>
-          <button type="button" onClick={() => setDeliveryFeeMode("deduct_from_merchant")} className={`rounded-2xl border p-4 text-start transition ${authoritativeDeliveryFeeMode === "deduct_from_merchant" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}>
+          <button type="button" onClick={() => setDeliveryFeeMode("deduct_from_merchant")} className={`rounded-2xl border p-4 text-start transition ${form.delivery_fee_mode === "deduct_from_merchant" ? "border-brand-gold/55 bg-brand-gold/15 text-brand-gold" : "border-white/10 bg-black/10 text-white/60"}`}>
             <strong className="block text-xs font-black">{isArabic ? "رسوم التوصيل على حساب التاجر" : "Charge delivery to merchant"}</strong>
             <small className="mt-1 block text-[10px] font-bold opacity-70">{isArabic ? "يظهر المبلغ بوضوح كمستحق على التاجر عند وجود رصيد عليه" : "A merchant liability is shown clearly as due from the merchant"}</small>
           </button>
@@ -649,40 +663,20 @@ function merchantSettlement(
                 isArabic={isArabic}
                 label={isArabic ? "المطلوب من العميل" : "Customer total"}
                 value={financials.customerTotal}
-                tone={
-                  merchantDebitActive
-                    ? "neutral"
-                    : "gold"
-                }
+                tone={financials.deliveryFeeMode === "customer_pays" ? "gold" : "neutral"}
               />
               <FinancialMetric
                 isArabic={isArabic}
                 label={settlement.label}
                 value={settlement.amount}
-                tone={
-                  merchantDebitActive
-                    ? "danger"
-                    : "neutral"
-                }
+                tone={merchantIsDebtor ? "danger" : "neutral"}
               />
             <FinancialMetric isArabic={isArabic} label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={financials.companyRevenue} />
               <FinancialMetric
                 isArabic={isArabic}
-                label={
-                  merchantDebitActive
-                    ? isArabic
-                      ? "إجمالي المستحق على التاجر"
-                      : "Merchant debit total"
-                    : isArabic
-                      ? "الإجمالي النهائي المطلوب من العميل"
-                      : "Final customer total"
-                }
-                value={
-                  merchantDebitActive
-                    ? financials.merchantDue
-                    : financials.customerTotal
-                }
-                tone={merchantDebitActive ? "danger" : "gold"}
+                label={finalFinancialLabel}
+                value={finalFinancialValue}
+                tone={finalFinancialTone}
               />
           </div>
         ) : (
