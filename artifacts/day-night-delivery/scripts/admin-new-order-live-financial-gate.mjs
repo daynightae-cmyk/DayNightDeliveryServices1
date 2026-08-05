@@ -21,10 +21,15 @@ const autocompletePath = path.join(
   root,
   "artifacts/day-night-delivery/src/components/admin/AdminHistoryAutocomplete.tsx",
 );
+const interactionStatePath = path.join(
+  root,
+  "artifacts/day-night-delivery/src/lib/adminNewOrderFinancialState.ts",
+);
 const component = fs.readFileSync(componentPath, "utf8");
 const operations = fs.readFileSync(operationsPath, "utf8");
 const persistence = fs.readFileSync(persistencePath, "utf8");
 const autocomplete = fs.readFileSync(autocompletePath, "utf8");
+const interactionState = fs.readFileSync(interactionStatePath, "utf8");
 
 const sourceChecks = [
   [component.includes("delivery_fee_mode: form.delivery_fee_mode"), "form delivery mode is the UI source of truth"],
@@ -36,9 +41,9 @@ const sourceChecks = [
   [component.includes('"الإجمالي النهائي للتاجر"'), "positive merchant final label exists"],
   [component.includes("const merchantIsDebtor = Boolean(financials && financials.merchantDue < 0)"), "red state follows the actual negative value"],
   [component.includes('tone={merchantIsDebtor ? "danger" : "neutral"}'), "merchant card danger tone is value-driven"],
-  [component.includes("explicitZeroGoods || explicitZeroManualDelivery"), "zero goods and explicit manual zero update the state atomically"],
-  [component.includes('next.delivery_fee_mode = "deduct_from_merchant"'), "zero values select merchant debit in the same state update"],
-  [component.includes('next.payment_method = "merchant_pays"'), "zero values synchronize merchant payment"],
+  [interactionState.includes("explicitZeroGoods || explicitZeroManual"), "zero goods and explicit manual zero update the state atomically"],
+  [interactionState.includes('next.delivery_fee_mode = "deduct_from_merchant"'), "zero values select merchant debit in the same state update"],
+  [interactionState.includes('next.payment_method = "merchant_pays"'), "zero values synchronize merchant payment"],
   [!component.includes("merchantDebitActive"), "presentation is not keyed only to the selected mode"],
   [!component.includes("authoritativeDeliveryFeeMode"), "no competing delivery-mode state remains"],
   [!component.includes("const customerTotal = Math.round"), "the component does not duplicate the central financial equations"],
@@ -47,6 +52,12 @@ const sourceChecks = [
   [autocomplete.includes(':not([type="number"])'), "history autocomplete excludes number inputs"],
   [autocomplete.includes(':not([data-admin-financial-input="true"])'), "history autocomplete excludes marked financial inputs"],
   [autocomplete.includes('input.dataset.adminFinancialInput === "true"'), "runtime autocomplete guard protects financial inputs"],
+  [component.includes('data-admin-financial-preview-version="5"'), "deployed form exposes financial truth version 5"],
+  [component.includes('onInput={(event) => setFinancialField("goods_value", event.currentTarget.value)}'), "goods value is bound on every input event"],
+  [component.includes('onInput={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)}'), "manual delivery is bound on every input event"],
+  [component.includes('onInput={(event) => setFinancialField("discount_amount", event.currentTarget.value)}'), "discount is bound on every input event"],
+  [!component.includes("useEffect("), "no effect can overwrite current financial input"],
+  [interactionState.includes("updateAdminFinancialField"), "financial field reducer is centralized and testable"],
   [operations.includes("merchant_due: financials.merchantDue"), "create payload persists signed merchant due"],
   [operations.includes("customer_total: financials.customerTotal"), "create payload persists customer total"],
   [operations.includes("company_revenue: financials.companyRevenue"), "create payload persists company revenue"],
