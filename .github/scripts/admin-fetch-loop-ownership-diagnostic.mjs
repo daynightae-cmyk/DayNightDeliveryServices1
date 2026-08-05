@@ -55,6 +55,30 @@ async function adminSession() {
   return { client, serialized };
 }
 
+async function readSerializableOwnership(page) {
+  return page.evaluate(() => {
+    const source = window.__dnFetchOwnership || {};
+    return {
+      startedAt: Number(source.startedAt || 0),
+      calls: Array.isArray(source.calls)
+        ? source.calls.map((call) => ({
+            at: Number(call?.at || 0),
+            method: String(call?.method || ''),
+            url: String(call?.url || ''),
+            stack: String(call?.stack || ''),
+          }))
+        : [],
+      totals: { ...(source.totals || {}) },
+      fullscreenAdds: Number(source.fullscreenAdds || 0),
+      fullscreenRemoves: Number(source.fullscreenRemoves || 0),
+      formAdds: Number(source.formAdds || 0),
+      formRemoves: Number(source.formRemoves || 0),
+      liveFullscreenCount: document.querySelectorAll('.dn-admin-fullscreen').length,
+      liveFormCount: document.querySelectorAll('[data-admin-new-order-form="merchant"]').length,
+    };
+  });
+}
+
 fs.mkdirSync(evidenceDirectory, { recursive: true });
 const auth = await adminSession();
 const browser = await chromium.launch({ headless: true });
@@ -157,9 +181,9 @@ try {
     .locator('[data-admin-new-order-form="merchant"]')
     .waitFor({ state: 'visible', timeout: 90000 });
 
-  const baseline = await page.evaluate(() => structuredClone(window.__dnFetchOwnership));
+  const baseline = await readSerializableOwnership(page);
   await page.waitForTimeout(12000);
-  const afterIdle = await page.evaluate(() => structuredClone(window.__dnFetchOwnership));
+  const afterIdle = await readSerializableOwnership(page);
 
   fs.writeFileSync(
     `${evidenceDirectory}/admin-fetch-loop-ownership.json`,
