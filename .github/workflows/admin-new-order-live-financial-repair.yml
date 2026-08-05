@@ -8,6 +8,7 @@ on:
       - .github/repairs/apply-admin-new-order-live-financial-fix.py
       - .github/repairs/apply-order-financial-centralization.py
       - .github/repairs/fix-admin-new-order-gate-runtime.py
+      - .github/repairs/update-precise-financial-plugin.py
 
 permissions:
   contents: write
@@ -35,6 +36,7 @@ jobs:
           python .github/repairs/apply-admin-new-order-live-financial-fix.py
           python .github/repairs/apply-order-financial-centralization.py
           python .github/repairs/fix-admin-new-order-gate-runtime.py
+          python .github/repairs/update-precise-financial-plugin.py
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -71,6 +73,8 @@ jobs:
           ! grep -Fq 'const customerTotal = Math.round' artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx
           ! grep -Fq 'merchantDebitActive' artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx
           ! grep -Fq 'authoritativeDeliveryFeeMode' artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx
+          grep -Fq 'delivery_fee_mode: form.delivery_fee_mode' artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx
+          grep -Fq 'day-night-precise-financial-rule-compatible-v6' artifacts/day-night-delivery/scripts/precise-financial-rule-compatible-plugin.ts
 
       - name: TypeScript
         run: pnpm --dir artifacts/day-night-delivery run typecheck
@@ -88,6 +92,7 @@ jobs:
           rm -f .github/repairs/apply-admin-new-order-live-financial-fix.py
           rm -f .github/repairs/apply-order-financial-centralization.py
           rm -f .github/repairs/fix-admin-new-order-gate-runtime.py
+          rm -f .github/repairs/update-precise-financial-plugin.py
           rm -f .github/workflows/admin-new-order-live-financial-repair.yml
 
       - name: Commit verified implementation
