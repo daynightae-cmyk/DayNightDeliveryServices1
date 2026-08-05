@@ -57,9 +57,20 @@ expect(adminData, /merchant_id:/, "Orders preserve supplied merchant information
 expect(adminData, /const merchant = input\.merchant \|\| null/, "Orders support merchant_id null");
 
 const financialAdminOrder = read("src/components/admin/AdminNewOrderComplete.tsx");
-expect(financialAdminOrder, /setPaymentMethod/, "Financial order form synchronizes payment and fee treatment");
+expect(
+  financialAdminOrder,
+  /function setDeliveryFeeMode[\s\S]*delivery_fee_mode:[\s\S]*payment_method:[\s\S]*merchant_pays/,
+  "Financial order form synchronizes payment and fee treatment",
+);
 expect(financialAdminOrder, /deduct_from_merchant/, "Merchant-paid selection deducts delivery from merchant");
 expect(financialAdminOrder, /placeholder="25\.00"/, "Manual delivery field presents the official 25 AED fee");
+
+const financialInteractionState = read("src/lib/adminNewOrderFinancialState.ts");
+expect(
+  financialInteractionState,
+  /updateAdminFinancialField[\s\S]*delivery_fee_mode:\s*"deduct_from_merchant"[\s\S]*payment_method:\s*"merchant_pays"/,
+  "Zero financial input atomically selects merchant debit",
+);
 
 const financialOperations = read("src/lib/orderFinancialOperations.ts");
 expect(financialOperations, /effectiveDeliveryFeeMode/, "Financial payload enforces merchant-paid delivery mode below the UI");
