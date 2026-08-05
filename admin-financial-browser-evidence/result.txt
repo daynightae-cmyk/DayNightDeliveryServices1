@@ -1,0 +1,6 @@
+PASS real browser financial input synchronization
+goods=4444 customer mode => customer=4469 merchant=4444
+goods=4444 merchant mode => customer=4444 merchant=4419
+goods=0 merchant mode => customer=0 merchant=-25
+goods=0 manual delivery=10 => customer=0 merchant=-10
+goods=100 manual delivery=10 => customer=100 merchant=90

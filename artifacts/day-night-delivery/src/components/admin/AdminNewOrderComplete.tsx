@@ -266,6 +266,20 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
     markFinancialChange();
   }
 
+  function handleFinancialInputCapture(event: FormEvent<HTMLFormElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+
+    const field = target.dataset.adminFinancialField;
+    if (
+      field === "goods_value" ||
+      field === "manual_delivery_price" ||
+      field === "discount_amount"
+    ) {
+      setFinancialField(field, target.value);
+    }
+  }
+
   function setPriceMode(mode: "system" | "manual") {
     setForm((current) => selectAdminPriceMode(current, mode));
     markFinancialChange();
@@ -491,7 +505,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
   }
 
   return (
-    <form data-admin-new-order-form="merchant" autoComplete="off" onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
+    <form data-admin-new-order-form="merchant" autoComplete="off" onInputCapture={handleFinancialInputCapture} onSubmit={submit} className="rounded-[2rem] border border-brand-sky/20 bg-white/[0.045] p-5 shadow-2xl shadow-black/20" dir={isArabic ? "rtl" : "ltr"}>
       <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold"><PackagePlus className="h-6 w-6" /></span>
@@ -570,7 +584,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         </div>
       </section>
 
-      <section data-admin-financial-preview-version="5" data-customer-total={financials?.customerTotal ?? ""} data-merchant-due={financials?.merchantDue ?? ""} className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
+      <section data-admin-financial-preview-version="6" data-customer-total={financials?.customerTotal ?? ""} data-merchant-due={financials?.merchantDue ?? ""} className="mt-4 rounded-[1.7rem] border border-brand-gold/30 bg-[linear-gradient(135deg,rgba(212,175,55,0.11),rgba(11,95,255,0.08),rgba(3,18,38,0.55))] p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="flex items-center gap-2 text-base font-black text-white"><WalletCards className="h-5 w-5 text-brand-gold" />{isArabic ? "التقسيم المالي للطلب" : "Order financial breakdown"}</h3>
@@ -582,7 +596,7 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><ReceiptText className="h-4 w-4 text-brand-sky" />{isArabic ? "قيمة البضاعة — يمكن أن تكون صفرًا" : "Goods value — zero allowed"}</span>
-            <input type="number" min={0} step="0.01" data-admin-financial-input="true" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onInput={(event) => setFinancialField("goods_value", event.currentTarget.value)} placeholder="100.00" className={inputClass()} required />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" data-admin-financial-field="goods_value" name="dn_goods_value_no_history_20260805" autoComplete="off" aria-autocomplete="none" inputMode="decimal" data-form-type="other" data-lpignore="true" data-1p-ignore="true" value={form.goods_value} onChange={(event) => setFinancialField("goods_value", event.currentTarget.value)} onBlur={(event) => setFinancialField("goods_value", event.currentTarget.value)} placeholder="100.00" className={inputClass()} required />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "ثمن منتجات التاجر" : "Merchant product value"}</small>
           </label>
           <label className="space-y-2">
@@ -591,11 +605,11 @@ type FinancialMetricTone = "neutral" | "gold" | "danger";
               <button type="button" onClick={() => setPriceMode("system")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode !== "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? `النظام ${pricing.systemTotal.toFixed(2)}` : `System ${pricing.systemTotal.toFixed(2)}`}</button>
               <button type="button" onClick={() => setPriceMode("manual")} className={`rounded-xl px-3 py-2 text-[10px] font-black ${form.price_mode === "manual" ? "bg-brand-gold text-brand-deep" : "text-white/65"}`}>{isArabic ? "يدوي" : "Manual"}</button>
             </div>
-            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.manual_delivery_price ?? ""} onInput={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
+            {form.price_mode === "manual" ? <input type="number" min={0} step="0.01" data-admin-financial-input="true" data-admin-financial-field="manual_delivery_price" value={form.manual_delivery_price ?? ""} onChange={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)} onBlur={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)} placeholder="25.00" className={inputClass()} /> : <div className="rounded-2xl border border-brand-sky/20 bg-brand-sky/5 px-4 py-3 text-lg font-black text-brand-sky" dir="ltr">{pricing.total.toFixed(2)} AED</div>}
           </label>
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-xs font-black text-white"><Landmark className="h-4 w-4 text-brand-sky" />{isArabic ? "الخصم — اختياري" : "Discount — optional"}</span>
-            <input type="number" min={0} step="0.01" data-admin-financial-input="true" value={form.discount_amount ?? ""} onInput={(event) => setFinancialField("discount_amount", event.currentTarget.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
+            <input type="number" min={0} step="0.01" data-admin-financial-input="true" data-admin-financial-field="discount_amount" value={form.discount_amount ?? ""} onChange={(event) => setFinancialField("discount_amount", event.currentTarget.value)} onBlur={(event) => setFinancialField("discount_amount", event.currentTarget.value)} placeholder={isArabic ? "اتركه فارغًا بدون خصم" : "Leave blank when there is no discount"} className={inputClass()} />
             <small className="text-[10px] font-bold text-white/40">{isArabic ? "لا يظهر في الملخص عندما تكون قيمته صفرًا" : "Hidden from the summary when its value is zero"}</small>
           </label>
         </div>
