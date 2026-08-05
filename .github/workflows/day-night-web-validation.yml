@@ -53,3 +53,5 @@ jobs:
 
       - name: Production build
         run: pnpm run web:build
+
+# Manual acceptance refresh: 2026-08-05 edit/delete contract verification
