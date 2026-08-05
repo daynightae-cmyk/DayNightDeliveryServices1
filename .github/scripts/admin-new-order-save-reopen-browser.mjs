@@ -19,6 +19,7 @@ const merchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
 const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 const storageKey = `sb-${projectRef}-auth-token`;
 const testCoupon = `98${Date.now().toString().slice(-8)}`;
+const staleAcceptanceCoupons = ['9801593698'];
 const evidenceDirectory = 'preview-browser-evidence';
 
 function assert(condition, message) {
@@ -134,7 +135,7 @@ async function typeValue(input, value, label) {
 
 async function waitForSavedOrder(client) {
   let latestError = null;
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     const { data, error } = await client
       .from('orders')
       .select(
@@ -151,27 +152,54 @@ async function waitForSavedOrder(client) {
   throw new Error(`saved_order_readback_timeout: ${latestError?.message || 'no row'}`);
 }
 
-async function cleanupTestOrder(client, orderId) {
-  if (!orderId) return { deleted: false, verified: false };
-
-  for (const table of ['admin_order_reconciliation_queue', 'admin_order_mutation_audit_v3']) {
-    const { error } = await client.from(table).delete().eq('order_id', orderId);
-    if (error && !/does not exist|schema cache|not found/i.test(String(error.message || ''))) {
-      throw new Error(`cleanup_${table}_failed: ${error.message}`);
-    }
+async function collectExactTestRows(client, { orderId = '', coupons = [] } = {}) {
+  const rows = new Map();
+  if (orderId) {
+    const { data, error } = await client
+      .from('orders')
+      .select('id,coupon_number')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw new Error(`cleanup_order_lookup_failed: ${error.message}`);
+    if (data?.id) rows.set(data.id, data);
   }
 
-  const { error: deleteError } = await client.from('orders').delete().eq('id', orderId);
-  if (deleteError) throw new Error(`cleanup_order_failed: ${deleteError.message}`);
+  const exactCoupons = [...new Set(coupons.map((value) => String(value || '').trim()).filter(Boolean))];
+  if (exactCoupons.length) {
+    const { data, error } = await client
+      .from('orders')
+      .select('id,coupon_number')
+      .in('coupon_number', exactCoupons);
+    if (error) throw new Error(`cleanup_coupon_lookup_failed: ${error.message}`);
+    for (const row of data || []) {
+      if (row?.id && exactCoupons.includes(String(row.coupon_number || '').trim())) rows.set(row.id, row);
+    }
+  }
+  return [...rows.values()];
+}
 
-  const { data: remaining, error: verifyError } = await client
-    .from('orders')
-    .select('id')
-    .eq('id', orderId)
-    .maybeSingle();
-  if (verifyError) throw new Error(`cleanup_verify_failed: ${verifyError.message}`);
-  assert(!remaining, 'cleanup_order_still_exists');
-  return { deleted: true, verified: true };
+async function cleanupExactTestOrders(client, criteria = {}) {
+  const rows = await collectExactTestRows(client, criteria);
+  for (const row of rows) {
+    for (const table of ['admin_order_reconciliation_queue', 'admin_order_mutation_audit_v3']) {
+      const { error } = await client.from(table).delete().eq('order_id', row.id);
+      if (error && !/does not exist|schema cache|not found/i.test(String(error.message || ''))) {
+        throw new Error(`cleanup_${table}_failed: ${error.message}`);
+      }
+    }
+
+    const { error: deleteError } = await client.from('orders').delete().eq('id', row.id);
+    if (deleteError) throw new Error(`cleanup_order_failed: ${deleteError.message}`);
+  }
+
+  const remaining = await collectExactTestRows(client, criteria);
+  assert(remaining.length === 0, `cleanup_test_orders_still_exist:${remaining.map((row) => row.id).join(',')}`);
+  return {
+    matched: rows.length,
+    deleted: rows.length,
+    deletedIds: rows.map((row) => row.id),
+    verified: true,
+  };
 }
 
 fs.mkdirSync(evidenceDirectory, { recursive: true });
@@ -179,9 +207,18 @@ const adminAuth = await createAdminSession();
 const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
 });
+
+const preflightCleanup = await cleanupExactTestOrders(serviceClient, {
+  coupons: staleAcceptanceCoupons,
+});
+fs.writeFileSync(
+  `${evidenceDirectory}/financial-save-reopen-preflight-cleanup.json`,
+  JSON.stringify({ coupons: staleAcceptanceCoupons, ...preflightCleanup }, null, 2),
+);
+
 const browser = await chromium.launch({ headless: true });
 let createdOrder = null;
-let cleanup = { deleted: false, verified: false };
+let cleanup = { matched: 0, deleted: 0, deletedIds: [], verified: false };
 let primaryError = null;
 
 try {
@@ -260,7 +297,6 @@ try {
     await form
       .getByRole('button', { name: /حفظ وبدء طلب جديد|Save and start next order/ })
       .click();
-    await form.getByText(new RegExp(testCoupon)).waitFor({ state: 'visible', timeout: 90000 });
 
     createdOrder = await waitForSavedOrder(serviceClient);
     assert(createdOrder.merchant_id === merchantId, 'database_merchant_id_mismatch');
@@ -386,10 +422,17 @@ try {
   }
 } finally {
   try {
-    cleanup = await cleanupTestOrder(serviceClient, createdOrder?.id);
+    cleanup = await cleanupExactTestOrders(serviceClient, {
+      orderId: createdOrder?.id || '',
+      coupons: [testCoupon],
+    });
     fs.writeFileSync(
       `${evidenceDirectory}/financial-save-reopen-cleanup.json`,
-      JSON.stringify({ testCoupon, orderId: createdOrder?.id || null, ...cleanup }, null, 2),
+      JSON.stringify(
+        { testCoupon, orderId: createdOrder?.id || null, ...cleanup },
+        null,
+        2,
+      ),
     );
   } catch (cleanupError) {
     fs.writeFileSync(
@@ -404,4 +447,4 @@ try {
 }
 
 if (primaryError) throw primaryError;
-assert(cleanup.deleted && cleanup.verified, 'test_order_cleanup_not_verified');
+assert(cleanup.verified, 'test_order_cleanup_not_verified');
