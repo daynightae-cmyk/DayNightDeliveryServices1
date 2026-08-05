@@ -8,6 +8,7 @@ on:
       - ".github/scripts/final-preview-browser-acceptance.mjs"
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
       - ".github/scripts/admin-new-order-save-reopen-browser.mjs"
+      - ".github/scripts/admin-financial-event-ownership-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -103,6 +104,13 @@ jobs:
         run: |
           set -euo pipefail
           node .github/scripts/final-preview-browser-acceptance-hardened.mjs
+
+      - name: Diagnose financial input event ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+          node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
 
       - name: Test save database readback reopen and cleanup
         shell: bash
