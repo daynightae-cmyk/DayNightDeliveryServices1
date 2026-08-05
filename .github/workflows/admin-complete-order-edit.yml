@@ -144,3 +144,5 @@ jobs:
           path: admin-complete-order-editor-evidence/
           if-no-files-found: warn
           retention-days: 30
+
+# Manual acceptance refresh: 2026-08-05 full edit verification
