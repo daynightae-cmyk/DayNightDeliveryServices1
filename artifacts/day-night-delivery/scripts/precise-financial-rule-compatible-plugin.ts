@@ -16,7 +16,7 @@ export function preciseFinancialRuleCompatiblePlugin(): Plugin {
 
   return {
     ...legacy,
-    name: "day-night-precise-financial-rule-compatible-v5",
+    name: "day-night-precise-financial-rule-compatible-v6",
     async transform(source, id, options) {
       const normalized = id.replace(/\\/g, "/").split("?")[0];
       const isAuditedCompleteEditor =
@@ -30,8 +30,10 @@ export function preciseFinancialRuleCompatiblePlugin(): Plugin {
         normalized.endsWith(
           "/src/components/admin/AdminNewOrderComplete.tsx",
         ) &&
-        source.includes("effectiveDeliveryFeeMode") &&
-        source.includes("calculateFinancialOpsOrder") &&
+        source.includes("const resolvedFinancialInput = useMemo<FinancialOpsOrderInput>") &&
+        source.includes("delivery_fee_mode: form.delivery_fee_mode") &&
+        source.includes("calculateFinancialOpsOrder(resolvedFinancialInput)") &&
+        source.includes("createFinancialOpsOrder(submissionInput)") &&
         source.includes('data-admin-new-order-form="merchant"');
 
       if (isAuditedCompleteEditor || isAuthoritativeNewOrder) {
