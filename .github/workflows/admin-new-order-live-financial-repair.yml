@@ -7,6 +7,7 @@ on:
       - .github/workflows/admin-new-order-live-financial-repair.yml
       - .github/repairs/apply-admin-new-order-live-financial-fix.py
       - .github/repairs/apply-order-financial-centralization.py
+      - .github/repairs/fix-admin-new-order-gate-runtime.py
 
 permissions:
   contents: write
@@ -33,6 +34,7 @@ jobs:
           set -euo pipefail
           python .github/repairs/apply-admin-new-order-live-financial-fix.py
           python .github/repairs/apply-order-financial-centralization.py
+          python .github/repairs/fix-admin-new-order-gate-runtime.py
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -85,6 +87,7 @@ jobs:
         run: |
           rm -f .github/repairs/apply-admin-new-order-live-financial-fix.py
           rm -f .github/repairs/apply-order-financial-centralization.py
+          rm -f .github/repairs/fix-admin-new-order-gate-runtime.py
           rm -f .github/workflows/admin-new-order-live-financial-repair.yml
 
       - name: Commit verified implementation
