@@ -1,19 +1,17 @@
 from pathlib import Path
+import re
 
 component_path = Path("artifacts/day-night-delivery/src/components/admin/AdminNewOrderComplete.tsx")
 component = component_path.read_text(encoding="utf-8")
-old_call = '''      const savedSettlement = merchantSettlement(
-                calculated.merchantDue,
-                isArabic,
-                calculated.deliveryFeeMode,
-              );'''
-new_call = '''      const savedSettlement = merchantSettlement(
-                calculated.merchantDue,
-                isArabic,
-              );'''
-if old_call not in component:
-    raise RuntimeError("saved merchant settlement signature was not found")
-component_path.write_text(component.replace(old_call, new_call, 1), encoding="utf-8")
+component, count = re.subn(
+    r"const savedSettlement = merchantSettlement\(\s*calculated\.merchantDue,\s*isArabic,\s*calculated\.deliveryFeeMode,\s*\);",
+    "const savedSettlement = merchantSettlement(\n        calculated.merchantDue,\n        isArabic,\n      );",
+    component,
+    count=1,
+)
+if count != 1:
+    raise RuntimeError(f"saved merchant settlement signature repair failed; matches={count}")
+component_path.write_text(component, encoding="utf-8")
 
 plugin_path = Path("artifacts/day-night-delivery/scripts/precise-financial-rule-compatible-plugin.ts")
 plugin = plugin_path.read_text(encoding="utf-8")
