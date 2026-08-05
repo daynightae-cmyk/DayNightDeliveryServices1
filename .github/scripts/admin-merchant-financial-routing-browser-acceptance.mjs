@@ -4,15 +4,79 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(`${process.env.PLAYWRIGHT_NODE_PATH}/playwright`);
+const { createClient } = require(
+  path.resolve(process.cwd(), "artifacts/day-night-delivery/node_modules/@supabase/supabase-js"),
+);
 
 const base = String(process.env.TEST_BASE_URL || "").replace(/\/$/, "");
-const adminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || "").trim();
+const supabaseUrl = String(process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+const anonKey = String(process.env.VITE_SUPABASE_ANON_KEY || "");
+const adminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || "").trim().toLowerCase();
 const adminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || "").trim();
 const evidenceDir = path.resolve("admin-merchant-financial-browser-evidence");
+const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+const storageKey = `sb-${projectRef}-auth-token`;
 fs.mkdirSync(evidenceDir, { recursive: true });
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function createMemoryStorage() {
+  const values = new Map();
+  return {
+    values,
+    adapter: {
+      getItem(key) {
+        return values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        values.set(key, value);
+      },
+      removeItem(key) {
+        values.delete(key);
+      },
+    },
+  };
+}
+
+async function createAdminSession() {
+  const memoryStorage = createMemoryStorage();
+  const sessionClient = createClient(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: true,
+      detectSessionInUrl: false,
+      storage: memoryStorage.adapter,
+      storageKey,
+    },
+  });
+
+  const { data, error } = await sessionClient.auth.signInWithPassword({
+    email: adminEmail,
+    password: adminPassword,
+  });
+  if (error) throw new Error(`admin_session_login_failed_${error.message}`);
+
+  const session = data?.session;
+  const userId = data?.user?.id;
+  assert(session?.access_token && session?.refresh_token && userId, "admin_session_missing");
+
+  const { data: profile, error: profileError } = await sessionClient
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (profileError) throw new Error(`admin_profile_check_failed_${profileError.message}`);
+  assert(String(profile?.role || "").toLowerCase() === "admin", `admin_profile_role_${profile?.role || "null"}`);
+
+  const serializedSession = memoryStorage.values.get(storageKey);
+  assert(
+    typeof serializedSession === "string" && serializedSession.includes(session.access_token),
+    "admin_serialized_session_missing",
+  );
+
+  return { serializedSession, sessionClient };
 }
 
 async function clickFirstVisible(locator, label) {
@@ -41,6 +105,8 @@ async function waitAttribute(locator, name, expected, label) {
 async function waitForRealMerchantOption(ownerSelect, page) {
   const timeoutAt = Date.now() + 150000;
   let lastOptions = [];
+  let refreshAttempted = false;
+
   while (Date.now() < timeoutAt) {
     lastOptions = await ownerSelect.locator("option").evaluateAll((nodes) =>
       nodes.map((node) => ({ value: node.value, text: node.textContent || "" })),
@@ -50,55 +116,52 @@ async function waitForRealMerchantOption(ownerSelect, page) {
     );
     if (merchantOption) return merchantOption;
 
-    const refreshButton = page.getByRole("button", { name: /تحديث|Refresh|تحميل البيانات الحية/i });
-    if (await refreshButton.first().isVisible().catch(() => false)) {
-      const disabled = await refreshButton.first().isDisabled().catch(() => true);
-      if (!disabled) await refreshButton.first().click().catch(() => {});
+    if (!refreshAttempted && Date.now() + 105000 < timeoutAt) {
+      const refreshButton = page.getByRole("button", { name: /تحديث|Refresh|تحميل البيانات الحية/i }).first();
+      if (await refreshButton.isVisible().catch(() => false)) {
+        const disabled = await refreshButton.isDisabled().catch(() => true);
+        if (!disabled) {
+          await refreshButton.click().catch(() => {});
+          refreshAttempted = true;
+        }
+      }
     }
     await page.waitForTimeout(1000);
   }
 
   const body = await page.locator("body").innerText().catch(() => "body unavailable");
   throw new Error(
-    `no_real_merchant_option_after_live_data_wait options=${JSON.stringify(lastOptions)} body=${body.slice(0, 1200)}`,
+    `no_real_merchant_option_after_live_data_wait options=${JSON.stringify(lastOptions)} body=${body.slice(0, 1600)}`,
   );
 }
 
-async function openAdmin(page) {
+const { serializedSession, sessionClient } = await createAdminSession();
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1150 } });
+await context.addInitScript(
+  ({ key, value }) => {
+    window.localStorage.setItem(key, value);
+  },
+  { key: storageKey, value: serializedSession },
+);
+const page = await context.newPage();
+
+try {
   await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=merchant_financial_routing`, {
     waitUntil: "domcontentloaded",
     timeout: 90000,
   });
 
   const shell = page.locator(".dncc-shell");
-  if (await shell.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false)) {
-    return;
+  const shellVisible = await shell
+    .waitFor({ state: "visible", timeout: 90000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shellVisible) {
+    const body = await page.locator("body").innerText().catch(() => "body unavailable");
+    throw new Error(`admin_shell_not_visible_after_injected_session body=${body.slice(0, 1600)}`);
   }
 
-  await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=merchant_financial_routing_login`, {
-    waitUntil: "domcontentloaded",
-    timeout: 90000,
-  });
-
-  const intro = page.locator(".auth-clean__intro-cta");
-  if (await intro.isVisible().catch(() => false)) await intro.click();
-
-  const email = page.locator("#dn-admin-email");
-  const password = page.locator("#dn-admin-password");
-  await email.waitFor({ state: "visible", timeout: 30000 });
-  await password.waitFor({ state: "visible", timeout: 30000 });
-  await email.fill(adminEmail);
-  await password.fill(adminPassword);
-  await page.locator('button[type="submit"]').click();
-  await shell.waitFor({ state: "visible", timeout: 90000 });
-}
-
-const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1440, height: 1150 } });
-const page = await context.newPage();
-
-try {
-  await openAdmin(page);
   await clickFirstVisible(page.locator('[data-dn-command-section="new_order"]'), "new_order_control");
 
   const form = page.locator('[data-admin-new-order-form="merchant"]');
@@ -178,6 +241,7 @@ try {
   fs.writeFileSync(
     path.join(evidenceDir, "result.txt"),
     [
+      "PASS injected authenticated admin session",
       "PASS merchant selection automatically routes delivery to merchant",
       "PASS goods and manual delivery update every financial card immediately",
       "PASS customer/merchant routing can be switched manually in both directions",
@@ -203,4 +267,5 @@ try {
   throw error;
 } finally {
   await browser.close();
+  await sessionClient.auth.signOut({ scope: "local" }).catch(() => {});
 }
