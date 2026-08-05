@@ -15,7 +15,7 @@ const adminEmail = String(process.env.RUNTIME_ADMIN_EMAIL || '').trim().toLowerC
 const adminPassword = String(process.env.RUNTIME_ADMIN_PASSWORD || '').trim();
 const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 const storageKey = `sb-${projectRef}-auth-token`;
-const merchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+const preferredMerchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
 const outputDirectory = 'preview-browser-evidence';
 
 function assert(condition, message) {
@@ -100,6 +100,26 @@ async function snapshot(page, stage) {
   }, stage);
 }
 
+async function resolveAvailableMerchantValue(select) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    const value = await select.locator('option').evaluateAll((options, preferred) => {
+      const real = options.filter((option) => {
+        const optionValue = String(option.getAttribute('value') || '').trim();
+        return optionValue && optionValue !== '__personal_order__';
+      });
+      const preferredOption = real.find(
+        (option) => String(option.getAttribute('value') || '').trim() === preferred,
+      );
+      return String(
+        preferredOption?.getAttribute('value') || real[0]?.getAttribute('value') || '',
+      ).trim();
+    }, preferredMerchantId);
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('diagnostic_real_merchant_option_missing');
+}
+
 fs.mkdirSync(outputDirectory, { recursive: true });
 const auth = await createAdminStorage();
 const browser = await chromium.launch({ headless: true });
@@ -128,8 +148,8 @@ try {
   await visibleForm.waitFor({ state: 'visible', timeout: 90000 });
   assert((await visibleForm.count()) === 1, `diagnostic_visible_form_count_${await visibleForm.count()}`);
   const merchantSelect = visibleForm.locator('[data-admin-order-owner-select="true"]');
-  await merchantSelect.locator(`option[value="${merchantId}"]`).waitFor({ state: 'attached', timeout: 90000 });
-  await merchantSelect.selectOption(merchantId);
+  const merchantValue = await resolveAvailableMerchantValue(merchantSelect);
+  await merchantSelect.selectOption(merchantValue);
 
   await page.evaluate(() => {
     window.__dnFinancialEventLog = [];
@@ -186,6 +206,7 @@ try {
     JSON.stringify({
       commit: process.env.GITHUB_HEAD_SHA || process.env.GITHUB_SHA || '',
       browser: await page.evaluate(() => navigator.userAgent),
+      merchantValue,
       snapshots,
     }, null, 2),
   );
@@ -196,6 +217,15 @@ try {
   assert(final.visiblePreviewCount === 1, `diagnostic_visible_preview_count_${final.visiblePreviewCount}`);
   assert(final.inputs.find((item) => item.visible && item.field === 'goods_value')?.value === '50', 'diagnostic_goods_dom_mismatch');
   assert(final.inputs.find((item) => item.visible && item.field === 'manual_delivery_price')?.value === '60', 'diagnostic_manual_dom_mismatch');
+  assert(Number(visiblePreview.dataset.goodsValue) === 50, 'diagnostic_goods_state_mismatch');
+  assert(Number(visiblePreview.dataset.deliveryFee) === 60, 'diagnostic_delivery_state_mismatch');
+  assert(Number(visiblePreview.dataset.customerTotal) === 50, 'diagnostic_customer_state_mismatch');
+  assert(Number(visiblePreview.dataset.merchantDue) === -10, 'diagnostic_merchant_state_mismatch');
+  assert(Number(visiblePreview.dataset.companyRevenue) === 60, 'diagnostic_company_state_mismatch');
+  const visibleText = String(visiblePreview.text || '').replace(/,/g, '');
+  assert(visibleText.includes('50.00'), 'diagnostic_visible_goods_or_customer_missing');
+  assert(visibleText.includes('60.00'), 'diagnostic_visible_delivery_or_revenue_missing');
+  assert(visibleText.includes('-10.00'), 'diagnostic_visible_negative_merchant_missing');
 } finally {
   await context.close();
   await auth.client.auth.signOut({ scope: 'local' }).catch(() => {});
