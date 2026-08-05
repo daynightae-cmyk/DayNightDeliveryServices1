@@ -7,6 +7,7 @@ on:
       - ".github/workflows/final-preview-browser-acceptance.yml"
       - ".github/scripts/final-preview-browser-acceptance.mjs"
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
+      - ".github/scripts/admin-financial-preview-browser-acceptance.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -15,6 +16,8 @@ on:
 
 permissions:
   contents: read
+  deployments: read
+  statuses: read
 
 concurrency:
   group: final-preview-browser-acceptance-${{ github.ref }}
@@ -114,4 +117,108 @@ jobs:
           name: DAY-NIGHT-Final-Preview-Browser-Evidence
           path: preview-browser-evidence/
           if-no-files-found: warn
+          retention-days: 30
+
+  admin-financial-exact-vercel-preview:
+    name: Admin financial exact Vercel Preview acceptance
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-runtime-tests
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_BRANCH: ${{ github.event.pull_request.head.ref }}
+      EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify protected acceptance credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD EXPECTED_COMMIT_SHA; do
+            test -n "${!name:-}" || { echo "Missing protected acceptance value: $name" >&2; exit 2; }
+          done
+
+      - name: Resolve successful Vercel Preview for exact PR head
+        id: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p admin-financial-browser-evidence
+          resolved=""
+          created_at=""
+          deployment_id=""
+          for attempt in $(seq 1 80); do
+            deployments="$(gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$EXPECTED_COMMIT_SHA&per_page=100")"
+            mapfile -t ids < <(jq -r '.[].id' <<<"$deployments")
+            for id in "${ids[@]:-}"; do
+              statuses="$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=100")"
+              row="$(jq -r '[.[] | select(.state == "success") | select((.environment_url // "") | contains("vercel.app"))] | sort_by(.created_at) | reverse | .[0] | [(.environment_url // ""), (.created_at // "")] | @tsv' <<<"$statuses")"
+              url="${row%%$'\t'*}"
+              timestamp="${row#*$'\t'}"
+              if [[ "$url" == https://*.vercel.app* ]]; then
+                version="$(curl -fsS --retry 3 --retry-delay 2 "${url%/}/version.json" || true)"
+                build_id="$(jq -r '.buildId // empty' <<<"$version" 2>/dev/null || true)"
+                if [[ "$build_id" == "$EXPECTED_COMMIT_SHA" ]]; then
+                  resolved="${url%/}"
+                  created_at="$timestamp"
+                  deployment_id="$id"
+                  break 2
+                fi
+              fi
+            done
+            echo "Waiting for exact Vercel Preview: attempt $attempt/80, SHA $EXPECTED_COMMIT_SHA"
+            sleep 15
+          done
+          if [[ -z "$resolved" ]]; then
+            echo "No successful Vercel Preview with matching version.json buildId was found for $EXPECTED_COMMIT_SHA" >&2
+            gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$EXPECTED_COMMIT_SHA&per_page=100" > admin-financial-browser-evidence/deployments.json || true
+            exit 1
+          fi
+          printf '%s\n' "$resolved" > admin-financial-browser-evidence/preview-url.txt
+          printf '%s\n' "$EXPECTED_COMMIT_SHA" > admin-financial-browser-evidence/commit.txt
+          printf '%s\n' "$created_at" > admin-financial-browser-evidence/deployment-created-at.txt
+          echo "url=$resolved" >> "$GITHUB_OUTPUT"
+          echo "created_at=$created_at" >> "$GITHUB_OUTPUT"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Install isolated real Chromium runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-financial-playwright"
+          rm -rf "$playwright_dir"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Run merchant, live-input, five-case, save and reopen acceptance
+        shell: bash
+        env:
+          DEPLOYED_PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          DEPLOYMENT_CREATED_AT: ${{ steps.preview.outputs.created_at }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/admin-financial-preview-browser-acceptance.mjs
+
+      - name: Upload exact Preview Chromium evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-Admin-Financial-Exact-Preview-Evidence
+          path: admin-financial-browser-evidence/
+          if-no-files-found: error
           retention-days: 30
