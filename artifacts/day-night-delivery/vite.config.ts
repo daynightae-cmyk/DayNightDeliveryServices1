@@ -48,6 +48,7 @@ function buildMetadataPlugin(): Plugin {
             supabaseKeyConfigured: Boolean(publicSupabaseAnonKey),
             supabaseConfigSource: "authoritative-vite-build-config",
             adminFinancialRule: "zero-goods-zero-delivery-merchant-v3",
+            adminFinancialPreviewVerification: "exact-protected-preview-identity-v4",
             adminStepUpRule: "sensitive-admin-actions-v1",
           },
           null,

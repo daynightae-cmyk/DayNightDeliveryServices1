@@ -8,6 +8,9 @@ on:
       - ".github/scripts/final-preview-browser-acceptance.mjs"
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
       - ".github/scripts/admin-new-order-save-reopen-browser.mjs"
+      - ".github/scripts/admin-new-order-save-reopen-browser-hardened.mjs"
+      - ".github/scripts/admin-financial-event-ownership-diagnostic.mjs"
+      - ".github/scripts/admin-fetch-loop-ownership-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -16,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: final-preview-browser-acceptance-${{ github.ref }}
@@ -29,7 +33,6 @@ jobs:
     timeout-minutes: 45
     environment: production-runtime-tests
     env:
-      DEPLOYED_PREVIEW_URL: https://day-night-delivery1-git-fix-gl-dd1944-daynightae-cmyks-projects.vercel.app
       TEST_BASE_URL: http://127.0.0.1:4173
       GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -95,21 +98,127 @@ jobs:
           cd "$playwright_dir"
           npm init -y >/dev/null
           npm install --ignore-scripts playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Test live financial inputs and merchant switching
+      - name: Test local exact build live financial inputs and merchant switching
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/final-preview-browser-acceptance-hardened.mjs
 
-      - name: Test save database readback reopen and cleanup
+      - name: Diagnose local financial input event ownership
         shell: bash
         run: |
           set -euo pipefail
-          node --check .github/scripts/admin-new-order-save-reopen-browser.mjs
-          node .github/scripts/admin-new-order-save-reopen-browser.mjs
+          node --check .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+          node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+
+      - name: Diagnose local background fetch ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
+          node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
+
+      - name: Test local save database readback reopen and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
+          node .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
+          mkdir -p preview-browser-evidence/local
+          find preview-browser-evidence -maxdepth 1 -type f ! -name 'local-web.pid' -exec cp {} preview-browser-evidence/local/ \;
+
+      - name: Resolve exact successful Vercel Preview for branch head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/$REPOSITORY"
+          preview_url=""
+          deployment_id=""
+          for attempt in $(seq 1 90); do
+            deployments="$(curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$api/deployments?sha=$GITHUB_HEAD_SHA&environment=Preview&per_page=30")"
+            deployment_id="$(printf '%s' "$deployments" | jq -r --arg sha "$GITHUB_HEAD_SHA" '[.[] | select(.sha == $sha and .environment == "Preview" and .creator.login == "vercel[bot]")][0].id // empty')"
+            if [ -n "$deployment_id" ]; then
+              statuses="$(curl -fsSL \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$api/deployments/$deployment_id/statuses")"
+              preview_url="$(printf '%s' "$statuses" | jq -r '[.[] | select(.state == "success")][0] | (.environment_url // .target_url // empty)')"
+            fi
+            if [ -n "$preview_url" ]; then break; fi
+            sleep 5
+          done
+          test -n "$deployment_id" || { echo "No Vercel Preview deployment found for $GITHUB_HEAD_SHA" >&2; exit 1; }
+          test -n "$preview_url" || { echo "Vercel Preview did not complete successfully for $GITHUB_HEAD_SHA" >&2; exit 1; }
+          preview_url="${preview_url%/}"
+          echo "EXACT_VERCEL_PREVIEW_URL=$preview_url" >> "$GITHUB_ENV"
+          echo "TEST_BASE_URL=$preview_url" >> "$GITHUB_ENV"
+          printf '%s\n' "$preview_url" > preview-browser-evidence/exact-vercel-preview-url.txt
+          printf '%s\n' "$deployment_id" > preview-browser-evidence/exact-vercel-deployment-id.txt
+
+      - name: Verify exact Vercel Preview identity and accessibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="preview-browser-evidence/vercel-preview-response.html"
+          curl -fsSL --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o "$response"
+          test -s "$response"
+          if node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(v.buildId!==process.env.GITHUB_HEAD_SHA)process.exit(2)" "$response"; then
+            cp "$response" preview-browser-evidence/vercel-preview-version.json
+            echo "PREVIEW_ACCESS=public" >> "$GITHUB_ENV"
+            echo "Exact Vercel Preview is public and buildId matches $GITHUB_HEAD_SHA"
+          elif grep -Eiq 'vercel|authentication|log in|sign in' "$response"; then
+            echo "PREVIEW_ACCESS=protected" >> "$GITHUB_ENV"
+            echo "Exact Vercel Preview deployment matches the branch SHA through GitHub Deployments, but Vercel Authentication protects its HTTP content." | tee preview-browser-evidence/vercel-preview-protection.txt
+          else
+            echo "Preview response was neither matching version JSON nor recognizable Vercel protection." >&2
+            head -c 500 "$response" >&2 || true
+            exit 1
+          fi
+
+      - name: Test exact public Vercel Preview live financial inputs and merchant switching
+        if: env.PREVIEW_ACCESS == 'public'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/final-preview-browser-acceptance-hardened.mjs
+
+      - name: Diagnose exact public Vercel Preview event and fetch ownership
+        if: env.PREVIEW_ACCESS == 'public'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+          node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
+
+      - name: Test exact public Vercel Preview save database readback reopen and cleanup
+        if: env.PREVIEW_ACCESS == 'public'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
+          mkdir -p preview-browser-evidence/vercel-preview
+          find preview-browser-evidence -maxdepth 1 -type f ! -name 'local-web.pid' -exec cp {} preview-browser-evidence/vercel-preview/ \;
+
+      - name: Record protected Preview acceptance basis
+        if: env.PREVIEW_ACCESS == 'protected'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s preview-browser-evidence/vercel-preview-protection.txt
+          test -s preview-browser-evidence/local-version.json
+          test -s preview-browser-evidence/financial-save-reopen-report.json
+          echo "Protected Preview identity PASS; exact local production build browser and save/reopen acceptance PASS. Production browser verification remains mandatory after merge." | tee preview-browser-evidence/protected-preview-acceptance.txt
 
       - name: Stop local application
         if: always()
