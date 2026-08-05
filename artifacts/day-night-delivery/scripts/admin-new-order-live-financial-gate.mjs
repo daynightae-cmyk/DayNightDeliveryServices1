@@ -52,7 +52,7 @@ const sourceChecks = [
   [autocomplete.includes(':not([type="number"])'), "history autocomplete excludes number inputs"],
   [autocomplete.includes(':not([data-admin-financial-input="true"])'), "history autocomplete excludes marked financial inputs"],
   [autocomplete.includes('input.dataset.adminFinancialInput === "true"'), "runtime autocomplete guard protects financial inputs"],
-  [component.includes('data-admin-financial-preview-version="7"'), "deployed form exposes financial truth version 7"],
+  [component.includes('data-admin-financial-preview-version="verified-v1"'), "form exposes the verified financial preview marker"],
   [component.includes('data-delivery-fee-mode={financials?.deliveryFeeMode ?? ""}'), "preview exposes the actual live delivery-fee destination"],
   [component.includes('payment_method: merchant ? "merchant_pays" : emptyOrder.payment_method'), "fresh merchant orders default to merchant payment"],
   [component.includes('delivery_fee_mode: merchant ? "deduct_from_merchant" : emptyOrder.delivery_fee_mode'), "fresh merchant orders default to merchant debit"],
@@ -60,14 +60,16 @@ const sourceChecks = [
   [component.includes('delivery_fee_mode: merchant ? "deduct_from_merchant" : "customer_pays"'), "selecting a merchant selects merchant debit atomically"],
   [component.includes('payment_method: merchant ? "merchant_pays" : current.payment_method'), "coupon merchant matching selects merchant payment"],
   [component.includes('delivery_fee_mode: merchant ? "deduct_from_merchant" : current.delivery_fee_mode'), "coupon merchant matching selects merchant debit"],
-  [component.includes("onInputCapture={handleFinancialInputCapture}"), "form captures financial input before bubble listeners can interfere"],
+  [!component.includes("onInputCapture={handleFinancialInputCapture}"), "financial state has no competing form-capture writer"],
   [component.includes('data-admin-financial-field="goods_value"'), "goods field has an explicit financial identity"],
   [component.includes('data-admin-financial-field="manual_delivery_price"'), "manual delivery field has an explicit financial identity"],
   [component.includes('data-admin-financial-field="discount_amount"'), "discount field has an explicit financial identity"],
   [component.includes('onChange={(event) => setFinancialField("goods_value", event.currentTarget.value)}'), "goods value uses the standard controlled-input change path"],
   [component.includes('onChange={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)}'), "manual delivery uses the standard controlled-input change path"],
   [component.includes('onChange={(event) => setFinancialField("discount_amount", event.currentTarget.value)}'), "discount uses the standard controlled-input change path"],
-  [component.includes('onBlur={(event) => setFinancialField("goods_value", event.currentTarget.value)}'), "goods value reconciles browser or extension autofill on blur"],
+  [!component.includes('onBlur={(event) => setFinancialField("goods_value", event.currentTarget.value)}'), "goods value has no competing blur writer"],
+  [!component.includes('onBlur={(event) => setFinancialField("manual_delivery_price", event.currentTarget.value)}'), "manual delivery has no competing blur writer"],
+  [!component.includes('onBlur={(event) => setFinancialField("discount_amount", event.currentTarget.value)}'), "discount has no competing blur writer"],
   [!component.includes("useEffect("), "no effect can overwrite current financial input"],
   [interactionState.includes("updateAdminFinancialField"), "financial field reducer is centralized and testable"],
   [operations.includes("merchant_due: financials.merchantDue"), "create payload persists signed merchant due"],
@@ -103,28 +105,28 @@ function assertMoney(actual, expected, label) {
 
 const cases = [
   {
-    name: "CASE 1 PASS: goods=0, fee=25, merchant, customer=0, merchant=-25",
+    name: "CASE 1 equation: goods=0, fee=25, merchant, customer=0, merchant=-25",
     input: { goodsValue: 0, deliveryFee: 25, discountAmount: 0, deliveryFeeMode: "deduct_from_merchant" },
     customer: 0,
     merchant: -25,
     revenue: 25,
   },
   {
-    name: "CASE 2 PASS: goods=100, fee=25, merchant, customer=100, merchant=75",
+    name: "CASE 2 equation: goods=100, fee=25, merchant, customer=100, merchant=75",
     input: { goodsValue: 100, deliveryFee: 25, discountAmount: 0, deliveryFeeMode: "deduct_from_merchant" },
     customer: 100,
     merchant: 75,
     revenue: 25,
   },
   {
-    name: "CASE 3 PASS: goods=10, fee=25, merchant, customer=10, merchant=-15",
+    name: "CASE 3 equation: goods=10, fee=25, merchant, customer=10, merchant=-15",
     input: { goodsValue: 10, deliveryFee: 25, discountAmount: 0, deliveryFeeMode: "deduct_from_merchant" },
     customer: 10,
     merchant: -15,
     revenue: 25,
   },
   {
-    name: "CASE 4 PASS: goods=100, fee=25, customer, customer=125, merchant=100",
+    name: "CASE 4 equation: goods=100, fee=25, customer, customer=125, merchant=100",
     input: { goodsValue: 100, deliveryFee: 25, discountAmount: 0, deliveryFeeMode: "customer_pays" },
     customer: 125,
     merchant: 100,
@@ -156,8 +158,6 @@ for (const [goodsValue, customer, merchant] of liveSequence) {
   assertMoney(result.customerTotal, customer, `live goods=${goodsValue} customer`);
   assertMoney(result.merchantDue, merchant, `live goods=${goodsValue} merchant`);
 }
-console.log("LIVE CHANGE PASS");
-console.log("SAVE/REOPEN PASS");
-console.log("BUILD CONTRACT PASS");
+console.log("STATIC FINANCIAL CONTRACT VERIFIED");
 
 fs.rmSync(tmp, { force: true });
