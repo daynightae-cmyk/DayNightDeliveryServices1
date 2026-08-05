@@ -240,6 +240,8 @@ try {
     await form.waitFor({ state: 'visible', timeout: 90000 });
     const preview = form.locator('[data-admin-financial-preview-version="verified-v1"]');
     await preview.waitFor({ state: 'visible', timeout: 30000 });
+    const previewMarker = await preview.getAttribute('data-admin-financial-preview-version');
+    assert(previewMarker === 'verified-v1', 'financial_preview_marker_mismatch');
 
     const merchantSelect = form.locator('[data-admin-order-owner-select="true"]').first();
     await merchantSelect
@@ -382,7 +384,7 @@ try {
       result: 'PASS',
       commit: expectedCommit,
       browser: await page.evaluate(() => navigator.userAgent),
-      marker: await preview.getAttribute('data-admin-financial-preview-version'),
+      marker: previewMarker,
       testCoupon,
       orderId: createdOrder.id,
       trackingNumber: createdOrder.tracking_number,
