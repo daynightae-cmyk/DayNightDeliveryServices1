@@ -10,6 +10,7 @@ on:
       - ".github/scripts/admin-new-order-save-reopen-browser.mjs"
       - ".github/scripts/admin-new-order-save-reopen-browser-hardened.mjs"
       - ".github/scripts/admin-financial-event-ownership-diagnostic.mjs"
+      - ".github/scripts/admin-fetch-loop-ownership-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
       - "android-role-shell/**"
       - "supabase/migrations/**"
@@ -112,6 +113,13 @@ jobs:
           set -euo pipefail
           node --check .github/scripts/admin-financial-event-ownership-diagnostic.mjs
           node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
+
+      - name: Diagnose background fetch ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
+          node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
 
       - name: Test save database readback reopen and cleanup
         shell: bash
