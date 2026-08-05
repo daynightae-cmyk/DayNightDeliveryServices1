@@ -83,7 +83,7 @@ replaceRequired(
         );
       },
       {
-        selector: '[data-admin-financial-preview-version="7"]',
+        selector: '[data-admin-financial-preview-version="verified-v1"]',
         customer: expected.customer,
         merchant: expected.merchant,
       },
@@ -136,7 +136,7 @@ replaceRequired(
     await clickVisibleSection(newOrderControl, 'new order');
     const form = page.locator('[data-admin-new-order-form="merchant"]');
     await form.waitFor({ state: 'visible', timeout: 90000 });
-    const preview = page.locator('[data-admin-financial-preview-version="7"]');
+    const preview = page.locator('[data-admin-financial-preview-version="verified-v1"]');
     await preview.waitFor({ state: 'visible', timeout: 90000 });
 
     const merchantSelect = page.locator('[data-admin-order-owner-select="true"]').first();
@@ -148,11 +148,12 @@ replaceRequired(
 
     await page.waitForFunction(
       ({ merchantValue }) => {
-        const node = document.querySelector('[data-admin-financial-preview-version="7"]');
+        const node = document.querySelector('[data-admin-financial-preview-version="verified-v1"]');
         return (
           node instanceof HTMLElement &&
           node.dataset.selectedMerchantId === merchantValue &&
-          node.dataset.deliveryFeeMode === 'deduct_from_merchant'
+          node.dataset.deliveryFeeMode === 'deduct_from_merchant' &&
+          node.dataset.paymentMethod === 'merchant_pays'
         );
       },
       { merchantValue },
