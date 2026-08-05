@@ -1,5 +1,6 @@
 name: Final Preview Browser Acceptance
 
+# Draft acceptance only. This workflow does not deploy or merge.
 on:
   pull_request:
     branches: [main]
