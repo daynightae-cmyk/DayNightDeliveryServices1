@@ -140,15 +140,11 @@ replaceRequired(
     await preview.waitFor({ state: 'visible', timeout: 90000 });
 
     const merchantSelect = page.locator('[data-admin-order-owner-select="true"]').first();
-    const merchantValue = await merchantSelect.locator('option').evaluateAll((options) => {
-      const match = options.find((option) => {
-        const value = option.getAttribute('value') || '';
-        return value && value !== '__personal_order__';
-      });
-      return match?.getAttribute('value') || '';
-    });
-    assert(Boolean(merchantValue), label + ': no real merchant option is available.');
-    await merchantSelect.selectOption(merchantValue);
+    await merchantSelect
+      .locator('option[value="' + ilytkId + '"]')
+      .waitFor({ state: 'attached', timeout: 90000 });
+    const merchantValue = ilytkId;
+    await merchantSelect.selectOption(merchantValue, { timeout: 90000 });
 
     await page.waitForFunction(
       ({ merchantValue }) => {
