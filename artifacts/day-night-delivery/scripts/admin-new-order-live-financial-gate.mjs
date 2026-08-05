@@ -17,9 +17,14 @@ const persistencePath = path.join(
   root,
   "artifacts/day-night-delivery/src/lib/adminOrderEditPersistence.ts",
 );
+const autocompletePath = path.join(
+  root,
+  "artifacts/day-night-delivery/src/components/admin/AdminHistoryAutocomplete.tsx",
+);
 const component = fs.readFileSync(componentPath, "utf8");
 const operations = fs.readFileSync(operationsPath, "utf8");
 const persistence = fs.readFileSync(persistencePath, "utf8");
+const autocomplete = fs.readFileSync(autocompletePath, "utf8");
 
 const sourceChecks = [
   [component.includes("delivery_fee_mode: form.delivery_fee_mode"), "form delivery mode is the UI source of truth"],
@@ -38,6 +43,10 @@ const sourceChecks = [
   [!component.includes("authoritativeDeliveryFeeMode"), "no competing delivery-mode state remains"],
   [!component.includes("const customerTotal = Math.round"), "the component does not duplicate the central financial equations"],
   [!component.includes("Math.max(0, financials.merchantDue)"), "negative merchant balances remain signed"],
+  [component.includes('data-admin-financial-input="true"'), "financial number inputs are explicitly isolated"],
+  [autocomplete.includes(':not([type="number"])'), "history autocomplete excludes number inputs"],
+  [autocomplete.includes(':not([data-admin-financial-input="true"])'), "history autocomplete excludes marked financial inputs"],
+  [autocomplete.includes('input.dataset.adminFinancialInput === "true"'), "runtime autocomplete guard protects financial inputs"],
   [operations.includes("merchant_due: financials.merchantDue"), "create payload persists signed merchant due"],
   [operations.includes("customer_total: financials.customerTotal"), "create payload persists customer total"],
   [operations.includes("company_revenue: financials.companyRevenue"), "create payload persists company revenue"],
