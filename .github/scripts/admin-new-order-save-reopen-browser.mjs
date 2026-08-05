@@ -35,15 +35,9 @@ function createMemoryStorage() {
   return {
     values,
     adapter: {
-      getItem(key) {
-        return values.get(key) ?? null;
-      },
-      setItem(key, value) {
-        values.set(key, value);
-      },
-      removeItem(key) {
-        values.delete(key);
-      },
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
     },
   };
 }
@@ -88,10 +82,16 @@ async function createAdminSession() {
     .eq('id', data.user.id)
     .single();
   if (profileError) throw new Error(`save_reopen_profile_failed: ${profileError.message}`);
-  assert(['admin', 'support', 'owner', 'super_admin'].includes(String(profile?.role || '').toLowerCase()), 'save_reopen_user_not_admin');
+  assert(
+    ['admin', 'support', 'owner', 'super_admin'].includes(String(profile?.role || '').toLowerCase()),
+    'save_reopen_user_not_admin',
+  );
 
   const serialized = memory.values.get(storageKey);
-  assert(typeof serialized === 'string' && serialized.includes(data.session.access_token), 'save_reopen_serialized_session_missing');
+  assert(
+    typeof serialized === 'string' && serialized.includes(data.session.access_token),
+    'save_reopen_serialized_session_missing',
+  );
   return { client, serialized, role: profile.role };
 }
 
@@ -132,12 +132,14 @@ async function typeValue(input, value, label) {
   assert((await input.inputValue()) === String(value), `${label}_dom_value_mismatch`);
 }
 
-async function waitForSavedOrder(adminClient) {
+async function waitForSavedOrder(client) {
   let latestError = null;
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const { data, error } = await adminClient
+    const { data, error } = await client
       .from('orders')
-      .select('id,tracking_number,invoice_number,coupon_number,merchant_id,goods_value,delivery_fee,delivery_price,manual_delivery_price,price_source,discount_amount,delivery_fee_mode,payment_method,customer_total,merchant_due,company_revenue,status,created_at')
+      .select(
+        'id,tracking_number,invoice_number,coupon_number,merchant_id,goods_value,delivery_fee,delivery_price,manual_delivery_price,price_source,discount_amount,delivery_fee_mode,payment_method,customer_total,merchant_due,company_revenue,status,created_at',
+      )
       .eq('coupon_number', testCoupon)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -149,20 +151,20 @@ async function waitForSavedOrder(adminClient) {
   throw new Error(`saved_order_readback_timeout: ${latestError?.message || 'no row'}`);
 }
 
-async function cleanupTestOrder(adminClient, orderId) {
+async function cleanupTestOrder(client, orderId) {
   if (!orderId) return { deleted: false, verified: false };
 
   for (const table of ['admin_order_reconciliation_queue', 'admin_order_mutation_audit_v3']) {
-    const { error } = await adminClient.from(table).delete().eq('order_id', orderId);
+    const { error } = await client.from(table).delete().eq('order_id', orderId);
     if (error && !/does not exist|schema cache|not found/i.test(String(error.message || ''))) {
       throw new Error(`cleanup_${table}_failed: ${error.message}`);
     }
   }
 
-  const { error: deleteError } = await adminClient.from('orders').delete().eq('id', orderId);
+  const { error: deleteError } = await client.from('orders').delete().eq('id', orderId);
   if (deleteError) throw new Error(`cleanup_order_failed: ${deleteError.message}`);
 
-  const { data: remaining, error: verifyError } = await adminClient
+  const { data: remaining, error: verifyError } = await client
     .from('orders')
     .select('id')
     .eq('id', orderId)
@@ -183,7 +185,10 @@ let cleanup = { deleted: false, verified: false };
 let primaryError = null;
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: 'ar-AE' });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1100 },
+    locale: 'ar-AE',
+  });
   await context.addInitScript(
     ({ key, value }) => window.localStorage.setItem(key, value),
     { key: storageKey, value: adminAuth.serialized },
@@ -192,7 +197,7 @@ try {
 
   try {
     await openAdmin(page);
-    await openSection(page, 'new_order', 'new order');
+    await openSection(page, 'new_order', 'new_order');
 
     const form = page.locator('[data-admin-new-order-form="merchant"]');
     await form.waitFor({ state: 'visible', timeout: 90000 });
@@ -200,39 +205,45 @@ try {
     await preview.waitFor({ state: 'visible', timeout: 30000 });
 
     const merchantSelect = form.locator('[data-admin-order-owner-select="true"]').first();
-    await merchantSelect.locator(`option[value="${merchantId}"]`).waitFor({ state: 'attached', timeout: 90000 });
+    await merchantSelect
+      .locator(`option[value="${merchantId}"]`)
+      .waitFor({ state: 'attached', timeout: 90000 });
     await merchantSelect.selectOption(merchantId);
 
-    const coupon = form.locator('[data-admin-next-order-focus="true"]');
-    await coupon.fill(testCoupon);
+    await form.locator('[data-admin-next-order-focus="true"]').fill(testCoupon);
     const textInputs = form.locator('input:not([type="number"])');
-    const receiverName = textInputs.filter({ has: undefined }).nth(1);
-    const receiverPhone = textInputs.filter({ has: undefined }).nth(2);
-    await receiverName.fill('DAY NIGHT FINANCIAL TEST');
-    await receiverPhone.fill('0500000000');
+    await textInputs.nth(1).fill('DAY NIGHT FINANCIAL TEST');
+    await textInputs.nth(2).fill('0500000000');
 
     const goods = form.locator('[data-admin-financial-field="goods_value"]');
     await typeValue(goods, '50', 'goods_value');
-    await clickFirstVisible(form.getByRole('button', { name: /^يدوي$|^Manual$/ }), 'manual price');
+    await clickFirstVisible(
+      form.getByRole('button', { name: /^يدوي$|^Manual$/ }),
+      'manual_price',
+    );
     const manualDelivery = form.locator('[data-admin-financial-field="manual_delivery_price"]');
     await typeValue(manualDelivery, '60', 'manual_delivery_price');
     await clickFirstVisible(
-      form.getByRole('button', { name: /رسوم التوصيل على حساب التاجر|Charge delivery to merchant/ }),
-      'merchant pays',
+      form.getByRole('button', {
+        name: /رسوم التوصيل على حساب التاجر|Charge delivery to merchant/,
+      }),
+      'merchant_pays',
     );
 
     await page.waitForFunction(
       ({ selector, selectedMerchant }) => {
         const node = document.querySelector(selector);
-        return node instanceof HTMLElement
-          && node.dataset.selectedMerchantId === selectedMerchant
-          && node.dataset.deliveryFeeMode === 'deduct_from_merchant'
-          && node.dataset.paymentMethod === 'merchant_pays'
-          && Number(node.dataset.goodsValue) === 50
-          && Number(node.dataset.deliveryFee) === 60
-          && Number(node.dataset.customerTotal) === 50
-          && Number(node.dataset.merchantDue) === -10
-          && Number(node.dataset.companyRevenue) === 60;
+        return (
+          node instanceof HTMLElement &&
+          node.dataset.selectedMerchantId === selectedMerchant &&
+          node.dataset.deliveryFeeMode === 'deduct_from_merchant' &&
+          node.dataset.paymentMethod === 'merchant_pays' &&
+          Number(node.dataset.goodsValue) === 50 &&
+          Number(node.dataset.deliveryFee) === 60 &&
+          Number(node.dataset.customerTotal) === 50 &&
+          Number(node.dataset.merchantDue) === -10 &&
+          Number(node.dataset.companyRevenue) === 60
+        );
       },
       {
         selector: '[data-admin-financial-preview-version="verified-v1"]',
@@ -246,48 +257,90 @@ try {
       fullPage: true,
     });
 
-    await form.getByRole('button', { name: /حفظ وبدء طلب جديد|Save and start next order/ }).click();
+    await form
+      .getByRole('button', { name: /حفظ وبدء طلب جديد|Save and start next order/ })
+      .click();
     await form.getByText(new RegExp(testCoupon)).waitFor({ state: 'visible', timeout: 90000 });
 
     createdOrder = await waitForSavedOrder(serviceClient);
     assert(createdOrder.merchant_id === merchantId, 'database_merchant_id_mismatch');
     assert(numeric(createdOrder.goods_value) === 50, 'database_goods_value_mismatch');
-    assert(numeric(createdOrder.delivery_fee ?? createdOrder.delivery_price) === 60, 'database_delivery_fee_mismatch');
+    assert(
+      numeric(createdOrder.delivery_fee ?? createdOrder.delivery_price) === 60,
+      'database_delivery_fee_mismatch',
+    );
     assert(numeric(createdOrder.manual_delivery_price) === 60, 'database_manual_delivery_price_mismatch');
     assert(String(createdOrder.price_source) === 'manual', 'database_price_source_mismatch');
     assert(numeric(createdOrder.discount_amount) === 0, 'database_discount_amount_mismatch');
-    assert(String(createdOrder.delivery_fee_mode) === 'deduct_from_merchant', 'database_delivery_fee_mode_mismatch');
-    assert(['sender_pays', 'merchant_pays'].includes(String(createdOrder.payment_method)), 'database_payment_method_mismatch');
+    assert(
+      String(createdOrder.delivery_fee_mode) === 'deduct_from_merchant',
+      'database_delivery_fee_mode_mismatch',
+    );
+    assert(
+      ['sender_pays', 'merchant_pays'].includes(String(createdOrder.payment_method)),
+      'database_payment_method_mismatch',
+    );
     assert(numeric(createdOrder.customer_total) === 50, 'database_customer_total_mismatch');
     assert(numeric(createdOrder.merchant_due) === -10, 'database_merchant_due_mismatch');
     assert(numeric(createdOrder.company_revenue) === 60, 'database_company_revenue_mismatch');
 
-    await openSection(page, 'all_orders', 'all orders');
+    await openSection(page, 'all_orders', 'all_orders');
     const search = page.locator('[data-admin-order-search="true"]');
     await search.waitFor({ state: 'visible', timeout: 90000 });
     await search.fill(testCoupon);
-    const list = page.locator('.dn-admin-bulk-selector-list');
-    await list.waitFor({ state: 'visible', timeout: 90000 });
-    await list.getByText(testCoupon, { exact: false }).first().waitFor({ state: 'visible', timeout: 90000 });
-    await clickFirstVisible(list.getByRole('button', { name: /تعديل|Edit/ }), 'saved order edit');
+
+    const selectorList = page.locator('.dn-admin-bulk-selector-list');
+    await selectorList.waitFor({ state: 'visible', timeout: 90000 });
+    await selectorList
+      .getByText(testCoupon, { exact: false })
+      .first()
+      .waitFor({ state: 'visible', timeout: 90000 });
+
+    const savedRow = page.locator('table tbody tr').filter({ hasText: testCoupon }).first();
+    await savedRow.waitFor({ state: 'visible', timeout: 90000 });
+    await savedRow.scrollIntoViewIfNeeded();
+    await savedRow.getByRole('button', { name: /تعديل|Edit/ }).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.waitFor({ state: 'visible', timeout: 30000 });
-    assert((await dialog.locator('[data-admin-complete-order-coupon="true"]').inputValue()) === testCoupon, 'reopen_coupon_mismatch');
-    assert((await dialog.locator('[data-admin-complete-order-merchant="true"]').inputValue()) === merchantId, 'reopen_merchant_mismatch');
+    assert(
+      (await dialog.locator('[data-admin-complete-order-coupon="true"]').inputValue()) ===
+        testCoupon,
+      'reopen_coupon_mismatch',
+    );
+    assert(
+      (await dialog.locator('[data-admin-complete-order-merchant="true"]').inputValue()) ===
+        merchantId,
+      'reopen_merchant_mismatch',
+    );
 
-    const accountingSection = dialog.locator('section').filter({ hasText: /الحسابات والتحصيل|Accounting and collection/ }).first();
+    const accountingSection = dialog
+      .locator('section')
+      .filter({ hasText: /الحسابات والتحصيل|Accounting and collection/ })
+      .first();
     await accountingSection.waitFor({ state: 'visible', timeout: 30000 });
     const financialInputs = accountingSection.locator('input[type="number"]');
     assert((await financialInputs.nth(0).inputValue()) === '50', 'reopen_goods_value_mismatch');
     assert(numeric(await financialInputs.nth(1).inputValue()) === 0, 'reopen_discount_amount_mismatch');
-    assert((await financialInputs.nth(2).inputValue()) === '60', 'reopen_manual_delivery_price_mismatch');
-    const paymentSelect = accountingSection.locator('select').last();
-    assert((await paymentSelect.inputValue()) === 'merchant_pays', 'reopen_payment_method_mismatch');
-    const merchantDebitButton = accountingSection.getByRole('button', { name: /التوصيل يُخصم من التاجر|Deduct from merchant/ });
-    assert((await merchantDebitButton.getAttribute('class') || '').includes('bg-brand-gold'), 'reopen_delivery_fee_mode_mismatch');
+    assert(
+      (await financialInputs.nth(2).inputValue()) === '60',
+      'reopen_manual_delivery_price_mismatch',
+    );
+    assert(
+      (await accountingSection.locator('select').last().inputValue()) === 'merchant_pays',
+      'reopen_payment_method_mismatch',
+    );
+    const merchantDebitButton = accountingSection.getByRole('button', {
+      name: /التوصيل يُخصم من التاجر|Deduct from merchant/,
+    });
+    assert(
+      (await merchantDebitButton.getAttribute('class') || '').includes('bg-brand-gold'),
+      'reopen_delivery_fee_mode_mismatch',
+    );
 
-    await dialog.screenshot({ path: `${evidenceDirectory}/financial-save-reopen-dialog.png` });
+    await dialog.screenshot({
+      path: `${evidenceDirectory}/financial-save-reopen-dialog.png`,
+    });
 
     const report = {
       result: 'PASS',
@@ -322,11 +375,12 @@ try {
     console.log(JSON.stringify(report, null, 2));
   } catch (error) {
     primaryError = error;
-    await page.screenshot({
-      path: `${evidenceDirectory}/financial-save-reopen-failure.png`,
-      fullPage: true,
-    }).catch(() => {});
-    throw error;
+    await page
+      .screenshot({
+        path: `${evidenceDirectory}/financial-save-reopen-failure.png`,
+        fullPage: true,
+      })
+      .catch(() => {});
   } finally {
     await context.close();
   }
