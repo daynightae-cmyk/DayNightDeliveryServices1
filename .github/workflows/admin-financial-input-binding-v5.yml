@@ -5,6 +5,7 @@ on:
     branches: [fix/admin-new-order-financial-input-binding-v5]
     paths:
       - .github/repairs/apply-admin-financial-input-binding-v5.py
+      - .github/repairs/fix-admin-financial-gate-v5.py
       - .github/workflows/admin-financial-input-binding-v5.yml
       - artifacts/day-night-delivery/src/lib/adminNewOrderFinancialState.ts
 
@@ -27,7 +28,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply final source repair
-        run: python .github/repairs/apply-admin-financial-input-binding-v5.py
+        run: |
+          python .github/repairs/apply-admin-financial-input-binding-v5.py
+          python .github/repairs/fix-admin-financial-gate-v5.py
 
       - uses: pnpm/action-setup@v4
         with:
@@ -123,6 +126,7 @@ jobs:
       - name: Remove temporary repair automation
         run: |
           rm -f .github/repairs/apply-admin-financial-input-binding-v5.py
+          rm -f .github/repairs/fix-admin-financial-gate-v5.py
           rm -f .github/workflows/admin-financial-input-binding-v5.yml
 
       - name: Commit verified implementation
