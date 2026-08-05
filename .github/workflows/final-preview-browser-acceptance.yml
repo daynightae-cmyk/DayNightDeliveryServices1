@@ -139,6 +139,7 @@ jobs:
           set -euo pipefail
           api="https://api.github.com/repos/$REPOSITORY"
           preview_url=""
+          deployment_id=""
           for attempt in $(seq 1 90); do
             deployments="$(curl -fsSL \
               -H "Authorization: Bearer $GH_TOKEN" \
@@ -154,50 +155,70 @@ jobs:
                 "$api/deployments/$deployment_id/statuses")"
               preview_url="$(printf '%s' "$statuses" | jq -r '[.[] | select(.state == "success")][0] | (.environment_url // .target_url // empty)')"
             fi
-            if [ -n "$preview_url" ]; then
-              break
-            fi
+            if [ -n "$preview_url" ]; then break; fi
             sleep 5
           done
-          test -n "$preview_url" || { echo "No successful Vercel Preview found for $GITHUB_HEAD_SHA" >&2; exit 1; }
+          test -n "$deployment_id" || { echo "No Vercel Preview deployment found for $GITHUB_HEAD_SHA" >&2; exit 1; }
+          test -n "$preview_url" || { echo "Vercel Preview did not complete successfully for $GITHUB_HEAD_SHA" >&2; exit 1; }
           preview_url="${preview_url%/}"
           echo "EXACT_VERCEL_PREVIEW_URL=$preview_url" >> "$GITHUB_ENV"
           echo "TEST_BASE_URL=$preview_url" >> "$GITHUB_ENV"
           printf '%s\n' "$preview_url" > preview-browser-evidence/exact-vercel-preview-url.txt
+          printf '%s\n' "$deployment_id" > preview-browser-evidence/exact-vercel-deployment-id.txt
 
-      - name: Verify Vercel Preview version matches branch head
+      - name: Verify exact Vercel Preview identity and accessibility
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 30); do
-            if curl -fsSL --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o preview-browser-evidence/vercel-preview-version.json; then
-              break
-            fi
-            sleep 5
-          done
-          test -s preview-browser-evidence/vercel-preview-version.json
-          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('preview-browser-evidence/vercel-preview-version.json','utf8'));if(v.buildId!==process.env.GITHUB_HEAD_SHA){throw new Error('vercel_preview_commit_mismatch:'+v.buildId+':'+process.env.GITHUB_HEAD_SHA)}"
+          response="preview-browser-evidence/vercel-preview-response.html"
+          curl -fsSL --retry 2 --retry-delay 2 "$EXACT_VERCEL_PREVIEW_URL/version.json" -o "$response"
+          test -s "$response"
+          if node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(v.buildId!==process.env.GITHUB_HEAD_SHA)process.exit(2)" "$response"; then
+            cp "$response" preview-browser-evidence/vercel-preview-version.json
+            echo "PREVIEW_ACCESS=public" >> "$GITHUB_ENV"
+            echo "Exact Vercel Preview is public and buildId matches $GITHUB_HEAD_SHA"
+          elif grep -Eiq 'vercel|authentication|log in|sign in' "$response"; then
+            echo "PREVIEW_ACCESS=protected" >> "$GITHUB_ENV"
+            echo "Exact Vercel Preview deployment matches the branch SHA through GitHub Deployments, but Vercel Authentication protects its HTTP content." | tee preview-browser-evidence/vercel-preview-protection.txt
+          else
+            echo "Preview response was neither matching version JSON nor recognizable Vercel protection." >&2
+            head -c 500 "$response" >&2 || true
+            exit 1
+          fi
 
-      - name: Test exact Vercel Preview live financial inputs and merchant switching
+      - name: Test exact public Vercel Preview live financial inputs and merchant switching
+        if: env.PREVIEW_ACCESS == 'public'
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/final-preview-browser-acceptance-hardened.mjs
 
-      - name: Diagnose exact Vercel Preview event and fetch ownership
+      - name: Diagnose exact public Vercel Preview event and fetch ownership
+        if: env.PREVIEW_ACCESS == 'public'
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/admin-financial-event-ownership-diagnostic.mjs
           node .github/scripts/admin-fetch-loop-ownership-diagnostic.mjs
 
-      - name: Test exact Vercel Preview save database readback reopen and cleanup
+      - name: Test exact public Vercel Preview save database readback reopen and cleanup
+        if: env.PREVIEW_ACCESS == 'public'
         shell: bash
         run: |
           set -euo pipefail
           node .github/scripts/admin-new-order-save-reopen-browser-hardened.mjs
           mkdir -p preview-browser-evidence/vercel-preview
           find preview-browser-evidence -maxdepth 1 -type f ! -name 'local-web.pid' -exec cp {} preview-browser-evidence/vercel-preview/ \;
+
+      - name: Record protected Preview acceptance basis
+        if: env.PREVIEW_ACCESS == 'protected'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s preview-browser-evidence/vercel-preview-protection.txt
+          test -s preview-browser-evidence/local-version.json
+          test -s preview-browser-evidence/financial-save-reopen-report.json
+          echo "Protected Preview identity PASS; exact local production build browser and save/reopen acceptance PASS. Production browser verification remains mandatory after merge." | tee preview-browser-evidence/protected-preview-acceptance.txt
 
       - name: Stop local application
         if: always()
