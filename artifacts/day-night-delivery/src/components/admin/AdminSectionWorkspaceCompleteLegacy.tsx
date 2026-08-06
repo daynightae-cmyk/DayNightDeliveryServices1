@@ -45,6 +45,7 @@ type Props = {
   id: AdminSectionId;
   isArabic: boolean;
   orders: Order[];
+  allOrders?: Order[];
   merchants: Merchant[];
   financeSummary: FinanceSummary | null;
   financeSummarySource?: FinanceSummarySource;
@@ -223,6 +224,7 @@ export default function AdminSectionWorkspaceComplete({
   id,
   isArabic,
   orders,
+  allOrders,
   merchants,
   financeSummary,
   financeSummarySource = "derived",
@@ -263,9 +265,25 @@ export default function AdminSectionWorkspaceComplete({
     [orders, statusOverrides],
   );
 
+  const liveAllOrders = useMemo(
+    () =>
+      (allOrders ?? orders).map((order) => {
+        const override = statusOverrides[String(order.id || tracking(order))];
+        return override && canonicalStatus(order.status) !== override
+          ? { ...order, status: override }
+          : order;
+      }),
+    [allOrders, orders, statusOverrides],
+  );
+
   const baseRows = useMemo(
     () => liveOrders.filter((order) => matchesAdminSection(order, id)),
     [id, liveOrders],
+  );
+
+  const allBaseRows = useMemo(
+    () => liveAllOrders.filter((order) => matchesAdminSection(order, id)),
+    [id, liveAllOrders],
   );
 
   const rows = useMemo(
@@ -273,22 +291,27 @@ export default function AdminSectionWorkspaceComplete({
     [baseRows, query, searchManaged],
   );
 
+  const allRows = useMemo(
+    () => searchManaged ? allBaseRows : allBaseRows.filter((order) => !query || orderSearchText(order).includes(normalize(query))),
+    [allBaseRows, query, searchManaged],
+  );
+
   const couponCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const order of liveOrders) {
+    for (const order of liveAllOrders) {
       const couponKey = normalize(order.coupon_number);
       if (!couponKey) continue;
       counts.set(couponKey, (counts.get(couponKey) || 0) + 1);
     }
     return counts;
-  }, [liveOrders]);
+  }, [liveAllOrders]);
 
   if (financeSections.has(id)) {
     return (
       <AdminFinanceOperationsCenter
         isArabic={isArabic}
         activeSection={id as FinanceArea}
-        orders={liveOrders}
+        orders={liveAllOrders}
         merchants={merchants}
         financeSummary={financeSummary}
         financeSummarySource={financeSummarySource}
@@ -362,17 +385,17 @@ export default function AdminSectionWorkspaceComplete({
   }
 
   const title = isArabic ? config.titleAr : config.titleEn;
-  const deliveryIncome = baseRows.reduce(
+  const deliveryIncome = allRows.reduce(
     (sum, order) =>
       sum + financialsFromOrder(order as Order & Record<string, unknown>).companyRevenue,
     0,
   );
-  const customerExposure = baseRows.reduce(
+  const customerExposure = allRows.reduce(
     (sum, order) =>
       sum + financialsFromOrder(order as Order & Record<string, unknown>).customerTotal,
     0,
   );
-  const merchantExposure = baseRows.reduce(
+  const merchantExposure = allRows.reduce(
     (sum, order) =>
       sum + financialsFromOrder(order as Order & Record<string, unknown>).merchantDue,
     0,
@@ -383,8 +406,8 @@ export default function AdminSectionWorkspaceComplete({
     sectionTitle: title,
     filters: query || (isArabic ? "بدون فلاتر" : "No filters"),
     totals: {
-      orders: String(baseRows.length),
-      visible: String(rows.length),
+      orders: String(allBaseRows.length),
+      visible: String(allRows.length),
       income: money(deliveryIncome, isArabic),
     },
     columns: [
@@ -399,7 +422,7 @@ export default function AdminSectionWorkspaceComplete({
       { key: "companyRevenue", label: isArabic ? "دخل داي نايت" : "DAY NIGHT revenue" },
       { key: "status", label: isArabic ? "الحالة" : "Status" },
     ],
-    rows: rows.map((order) => {
+    rows: allRows.map((order) => {
       const financial = financialsFromOrder(order as Order & Record<string, unknown>);
       return {
         tracking: tracking(order),
@@ -452,7 +475,7 @@ export default function AdminSectionWorkspaceComplete({
       <div className="dn-section-kpis">
         <article>
           <AdminIconBadge name="orders" />
-          <strong>{baseRows.length}</strong>
+          <strong>{allBaseRows.length}</strong>
           <span>{isArabic ? "إجمالي الطلبات" : "Total orders"}</span>
           <small>{isArabic ? "بيانات حقيقية" : "Live data"}</small>
         </article>
