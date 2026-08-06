@@ -28,14 +28,17 @@ jobs:
           ref: fix/admin-all-orders-complete-dataset-20260806
           fetch-depth: 0
 
-      - name: Configure Node and pnpm
+      - name: Configure Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Enable pnpm through Corepack
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
