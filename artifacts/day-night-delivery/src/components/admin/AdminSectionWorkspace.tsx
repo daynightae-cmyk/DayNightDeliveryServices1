@@ -492,6 +492,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
         <AdminSectionWorkspaceComplete
           {...props}
           orders={renderedWorkspaceOrders}
+          allOrders={visibleSectionOrders}
           merchants={effectiveMerchants}
           onRefresh={refreshCurrentWorkspace}
           searchManaged={showBulkConsole}
