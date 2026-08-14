@@ -69,6 +69,22 @@ body:has(.dn-merchant-app) {
   background: var(--dnm-bg) !important;
 }
 
+/* ProductionExperience mounts the toast stack beside the Merchant app. Keep
+   broad portal scroll rules from treating that fixed overlay as an app shell. */
+body:has(.dn-merchant-app) #root > .dn-production-stack {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+body:has(.dn-merchant-app) #root > .dn-production-stack::before,
+body:has(.dn-merchant-app) #root > .dn-production-stack::after {
+  content: none !important;
+  display: none !important;
+}
+
 /* Shell, sidebar and header */
 .dn-merchant-app .dn-merchant-sidebar {
   border-inline-end: 1px solid var(--dnm-border) !important;
