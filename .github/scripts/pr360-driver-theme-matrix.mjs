@@ -428,6 +428,45 @@ async function assertDriverProductionStackSafe(page, label, viewport) {
   assert(state.beforeContent === "none" || state.beforeDisplay === "none", `${label}_production_stack_fixed_pseudo:${JSON.stringify(state)}`);
 }
 
+async function merchantDarkVisualDiagnostic(page) {
+  return page.evaluate(() => {
+    const describe = (element) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const before = getComputedStyle(element, "::before");
+      const after = getComputedStyle(element, "::after");
+      return {
+        tag: element.tagName,
+        id: element.id || "",
+        className: typeof element.className === "string" ? element.className : "",
+        ariaHidden: element.getAttribute("aria-hidden"),
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        position: style.position,
+        zIndex: style.zIndex,
+        opacity: style.opacity,
+        visibility: style.visibility,
+        pointerEvents: style.pointerEvents,
+        background: style.background,
+        backgroundColor: style.backgroundColor,
+        transform: style.transform,
+        filter: style.filter,
+        backdropFilter: style.backdropFilter,
+        before: { content: before.content, display: before.display, position: before.position, inset: before.inset, background: before.background, opacity: before.opacity, zIndex: before.zIndex, transform: before.transform },
+        after: { content: after.content, display: after.display, position: after.position, inset: after.inset, background: after.background, opacity: after.opacity, zIndex: after.zIndex, transform: after.transform },
+      };
+    };
+    const points = [[24, 128], [120, 128], [175, 128], [270, 128], [24, 300], [120, 300], [175, 300], [270, 300]];
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      points: points.map(([x, y]) => ({ x, y, elements: document.elementsFromPoint(x, y).slice(0, 10).map(describe) })),
+      rootChildren: [...document.querySelectorAll("#root > *")].map(describe),
+      merchantNodes: [".dn-merchant-app", ".dn-merchant-main-column", ".dn-merchant-header", ".dn-merchant-content", ".dn-merchant-content-inner", ".dn-production-stack"].map((selector) => ({ selector, node: describe(document.querySelector(selector)) })),
+      fixed: [...document.querySelectorAll("body *")].filter((element) => getComputedStyle(element).position === "fixed").map(describe),
+    };
+  });
+}
+
 async function driverNavigationLayoutDiagnostic(page) {
   return page.evaluate(() => [
     ".dn-driver-workspace-v3",
@@ -793,6 +832,9 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await assertNoHorizontalOverflow(page, `${role}_${label}_dark`);
   await assertDriverProductionStackSafe(page, `${role}_${label}_dark`, viewport);
   await screenshot(page, `${role}-${label}-dark`);
+  if (role === "merchant" && label === "320x568") {
+    fs.writeFileSync(path.join(evidenceDir, "merchant-320x568-dark-diagnostic.json"), JSON.stringify(await merchantDarkVisualDiagnostic(page), null, 2));
+  }
 
   await page.reload({ waitUntil: "domcontentloaded", timeout: 90000 });
   await page.locator(config.root).waitFor({ state: "visible", timeout: 90000 });
