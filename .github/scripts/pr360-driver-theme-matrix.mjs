@@ -428,6 +428,40 @@ async function assertDriverProductionStackSafe(page, label, viewport) {
   assert(state.beforeContent === "none" || state.beforeDisplay === "none", `${label}_production_stack_fixed_pseudo:${JSON.stringify(state)}`);
 }
 
+async function driverNavigationLayoutDiagnostic(page) {
+  return page.evaluate(() => [
+    ".dn-driver-workspace-v3",
+    ".dn-driver-navigation-workspace",
+    ".dn-driver-navigation-header",
+    ".dn-driver-navigation-header > div",
+    ".dn-driver-navigation-header > button",
+    ".dn-driver-navigation-layout",
+    ".dn-driver-navigation-map",
+    ".dn-driver-navigation-mission",
+    ".dn-driver-navigation-mission .dn-driver-order-card-v2",
+  ].map((selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return { selector, missing: true };
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      selector,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom },
+      direction: style.direction,
+      display: style.display,
+      position: style.position,
+      width: style.width,
+      minWidth: style.minWidth,
+      maxWidth: style.maxWidth,
+      margin: style.margin,
+      padding: style.padding,
+      overflow: style.overflow,
+      flex: style.flex,
+      transform: style.transform,
+    };
+  }));
+}
+
 async function assertScrollable(page, label) {
   const result = await page.evaluate(() => {
     const scrollers = [document.scrollingElement, document.querySelector(".dn-driver-workspace-v3"), document.querySelector(".dn-merchant-content"), document.querySelector(".dncc-main")].filter(Boolean);
@@ -568,7 +602,11 @@ async function driverMissionFlow(page, fixture, service) {
   const dock = page.locator(".dn-driver-mobile-dock-v3");
   const dockBox = await dock.boundingBox();
   const closeButton = page.locator(".dn-driver-navigation-header button").first();
-  await assertVisibleAndContained(closeButton, "driver_navigation_close", viewport);
+  await closeButton.waitFor({ state: "visible", timeout: 30000 });
+  const closeBox = await closeButton.boundingBox();
+  if (!closeBox || closeBox.x < -2 || closeBox.x + closeBox.width > viewport.width + 2 || closeBox.y < -2 || closeBox.y > viewport.height + 2) {
+    throw new Error(`driver_navigation_close_outside_viewport:${JSON.stringify({ closeBox, diagnostic: await driverNavigationLayoutDiagnostic(page) })}`);
+  }
   await page.locator(".dn-driver-navigation-sync").scrollIntoViewIfNeeded();
   const syncBox = await page.locator(".dn-driver-navigation-sync").boundingBox();
   assert(!dockBox || !syncBox || syncBox.y + syncBox.height <= dockBox.y + 2, "driver_navigation_sync_covered_by_dock");
