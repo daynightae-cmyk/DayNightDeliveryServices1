@@ -148,11 +148,11 @@ function MapViewport({ points, currentPosition, follow }: { points: LatLngTuple[
   useEffect(() => {
     map.invalidateSize({ pan: false });
     if (follow && currentPosition) {
-      map.setView(currentPosition, Math.max(17, map.getZoom()), { animate: true });
+      map.setView(currentPosition, Math.max(17, map.getZoom()), { animate: false });
     } else if (points.length === 1) {
-      map.setView(points[0], 16, { animate: true });
+      map.setView(points[0], 16, { animate: false });
     } else if (points.length > 1) {
-      map.fitBounds(points, { padding: [52, 52], maxZoom: 17, animate: true });
+      map.fitBounds(points, { padding: [52, 52], maxZoom: 17, animate: false });
     }
   }, [currentPosition?.[0], currentPosition?.[1], follow, map, signature]);
 
@@ -414,7 +414,7 @@ export default function TrackingMap({ order, navigationMode = false, devicePosit
         ))}
       </div>
 
-      <MapContainer key={mapMode} center={center} zoom={navigationMode ? 17 : 14} style={{ height: "100%", minHeight: 360, width: "100%" }} scrollWheelZoom={navigationMode} zoomControl preferCanvas>
+      <MapContainer key={mapMode} center={center} zoom={navigationMode ? 17 : 14} style={{ height: "100%", minHeight: 360, width: "100%" }} scrollWheelZoom={navigationMode} zoomControl zoomAnimation={false} preferCanvas>
         {baseLayer}
         <MapViewport points={mapPoints.length ? mapPoints : [center]} currentPosition={displayDriverPos} follow={followDriver && Boolean(displayDriverPos)} />
         {routePoints.length > 1 && (
