@@ -1,0 +1,131 @@
+name: PR360 Exact-Head Local Chromium Matrix
+
+on:
+  push:
+    branches:
+      - codex-pr360-local-chromium-qa-20260815
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr360-exact-head-local-chromium
+  cancel-in-progress: true
+
+jobs:
+  exact-head-local-chromium:
+    name: Driver and cross-portal theme viewport acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production-runtime-tests
+    env:
+      EXACT_HEAD: fb6c24e97ef5108e3cfd6afb11d0c1ded3fcc909
+      GITHUB_HEAD_SHA: fb6c24e97ef5108e3cfd6afb11d0c1ded3fcc909
+      VERCEL_GIT_COMMIT_SHA: fb6c24e97ef5108e3cfd6afb11d0c1ded3fcc909
+      TEST_BASE_URL: http://127.0.0.1:4173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+      RUNTIME_MERCHANT_EMAIL: ${{ secrets.RUNTIME_MERCHANT_EMAIL }}
+      RUNTIME_MERCHANT_PASSWORD: ${{ secrets.RUNTIME_MERCHANT_PASSWORD }}
+      RUNTIME_DRIVER_EMAIL: ${{ secrets.RUNTIME_DRIVER_EMAIL }}
+      RUNTIME_DRIVER_PASSWORD: ${{ secrets.RUNTIME_DRIVER_PASSWORD }}
+
+    steps:
+      - name: Check out isolated QA harness
+        uses: actions/checkout@v4
+        with:
+          path: harness
+
+      - name: Check out exact PR head application
+        uses: actions/checkout@v4
+        with:
+          ref: fb6c24e97ef5108e3cfd6afb11d0c1ded3fcc909
+          path: app
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Verify exact source and protected runtime credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C app rev-parse HEAD)" = "$EXACT_HEAD"
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD RUNTIME_MERCHANT_EMAIL RUNTIME_MERCHANT_PASSWORD RUNTIME_DRIVER_EMAIL RUNTIME_DRIVER_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Typecheck and build exact branch head
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm run web:typecheck
+          pnpm run web:build
+          test -s artifacts/day-night-delivery/dist/public/index.html
+          node -e "const fs=require('fs');const v=JSON.parse(fs.readFileSync('artifacts/day-night-delivery/dist/public/version.json','utf8'));if(v.buildId!==process.env.EXACT_HEAD){throw new Error('exact_build_commit_mismatch:'+v.buildId)};if(!v.supabaseProject||!v.supabaseKeyConfigured){throw new Error('exact_build_runtime_config_missing')}"
+          mkdir -p pr360-chromium-evidence
+          cp artifacts/day-night-delivery/dist/public/version.json pr360-chromium-evidence/local-version.json
+
+      - name: Serve exact production build locally
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > pr360-chromium-evidence/local-web.log 2>&1 &
+          echo $! > pr360-chromium-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat pr360-chromium-evidence/local-web.log >&2
+          exit 1
+
+      - name: Install isolated Chromium runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-pr360-playwright"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.62.1
+          npx playwright install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Run exact-head Driver and Day Night viewport acceptance
+        shell: bash
+        working-directory: app
+        env:
+          EVIDENCE_DIR: pr360-chromium-evidence
+        run: |
+          set -euo pipefail
+          node ../harness/.github/scripts/pr360-driver-theme-matrix.mjs
+
+      - name: Stop exact local application
+        if: always()
+        shell: bash
+        run: |
+          if [ -f app/pr360-chromium-evidence/local-web.pid ]; then
+            kill "$(cat app/pr360-chromium-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload minimal Chromium evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR360-Exact-Head-Local-Chromium-Evidence
+          path: app/pr360-chromium-evidence/
+          if-no-files-found: error
+          retention-days: 30
