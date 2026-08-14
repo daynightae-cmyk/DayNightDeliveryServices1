@@ -188,9 +188,25 @@ async function createDriverFixture(merchantAuth, adminAuth, driverAuth, service)
     p_note: `PR #360 exact-head Chromium assignment — ${runId}`,
     p_force: false,
   });
-  if (dispatchError) throw new Error(`driver_fixture_dispatch_failed:${dispatchError.message}`);
-  const dispatch = record(Array.isArray(dispatchRaw) ? dispatchRaw[0] : dispatchRaw);
-  assert(dispatch.ok, `driver_fixture_dispatch_not_ok:${JSON.stringify(dispatch)}`);
+  let assignmentMode = "admin_dispatch_order";
+  if (dispatchError) {
+    // The production database currently exposes a pre-render enum/btrim defect in
+    // the dispatch helper. It is unrelated to this UI candidate. Build the
+    // disposable QA fixture with service-role assignment only in that exact case.
+    assert(/btrim\(order_status\)/i.test(dispatchError.message), `driver_fixture_dispatch_failed:${dispatchError.message}`);
+    const { data: current, error: currentError } = await service.from("orders").select("*").eq("id", order.id).single();
+    if (currentError) throw new Error(`driver_fixture_read_before_assignment_failed:${currentError.message}`);
+    const patch = { status: "assigned" };
+    if (Object.prototype.hasOwnProperty.call(current, "driver_id")) patch.driver_id = driverId;
+    if (Object.prototype.hasOwnProperty.call(current, "assigned_driver_id")) patch.assigned_driver_id = driverId;
+    assert(patch.driver_id || patch.assigned_driver_id, "driver_fixture_assignment_columns_missing");
+    const { error: directError } = await service.from("orders").update(patch).eq("id", order.id);
+    if (directError) throw new Error(`driver_fixture_direct_assignment_failed:${directError.message}`);
+    assignmentMode = "service_role_disposable_fixture_fallback";
+  } else {
+    const dispatch = record(Array.isArray(dispatchRaw) ? dispatchRaw[0] : dispatchRaw);
+    assert(dispatch.ok, `driver_fixture_dispatch_not_ok:${JSON.stringify(dispatch)}`);
+  }
 
   const assigned = await waitFor("driver_fixture_assignment", async () => {
     const { data, error } = await service.from("orders").select("*").eq("id", order.id).single();
@@ -198,7 +214,7 @@ async function createDriverFixture(merchantAuth, adminAuth, driverAuth, service)
     return String(data.driver_id || data.assigned_driver_id || "") === String(driverId) ? data : null;
   });
   const reference = clean(assigned.tracking_number || assigned.tracking_code || assigned.invoice_number || assigned.id);
-  return { id: order.id, driverId, merchantId: merchants[0].id, reference, destination };
+  return { id: order.id, driverId, merchantId: merchants[0].id, reference, destination, assignmentMode };
 }
 
 async function cleanupFixture(service, fixture) {
@@ -673,6 +689,7 @@ try {
   await driverNoPhoneCondition(browser, driverAuth, fixture);
   report.driver = {
     authenticatedRoute: "PASS",
+    disposableFixtureAssignment: fixture.assignmentMode,
     home: "PASS",
     currentMission: "PASS",
     currentMissionNoPhoneCondition: "PASS",
