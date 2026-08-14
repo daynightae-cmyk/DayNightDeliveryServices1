@@ -19,6 +19,27 @@
 
     <script>
       (function () {
+        var themeMode = "system";
+        try {
+          var savedThemeMode = localStorage.getItem("dn_theme_mode");
+          if (savedThemeMode === "dark" || savedThemeMode === "light" || savedThemeMode === "system") {
+            themeMode = savedThemeMode;
+          } else {
+            var adminTheme = JSON.parse(localStorage.getItem("dn_admin_control_settings_v2") || "{}").theme;
+            if (adminTheme === "day") themeMode = "light";
+            if (adminTheme === "night") themeMode = "dark";
+          }
+        } catch (_) {}
+        var resolvedTheme = themeMode === "system"
+          ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+          : themeMode;
+        document.documentElement.classList.add(resolvedTheme === "dark" ? "dark-theme" : "light-theme");
+        document.documentElement.setAttribute("data-theme", resolvedTheme);
+        document.documentElement.setAttribute("data-dn-admin-theme", resolvedTheme === "dark" ? "night" : "day");
+        document.documentElement.style.colorScheme = resolvedTheme;
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) themeColor.setAttribute("content", resolvedTheme === "dark" ? "#041226" : "#edf5ff");
+
         var LANGUAGE_KEY = "dn_lang_preference";
         var LANGUAGE_EXPLICIT_KEY = "dn_lang_explicit_v2";
         var params = new URLSearchParams(window.location.search || "");

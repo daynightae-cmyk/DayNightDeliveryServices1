@@ -100,6 +100,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.style.colorScheme = theme;
     document.body?.classList.toggle("light-theme", theme === "light");
     document.body?.classList.toggle("dark-theme", theme === "dark");
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#041226" : "#edf5ff");
     persistAdminTheme(theme);
   }, [theme]);
 
@@ -109,10 +112,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
-  const toggleTheme = () =>
-    setThemeModeState((current) =>
-      current === "dark" ? "light" : current === "light" ? "system" : "dark",
-    );
+  // The visible theme control is intentionally deterministic: one press always
+  // switches between day and night. "system" remains available as an initial
+  // preference, but the user never has to press twice to see a visual change.
+  const toggleTheme = () => setThemeModeState(theme === "dark" ? "light" : "dark");
   const setLanguage = (lang: Language) => {
     applyLanguageToDocument(lang);
     saveLanguage(lang);

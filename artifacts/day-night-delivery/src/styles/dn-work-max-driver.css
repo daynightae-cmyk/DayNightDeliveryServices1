@@ -1,0 +1,989 @@
+/* DAY NIGHT — Driver Work + MAX
+   Fast, one-hand, field-operations presentation. Data and status callbacks stay unchanged. */
+
+.dn-driver-shell,
+.dn-driver-login-page {
+  --dnd-bg: #061426;
+  --dnd-bg-2: #09203a;
+  --dnd-surface: #0b2542;
+  --dnd-surface-2: #103354;
+  --dnd-surface-3: #174467;
+  --dnd-text: #f8fbff;
+  --dnd-muted: #a8bfd5;
+  --dnd-line: rgba(145, 197, 240, .17);
+  --dnd-blue: #1f92f2;
+  --dnd-sky: #51cbff;
+  --dnd-gold: #e0b944;
+  --dnd-success: #16bd83;
+  --dnd-warning: #efa52b;
+  --dnd-danger: #ec5c68;
+  --dnd-shadow: 0 22px 56px rgba(0, 7, 22, .31);
+  --dnd-shadow-soft: 0 10px 28px rgba(0, 7, 22, .22);
+  color: var(--dnd-text);
+  font-family: var(--dn-wm-font);
+}
+
+.dn-driver-shell.is-light,
+:root.light-theme .dn-driver-login-page {
+  --dnd-bg: #eef6ff;
+  --dnd-bg-2: #f9fcff;
+  --dnd-surface: #ffffff;
+  --dnd-surface-2: #f0f7ff;
+  --dnd-surface-3: #deedff;
+  --dnd-text: #071a33;
+  --dnd-muted: #526d88;
+  --dnd-line: rgba(7, 68, 128, .14);
+  --dnd-blue: #096bd7;
+  --dnd-sky: #168fce;
+  --dnd-gold: #c69a1f;
+  --dnd-shadow: 0 22px 52px rgba(30, 76, 126, .14);
+  --dnd-shadow-soft: 0 10px 26px rgba(30, 76, 126, .1);
+}
+
+html[data-native-shell="driver"] body:has(.dn-driver-shell.is-dark),
+body:has(.dn-driver-shell.is-dark) {
+  color: #f8fbff !important;
+  background: #061426 !important;
+}
+
+html[data-native-shell="driver"] body:has(.dn-driver-shell.is-light),
+body:has(.dn-driver-shell.is-light) {
+  color: #071a33 !important;
+  background: #eef6ff !important;
+}
+
+/* ProductionExperience mounts its toast stack as a separate direct child of
+   #root. Legacy portal resets must not turn that fixed, normally transparent
+   stack into a full-viewport layer above the authenticated Driver UI. */
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack {
+  width: min(92vw, 520px) !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack::before,
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack::after {
+  content: none !important;
+  display: none !important;
+}
+
+html[data-native-shell="driver"] .dn-driver-workspace-v3,
+.dn-driver-shell .dn-driver-workspace-v3 {
+  color: var(--dnd-text) !important;
+  background:
+    radial-gradient(circle at 8% 2%, rgba(31, 146, 242, .15), transparent 32rem),
+    radial-gradient(circle at 94% 100%, rgba(224, 185, 68, .1), transparent 28rem),
+    linear-gradient(145deg, var(--dnd-bg), var(--dnd-bg-2)) !important;
+  transition: background 180ms var(--dn-wm-ease), color 180ms var(--dn-wm-ease);
+}
+
+.dn-driver-shell .dn-driver-workspace-v3::before {
+  content: "" !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  display: block !important;
+  pointer-events: none !important;
+  opacity: .28 !important;
+  background-image:
+    linear-gradient(rgba(91, 169, 236, .065) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 169, 236, .065) 1px, transparent 1px) !important;
+  background-size: 40px 40px !important;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 75%);
+  mask-image: linear-gradient(to bottom, #000, transparent 75%);
+}
+
+/* Driver rail and top operations bar */
+.dn-driver-shell .dn-driver-exact-rail {
+  border-inline-end: 1px solid rgba(145, 197, 240, .13);
+  color: #e8f4ff;
+  background:
+    radial-gradient(circle at 50% 0, rgba(31, 146, 242, .2), transparent 20rem),
+    linear-gradient(180deg, #051a34, #031124) !important;
+  box-shadow: 12px 0 38px rgba(0, 7, 22, .22);
+}
+
+.dn-driver-shell[dir="rtl"] .dn-driver-exact-rail {
+  border-inline-end: 0;
+  border-inline-start: 1px solid rgba(145, 197, 240, .13);
+  box-shadow: -12px 0 38px rgba(0, 7, 22, .22);
+}
+
+.dn-driver-shell .dn-driver-exact-rail :is(button, a) {
+  border: 1px solid transparent;
+  border-radius: 15px;
+  color: #b6cce0;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.dn-driver-shell .dn-driver-exact-rail :is(button, a):hover,
+.dn-driver-shell .dn-driver-exact-rail :is(button, a).is-active {
+  border-color: rgba(77, 186, 255, .26);
+  color: #fff;
+  background: linear-gradient(135deg, rgba(9, 105, 215, .78), rgba(21, 149, 230, .58));
+}
+
+.dn-driver-shell .dn-driver-exact-header {
+  min-height: 76px;
+  border: 1px solid var(--dnd-line) !important;
+  border-radius: 22px !important;
+  color: var(--dnd-text) !important;
+  background: var(--dnd-surface) !important;
+  background: color-mix(in srgb, var(--dnd-surface) 84%, transparent) !important;
+  box-shadow: var(--dnd-shadow-soft) !important;
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.dn-driver-shell .dn-driver-exact-header :is(h1, h2, strong) {
+  color: var(--dnd-text) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-header :is(p, small, span) {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-shell .dn-driver-icon-button-v3,
+.dn-driver-shell .dn-driver-exact-shift-button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--dnd-line) !important;
+  border-radius: 14px !important;
+  color: var(--dnd-text) !important;
+  background: var(--dnd-surface-2) !important;
+  box-shadow: none !important;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.dn-driver-shell .dn-driver-icon-button-v3:hover,
+.dn-driver-shell .dn-driver-exact-shift-button:hover:not(:disabled) {
+  border-color: rgba(31, 146, 242, .44) !important;
+  color: var(--dnd-blue) !important;
+  background: var(--dnd-surface-3) !important;
+}
+
+.dn-driver-shell .dn-driver-theme-button {
+  color: var(--dnd-gold) !important;
+}
+
+.dn-driver-shell .dn-driver-shift-badge {
+  min-height: 30px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 850;
+}
+
+/* Main mission board */
+.dn-driver-shell .dn-driver-mission-focus {
+  display: grid;
+  gap: 14px;
+  padding: clamp(17px, 2vw, 23px);
+  border: 1px solid rgba(78, 193, 255, .26);
+  border-radius: 22px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 92% 5%, rgba(81, 203, 255, .25), transparent 34%),
+    radial-gradient(circle at 5% 100%, rgba(224, 185, 68, .12), transparent 32%),
+    linear-gradient(135deg, #04152b, #0a477b);
+  box-shadow: 0 22px 58px rgba(0, 8, 26, .28), inset 0 1px rgba(255, 255, 255, .1);
+}
+
+.dn-driver-shell .dn-driver-mission-focus > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dn-driver-shell .dn-driver-mission-focus > header > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f1cf68;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.dn-driver-shell .dn-driver-mission-focus > header svg {
+  width: 17px;
+  height: 17px;
+}
+
+.dn-driver-shell .dn-driver-mission-focus h2 {
+  margin: 4px 0 0;
+  color: #fff !important;
+  font-size: clamp(22px, 2.8vw, 32px);
+  font-weight: 900;
+  letter-spacing: -.035em;
+}
+
+.dn-driver-shell .dn-driver-mission-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, .6fr) minmax(260px, 1.4fr) minmax(150px, .55fr);
+  gap: 9px;
+}
+
+.dn-driver-shell .dn-driver-mission-focus-grid article {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 74px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 16px;
+  background: rgba(2, 16, 35, .35);
+}
+
+.dn-driver-shell .dn-driver-mission-focus-grid small {
+  color: #bcd2e8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dn-driver-shell .dn-driver-mission-focus-grid strong {
+  overflow: hidden;
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+}
+
+.dn-driver-shell .dn-driver-mission-focus > footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.dn-driver-shell .dn-driver-mission-focus > footer :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 15px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(255, 255, 255, .075);
+  font-weight: 850;
+}
+
+.dn-driver-shell .dn-driver-mission-focus > footer .is-primary {
+  border-color: rgba(255, 228, 132, .3);
+  color: #071a33;
+  background: linear-gradient(135deg, #d5aa2e, #f2d474);
+  box-shadow: 0 12px 28px rgba(224, 185, 68, .2);
+}
+
+.dn-driver-shell .dn-driver-exact-board {
+  gap: clamp(12px, 1.4vw, 18px) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-board > article,
+.dn-driver-shell .dn-driver-exact-actionbar,
+.dn-driver-shell .dn-driver-navigation-workspace,
+.dn-driver-shell .dn-driver-section-heading-v3,
+.dn-driver-shell .dn-driver-empty-v3,
+.dn-driver-shell .dn-driver-profile-layout-v3 > *,
+.dn-driver-shell .dn-driver-order-card-v2 {
+  border: 1px solid var(--dnd-line) !important;
+  border-radius: 22px !important;
+  color: var(--dnd-text) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .024), transparent 46%),
+    var(--dnd-surface) !important;
+  box-shadow: var(--dnd-shadow-soft) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-board > article {
+  overflow: hidden;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.dn-driver-shell .dn-driver-exact-board > article:hover {
+  border-color: var(--dnd-blue) !important;
+  border-color: color-mix(in srgb, var(--dnd-blue) 35%, var(--dnd-line)) !important;
+  box-shadow: var(--dnd-shadow) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-board > article > header {
+  border-block-end: 1px solid var(--dnd-line);
+  background: var(--dnd-surface-2);
+  background: color-mix(in srgb, var(--dnd-surface-2) 65%, transparent);
+}
+
+.dn-driver-shell .dn-driver-exact-board > article > header :is(h2, strong) {
+  color: var(--dnd-text) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-board > article > header small {
+  color: var(--dnd-muted) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-job-list > button {
+  border: 1px solid var(--dnd-line) !important;
+  border-radius: 17px !important;
+  color: var(--dnd-text) !important;
+  background: var(--dnd-surface-2) !important;
+  box-shadow: none !important;
+  transition: transform 160ms var(--dn-wm-ease), border-color 160ms ease, background 160ms ease;
+}
+
+.dn-driver-shell .dn-driver-exact-job-list > button:hover,
+.dn-driver-shell .dn-driver-exact-job-list > button.is-selected {
+  border-color: rgba(31, 146, 242, .5) !important;
+  background:
+    linear-gradient(135deg, rgba(31, 146, 242, .13), transparent 70%),
+    var(--dnd-surface-3) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-job-list > button.is-selected {
+  box-shadow: inset 3px 0 var(--dnd-gold) !important;
+}
+
+.dn-driver-shell[dir="rtl"] .dn-driver-exact-job-list > button.is-selected {
+  box-shadow: inset -3px 0 var(--dnd-gold) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-job-number {
+  color: var(--dnd-sky) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.dn-driver-shell .dn-driver-exact-job-tags em {
+  border: 1px solid var(--dnd-line);
+  border-radius: 999px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface);
+}
+
+.dn-driver-shell .dn-driver-exact-job-route b {
+  color: var(--dnd-text) !important;
+  line-height: 1.55;
+}
+
+.dn-driver-shell .dn-driver-exact-job-progress i {
+  background: var(--dnd-muted) !important;
+  background: color-mix(in srgb, var(--dnd-muted) 35%, transparent) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-job-progress i.is-complete {
+  background: linear-gradient(90deg, var(--dnd-blue), var(--dnd-sky)) !important;
+  box-shadow: 0 0 12px rgba(31, 146, 242, .2);
+}
+
+.dn-driver-shell .dn-driver-exact-vehicle-canvas {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(31, 146, 242, .15), transparent 43%),
+    linear-gradient(145deg, var(--dnd-bg), var(--dnd-surface-2)) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-vehicle-canvas img {
+  filter: drop-shadow(0 22px 18px rgba(0, 7, 22, .3));
+}
+
+.dn-driver-shell .dn-driver-exact-metrics article {
+  border: 1px solid var(--dnd-line);
+  border-radius: 15px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-exact-metrics article strong {
+  color: var(--dnd-text) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.dn-driver-shell .dn-driver-exact-map-canvas,
+.dn-driver-shell .dn-driver-navigation-map {
+  overflow: hidden;
+  border: 1px solid var(--dnd-line);
+  border-radius: 18px;
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-exact-map footer {
+  border-block-start: 1px solid var(--dnd-line);
+  background: var(--dnd-surface);
+}
+
+.dn-driver-shell .dn-driver-exact-map footer section {
+  border-color: var(--dnd-line);
+}
+
+.dn-driver-shell .dn-driver-map-navigation-button,
+.dn-driver-shell .dn-driver-exact-actions .is-navigation {
+  border-color: rgba(89, 210, 255, .32) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #0764d3, #1598e4) !important;
+  box-shadow: 0 12px 28px rgba(5, 99, 211, .22) !important;
+}
+
+.dn-driver-shell .dn-driver-exact-actionbar {
+  gap: 12px;
+  padding: 13px 16px;
+}
+
+.dn-driver-shell .dn-driver-exact-actionbar > div {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-shell .dn-driver-exact-actions button {
+  min-height: 46px;
+  border: 1px solid var(--dnd-line);
+  border-radius: 14px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface-2);
+  font-weight: 850;
+}
+
+.dn-driver-shell .dn-driver-exact-actions button.is-primary {
+  border-color: rgba(73, 192, 255, .32);
+  color: #fff;
+  background: linear-gradient(135deg, #0765d5, #1595e6);
+}
+
+/* Mission cards and action-first status controls */
+.dn-driver-shell .dn-driver-order-list-v3 {
+  gap: 16px;
+}
+
+.dn-driver-shell .dn-driver-order-card-v2 {
+  overflow: hidden;
+  padding: clamp(16px, 2.2vw, 24px);
+}
+
+.dn-driver-shell .dn-driver-order-header {
+  gap: 12px;
+  padding-block-end: 16px;
+  border-block-end: 1px solid var(--dnd-line);
+}
+
+.dn-driver-shell .dn-driver-order-header h3 {
+  color: var(--dnd-text) !important;
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 900;
+  letter-spacing: -.035em;
+}
+
+.dn-driver-shell .dn-driver-order-header p,
+.dn-driver-shell .dn-driver-order-card-v2 small {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-shell .dn-driver-order-reference {
+  border: 1px solid var(--dnd-line);
+  border-radius: 12px;
+  color: var(--dnd-blue);
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-status,
+.dn-driver-shell .dn-driver-priority {
+  min-height: 28px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 850;
+}
+
+.dn-driver-shell .dn-driver-order-progress {
+  overflow-x: auto;
+  padding: 16px 4px 8px;
+  scrollbar-width: none;
+}
+
+.dn-driver-shell .dn-driver-order-progress span {
+  min-width: 88px;
+}
+
+.dn-driver-shell .dn-driver-order-progress span i {
+  border-color: var(--dnd-line);
+  color: var(--dnd-muted);
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-order-progress span.is-complete i {
+  border-color: var(--dnd-blue);
+  color: #fff;
+  background: linear-gradient(135deg, var(--dnd-blue), var(--dnd-sky));
+  box-shadow: 0 0 0 5px rgba(31, 146, 242, .1);
+}
+
+.dn-driver-shell .dn-driver-order-route > div,
+.dn-driver-shell .dn-driver-order-meta-v2,
+.dn-driver-shell .dn-driver-order-notes,
+.dn-driver-shell .dn-driver-action-note {
+  border: 1px solid var(--dnd-line);
+  border-radius: 17px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-order-route strong,
+.dn-driver-shell .dn-driver-order-notes strong {
+  color: var(--dnd-text) !important;
+}
+
+.dn-driver-shell .dn-driver-order-meta-v2 span {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-shell .dn-driver-contact-grid {
+  gap: 9px;
+}
+
+.dn-driver-shell .dn-driver-contact-grid :is(a, button) {
+  min-height: 50px;
+  border: 1px solid var(--dnd-line);
+  border-radius: 15px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface-2);
+  font-weight: 850;
+}
+
+.dn-driver-shell .dn-driver-contact-grid :is(a, button):hover:not(:disabled) {
+  border-color: rgba(31, 146, 242, .42);
+  color: var(--dnd-blue);
+  background: var(--dnd-surface-3);
+}
+
+.dn-driver-shell .dn-driver-action-grid {
+  gap: 10px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--dnd-line);
+}
+
+.dn-driver-shell .dn-driver-action-grid button {
+  min-height: 58px;
+  border: 1px solid rgba(78, 193, 255, .3);
+  border-radius: 17px;
+  color: #fff;
+  background: linear-gradient(135deg, #0765d5, #1595e6);
+  box-shadow: 0 12px 28px rgba(7, 101, 213, .2);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.dn-driver-shell .dn-driver-action-grid button.is-danger {
+  border-color: rgba(255, 171, 179, .3);
+  color: #fff;
+  background: linear-gradient(135deg, #b9283a, #ea5b67);
+  box-shadow: 0 12px 28px rgba(185, 40, 58, .18);
+}
+
+.dn-driver-shell .dn-driver-action-note textarea {
+  border: 1px solid var(--dnd-line);
+  border-radius: 14px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface);
+}
+
+/* In-app navigation becomes a map + operational bottom sheet on mobile */
+.dn-driver-shell .dn-driver-navigation-workspace {
+  overflow: hidden;
+}
+
+.dn-driver-shell .dn-driver-navigation-header {
+  border-block-end: 1px solid var(--dnd-line);
+  background: var(--dnd-surface-2);
+}
+
+.dn-driver-shell .dn-driver-navigation-header :is(h2, strong) {
+  color: var(--dnd-text) !important;
+}
+
+.dn-driver-shell .dn-driver-navigation-header p {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-shell .dn-driver-navigation-header > button {
+  border: 1px solid var(--dnd-line);
+  border-radius: 14px;
+  color: var(--dnd-text);
+  background: var(--dnd-surface);
+}
+
+.dn-driver-shell .dn-driver-navigation-mission {
+  min-width: 0;
+}
+
+.dn-driver-shell .dn-driver-navigation-sync {
+  border-block-start: 1px solid var(--dnd-line);
+  color: var(--dnd-muted);
+  background: var(--dnd-surface-2);
+}
+
+/* Authentication */
+.dn-driver-login-page {
+  min-height: 100dvh;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 10% 5%, rgba(31, 146, 242, .2), transparent 34rem),
+    radial-gradient(circle at 95% 95%, rgba(224, 185, 68, .12), transparent 29rem),
+    linear-gradient(145deg, var(--dnd-bg), var(--dnd-bg-2));
+}
+
+.dn-driver-login-page .dn-portal-auth-shell {
+  overflow: hidden;
+  border: 1px solid var(--dnd-line);
+  border-radius: 30px;
+  background: var(--dnd-surface);
+  box-shadow: 0 34px 90px rgba(0, 7, 22, .35);
+}
+
+.dn-driver-login-page .dn-driver-auth-visual {
+  background:
+    radial-gradient(circle at 78% 16%, rgba(81, 203, 255, .24), transparent 36%),
+    radial-gradient(circle at 12% 90%, rgba(224, 185, 68, .13), transparent 32%),
+    linear-gradient(145deg, #04152b, #084477) !important;
+}
+
+.dn-driver-login-page .dn-driver-auth-card {
+  color: var(--dnd-text);
+  background: var(--dnd-surface) !important;
+}
+
+.dn-driver-login-page .dn-driver-auth-card :is(h2, label > span) {
+  color: var(--dnd-text) !important;
+}
+
+.dn-driver-login-page .dn-driver-auth-card p {
+  color: var(--dnd-muted);
+}
+
+.dn-driver-login-page .dn-portal-auth-form input {
+  min-height: 52px;
+  border: 1px solid var(--dnd-line) !important;
+  border-radius: 15px !important;
+  color: var(--dnd-text) !important;
+  background: var(--dnd-surface-2) !important;
+}
+
+.dn-driver-login-page .dn-portal-auth-primary {
+  min-height: 54px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #0765d5, #1595e6);
+  box-shadow: 0 14px 32px rgba(7, 101, 213, .22);
+}
+
+/* Mobile field runtime */
+@media (max-width: 980px) {
+  html[data-native-shell="driver"] .dn-driver-workspace-v3,
+  .dn-driver-shell .dn-driver-workspace-v3 {
+    padding: max(8px, env(safe-area-inset-top)) 8px calc(106px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .dn-driver-shell .dn-driver-exact-header {
+    position: sticky !important;
+    inset-block-start: max(6px, env(safe-area-inset-top)) !important;
+    z-index: 28 !important;
+    min-height: 62px;
+    border-radius: 18px !important;
+  }
+
+  .dn-driver-shell .dn-driver-exact-header > div:first-child p,
+  .dn-driver-shell .dn-driver-exact-header .dn-driver-shift-badge,
+  .dn-driver-shell .dn-driver-exact-shift-button span {
+    display: none;
+  }
+
+  .dn-driver-shell .dn-driver-exact-board {
+    gap: 10px !important;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus-grid article:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .dn-driver-shell .dn-driver-exact-board > article {
+    border-radius: 19px !important;
+  }
+
+  .dn-driver-shell .dn-driver-exact-job-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(270px, 88%);
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline mandatory;
+    scrollbar-width: none;
+  }
+
+  .dn-driver-shell .dn-driver-exact-job-list > * {
+    scroll-snap-align: center;
+  }
+
+  .dn-driver-shell .dn-driver-exact-map-canvas {
+    min-height: 320px;
+  }
+
+  .dn-driver-shell .dn-driver-exact-actionbar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px;
+    border-radius: 19px !important;
+  }
+
+  .dn-driver-shell .dn-driver-exact-actionbar > div:not(.dn-driver-exact-actions) {
+    display: none;
+  }
+
+  .dn-driver-shell .dn-driver-exact-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dn-driver-shell .dn-driver-exact-actions button {
+    min-height: 54px;
+  }
+
+  .dn-driver-shell .dn-driver-mobile-dock-v3 {
+    inset-inline: 8px !important;
+    inset-block-end: calc(7px + env(safe-area-inset-bottom)) !important;
+    min-height: 72px;
+    padding: 6px;
+    border: 1px solid var(--dnd-line) !important;
+    border-radius: 22px !important;
+    background: var(--dnd-surface) !important;
+    background: color-mix(in srgb, var(--dnd-surface) 90%, transparent) !important;
+    box-shadow: 0 20px 50px rgba(0, 7, 22, .32) !important;
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  }
+
+  .dn-driver-shell .dn-driver-mobile-dock-v3 button {
+    min-width: 0;
+    min-height: 58px;
+    border: 0;
+    border-radius: 15px;
+    color: var(--dnd-muted);
+    background: transparent;
+  }
+
+  .dn-driver-shell .dn-driver-mobile-dock-v3 button.is-active {
+    color: var(--dnd-blue);
+    background: transparent;
+    background: color-mix(in srgb, var(--dnd-blue) 11%, transparent);
+  }
+
+  .dn-driver-shell .dn-driver-navigation-workspace {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    min-height: calc(100dvh - 112px);
+    border-radius: 20px !important;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-workspace > .dn-driver-navigation-header,
+  .dn-driver-shell .dn-driver-navigation-workspace > .dn-driver-navigation-layout,
+  .dn-driver-shell .dn-driver-navigation-workspace > .dn-driver-navigation-sync,
+  .dn-driver-shell .dn-driver-navigation-map {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header {
+    padding: 14px;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header h2 {
+    font-size: 20px;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header p,
+  .dn-driver-shell .dn-driver-navigation-header span {
+    font-size: 12px;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-layout {
+    display: block;
+    min-height: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-map {
+    min-height: 52dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-mission {
+    position: relative;
+    z-index: 4;
+    margin: -32px 8px 8px;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-mission .dn-driver-order-card-v2 {
+    max-height: 58dvh;
+    overflow-y: auto;
+    border-radius: 24px !important;
+    box-shadow: 0 -18px 48px rgba(0, 7, 22, .3) !important;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-sync {
+    overflow-x: auto;
+    gap: 16px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .dn-driver-shell .dn-driver-navigation-header > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header > button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header > button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .dn-driver-shell .dn-driver-exact-header {
+    padding: 7px 9px !important;
+  }
+
+  .dn-driver-shell .dn-driver-exact-header > div:first-child small,
+  .dn-driver-shell .dn-driver-refresh-button-v3 {
+    display: none;
+  }
+
+  .dn-driver-shell .dn-driver-icon-button-v3,
+  .dn-driver-shell .dn-driver-exact-shift-button {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .dn-driver-shell .dn-driver-exact-vehicle {
+    display: none;
+  }
+
+  .dn-driver-shell .dn-driver-exact-map footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dn-driver-shell .dn-driver-order-card-v2 {
+    padding: 14px;
+    border-radius: 19px !important;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus {
+    padding: 16px 14px;
+    border-radius: 19px;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus > header {
+    align-items: flex-start;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus-grid article:nth-child(2) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus > footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dn-driver-shell .dn-driver-mission-focus > footer .is-primary {
+    grid-column: 1 / -1;
+    min-height: 58px;
+  }
+
+  .dn-driver-shell .dn-driver-order-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dn-driver-shell .dn-driver-order-badges {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dn-driver-shell .dn-driver-order-route,
+  .dn-driver-shell .dn-driver-contact-grid,
+  .dn-driver-shell .dn-driver-action-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dn-driver-shell .dn-driver-contact-grid :is(a, button) {
+    min-height: 54px;
+  }
+
+  .dn-driver-shell .dn-driver-action-grid button {
+    min-height: 62px;
+    font-size: 16px;
+  }
+
+  .dn-driver-shell .dn-driver-section-heading-v3 {
+    padding: 18px;
+  }
+
+  .dn-driver-login-page {
+    padding: 0;
+  }
+
+  .dn-driver-login-page .dn-portal-auth-shell {
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dn-driver-login-page .dn-driver-auth-card {
+    padding:
+      max(22px, env(safe-area-inset-top))
+      18px
+      max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 359px) {
+  .dn-driver-shell .dn-driver-exact-header > div:first-child {
+    max-width: 108px;
+  }
+
+  .dn-driver-shell .dn-driver-language-button span {
+    display: none;
+  }
+
+  .dn-driver-shell .dn-driver-exact-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-driver-shell .dn-driver-mobile-dock-v3 button span {
+    font-size: 9px;
+  }
+}

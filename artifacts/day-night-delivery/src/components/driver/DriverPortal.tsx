@@ -9,6 +9,7 @@ import "../../styles/dn-driver-figma.css";
 import "../../styles/dn-driver-figma-exact.css";
 import "../../styles/dn-driver-mobile-runtime-final.css";
 import "../../styles/dn-driver-runtime-v114.css";
+import "../../styles/dn-work-max-driver.css";
 
 export default function DriverPortal() {
   const { language } = useAppContext();

@@ -1,6 +1,21 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { AlertTriangle, Database, Loader2, RefreshCw, SearchX, WifiOff } from "lucide-react";
-import { merchantStatusClass, merchantStatusLabel } from "./merchantStatusMapping";
+import {
+  AlertTriangle,
+  CircleCheckBig,
+  Clock3,
+  Database,
+  Loader2,
+  PackageCheck,
+  RefreshCw,
+  RotateCcw,
+  Route,
+  SearchX,
+  ShieldAlert,
+  Truck,
+  WifiOff,
+  XCircle,
+} from "lucide-react";
+import { merchantStatusClass, merchantStatusLabel, normalizeMerchantStatus } from "./merchantStatusMapping";
 
 export function MerchantSectionHeader({
   eyebrowAr,
@@ -38,11 +53,27 @@ export function MerchantCard({ children, className = "", tone = "default" }: { c
 }
 
 export function MerchantButton({ children, variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" | "gold" }) {
-  return <button {...props} className={`dn-merchant-button is-${variant} ${className}`}>{children}</button>;
+  return <button type="button" {...props} className={`dn-merchant-button is-${variant} ${className}`}>{children}</button>;
 }
 
 export function MerchantStatusBadge({ status, isArabic }: { status: string; isArabic: boolean }) {
-  return <span className={merchantStatusClass(status)}>{merchantStatusLabel(status, isArabic)}</span>;
+  const normalized = normalizeMerchantStatus(status);
+  const Icon = normalized === "delivered"
+    ? CircleCheckBig
+    : ["cancelled", "failed", "delivery_failed"].includes(normalized)
+      ? XCircle
+      : ["returned", "return_requested"].includes(normalized)
+        ? RotateCcw
+        : ["under_review", "review", "postponed"].includes(normalized)
+          ? ShieldAlert
+          : ["in_transit", "out_for_delivery", "arrived_at_customer"].includes(normalized)
+            ? Route
+            : ["assigned", "accepted", "heading_to_pickup"].includes(normalized)
+              ? Truck
+              : ["picked_up", "at_hub"].includes(normalized)
+                ? PackageCheck
+                : Clock3;
+  return <span className={merchantStatusClass(status)}><Icon className="h-3.5 w-3.5" aria-hidden />{merchantStatusLabel(status, isArabic)}</span>;
 }
 
 export function MerchantSourceBadge({ source, isArabic }: { source: "live" | "derived" | "unavailable"; isArabic: boolean }) {
@@ -95,7 +126,7 @@ export function MerchantModal({ open, title, children, onClose, footer }: { open
   return (
     <div className="dn-merchant-modal-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => event.currentTarget === event.target && onClose()}>
       <section className="dn-merchant-modal">
-        <header><h2>{title}</h2><button type="button" onClick={onClose}>×</button></header>
+        <header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="Close">×</button></header>
         <div className="dn-merchant-modal-body">{children}</div>
         {footer ? <footer>{footer}</footer> : null}
       </section>

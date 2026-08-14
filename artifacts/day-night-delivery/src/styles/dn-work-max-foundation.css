@@ -1,0 +1,156 @@
+/* DAY NIGHT — Work + MAX visual foundation
+   Presentation-only tokens shared by the real Admin, Merchant and Driver apps. */
+
+:root {
+  --dn-wm-navy-950: #031022;
+  --dn-wm-navy-900: #06182f;
+  --dn-wm-navy-850: #09213d;
+  --dn-wm-navy-800: #0d2b4e;
+  --dn-wm-blue-700: #075fce;
+  --dn-wm-blue-600: #0b72e7;
+  --dn-wm-blue-500: #1d8cff;
+  --dn-wm-sky-400: #4cc7ff;
+  --dn-wm-gold-500: #d4af37;
+  --dn-wm-gold-400: #f0ca5a;
+  --dn-wm-success: #12b981;
+  --dn-wm-warning: #f0a323;
+  --dn-wm-danger: #ed5968;
+  --dn-wm-radius-sm: 12px;
+  --dn-wm-radius-md: 18px;
+  --dn-wm-radius-lg: 26px;
+  --dn-wm-radius-xl: 34px;
+  --dn-wm-ease: cubic-bezier(.2, .8, .2, 1);
+  --dn-wm-font: "IBM Plex Sans Arabic", "Noto Sans Arabic", Tajawal, Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dn-wm-focus: 0 0 0 3px rgba(76, 199, 255, .28), 0 0 0 6px rgba(7, 95, 206, .14);
+  --dn-wm-page: #041226;
+  --dn-wm-surface: rgba(9, 32, 59, .92);
+  --dn-wm-surface-elevated: rgba(14, 44, 79, .94);
+  --dn-wm-surface-soft: rgba(255, 255, 255, .055);
+  --dn-wm-text: #f7fbff;
+  --dn-wm-muted: #a9bed4;
+  --dn-wm-line: rgba(151, 199, 240, .16);
+  --dn-wm-shadow: 0 22px 60px rgba(0, 8, 25, .32);
+  --dn-wm-shadow-soft: 0 10px 30px rgba(0, 8, 25, .2);
+}
+
+:root.light-theme {
+  --dn-wm-page: #edf5ff;
+  --dn-wm-surface: rgba(255, 255, 255, .9);
+  --dn-wm-surface-elevated: rgba(246, 250, 255, .96);
+  --dn-wm-surface-soft: rgba(8, 70, 139, .055);
+  --dn-wm-text: #071a33;
+  --dn-wm-muted: #526b85;
+  --dn-wm-line: rgba(8, 62, 116, .13);
+  --dn-wm-shadow: 0 22px 55px rgba(30, 76, 126, .14);
+  --dn-wm-shadow-soft: 0 10px 28px rgba(30, 76, 126, .1);
+}
+
+html {
+  min-width: 320px;
+  background: var(--dn-wm-page);
+  color-scheme: dark;
+  scrollbar-gutter: stable;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 180ms var(--dn-wm-ease), color 180ms var(--dn-wm-ease);
+}
+
+html.light-theme { color-scheme: light; }
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--dn-wm-font);
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+  overflow-x: clip;
+  background: var(--dn-wm-page);
+}
+
+/* Production notifications are a fixed toast stack, not an application root.
+   Prevent legacy #root > div decoration layers from becoming a viewport veil. */
+#root > .dn-production-stack {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+#root > .dn-production-stack::before,
+#root > .dn-production-stack::after {
+  content: none !important;
+  display: none !important;
+}
+
+::selection {
+  color: #fff;
+  background: rgba(7, 95, 206, .72);
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a, input, select, textarea):focus-visible {
+  outline: 0 !important;
+  box-shadow: var(--dn-wm-focus) !important;
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a):active:not(:disabled) {
+  opacity: .92;
+}
+
+/* Individual transform properties compose with an element's existing transform.
+   Older browsers simply keep the opacity feedback without losing positioning. */
+@supports (scale: .985) and (translate: 0 1px) {
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a):active:not(:disabled) {
+    scale: .985;
+    translate: 0 1px;
+  }
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(
+  [dir="ltr"] [dir="ltr"],
+  [dir="rtl"] [dir="ltr"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"]
+) {
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: .015em;
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, input, select, textarea) {
+  min-height: 44px;
+}
+
+:where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed !important;
+  filter: saturate(.6);
+}
+
+@media (max-width: 600px) {
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(input, select, textarea) {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen),
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) *,
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) *::before,
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

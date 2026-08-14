@@ -129,8 +129,8 @@ export function MerchantHeader(props: MerchantHeaderProps) {
         <button type="button" onClick={onOpenNotifications} className="is-notification" aria-label={isArabic ? "الإشعارات" : "Notifications"}>
           <Bell className="h-5 w-5" />{unreadCount > 0 ? <b>{unreadCount > 99 ? "99+" : unreadCount}</b> : null}
         </button>
-        <button type="button" onClick={onToggleLanguage} aria-label={isArabic ? "English" : "العربية"}><Languages className="h-5 w-5" /><span>{isArabic ? "EN" : "ع"}</span></button>
-        <button type="button" onClick={onToggleTheme} aria-label={isArabic ? "تغيير المظهر" : "Change theme"}>{isDark ? <SunMedium className="h-5 w-5" /> : <MoonStar className="h-5 w-5" />}</button>
+        <button type="button" className="is-language" onClick={onToggleLanguage} aria-label={isArabic ? "English" : "العربية"}><Languages className="h-5 w-5" /><span>{isArabic ? "EN" : "ع"}</span></button>
+        <button type="button" className="is-theme" onClick={onToggleTheme} aria-label={isArabic ? "تغيير المظهر" : "Change theme"}>{isDark ? <SunMedium className="h-5 w-5" /> : <MoonStar className="h-5 w-5" />}</button>
         <button type="button" className="is-logout" onClick={onLogout} aria-label={isArabic ? "تسجيل الخروج" : "Sign out"}><LogOut className="h-5 w-5" /></button>
       </div>
     </header>
