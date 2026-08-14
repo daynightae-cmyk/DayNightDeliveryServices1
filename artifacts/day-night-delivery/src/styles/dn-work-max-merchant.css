@@ -769,12 +769,12 @@ body:has(.dn-merchant-app) #root > .dn-production-stack::after {
   }
 
   .dn-merchant-app .dn-merchant-header-actions > :is(button, a) {
-    display: none;
+    display: none !important;
   }
 
   .dn-merchant-app .dn-merchant-header-actions > .is-language,
   .dn-merchant-app .dn-merchant-header-actions > .is-theme {
-    display: grid;
+    display: grid !important;
   }
 
   .dn-merchant-app .dn-merchant-content {
