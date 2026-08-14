@@ -552,12 +552,16 @@ async function driverMissionFlow(page, fixture, service) {
   assert(clean(await navigation.innerText()).includes(fixture.reference), "driver_navigation_reference_missing");
   await assertNoHorizontalOverflow(page, "driver_navigation_390");
 
-  const zoomControl = await firstVisibleLocator(page.locator(".dn-driver-navigation-map .leaflet-control-zoom-in"), "driver_map_zoom");
-  const controlBox = await zoomControl.boundingBox();
+  // The shared mobile map CSS intentionally hides Leaflet's compact zoom
+  // widget at <=768px. Validate the in-map navigation controls that remain
+  // interactive in the Driver mobile flow instead of treating that policy as
+  // a missing-control regression.
+  const mapControl = await firstVisibleLocator(page.locator(".dn-driver-navigation-map .dn-live-map-navigation button[title]"), "driver_map_control");
+  const controlBox = await mapControl.boundingBox();
   assert(controlBox, "driver_map_control_box_missing");
   const hit = await page.evaluate(({ x, y }) => {
     const hitElement = document.elementFromPoint(x, y);
-    return Boolean(hitElement?.closest(".leaflet-control-zoom"));
+    return Boolean(hitElement?.closest(".dn-live-map-navigation button"));
   }, { x: controlBox.x + controlBox.width / 2, y: controlBox.y + controlBox.height / 2 });
   assert(hit, "driver_map_control_z_index_collision");
 
@@ -569,7 +573,7 @@ async function driverMissionFlow(page, fixture, service) {
   const syncBox = await page.locator(".dn-driver-navigation-sync").boundingBox();
   assert(!dockBox || !syncBox || syncBox.y + syncBox.height <= dockBox.y + 2, "driver_navigation_sync_covered_by_dock");
   await screenshot(page, "driver-390-navigation-map");
-  await assertPressStability(page, zoomControl, "driver_map_zoom_press");
+  await assertPressStability(page, mapControl, "driver_map_control_press");
 
   await closeButton.click();
   await mission.waitFor({ state: "visible", timeout: 30000 });
