@@ -52,6 +52,22 @@ body:has(.dn-driver-shell.is-light) {
   background: #eef6ff !important;
 }
 
+/* ProductionExperience mounts its toast stack as a separate direct child of
+   #root. Legacy portal resets must not turn that fixed, normally transparent
+   stack into a full-viewport layer above the authenticated Driver UI. */
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack {
+  width: min(92vw, 520px) !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack::before,
+body:has(.dn-driver-exact-shell) #root > .dn-production-stack::after {
+  content: none !important;
+  display: none !important;
+}
+
 html[data-native-shell="driver"] .dn-driver-workspace-v3,
 .dn-driver-shell .dn-driver-workspace-v3 {
   color: var(--dnd-text) !important;
