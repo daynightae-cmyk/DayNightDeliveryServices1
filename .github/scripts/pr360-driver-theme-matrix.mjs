@@ -782,6 +782,7 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await representative.marker.waitFor({ state: "visible", timeout: 30000 });
   if (representative.surface && await representative.surface.count()) await representative.surface.waitFor({ state: "visible", timeout: 30000 });
   await assertNoHorizontalOverflow(page, `${role}_${label}_light`);
+  await assertDriverProductionStackSafe(page, `${role}_${label}_light`, viewport);
   await screenshot(page, `${role}-${label}-light`);
 
   const config = roleThemeConfig(role);
@@ -790,6 +791,7 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await representative.marker.waitFor({ state: "visible", timeout: 30000 });
   if (representative.surface && await representative.surface.count()) await representative.surface.waitFor({ state: "visible", timeout: 30000 });
   await assertNoHorizontalOverflow(page, `${role}_${label}_dark`);
+  await assertDriverProductionStackSafe(page, `${role}_${label}_dark`, viewport);
   await screenshot(page, `${role}-${label}-dark`);
 
   await page.reload({ waitUntil: "domcontentloaded", timeout: 90000 });

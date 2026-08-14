@@ -19,9 +19,9 @@ jobs:
     timeout-minutes: 40
     environment: production-runtime-tests
     env:
-      EXACT_HEAD: 11602a828d05ebf97720b64976bd553317329a92
-      GITHUB_HEAD_SHA: 11602a828d05ebf97720b64976bd553317329a92
-      VERCEL_GIT_COMMIT_SHA: 11602a828d05ebf97720b64976bd553317329a92
+      EXACT_HEAD: 015b0ab0360c9a07aaf69d609e548cdbe9da12d8
+      GITHUB_HEAD_SHA: 015b0ab0360c9a07aaf69d609e548cdbe9da12d8
+      VERCEL_GIT_COMMIT_SHA: 015b0ab0360c9a07aaf69d609e548cdbe9da12d8
       TEST_BASE_URL: http://127.0.0.1:4173
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -42,7 +42,7 @@ jobs:
       - name: Check out exact PR head application
         uses: actions/checkout@v4
         with:
-          ref: 11602a828d05ebf97720b64976bd553317329a92
+          ref: 015b0ab0360c9a07aaf69d609e548cdbe9da12d8
           path: app
 
       - uses: pnpm/action-setup@v4
