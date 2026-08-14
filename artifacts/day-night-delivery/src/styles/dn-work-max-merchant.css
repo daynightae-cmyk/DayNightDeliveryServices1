@@ -65,9 +65,8 @@
   mask-image: linear-gradient(to bottom, #000, transparent 72%);
 }
 
-body:has(.dn-merchant-app) {
-  background: var(--dnm-bg) !important;
-}
+body:has(.dn-merchant-app.is-dark) { background: #041226 !important; }
+body:has(.dn-merchant-app.is-light) { background: #edf5ff !important; }
 
 /* ProductionExperience mounts the toast stack beside the Merchant app. Keep
    broad portal scroll rules from treating that fixed overlay as an app shell. */
