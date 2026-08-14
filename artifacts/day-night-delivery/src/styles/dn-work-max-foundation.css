@@ -75,6 +75,9 @@ body {
 /* Production notifications are a fixed toast stack, not an application root.
    Prevent legacy #root > div decoration layers from becoming a viewport veil. */
 #root > .dn-production-stack {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
   background: transparent !important;
 }
 
