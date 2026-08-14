@@ -72,6 +72,18 @@ body {
   background: var(--dn-wm-page);
 }
 
+/* Production notifications are a fixed toast stack, not an application root.
+   Prevent legacy #root > div decoration layers from becoming a viewport veil. */
+#root > .dn-production-stack {
+  background: transparent !important;
+}
+
+#root > .dn-production-stack::before,
+#root > .dn-production-stack::after {
+  content: none !important;
+  display: none !important;
+}
+
 ::selection {
   color: #fff;
   background: rgba(7, 95, 206, .72);
