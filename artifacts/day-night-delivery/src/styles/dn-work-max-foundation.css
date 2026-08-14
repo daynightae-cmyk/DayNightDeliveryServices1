@@ -67,6 +67,7 @@ textarea {
 
 body {
   min-width: 320px;
+  overflow-x: hidden;
   overflow-x: clip;
   background: var(--dn-wm-page);
 }
@@ -87,7 +88,16 @@ body {
 }
 
 :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a):active:not(:disabled) {
-  transform: translateY(1px) scale(.985);
+  opacity: .92;
+}
+
+/* Individual transform properties compose with an element's existing transform.
+   Older browsers simply keep the opacity feedback without losing positioning. */
+@supports (scale: .985) and (translate: 0 1px) {
+  :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(button, a):active:not(:disabled) {
+    scale: .985;
+    translate: 0 1px;
+  }
 }
 
 :where(.dn-merchant-app, .dn-driver-shell, .dn-admin-fullscreen) :where(

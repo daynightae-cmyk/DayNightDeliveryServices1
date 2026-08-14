@@ -74,6 +74,7 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
     linear-gradient(rgba(91, 169, 236, .065) 1px, transparent 1px),
     linear-gradient(90deg, rgba(91, 169, 236, .065) 1px, transparent 1px) !important;
   background-size: 40px 40px !important;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 75%);
   mask-image: linear-gradient(to bottom, #000, transparent 75%);
 }
 
@@ -112,6 +113,7 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
   border: 1px solid var(--dnd-line) !important;
   border-radius: 22px !important;
   color: var(--dnd-text) !important;
+  background: var(--dnd-surface) !important;
   background: color-mix(in srgb, var(--dnd-surface) 84%, transparent) !important;
   box-shadow: var(--dnd-shadow-soft) !important;
   backdrop-filter: blur(18px) saturate(1.2);
@@ -288,12 +290,14 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
 }
 
 .dn-driver-shell .dn-driver-exact-board > article:hover {
+  border-color: var(--dnd-blue) !important;
   border-color: color-mix(in srgb, var(--dnd-blue) 35%, var(--dnd-line)) !important;
   box-shadow: var(--dnd-shadow) !important;
 }
 
 .dn-driver-shell .dn-driver-exact-board > article > header {
   border-block-end: 1px solid var(--dnd-line);
+  background: var(--dnd-surface-2);
   background: color-mix(in srgb, var(--dnd-surface-2) 65%, transparent);
 }
 
@@ -349,6 +353,7 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
 }
 
 .dn-driver-shell .dn-driver-exact-job-progress i {
+  background: var(--dnd-muted) !important;
   background: color-mix(in srgb, var(--dnd-muted) 35%, transparent) !important;
 }
 
@@ -739,6 +744,7 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
     padding: 6px;
     border: 1px solid var(--dnd-line) !important;
     border-radius: 22px !important;
+    background: var(--dnd-surface) !important;
     background: color-mix(in srgb, var(--dnd-surface) 90%, transparent) !important;
     box-shadow: 0 20px 50px rgba(0, 7, 22, .32) !important;
     backdrop-filter: blur(20px) saturate(1.2);
@@ -756,6 +762,7 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
 
   .dn-driver-shell .dn-driver-mobile-dock-v3 button.is-active {
     color: var(--dnd-blue);
+    background: transparent;
     background: color-mix(in srgb, var(--dnd-blue) 11%, transparent);
   }
 
