@@ -266,11 +266,24 @@ async function createRoleContext(browser, auth, viewport = { width: 390, height:
       window.__dnThemeTrace = [];
       const capture = () => {
         const root = document.documentElement;
+        if (!root) return;
         const snapshot = `${root.getAttribute("data-theme") || "unset"}|${root.className}`;
         if (window.__dnThemeTrace.at(-1) !== snapshot) window.__dnThemeTrace.push(snapshot);
       };
-      capture();
-      new MutationObserver(capture).observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "data-dn-admin-theme"] });
+      const themeObserver = new MutationObserver(capture);
+      const startThemeObserver = () => {
+        const root = document.documentElement;
+        if (!root) return false;
+        capture();
+        themeObserver.observe(root, { attributes: true, attributeFilter: ["class", "data-theme", "data-dn-admin-theme"] });
+        return true;
+      };
+      if (!startThemeObserver()) {
+        const bootObserver = new MutationObserver(() => {
+          if (startThemeObserver()) bootObserver.disconnect();
+        });
+        bootObserver.observe(document, { childList: true, subtree: true });
+      }
     },
     { key: storageKey, value: auth.serializedSession },
   );
@@ -339,6 +352,54 @@ async function assertVisibleAndContained(locator, label, viewport, edgeTolerance
   return box;
 }
 
+async function driverLayoutDiagnostic(page) {
+  return page.evaluate(() => {
+    const inspect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        selector,
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, bottom: rect.bottom },
+        display: style.display,
+        position: style.position,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        transform: style.transform,
+        translate: style.translate,
+        margin: style.margin,
+        padding: style.padding,
+        minHeight: style.minHeight,
+        height: style.height,
+        overflow: style.overflow,
+        zIndex: style.zIndex,
+      };
+    };
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      scroll: { x: scrollX, y: scrollY },
+      document: {
+        clientHeight: document.documentElement.clientHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+        bodyScrollHeight: document.body.scrollHeight,
+      },
+      nodes: [
+        "html",
+        "body",
+        "#root",
+        "#root > div",
+        "#root > div > main",
+        ".dn-driver-exact-shell",
+        ".dn-driver-workspace-v3",
+        ".dn-driver-exact-header",
+        ".dn-driver-mission-focus",
+        ".dn-driver-mobile-dock-v3",
+      ].map(inspect),
+    };
+  });
+}
+
 async function assertScrollable(page, label) {
   const result = await page.evaluate(() => {
     const scrollers = [document.scrollingElement, document.querySelector(".dn-driver-workspace-v3"), document.querySelector(".dn-merchant-content"), document.querySelector(".dncc-main")].filter(Boolean);
@@ -396,6 +457,11 @@ async function driverMatrix(page, telemetry, fixture) {
     assert(destinationText.length > 2 && !/العنوان غير متاح|address unavailable|^—$/i.test(destinationText), `driver_${viewport.label}_destination_missing:${destinationText}`);
     assert(missionText.includes("123.45 AED"), `driver_${viewport.label}_cod_missing`);
     assert(await mission.locator('a[href^="tel:"]').count() === 1, `driver_${viewport.label}_call_action_missing`);
+    const missionBox = await mission.boundingBox();
+    if (!missionBox || missionBox.y + missionBox.height < 0 || missionBox.y > viewport.height) {
+      const diagnostic = await driverLayoutDiagnostic(page);
+      throw new Error(`driver_${viewport.label}_mission_outside_initial_viewport:${JSON.stringify(diagnostic)}`);
+    }
     await assertNoHorizontalOverflow(page, `driver_${viewport.label}`);
     await assertScrollable(page, `driver_${viewport.label}`);
 
