@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex-pr360-local-chromium-qa-20260815
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -15,6 +18,7 @@ concurrency:
 jobs:
   exact-head-local-chromium:
     name: Driver and cross-portal theme viewport acceptance
+    if: ${{ github.event_name != 'pull_request' || github.head_ref == 'codex-pr360-local-chromium-qa-20260815' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: production-runtime-tests
