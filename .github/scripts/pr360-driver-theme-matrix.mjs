@@ -630,16 +630,25 @@ async function driverMissionFlow(page, fixture, service) {
   await clickFirstVisible(page.locator(".dn-driver-mobile-dock-v3 button").filter({ hasText: /ملفي|Profile/i }), "driver_profile_dock");
   await page.getByRole("heading", { name: /ملف المندوب الكامل|Complete driver profile/i }).waitFor({ state: "visible", timeout: 30000 });
   await page.locator(".dn-driver-profile-editor-v2").waitFor({ state: "visible", timeout: 30000 });
+  await page.waitForFunction(() => window.scrollY <= 2);
   await assertNoHorizontalOverflow(page, "driver_profile_390");
   await screenshot(page, "driver-390-profile");
 
-  await page.locator(".dn-driver-language-button").click();
-  await page.locator(rootByRole.driver).evaluate((element) => element.getAttribute("dir") === "ltr");
+  await clickFirstVisible(page.locator(".dn-driver-language-button"), "driver_language_english");
+  await page.waitForFunction((selector) => {
+    const root = document.querySelector(selector);
+    return document.documentElement.dataset.language === "en" && root?.getAttribute("dir") === "ltr";
+  }, rootByRole.driver);
   await page.getByRole("heading", { name: /Complete driver profile/i }).waitFor({ state: "visible", timeout: 30000 });
   assert(await page.locator(rootByRole.driver).getAttribute("dir") === "ltr", "driver_ltr_not_applied");
+  await page.locator(".dn-driver-profile-editor-v2").waitFor({ state: "visible", timeout: 30000 });
   await assertNoHorizontalOverflow(page, "driver_profile_390_ltr");
   await screenshot(page, "driver-390-profile-english");
-  await page.locator(".dn-driver-language-button").click();
+  await clickFirstVisible(page.locator(".dn-driver-language-button"), "driver_language_arabic");
+  await page.waitForFunction((selector) => {
+    const root = document.querySelector(selector);
+    return document.documentElement.dataset.language === "ar" && root?.getAttribute("dir") === "rtl";
+  }, rootByRole.driver);
   await page.getByRole("heading", { name: /ملف المندوب الكامل/i }).waitFor({ state: "visible", timeout: 30000 });
 }
 
