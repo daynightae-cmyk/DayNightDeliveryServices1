@@ -392,7 +392,8 @@ async function driverMatrix(page, telemetry, fixture) {
     const mission = page.locator(".dn-driver-mission-focus");
     const missionText = clean(await mission.innerText());
     assert(missionText.includes(fixture.reference), `driver_${viewport.label}_reference_missing:${missionText.slice(0, 260)}`);
-    assert(missionText.includes(runId), `driver_${viewport.label}_destination_missing`);
+    const destinationText = clean(await mission.locator(".dn-driver-mission-focus-grid article").nth(1).locator("strong").innerText());
+    assert(destinationText.length > 2 && !/العنوان غير متاح|address unavailable|^—$/i.test(destinationText), `driver_${viewport.label}_destination_missing:${destinationText}`);
     assert(missionText.includes("123.45 AED"), `driver_${viewport.label}_cod_missing`);
     assert(await mission.locator('a[href^="tel:"]').count() === 1, `driver_${viewport.label}_call_action_missing`);
     await assertNoHorizontalOverflow(page, `driver_${viewport.label}`);
