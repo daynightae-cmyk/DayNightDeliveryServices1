@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, LogOut, RefreshCw } from "lucide-react";
 import { supabase } from "../../supabase";
 import { driverErrorMessage, fetchDriverSession } from "../../lib/driverData";
@@ -9,6 +9,8 @@ import type { DriverProfile, ProfileRole } from "../../types/driver";
 const VISUAL_ROLE_TEST = (import.meta as any).env?.VITE_ROLE_VISUAL_TEST === "1";
 
 export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
+  const isArabicRef = useRef(isArabic);
+  isArabicRef.current = isArabic;
   const [loading, setLoading] = useState(!VISUAL_ROLE_TEST);
   const [signedIn, setSignedIn] = useState(false);
   const [profile, setProfile] = useState<ProfileRole | null>(null);
@@ -26,7 +28,7 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
     }
 
     if (!supabase) {
-      setError(isArabic ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
+      setError(isArabicRef.current ? "الخدمة غير متاحة حالياً." : "The service is unavailable right now.");
       setLoading(false);
       return;
     }
@@ -46,11 +48,11 @@ export default function DriverAuthGuard({ isArabic }: { isArabic: boolean }) {
       setProfile(payload?.profile || null);
       setDriver(payload?.driver?.id ? payload.driver : null);
     } catch (loadError) {
-      setError(driverErrorMessage(loadError, isArabic));
+      setError(driverErrorMessage(loadError, isArabicRef.current));
     } finally {
       setLoading(false);
     }
-  }, [isArabic]);
+  }, []);
 
   useEffect(() => {
     void load();

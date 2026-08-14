@@ -154,6 +154,17 @@ export default function DriverDashboard({
   }, []);
 
   useEffect(() => {
+    const scrollToStart = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.querySelector<HTMLElement>(".dn-driver-workspace-v3")
+        ?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+    scrollToStart();
+    const frame = window.requestAnimationFrame(scrollToStart);
+    return () => window.cancelAnimationFrame(frame);
+  }, [tab]);
+
+  useEffect(() => {
     if (navigationOrderId && !activeOrders.some((order) => order.id === navigationOrderId)) {
       setNavigationOrderId(null);
     }
