@@ -107,9 +107,22 @@ async function loginRole(role, email, password) {
   if (error) throw new Error(`${role}_login_failed:${error.message}`);
   const userId = data?.user?.id;
   assert(userId && data?.session?.access_token, `${role}_session_missing`);
-  const { data: profile, error: profileError } = await client.from("profiles").select("role").eq("id", userId).single();
-  if (profileError) throw new Error(`${role}_profile_failed:${profileError.message}`);
-  assert(normalize(profile?.role) === role, `${role}_profile_role:${profile?.role || "null"}`);
+  if (role === "admin") {
+    const { data: profile, error: profileError } = await client.from("profiles").select("role").eq("id", userId).single();
+    if (profileError) throw new Error(`${role}_profile_failed:${profileError.message}`);
+    assert(normalize(profile?.role) === "admin", `${role}_profile_role:${profile?.role || "null"}`);
+  } else if (role === "merchant") {
+    const { data: merchantPayload, error: merchantError } = await client.rpc("merchant_get_session_profile");
+    if (merchantError) throw new Error(`merchant_session_profile_failed:${merchantError.message}`);
+    const merchants = array(record(merchantPayload).merchants);
+    assert(merchants.length === 1 && merchants[0]?.id, `merchant_session_profile_count:${merchants.length}`);
+  } else {
+    const { data: driverPayloadRaw, error: driverError } = await client.rpc("driver_get_session_profile");
+    if (driverError) throw new Error(`driver_session_profile_failed:${driverError.message}`);
+    const driverPayload = record(Array.isArray(driverPayloadRaw) ? driverPayloadRaw[0] : driverPayloadRaw);
+    assert(normalize(record(driverPayload.profile).role) === "driver", `driver_session_profile_role:${record(driverPayload.profile).role || "null"}`);
+    assert(record(driverPayload.driver).id, "driver_session_profile_id_missing");
+  }
   const serializedSession = memory.values.get(storageKey);
   assert(typeof serializedSession === "string" && serializedSession.includes(data.session.access_token), `${role}_serialized_session_missing`);
   return { role, client, serializedSession, userId };
