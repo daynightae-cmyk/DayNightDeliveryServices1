@@ -37,6 +37,8 @@ import {
   Loader2,
   FileMinus,
   RefreshCw,
+  MoonStar,
+  SunMedium,
   X,
 } from "lucide-react";
 import companyMeta from "../data/companyMeta";
@@ -95,6 +97,7 @@ import "../styles/dn-admin-pdf.css";
 import "../styles/dn-admin-audio.css";
 import "../styles/dn-admin-iconography.css";
 import "../styles/dn-admin-visual-rescue.css";
+import "../styles/dn-work-max-admin.css";
 
 const menu = [
   {
@@ -803,7 +806,7 @@ function AdminOrderCommandDeck({
 }
 
 export default function AdminPanelLuxury() {
-  const { language, toggleLanguage } = useAppContext();
+  const { language, theme, toggleLanguage, toggleTheme } = useAppContext();
   const isArabic = language === "ar";
   const ui = isArabic ? copy.ar : copy.en;
 
@@ -1424,7 +1427,7 @@ export default function AdminPanelLuxury() {
       merchants={merchants}
       scope="admin-global"
     >
-      <div className="dn-admin-fullscreen" dir={isArabic ? "rtl" : "ltr"}>
+      <div className={`dn-admin-fullscreen ${theme === "dark" ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"} data-admin-theme={theme}>
       <button
         type="button"
         className="dn-admin-mobile-open"
@@ -1502,6 +1505,16 @@ export default function AdminPanelLuxury() {
               <button type="button" onClick={toggleLanguage}>
                 <Languages className="h-4 w-4" />
                 {ui.language}
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? (isArabic ? "تفعيل الوضع النهاري" : "Use day mode") : (isArabic ? "تفعيل الوضع الليلي" : "Use night mode")}
+                title={theme === "dark" ? (isArabic ? "الوضع النهاري" : "Day mode") : (isArabic ? "الوضع الليلي" : "Night mode")}
+              >
+                {theme === "dark" ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
+                {theme === "dark" ? (isArabic ? "نهاري" : "Day") : (isArabic ? "ليلي" : "Night")}
               </button>
 
               <button type="button" onClick={() => void refreshAdminData()}>

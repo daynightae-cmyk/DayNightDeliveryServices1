@@ -45,6 +45,7 @@ import {
 } from "../../portal-designs/merchant";
 import "../../styles/dn-merchant-command-center.css";
 import "../../styles/dn-merchant-figma.css";
+import "../../styles/dn-work-max-merchant.css";
 
 type MerchantRecord = Merchant & Record<string, unknown>;
 type OrderRecord = Order & Record<string, unknown>;

@@ -33,7 +33,7 @@ export function MerchantPortalShell({ currentSection, data, callbacks, isArabic,
   }
 
   return (
-    <div className={`dn-merchant-app ${isDark ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"} data-merchant-authenticated="true">
+    <div className={`dn-merchant-app ${isDark ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"} data-merchant-authenticated="true" data-merchant-theme={isDark ? "dark" : "light"}>
       <MerchantDesktopSidebar
         currentSection={currentSection}
         merchant={data.merchant}
@@ -60,7 +60,7 @@ export function MerchantPortalShell({ currentSection, data, callbacks, isArabic,
           onLogout={() => void callbacks.onLogout()}
         />
         {data.connection.state !== "connected" ? (
-          <div className={`dn-merchant-connectivity-banner is-${data.connection.state}`}>
+          <div className={`dn-merchant-connectivity-banner is-${data.connection.state}`} role="status" aria-live="polite">
             <strong>{isArabic ? data.connection.messageAr || "الاتصال غير مستقر" : data.connection.messageEn || "Connection is not stable"}</strong>
             <span>{data.connection.lastSuccessfulSyncAt ? (isArabic ? `آخر مزامنة: ${data.connection.lastSuccessfulSyncAt}` : `Last sync: ${data.connection.lastSuccessfulSyncAt}`) : ""}</span>
           </div>

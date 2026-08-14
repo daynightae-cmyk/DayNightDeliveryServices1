@@ -12,6 +12,7 @@ import {
   Languages,
   LogOut,
   MessageCircle,
+  MoonStar,
   Navigation,
   Package,
   PauseCircle,
@@ -22,6 +23,7 @@ import {
   Settings2,
   ShieldCheck,
   Signal,
+  SunMedium,
   Truck,
   UserRound,
   Weight,
@@ -106,7 +108,7 @@ export default function DriverDashboard({
   isArabic: boolean;
   onProfileUpdated: () => Promise<void> | void;
 }) {
-  const { toggleLanguage } = useAppContext();
+  const { theme, toggleLanguage, toggleTheme } = useAppContext();
   const navigate = useNavigate();
   const {
     activeOrders,
@@ -257,8 +259,17 @@ export default function DriverDashboard({
   const currentPieces = Number(currentOrder?.pieces);
   const displayLanguage = isArabic ? "ar" : "en";
   const localizeDriverOrder = (value: DriverOrder) => value as unknown as Order;
+  const currentReference = currentOrder
+    ? currentOrder.tracking_number || currentOrder.tracking_code || currentOrder.invoice_number || currentOrder.id
+    : "";
+  const currentDestination = currentOrder
+    ? localizedOrderDestination(localizeDriverOrder(currentOrder), displayLanguage)
+    : "";
+  const currentCustomerPhone = currentOrder
+    ? String(currentOrder.receiver_phone || currentOrder.customer_phone || "").replace(/[^+\d]/g, "")
+    : "";
   return (
-    <section className="dn-driver-shell dn-driver-shell-v3 dn-driver-exact-shell" dir={isArabic ? "rtl" : "ltr"}>
+    <section className={`dn-driver-shell dn-driver-shell-v3 dn-driver-exact-shell ${theme === "dark" ? "is-dark" : "is-light"}`} dir={isArabic ? "rtl" : "ltr"} data-driver-theme={theme}>
       <aside className="dn-driver-rail-v3 dn-driver-exact-rail" aria-label={isArabic ? "تنقل لوحة المندوب" : "Driver navigation"}>
         <button type="button" className="dn-driver-brand-mark-v3" onClick={() => setTab("home")} aria-label="DAY NIGHT">
           <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" />
@@ -312,6 +323,15 @@ export default function DriverDashboard({
               <Languages />
               <span>{isArabic ? "EN" : "ع"}</span>
             </button>
+            <button
+              type="button"
+              className="dn-driver-icon-button-v3 dn-driver-theme-button"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? (isArabic ? "تفعيل الوضع النهاري" : "Use day mode") : (isArabic ? "تفعيل الوضع الليلي" : "Use night mode")}
+              title={theme === "dark" ? (isArabic ? "الوضع النهاري" : "Day mode") : (isArabic ? "الوضع الليلي" : "Night mode")}
+            >
+              {theme === "dark" ? <SunMedium /> : <MoonStar />}
+            </button>
             <button type="button" className="dn-driver-icon-button-v3" aria-label={isArabic ? "الإشعارات" : "Notifications"}>
               <Bell />
               {activeOrders.length > 0 && <b>{activeOrders.length}</b>}
@@ -322,6 +342,28 @@ export default function DriverDashboard({
         {(error || actionError || gps.error) && (
           <div className="dn-driver-alert dn-driver-alert-v3">{actionError || gps.error || error}</div>
         )}
+
+        {tab === "home" && currentOrder && !navigationActive ? (
+          <section className="dn-driver-mission-focus" aria-label={isArabic ? "المهمة الحالية" : "Current mission"}>
+            <header>
+              <div>
+                <span><Signal />{isArabic ? "المهمة الحالية" : "CURRENT MISSION"}</span>
+                <h2>{isArabic ? "المطلوب تنفيذه الآن" : "What to do now"}</h2>
+              </div>
+              <span className={`dn-driver-status dn-driver-status-${normalizeStatus(currentOrder.status)}`}>{statusLabel(currentOrder.status, isArabic)}</span>
+            </header>
+            <div className="dn-driver-mission-focus-grid">
+              <article><small>{isArabic ? "رقم الطلب" : "Order"}</small><strong dir="ltr">{currentReference}</strong></article>
+              <article><small>{isArabic ? "الوجهة" : "Destination"}</small><strong>{currentDestination || (isArabic ? "العنوان غير متاح" : "Address unavailable")}</strong></article>
+              <article><small>{isArabic ? "التحصيل" : "COD"}</small><strong dir="ltr">{Number(currentOrder.cod_amount || 0).toFixed(2)} AED</strong></article>
+            </div>
+            <footer>
+              {currentCustomerPhone ? <a href={`tel:${currentCustomerPhone}`}><Phone />{isArabic ? "اتصال بالعميل" : "Call customer"}</a> : null}
+              <button type="button" onClick={() => setTab("active")}><Settings2 />{isArabic ? "إدارة المهمة" : "Manage mission"}</button>
+              <button type="button" className="is-primary" onClick={() => void startInAppNavigation(currentOrder)}><Navigation />{isArabic ? "ابدأ الملاحة" : "Start navigation"}</button>
+            </footer>
+          </section>
+        ) : null}
 
         {tab === "home" && navigationActive && currentOrder ? (
           <section className="dn-driver-navigation-workspace">
