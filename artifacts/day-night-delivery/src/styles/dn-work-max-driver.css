@@ -833,6 +833,26 @@ html[data-native-shell="driver"] .dn-driver-workspace-v3,
 }
 
 @media (max-width: 600px) {
+  .dn-driver-shell .dn-driver-navigation-header > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header > button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .dn-driver-shell .dn-driver-navigation-header > button svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .dn-driver-shell .dn-driver-exact-header {
     padding: 7px 9px !important;
   }
