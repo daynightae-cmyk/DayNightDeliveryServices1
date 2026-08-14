@@ -347,6 +347,22 @@ async function assertNoHorizontalOverflow(page, label) {
   assert(excess <= 3, `${label}_horizontal_overflow:${JSON.stringify(overflow)}`);
 }
 
+async function assertRoleRootAnchored(page, role, label) {
+  const selector = rootByRole[role];
+  const state = await page.evaluate((rootSelector) => {
+    const element = document.querySelector(rootSelector);
+    const rect = element?.getBoundingClientRect();
+    return {
+      scrollX: window.scrollX,
+      viewport: window.innerWidth,
+      rect: rect ? { x: rect.x, width: rect.width, right: rect.right } : null,
+    };
+  }, selector);
+  assert(state.rect, `${label}_role_root_missing`);
+  assert(Math.abs(state.scrollX) <= 2, `${label}_horizontal_scroll_offset:${JSON.stringify(state)}`);
+  assert(state.rect.x >= -2 && state.rect.right <= state.viewport + 2, `${label}_role_root_displaced:${JSON.stringify(state)}`);
+}
+
 async function assertVisibleAndContained(locator, label, viewport, edgeTolerance = 2) {
   await locator.waitFor({ state: "visible", timeout: 30000 });
   const box = await locator.boundingBox();
@@ -821,6 +837,7 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await representative.marker.waitFor({ state: "visible", timeout: 30000 });
   if (representative.surface && await representative.surface.count()) await representative.surface.waitFor({ state: "visible", timeout: 30000 });
   await assertNoHorizontalOverflow(page, `${role}_${label}_light`);
+  await assertRoleRootAnchored(page, role, `${role}_${label}_light`);
   await assertDriverProductionStackSafe(page, `${role}_${label}_light`, viewport);
   await screenshot(page, `${role}-${label}-light`);
 
@@ -830,6 +847,7 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await representative.marker.waitFor({ state: "visible", timeout: 30000 });
   if (representative.surface && await representative.surface.count()) await representative.surface.waitFor({ state: "visible", timeout: 30000 });
   await assertNoHorizontalOverflow(page, `${role}_${label}_dark`);
+  await assertRoleRootAnchored(page, role, `${role}_${label}_dark`);
   await assertDriverProductionStackSafe(page, `${role}_${label}_dark`, viewport);
   await screenshot(page, `${role}-${label}-dark`);
   if (role === "merchant" && label === "320x568") {
@@ -848,6 +866,7 @@ async function themeCycle(browser, auth, role, viewport, label) {
   await page.locator(config.root).waitFor({ state: "visible", timeout: 90000 });
   await assertThemeState(page, role, "light");
   await assertNoHorizontalOverflow(page, `${role}_${label}_light_reload`);
+  await assertRoleRootAnchored(page, role, `${role}_${label}_light_reload`);
   assertTelemetry(telemetry);
   await context.close();
   return { role, viewport: label, lightToDark: "PASS", darkToLight: "PASS", persistence: "PASS", noWrongThemeFlash: "PASS" };
