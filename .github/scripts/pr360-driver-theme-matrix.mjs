@@ -328,6 +328,15 @@ async function clickFirstVisible(locator, label) {
   throw new Error(`${label}_visible_control_missing`);
 }
 
+async function firstVisibleLocator(locator, label) {
+  const count = await locator.count();
+  for (let index = 0; index < count; index += 1) {
+    const item = locator.nth(index);
+    if (await item.isVisible().catch(() => false)) return item;
+  }
+  throw new Error(`${label}_visible_control_missing`);
+}
+
 async function assertNoHorizontalOverflow(page, label) {
   const overflow = await page.evaluate(() => ({
     viewport: window.innerWidth,
@@ -400,6 +409,25 @@ async function driverLayoutDiagnostic(page) {
   });
 }
 
+async function assertDriverProductionStackSafe(page, label, viewport) {
+  const stack = page.locator("#root > .dn-production-stack");
+  if (!(await stack.count())) return;
+  const state = await stack.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const before = getComputedStyle(element, "::before");
+    return {
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      backgroundColor: style.backgroundColor,
+      beforeContent: before.content,
+      beforeDisplay: before.display,
+    };
+  });
+  assert(state.rect.height < viewport.height * .9, `${label}_production_stack_full_viewport:${JSON.stringify(state)}`);
+  assert(state.backgroundColor === "rgba(0, 0, 0, 0)", `${label}_production_stack_opaque:${JSON.stringify(state)}`);
+  assert(state.beforeContent === "none" || state.beforeDisplay === "none", `${label}_production_stack_fixed_pseudo:${JSON.stringify(state)}`);
+}
+
 async function assertScrollable(page, label) {
   const result = await page.evaluate(() => {
     const scrollers = [document.scrollingElement, document.querySelector(".dn-driver-workspace-v3"), document.querySelector(".dn-merchant-content"), document.querySelector(".dncc-main")].filter(Boolean);
@@ -465,6 +493,7 @@ async function driverMatrix(page, telemetry, fixture) {
       const diagnostic = await driverLayoutDiagnostic(page);
       throw new Error(`driver_${viewport.label}_mission_not_visually_available:${JSON.stringify({ missionBox, missionVisibleHeight, diagnostic })}`);
     }
+    await assertDriverProductionStackSafe(page, `driver_${viewport.label}`, viewport);
     await assertNoHorizontalOverflow(page, `driver_${viewport.label}`);
     await assertScrollable(page, `driver_${viewport.label}`);
 
@@ -523,8 +552,7 @@ async function driverMissionFlow(page, fixture, service) {
   assert(clean(await navigation.innerText()).includes(fixture.reference), "driver_navigation_reference_missing");
   await assertNoHorizontalOverflow(page, "driver_navigation_390");
 
-  const zoomControl = page.locator(".dn-driver-navigation-map .leaflet-control-zoom-in").first();
-  await zoomControl.waitFor({ state: "visible", timeout: 30000 });
+  const zoomControl = await firstVisibleLocator(page.locator(".dn-driver-navigation-map .leaflet-control-zoom-in"), "driver_map_zoom");
   const controlBox = await zoomControl.boundingBox();
   assert(controlBox, "driver_map_control_box_missing");
   const hit = await page.evaluate(({ x, y }) => {
