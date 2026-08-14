@@ -171,6 +171,7 @@ async function createDriverFixture(merchantAuth, adminAuth, driverAuth, service)
       service_type: "standard",
       payment_method: "cod",
       cod_amount: 123.45,
+      coupon_number: runId,
       merchant_reference: runId,
       notes: `PR360_CHROMIUM:${runId}`,
     },
