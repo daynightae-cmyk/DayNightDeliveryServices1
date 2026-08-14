@@ -458,9 +458,12 @@ async function driverMatrix(page, telemetry, fixture) {
     assert(missionText.includes("123.45 AED"), `driver_${viewport.label}_cod_missing`);
     assert(await mission.locator('a[href^="tel:"]').count() === 1, `driver_${viewport.label}_call_action_missing`);
     const missionBox = await mission.boundingBox();
-    if (!missionBox || missionBox.y + missionBox.height < 0 || missionBox.y > viewport.height) {
+    const missionVisibleHeight = missionBox
+      ? Math.max(0, Math.min(viewport.height, missionBox.y + missionBox.height) - Math.max(0, missionBox.y))
+      : 0;
+    if (!missionBox || missionVisibleHeight < Math.min(120, viewport.height * .25)) {
       const diagnostic = await driverLayoutDiagnostic(page);
-      throw new Error(`driver_${viewport.label}_mission_outside_initial_viewport:${JSON.stringify(diagnostic)}`);
+      throw new Error(`driver_${viewport.label}_mission_not_visually_available:${JSON.stringify({ missionBox, missionVisibleHeight, diagnostic })}`);
     }
     await assertNoHorizontalOverflow(page, `driver_${viewport.label}`);
     await assertScrollable(page, `driver_${viewport.label}`);
@@ -485,7 +488,13 @@ async function driverMatrix(page, telemetry, fixture) {
     if (["320x568", "390x844", "768x1024", "1440x900"].includes(viewport.label)) {
       await screenshot(page, `driver-${viewport.label}-light`);
     }
-    results.push({ viewport: viewport.label, horizontalOverflow: "PASS", mission: "PASS", navigation: "PASS" });
+    results.push({
+      viewport: viewport.label,
+      horizontalOverflow: "PASS",
+      mission: "PASS",
+      navigation: "PASS",
+      ...(viewport.label === "320x568" ? { layoutDiagnostic: await driverLayoutDiagnostic(page) } : {}),
+    });
   }
   assertTelemetry(telemetry);
   return results;
