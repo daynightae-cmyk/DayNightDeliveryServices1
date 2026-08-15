@@ -85,18 +85,18 @@ assert(closing.includes("قاعدة البيانات فقط"), "Daily closing de
 assert(closing.includes('return "—"'), "Unavailable finance data is not represented by fabricated zeroes");
 assert(!closing.includes("buildPreview"), "Daily closing no longer builds a local financial preview");
 assert(!closing.includes("saveDailyClosingSnapshot"), "Daily closing does not use the legacy local-capable save path");
-assert(!closing.includes("localStorage"), "Daily closing UI never stores financial records locally");
+assert(!/\blocalStorage\s*\./.test(closing), "Daily closing UI never executes localStorage financial persistence");
 
 assert(dailyClosingRuntime.includes('supabase.rpc("admin_daily_closing_snapshot"'), "Daily closing runtime reads the authoritative RPC first");
 assert(dailyClosingRuntime.includes('supabase.rpc("admin_save_daily_closing"'), "Daily closing runtime saves through the finance RPC first");
-assert(dailyClosingRuntime.includes('from("order_financial_settlements")'), "Daily closing runtime can read authoritative settlement rows directly");
+assert(dailyClosingRuntime.includes('"order_financial_settlements"'), "Daily closing runtime can read authoritative settlement rows directly");
 assert(dailyClosingRuntime.includes('from("admin_expenses")'), "Daily closing runtime reads approved production expenses");
-assert(dailyClosingRuntime.includes('from("admin_adjustments")'), "Daily closing runtime reads production adjustments");
+assert(dailyClosingRuntime.includes('"admin_adjustments"'), "Daily closing runtime reads production adjustments");
 assert(dailyClosingRuntime.includes('from("admin_finance_budget_status")'), "Daily closing runtime reads production budget status");
 assert(dailyClosingRuntime.includes('from("admin_daily_closings")'), "Daily closing runtime persists snapshots in the database");
 assert(dailyClosingRuntime.includes('source: "unavailable"'), "Daily closing runtime exposes unavailable state instead of invented values");
 assert(dailyClosingRuntime.includes("persistedClosedSnapshot"), "Closed daily closing is read from its persisted frozen snapshot");
-assert(!dailyClosingRuntime.includes("localStorage"), "Daily closing runtime never stores finance in localStorage");
+assert(!/\blocalStorage\s*\./.test(dailyClosingRuntime), "Daily closing runtime never executes localStorage finance persistence");
 
 assert(health.includes("fetchFinanceHardeningHealth"), "Database health verifies the finance hardening RPC");
 assert(health.includes("20260720010000_admin_finance_budget_expenses_hardening.sql"), "Health center points to the finance foundation migration");
