@@ -14,6 +14,10 @@ const source = fs
   .replace(
     'read("src/components/admin/AdminOperationsLayer.tsx")',
     'read("src/components/admin/AdminOperationsLayerLegacy.tsx")',
+  )
+  .replace(
+    '"fetchAuthoritativeDailyClosing", "saveAuthoritativeDailyClosing"',
+    '"fetchDailyClosing", "saveDailyClosing"',
   );
 
 fs.writeFileSync(temporaryPath, source, "utf8");
