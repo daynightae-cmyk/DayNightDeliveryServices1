@@ -12,15 +12,26 @@ const evidenceDir = path.resolve('nexus-phase4-evidence');
 function assert(condition, message) { if (!condition) throw new Error(`NEXUS_PHASE4_BROWSER_FAILED: ${message}`); }
 
 async function loginAdmin(page) {
-  await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=nexus_phase4`, { waitUntil:'domcontentloaded', timeout:90000 });
-  if (await page.locator('.dn-admin-fullscreen').waitFor({ state:'visible', timeout:30000 }).then(()=>true).catch(()=>false)) return;
-  await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=nexus_phase4_login`, { waitUntil:'domcontentloaded', timeout:90000 });
-  const intro = page.locator('.auth-clean__intro-cta'); if (await intro.isVisible().catch(()=>false)) await intro.click();
-  await page.locator('#dn-admin-email').waitFor({ state:'visible', timeout:30000 });
-  await page.locator('#dn-admin-email').fill(adminEmail);
-  await page.locator('#dn-admin-password').fill(adminPassword);
-  await page.locator('button[type="submit"]').click();
-  await page.locator('.dn-admin-fullscreen').waitFor({ state:'visible', timeout:90000 });
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await page.goto(`${base}/admin?nosplash=1&lang=ar&__dn_acceptance=nexus_phase4_admin_${attempt}`, { waitUntil:'domcontentloaded', timeout:90000 });
+    if (await page.locator('.dn-admin-fullscreen').waitFor({ state:'visible', timeout:12000 }).then(()=>true).catch(()=>false)) return;
+
+    await page.goto(`${base}/auth?nosplash=1&lang=ar&__dn_acceptance=nexus_phase4_login_${attempt}`, { waitUntil:'domcontentloaded', timeout:90000 });
+    const intro = page.locator('.auth-clean__intro-cta');
+    if (await intro.isVisible().catch(()=>false)) await intro.click();
+    const email = page.locator('#dn-admin-email');
+    const formReady = await email.waitFor({ state:'visible', timeout:18000 }).then(()=>true).catch(()=>false);
+    if (!formReady) {
+      await page.waitForTimeout(1200 * attempt);
+      continue;
+    }
+    await email.fill(adminEmail);
+    await page.locator('#dn-admin-password').fill(adminPassword);
+    await page.locator('button[type="submit"]').click();
+    if (await page.locator('.dn-admin-fullscreen').waitFor({ state:'visible', timeout:45000 }).then(()=>true).catch(()=>false)) return;
+    await page.waitForTimeout(1200 * attempt);
+  }
+  throw new Error('NEXUS_PHASE4_BROWSER_FAILED: protected Admin login did not become ready after 3 clean attempts');
 }
 
 async function waitForPhase4Ready(page, label) {
