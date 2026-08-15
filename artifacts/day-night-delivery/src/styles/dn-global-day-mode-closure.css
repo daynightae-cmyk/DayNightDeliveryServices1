@@ -1,0 +1,878 @@
+/* ========================================================================== */
+/* DAY NIGHT — GLOBAL DAY MODE CLOSURE                                       */
+/* Final presentation-only source of truth loaded after every legacy theme.  */
+/* Scope: Public + Admin + Merchant + Driver + Auth + Native role shells.     */
+/* No data, auth, pricing, order, accounting, API, DB, RLS or RPC behavior.   */
+/* ========================================================================== */
+
+:root.light-theme {
+  color-scheme: light !important;
+  --dn-day-ink: #06182f;
+  --dn-day-ink-2: #123a5d;
+  --dn-day-muted: #526f8b;
+  --dn-day-muted-2: #7189a1;
+  --dn-day-blue: #086fd4;
+  --dn-day-sky: #28a8ea;
+  --dn-day-gold: #a87900;
+  --dn-day-gold-solid: #d4af37;
+  --dn-day-canvas: #edf6ff;
+  --dn-day-pearl: #fbfdff;
+  --dn-day-ice: #e7f3ff;
+  --dn-day-glass: rgba(252, 254, 255, .84);
+  --dn-day-glass-strong: rgba(255, 255, 255, .94);
+  --dn-day-glass-soft: rgba(233, 245, 255, .76);
+  --dn-day-line: rgba(7, 77, 145, .16);
+  --dn-day-line-strong: rgba(7, 77, 145, .25);
+  --dn-day-shadow: 0 26px 72px rgba(21, 67, 118, .14), 0 6px 18px rgba(21, 67, 118, .06);
+  --dn-day-shadow-soft: 0 13px 34px rgba(21, 67, 118, .10), 0 2px 8px rgba(21, 67, 118, .045);
+  --dn-day-dark-anchor: #04172d;
+  --dn-day-dark-anchor-2: #082f56;
+}
+
+html.light-theme,
+html.light-theme body {
+  background-color: var(--dn-day-canvas) !important;
+}
+
+html.light-theme body {
+  color: var(--dn-day-ink);
+  background:
+    radial-gradient(circle at 7% 2%, rgba(25, 137, 234, .13), transparent 30rem),
+    radial-gradient(circle at 94% 7%, rgba(71, 190, 248, .10), transparent 28rem),
+    radial-gradient(circle at 87% 88%, rgba(212, 175, 55, .075), transparent 27rem),
+    linear-gradient(145deg, #e8f3ff 0%, #f9fcff 42%, #edf6ff 72%, #e3f0ff 100%) !important;
+  background-attachment: fixed !important;
+}
+
+html.light-theme #root {
+  color: var(--dn-day-ink);
+  background: transparent !important;
+}
+
+html.light-theme ::selection {
+  color: #fff;
+  background: rgba(8, 111, 212, .76);
+}
+
+/* -------------------------------------------------------------------------- */
+/* UNIVERSAL READABILITY CONTRACT                                             */
+/* -------------------------------------------------------------------------- */
+
+html.light-theme body :is(input, select, textarea) {
+  color: var(--dn-day-ink) !important;
+  caret-color: var(--dn-day-blue);
+}
+
+html.light-theme body :is(input, textarea)::placeholder {
+  color: #7890a8 !important;
+  opacity: 1 !important;
+}
+
+html.light-theme body :is(input, select, textarea):disabled {
+  color: #74899f !important;
+  -webkit-text-fill-color: #74899f !important;
+  opacity: .82;
+}
+
+html.light-theme body :is(button, a, input, select, textarea):focus-visible {
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px rgba(40, 168, 234, .22), 0 0 0 6px rgba(8, 111, 212, .09) !important;
+}
+
+/* Gold/yellow is an accent, never a low-contrast surface. */
+html body :is(.dn-admin-fullscreen, .dn-merchant-app, .dn-driver-shell, .dn-public-footer, .dn-it-page) :is(
+  [class~="bg-brand-gold"],
+  [class~="!bg-brand-gold"],
+  [class~="bg-amber-300"],
+  [class~="bg-amber-400"],
+  [class~="bg-yellow-300"],
+  [class~="bg-yellow-400"],
+  .is-gold
+) {
+  color: #04172d !important;
+  text-shadow: none !important;
+}
+
+html body :is(.dn-admin-fullscreen, .dn-merchant-app, .dn-driver-shell, .dn-public-footer, .dn-it-page) :is(
+  [class~="bg-brand-gold"],
+  [class~="!bg-brand-gold"],
+  [class~="bg-amber-300"],
+  [class~="bg-amber-400"],
+  [class~="bg-yellow-300"],
+  [class~="bg-yellow-400"],
+  .is-gold
+) :is(span, strong, small, b, i, svg) {
+  color: inherit !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Translucent gold surfaces still require readable brown/navy copy in Light. */
+html.light-theme body :is(.dn-admin-fullscreen, .dn-merchant-app, .dn-driver-shell) [class*="bg-brand-gold/"] {
+  color: #473600 !important;
+}
+
+html.light-theme body :is(.dn-admin-fullscreen, .dn-merchant-app, .dn-driver-shell) [class*="bg-brand-gold/"] :is(span, strong, small, b, svg) {
+  color: inherit !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* PUBLIC WEBSITE — one luxury Light DNA across every official public route. */
+/* -------------------------------------------------------------------------- */
+
+html.light-theme body:has(.dn-official-header) {
+  color: var(--dn-day-ink) !important;
+  background:
+    radial-gradient(circle at 8% 4%, rgba(15, 127, 231, .14), transparent 31rem),
+    radial-gradient(circle at 92% 10%, rgba(71, 190, 248, .10), transparent 27rem),
+    radial-gradient(circle at 84% 82%, rgba(212, 175, 55, .07), transparent 26rem),
+    linear-gradient(145deg, #e9f4ff 0%, #fbfdff 48%, #edf7ff 100%) !important;
+}
+
+html.light-theme body:has(.dn-official-header) main {
+  color: var(--dn-day-ink) !important;
+}
+
+html.light-theme body:has(.dn-official-header) main :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--dn-day-ink) !important;
+  text-shadow: none;
+}
+
+html.light-theme body:has(.dn-official-header) main :is(p, li, dd) {
+  color: var(--dn-day-muted);
+}
+
+html.light-theme body:has(.dn-official-header) main :is(label, dt, small) {
+  color: var(--dn-day-muted-2);
+}
+
+html.light-theme .dn-official-topbar {
+  color: var(--dn-day-ink) !important;
+  border-color: rgba(7, 77, 145, .13) !important;
+  background: linear-gradient(90deg, rgba(248, 252, 255, .97), rgba(255,255,255,.95), rgba(238, 248, 255, .96)) !important;
+  box-shadow: 0 8px 24px rgba(21, 67, 118, .075), inset 0 -1px rgba(255,255,255,.98) !important;
+}
+
+html.light-theme .dn-official-header {
+  color: var(--dn-day-ink) !important;
+  border-color: rgba(7, 77, 145, .14) !important;
+  background:
+    radial-gradient(circle at 10% -25%, rgba(29, 145, 239, .10), transparent 22rem),
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(237,247,255,.88)) !important;
+  box-shadow: 0 16px 44px rgba(21,67,118,.11), inset 0 1px #fff !important;
+  backdrop-filter: blur(20px) saturate(1.16) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.16) !important;
+}
+
+html.light-theme .dn-official-header :is(a, button) {
+  color: #153d60;
+}
+
+html.light-theme .dn-official-header :is(a, button):hover {
+  color: var(--dn-day-blue) !important;
+}
+
+/* Common public glass/card surfaces receive the same material and depth. */
+html.light-theme body:has(.dn-official-header) :is(
+  .glass,
+  .glass-premium,
+  .dn-glass-card,
+  .dn-finish-surface,
+  .dn-finish-card,
+  [class*="dn-"][class*="card"],
+  [class*="dn-"][class*="panel"]
+) {
+  border-color: var(--dn-day-line) !important;
+}
+
+html.light-theme body:has(.dn-official-header) main :is(
+  .glass,
+  .glass-premium,
+  .dn-glass-card,
+  .dn-finish-surface,
+  .dn-finish-card
+) {
+  color: var(--dn-day-ink) !important;
+  background:
+    radial-gradient(circle at 94% 0, rgba(20, 133, 232, .075), transparent 19rem),
+    linear-gradient(145deg, rgba(255,255,255,.94), rgba(235,246,255,.84)) !important;
+  box-shadow: var(--dn-day-shadow-soft) !important;
+  backdrop-filter: blur(18px) saturate(1.10) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.10) !important;
+}
+
+html.light-theme body:has(.dn-official-header) main :is(input, select, textarea) {
+  border-color: rgba(7, 77, 145, .18) !important;
+  color: var(--dn-day-ink) !important;
+  background: linear-gradient(180deg, #fff, #f4f9ff) !important;
+  box-shadow: inset 0 1px #fff, 0 6px 18px rgba(21,67,118,.055) !important;
+}
+
+/* Deliberately dark public anchors retain white/silver typography. */
+html.light-theme :is(.dn-official-hero, .dn-official-service-strip, .dn-public-footer) {
+  color: #f7fbff !important;
+}
+
+html.light-theme :is(.dn-official-hero, .dn-official-service-strip, .dn-public-footer) :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: #f8fbff !important;
+}
+
+html.light-theme :is(.dn-official-hero, .dn-official-service-strip, .dn-public-footer) :is(p, li, small) {
+  color: #bed1e3 !important;
+}
+
+html.light-theme .dn-official-service-strip {
+  border-color: rgba(102, 192, 255, .18) !important;
+  background:
+    radial-gradient(circle at 84% 0, rgba(50, 177, 255, .15), transparent 23rem),
+    linear-gradient(90deg, #04172d, #08345f 50%, #04172d) !important;
+  box-shadow: 0 18px 42px rgba(3,18,38,.18), inset 0 1px rgba(255,255,255,.07) !important;
+}
+
+/* Footer must remain a dark luxury anchor even when generic Light utilities
+   attempt to paint descendants white. This specifically closes social cards. */
+html.light-theme .dn-public-footer,
+.dn-public-footer {
+  color: #f8fbff !important;
+  background:
+    radial-gradient(circle at 10% -8%, rgba(31,144,235,.19), transparent 30rem),
+    radial-gradient(circle at 90% 5%, rgba(212,175,55,.09), transparent 25rem),
+    linear-gradient(180deg, #071f3a 0%, #031427 48%, #010916 100%) !important;
+}
+
+html.light-theme .dn-public-footer :is(h2,h3,h4,strong),
+.dn-public-footer :is(h2,h3,h4,strong) {
+  color: #f8fbff !important;
+}
+
+html.light-theme .dn-public-footer :is(p,a,span,small),
+.dn-public-footer :is(p,a,span,small) {
+  color: #b9cbde;
+}
+
+html.light-theme .dn-public-footer a:hover,
+.dn-public-footer a:hover {
+  color: #f3cb55 !important;
+}
+
+html.light-theme .dn-public-footer .mt-6 > .grid.grid-cols-2 > a,
+.dn-public-footer .mt-6 > .grid.grid-cols-2 > a {
+  border-color: rgba(255,255,255,.10) !important;
+  color: #f8fbff !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.025)),
+    radial-gradient(circle at 90% 0, rgba(31,144,235,.10), transparent 10rem) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.045), 0 10px 24px rgba(0,0,0,.10) !important;
+}
+
+html.light-theme .dn-public-footer .mt-6 > .grid.grid-cols-2 > a:hover,
+.dn-public-footer .mt-6 > .grid.grid-cols-2 > a:hover {
+  border-color: rgba(212,175,55,.36) !important;
+  background: rgba(255,255,255,.075) !important;
+  box-shadow: 0 14px 30px rgba(0,0,0,.16), 0 0 0 1px rgba(212,175,55,.08) !important;
+}
+
+html.light-theme .dn-public-footer .mt-6 > .grid.grid-cols-2 > a :is(span, strong, small),
+.dn-public-footer .mt-6 > .grid.grid-cols-2 > a :is(span, strong, small) {
+  color: #eef6ff !important;
+}
+
+html.light-theme .dn-public-footer .mt-6 > .grid.grid-cols-2 > a span span:last-child,
+.dn-public-footer .mt-6 > .grid.grid-cols-2 > a span span:last-child {
+  color: #8fa8bf !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* SHARED APP LIGHT MATERIAL — Admin + Merchant + Driver                     */
+/* -------------------------------------------------------------------------- */
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) {
+  --dn-app-ink: #06182f;
+  --dn-app-ink-2: #123a5d;
+  --dn-app-muted: #55738f;
+  --dn-app-line: rgba(6, 75, 145, .15);
+  --dn-app-line-strong: rgba(6, 75, 145, .25);
+  --dn-app-card: rgba(252,254,255,.90);
+  --dn-app-card-strong: rgba(255,255,255,.96);
+  --dn-app-soft: rgba(231,244,255,.80);
+  --dn-app-shadow: 0 20px 52px rgba(21,67,118,.12), 0 4px 14px rgba(21,67,118,.055);
+  color: var(--dn-app-ink) !important;
+}
+
+body:has(.dn-admin-fullscreen.is-light),
+body:has(.dn-merchant-app.is-light),
+body:has(.dn-driver-shell.is-light) {
+  color: var(--dn-day-ink) !important;
+  background:
+    radial-gradient(circle at 7% 2%, rgba(18,130,232,.15), transparent 31rem),
+    radial-gradient(circle at 94% 9%, rgba(70,191,250,.11), transparent 28rem),
+    radial-gradient(circle at 86% 89%, rgba(212,175,55,.075), transparent 26rem),
+    linear-gradient(145deg, #e5f1ff, #f9fcff 48%, #eaf5ff) !important;
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(h1,h2,h3,h4,h5,h6) {
+  color: var(--dn-app-ink);
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(p, small, label) {
+  color: var(--dn-app-muted);
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(input, select, textarea) {
+  border-color: rgba(6,75,145,.18) !important;
+  color: var(--dn-app-ink) !important;
+  background: linear-gradient(180deg, #fff 0%, #f4f9ff 100%) !important;
+  box-shadow: 0 7px 20px rgba(21,67,118,.055), inset 0 1px #fff !important;
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(input, select, textarea):hover {
+  border-color: rgba(8,111,212,.27) !important;
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(input, select, textarea):focus {
+  border-color: rgba(8,111,212,.48) !important;
+  box-shadow: 0 0 0 3px rgba(8,111,212,.08), 0 10px 24px rgba(21,67,118,.08), inset 0 1px #fff !important;
+}
+
+/* Generic business surfaces. Class-prefix matching lets this cover current and
+   future pages without requiring every route to hand-copy a new Light theme. */
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(
+  [class*="card"],
+  [class*="panel"],
+  [class*="surface"],
+  [class*="tile"],
+  [class*="summary"],
+  [class*="metric"],
+  [class*="kpi"],
+  [class*="form-section"]
+) {
+  border-color: var(--dn-app-line);
+}
+
+/* Tables and dense financial/business lists. */
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(table, [role="table"]) {
+  color: var(--dn-app-ink);
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(thead, [class*="table-head"], [class*="table-header"]) {
+  color: #173e60 !important;
+  background: rgba(220, 238, 255, .74) !important;
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) tbody tr {
+  border-color: rgba(6,75,145,.10) !important;
+}
+
+:is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) tbody tr:hover {
+  background: rgba(20,133,232,.045) !important;
+}
+
+/* Dialogs / drawers / bottom sheets share the same readable Light material. */
+html.light-theme body :is(
+  [role="dialog"],
+  [aria-modal="true"],
+  [class*="modal"],
+  [class*="dialog"],
+  [class*="drawer"],
+  [class*="sheet"]
+):not(.dn-public-footer *) {
+  --dn-dialog-ink: #06182f;
+}
+
+html.light-theme body :is(
+  .dn-merchant-app,
+  .dn-driver-shell,
+  .dn-admin-fullscreen
+) :is([role="dialog"], [aria-modal="true"], [class*="modal"], [class*="dialog"], [class*="drawer"], [class*="sheet"]) {
+  color: #06182f;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ADMIN — complete Light closure for every current section.                  */
+/* -------------------------------------------------------------------------- */
+
+.dn-admin-fullscreen.is-light {
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 6% 1%, rgba(13,124,229,.17), transparent 30rem),
+    radial-gradient(circle at 94% 8%, rgba(73,192,255,.11), transparent 28rem),
+    radial-gradient(circle at 88% 88%, rgba(212,175,55,.075), transparent 25rem),
+    linear-gradient(142deg, #e2efff 0%, #f9fcff 48%, #eaf5ff 100%) !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-workspace-host {
+  border-color: rgba(6,75,145,.13) !important;
+  background:
+    radial-gradient(circle at 98% 0, rgba(17,132,235,.075), transparent 26rem),
+    linear-gradient(145deg, rgba(255,255,255,.62), rgba(231,244,255,.52)) !important;
+  box-shadow: 0 28px 74px rgba(21,67,118,.105), inset 0 1px rgba(255,255,255,.90) !important;
+}
+
+.dn-admin-fullscreen.is-light :is(
+  .dn-admin-dashboard-kpis > article,
+  .dn-admin-section-kpis > article,
+  .dn-section-kpis > article,
+  .dn-admin-secondary-panel,
+  .dn-section-panels > article,
+  .dn-section-table-card,
+  .dn-admin-action-tile,
+  .dn-admin-loading-banner,
+  .dn-admin-empty-state
+) {
+  border-color: rgba(6,75,145,.14) !important;
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 92% 0, rgba(17,132,235,.07), transparent 17rem),
+    linear-gradient(145deg, rgba(255,255,255,.97), rgba(235,246,255,.88)) !important;
+  box-shadow: var(--dn-app-shadow) !important;
+}
+
+.dn-admin-fullscreen.is-light :is(
+  [data-admin-new-order-form="merchant"],
+  [data-admin-unified-personal-order-entry="true"] > div:first-child
+) {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.17) !important;
+  background:
+    radial-gradient(circle at 98% 0, rgba(8,111,212,.10), transparent 24rem),
+    radial-gradient(circle at 4% 100%, rgba(212,175,55,.065), transparent 22rem),
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(232,244,255,.86)) !important;
+  box-shadow: 0 27px 68px rgba(21,67,118,.14), inset 0 1px #fff !important;
+}
+
+.dn-admin-fullscreen.is-light [data-admin-financial-preview-version="verified-v1"] {
+  color: #06182f !important;
+  border-color: rgba(164,119,0,.22) !important;
+  background:
+    radial-gradient(circle at 94% 0, rgba(212,175,55,.11), transparent 20rem),
+    linear-gradient(145deg, rgba(255,253,245,.96), rgba(238,247,255,.88)) !important;
+  box-shadow: 0 20px 52px rgba(21,67,118,.10), inset 0 1px rgba(255,255,255,.98) !important;
+}
+
+/* Exact delivery-fee payer choices: selected = solid champagne gold + navy. */
+.dn-admin-fullscreen [data-admin-financial-preview-version="verified-v1"] button[class*="bg-brand-gold/15"] {
+  border-color: rgba(119,79,0,.30) !important;
+  color: #04172d !important;
+  background: linear-gradient(135deg, #f4dc88 0%, #d4af37 48%, #edc958 100%) !important;
+  box-shadow: 0 13px 30px rgba(164,119,0,.22), inset 0 1px rgba(255,255,255,.72) !important;
+}
+
+.dn-admin-fullscreen [data-admin-financial-preview-version="verified-v1"] button[class*="bg-brand-gold/15"] * {
+  color: #04172d !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Dark command rail stays intentional in Admin Light mode. */
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full {
+  color: #f6fbff !important;
+  background:
+    radial-gradient(circle at 50% -6%, rgba(43,166,255,.20), transparent 20rem),
+    radial-gradient(circle at 9% 94%, rgba(212,175,55,.08), transparent 18rem),
+    linear-gradient(180deg, #061d39, #021020) !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full :is(h1,h2,h3,h4,strong) {
+  color: #f8fbff !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full :is(p,small,span) {
+  color: #b7cce0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* MERCHANT — all sections, forms, business pages and mobile sheets.          */
+/* -------------------------------------------------------------------------- */
+
+.dn-merchant-app.is-light {
+  --dnm-bg: #e7f2ff !important;
+  --dnm-bg-2: #fbfdff !important;
+  --dnm-surface: rgba(252,254,255,.91) !important;
+  --dnm-surface-2: rgba(239,248,255,.94) !important;
+  --dnm-surface-3: rgba(224,240,255,.92) !important;
+  --dnm-text: #06182f !important;
+  --dnm-muted: #55738f !important;
+  --dnm-border: rgba(6,75,145,.15) !important;
+  --dnm-blue: #086fd4 !important;
+  --dnm-sky: #28a8ea !important;
+  --dnm-gold: #a87900 !important;
+  --dnm-shadow: var(--dn-day-shadow) !important;
+  --dnm-shadow-soft: var(--dn-day-shadow-soft) !important;
+  background:
+    radial-gradient(circle at 7% 1%, rgba(17,132,235,.15), transparent 31rem),
+    radial-gradient(circle at 95% 9%, rgba(69,190,249,.10), transparent 27rem),
+    radial-gradient(circle at 88% 90%, rgba(212,175,55,.07), transparent 25rem),
+    linear-gradient(145deg, #e4f1ff, #fbfdff 50%, #eaf5ff) !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-header {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.13) !important;
+  background: rgba(248,252,255,.88) !important;
+  box-shadow: 0 14px 36px rgba(21,67,118,.09), inset 0 -1px rgba(255,255,255,.98) !important;
+  backdrop-filter: blur(20px) saturate(1.14) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.14) !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-content-inner :is(
+  .dn-merchant-kpi,
+  .dn-merchant-stat-card,
+  .dn-merchant-card,
+  .dn-merchant-panel,
+  .dn-merchant-table-card,
+  .dn-merchant-form-card,
+  .dn-merchant-summary-card,
+  .dn-merchant-order-card
+) {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.14) !important;
+  background:
+    radial-gradient(circle at 92% 0, rgba(17,132,235,.065), transparent 17rem),
+    linear-gradient(145deg, rgba(255,255,255,.97), rgba(235,246,255,.88)) !important;
+  box-shadow: var(--dn-app-shadow) !important;
+}
+
+/* The merchant dashboard hero is a deliberate dark operational anchor. */
+.dn-merchant-app.is-light .dn-merchant-dashboard-hero {
+  color: #f8fbff !important;
+  border-color: rgba(104,193,255,.24) !important;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(72,199,255,.25), transparent 34%),
+    radial-gradient(circle at 8% 100%, rgba(212,175,55,.12), transparent 35%),
+    linear-gradient(135deg, #04172d, #073c70 58%, #0a568d) !important;
+  box-shadow: 0 30px 78px rgba(3,20,41,.28), inset 0 1px rgba(255,255,255,.09) !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-dashboard-hero :is(h1,h2,h3,h4,strong) {
+  color: #f8fbff !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-dashboard-hero :is(p,small,span) {
+  color: #c5d9ea;
+}
+
+/* Merchant sidebar is a stable navy brand rail in both modes. */
+.dn-merchant-app.is-light .dn-merchant-sidebar {
+  color: #f6fbff !important;
+  border-color: rgba(255,255,255,.09) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(52,160,255,.20), transparent 18rem),
+    linear-gradient(180deg, #082b50, #04172d) !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-sidebar :is(h1,h2,h3,h4,strong) {
+  color: #f8fbff !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-sidebar :is(p,span,small) {
+  color: #b9cde0;
+}
+
+.dn-merchant-app.is-light :is(.dn-merchant-command-palette, .dn-merchant-mobile-more, .dn-merchant-mobile-more-sheet, [class*="dn-merchant-"][class*="dialog"], [class*="dn-merchant-"][class*="sheet"]) {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.16) !important;
+  background:
+    radial-gradient(circle at 95% 0, rgba(17,132,235,.08), transparent 18rem),
+    linear-gradient(145deg, rgba(255,255,255,.98), rgba(234,246,255,.94)) !important;
+  box-shadow: 0 28px 76px rgba(11,46,85,.18), inset 0 1px #fff !important;
+}
+
+.dn-merchant-app.is-light .dn-merchant-bottom-nav {
+  border-color: rgba(6,75,145,.14) !important;
+  background: rgba(249,252,255,.92) !important;
+  box-shadow: 0 -14px 34px rgba(21,67,118,.11), inset 0 1px #fff !important;
+  backdrop-filter: blur(20px) saturate(1.14) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.14) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* DRIVER — all tabs, mission cards, communication, maps, profile and mobile. */
+/* -------------------------------------------------------------------------- */
+
+.dn-driver-shell.is-light {
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 7% 1%, rgba(17,132,235,.14), transparent 31rem),
+    radial-gradient(circle at 95% 8%, rgba(70,191,250,.10), transparent 27rem),
+    radial-gradient(circle at 88% 91%, rgba(212,175,55,.065), transparent 25rem),
+    linear-gradient(145deg, #e6f2ff, #fbfdff 50%, #eaf5ff) !important;
+}
+
+.dn-driver-shell.is-light .dn-driver-workspace-v3 {
+  color: #06182f !important;
+  background: transparent !important;
+}
+
+.dn-driver-shell.is-light .dn-driver-topbar-v3 {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.13) !important;
+  background: rgba(248,252,255,.90) !important;
+  box-shadow: 0 14px 36px rgba(21,67,118,.09), inset 0 -1px rgba(255,255,255,.98) !important;
+  backdrop-filter: blur(20px) saturate(1.14) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.14) !important;
+}
+
+.dn-driver-shell.is-light :is(
+  .dn-driver-current-mission,
+  .dn-driver-order-card,
+  .dn-driver-profile-panel,
+  .dn-driver-status-card,
+  .dn-driver-stat-card,
+  .dn-driver-summary-card,
+  .dn-driver-communication-card,
+  [class*="dn-driver-"][class*="card"],
+  [class*="dn-driver-"][class*="panel"]
+) {
+  border-color: rgba(6,75,145,.14) !important;
+}
+
+.dn-driver-shell.is-light :is(
+  .dn-driver-order-card,
+  .dn-driver-profile-panel,
+  .dn-driver-status-card,
+  .dn-driver-stat-card,
+  .dn-driver-summary-card,
+  .dn-driver-communication-card
+) {
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 93% 0, rgba(17,132,235,.065), transparent 17rem),
+    linear-gradient(145deg, rgba(255,255,255,.97), rgba(235,246,255,.88)) !important;
+  box-shadow: var(--dn-app-shadow) !important;
+}
+
+/* Rail stays navy in Light so field navigation has a stable high-contrast
+   one-hand anchor. */
+.dn-driver-shell.is-light .dn-driver-rail-v3 {
+  color: #f7fbff !important;
+  border-color: rgba(255,255,255,.09) !important;
+  background:
+    radial-gradient(circle at 50% -6%, rgba(49,168,255,.20), transparent 18rem),
+    linear-gradient(180deg, #072a4e, #031629) !important;
+  box-shadow: 14px 0 36px rgba(3,20,41,.17) !important;
+}
+
+.dn-driver-shell.is-light[dir="rtl"] .dn-driver-rail-v3 {
+  box-shadow: -14px 0 36px rgba(3,20,41,.17) !important;
+}
+
+.dn-driver-shell.is-light .dn-driver-rail-v3 :is(button,a) {
+  color: #c1d4e6;
+}
+
+.dn-driver-shell.is-light .dn-driver-rail-v3 :is(button,a):hover {
+  color: #fff !important;
+  background: rgba(255,255,255,.07) !important;
+}
+
+.dn-driver-shell.is-light .dn-driver-rail-v3 button.is-active {
+  color: #04172d !important;
+  background: linear-gradient(135deg, #f4da7a, #d4af37) !important;
+  box-shadow: 0 10px 24px rgba(164,119,0,.22) !important;
+}
+
+/* Map remains an intentional dark operational anchor in Light. */
+.dn-driver-shell.is-light :is(.dn-live-map-shell, .dn-3d-tracking-map, [class*="driver-map"]) {
+  color: #f7fbff !important;
+  background: #020812 !important;
+  box-shadow: 0 26px 70px rgba(0,0,0,.27), 0 0 34px rgba(24,168,232,.10) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* AUTH / LOGIN / EMPTY STATES — Light mode cannot fall back to stale dark CSS */
+/* -------------------------------------------------------------------------- */
+
+html.light-theme :is(.dn-portal-auth-page, .dn-merchant-login-v3, .dn-merchant-state-v3) {
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 8% 3%, rgba(17,132,235,.15), transparent 30rem),
+    radial-gradient(circle at 93% 90%, rgba(212,175,55,.07), transparent 25rem),
+    linear-gradient(145deg, #e6f2ff, #fbfdff 52%, #ebf6ff) !important;
+}
+
+html.light-theme .dn-portal-auth-visual,
+html.light-theme .dn-merchant-login-visual-v3 {
+  color: #f8fbff !important;
+  border-color: rgba(104,193,255,.19) !important;
+  background:
+    radial-gradient(circle at 82% 5%, rgba(47,173,255,.22), transparent 23rem),
+    radial-gradient(circle at 10% 100%, rgba(212,175,55,.10), transparent 20rem),
+    linear-gradient(145deg, #04172d, #073963 62%, #0a4f7e) !important;
+  box-shadow: 0 30px 80px rgba(3,20,41,.24), inset 0 1px rgba(255,255,255,.08) !important;
+}
+
+html.light-theme :is(.dn-portal-auth-visual, .dn-merchant-login-visual-v3) :is(h1,h2,h3,strong) {
+  color: #f8fbff !important;
+}
+
+html.light-theme :is(.dn-portal-auth-visual, .dn-merchant-login-visual-v3) :is(p,span,small) {
+  color: #c5d9ea;
+}
+
+html.light-theme :is(.dn-portal-auth-card, .dn-merchant-login-card-v3, .dn-merchant-state-v3) {
+  color: #06182f !important;
+  border-color: rgba(6,75,145,.16) !important;
+  background:
+    radial-gradient(circle at 94% 0, rgba(17,132,235,.075), transparent 18rem),
+    linear-gradient(145deg, rgba(255,255,255,.98), rgba(235,246,255,.91)) !important;
+  box-shadow: 0 30px 80px rgba(21,67,118,.16), inset 0 1px #fff !important;
+}
+
+html.light-theme :is(.dn-portal-auth-card, .dn-merchant-login-card-v3, .dn-merchant-state-v3) :is(h1,h2,h3,strong) {
+  color: #06182f !important;
+}
+
+html.light-theme :is(.dn-portal-auth-card, .dn-merchant-login-card-v3, .dn-merchant-state-v3) :is(p,span,small,label) {
+  color: #55738f;
+}
+
+html.light-theme :is(.dn-portal-auth-card, .dn-merchant-login-card-v3) :is(input,select,textarea) {
+  border-color: rgba(6,75,145,.18) !important;
+  color: #06182f !important;
+  background: linear-gradient(180deg, #fff, #f4f9ff) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* STANDALONE INTERNATIONAL TRACKING — harmonize with global pearl palette.   */
+/* -------------------------------------------------------------------------- */
+
+.dn-it-page.is-light {
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 5% 3%, rgba(14,116,222,.17), transparent 31rem),
+    radial-gradient(circle at 93% 7%, rgba(76,190,250,.12), transparent 28rem),
+    radial-gradient(circle at 84% 82%, rgba(212,175,55,.075), transparent 27rem),
+    linear-gradient(137deg, #e2efff 0%, #f4faff 31%, #fbfdff 57%, #e8f4ff 100%) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-copy h1 {
+  color: #06182f !important;
+  font-size: clamp(38px, 4.55vw, 70px) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.045em !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-copy p {
+  color: #456682 !important;
+  font-weight: 650 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* MOBILE / TABLET — same design DNA, lower visual cost and zero overflow.    */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 980px) {
+  html.light-theme body {
+    background-attachment: scroll !important;
+  }
+
+  :is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) {
+    max-width: 100vw;
+    overflow-x: clip !important;
+  }
+
+  :is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(
+    [class*="card"], [class*="panel"], [class*="surface"], [class*="sheet"]
+  ) {
+    backdrop-filter: blur(12px) saturate(1.06) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.06) !important;
+  }
+
+  .dn-admin-fullscreen.is-light .dn-admin-workspace-host {
+    border-radius: 24px !important;
+    padding: 14px !important;
+  }
+
+  .dn-it-page.is-light .dn-it-initial-copy h1 {
+    font-size: clamp(34px, 7vw, 56px) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  html.light-theme body :is(input, select, textarea) {
+    font-size: 16px !important;
+  }
+
+  :is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) {
+    --dn-app-shadow: 0 12px 32px rgba(21,67,118,.09), 0 2px 8px rgba(21,67,118,.04);
+  }
+
+  .dn-admin-fullscreen.is-light .dn-admin-workspace-host {
+    padding: 10px !important;
+    border-radius: 20px !important;
+  }
+
+  .dn-merchant-app.is-light .dn-merchant-content-inner,
+  .dn-driver-shell.is-light .dn-driver-workspace-v3 {
+    padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  }
+
+  .dn-merchant-app.is-light .dn-merchant-content-inner {
+    padding-block-end: max(92px, calc(76px + env(safe-area-inset-bottom))) !important;
+  }
+
+  .dn-driver-shell.is-light .dn-driver-workspace-v3 {
+    padding-block-end: max(78px, calc(62px + env(safe-area-inset-bottom))) !important;
+  }
+
+  .dn-public-footer .dn-public-footer-content {
+    padding-inline: 18px !important;
+  }
+
+  .dn-public-footer .mt-6 > .grid.grid-cols-2 > a {
+    min-width: 0;
+    padding: 10px !important;
+  }
+
+  .dn-it-page.is-light .dn-it-initial-copy h1 {
+    font-size: clamp(31px, 10vw, 44px) !important;
+    line-height: 1.12 !important;
+  }
+}
+
+@media (max-width: 430px) {
+  :is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) :is(
+    [class*="card"], [class*="panel"], [class*="surface"], [class*="sheet"]
+  ) {
+    border-radius: min(18px, 5vw) !important;
+  }
+
+  .dn-public-footer .mt-6 > .grid.grid-cols-2 {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .dn-public-footer .mt-6 > .grid.grid-cols-2 > a :is(span, strong, small) {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  :is(.dn-admin-fullscreen.is-light, .dn-merchant-app.is-light, .dn-driver-shell.is-light) {
+    font-size: 14px;
+  }
+
+  .dn-public-footer .mt-6 > .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Native WebView / PWA safe areas. */
+@supports (padding: max(0px)) {
+  .dn-merchant-app.is-light,
+  .dn-driver-shell.is-light {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Never burn GPU on decorative blur when the user requests reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  html.light-theme *,
+  html.light-theme *::before,
+  html.light-theme *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
