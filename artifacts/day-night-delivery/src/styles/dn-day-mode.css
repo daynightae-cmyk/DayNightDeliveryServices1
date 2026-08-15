@@ -1,6 +1,6 @@
 /* DAY NIGHT — Public day/night compatibility layer
-   Keep this file deliberately small and scoped. It must never force the
-   light theme back into dark colors or override page typography globally. */
+   Keep this file deliberately scoped. It must never force the light theme
+   back into dark colors or override page typography globally. */
 
 :root.light-theme {
   color-scheme: light !important;
@@ -77,4 +77,355 @@ html.dark-theme body:has(.dn-it-page.is-dark) {
 
 .dn-live-map-shell .leaflet-control-attribution {
   display: none !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* PUBLIC FOOTER — a deliberate dark luxury anchor in both application modes. */
+/* -------------------------------------------------------------------------- */
+.dn-public-footer {
+  color: #f7fbff !important;
+  background:
+    radial-gradient(circle at 12% -8%, rgba(31, 144, 235, .20), transparent 30rem),
+    radial-gradient(circle at 88% 8%, rgba(212, 175, 55, .10), transparent 25rem),
+    linear-gradient(180deg, #071f3a 0%, #031426 46%, #010916 100%) !important;
+  box-shadow: 0 -28px 80px rgba(4, 28, 55, .20), inset 0 1px rgba(255, 255, 255, .055) !important;
+}
+
+.dn-public-footer :is(h2, h3, h4) {
+  color: #f8fbff !important;
+}
+
+.dn-public-footer .dn-public-footer-content > div:first-child > p:last-of-type {
+  color: #b9cbde !important;
+}
+
+.dn-public-footer .dn-developer-signature > div {
+  border-color: rgba(212, 175, 55, .24) !important;
+  color: #f7fbff !important;
+  background:
+    radial-gradient(circle at 8% 0, rgba(30, 143, 236, .14), transparent 18rem),
+    radial-gradient(circle at 94% 100%, rgba(212, 175, 55, .12), transparent 16rem),
+    linear-gradient(135deg, rgba(5, 24, 47, .96), rgba(8, 42, 78, .91) 58%, rgba(43, 36, 13, .78)) !important;
+  box-shadow: 0 22px 65px rgba(0, 0, 0, .30), inset 0 1px rgba(255, 255, 255, .05) !important;
+}
+
+.dn-public-footer .dn-developer-signature > div > div:first-of-type > div span:first-child {
+  color: rgba(226, 238, 249, .58) !important;
+}
+
+.dn-public-footer .dn-developer-signature > div > div:first-of-type p {
+  color: rgba(218, 231, 244, .52) !important;
+}
+
+.dn-public-footer .dn-developer-signature > div > a:last-child {
+  border-color: rgba(212, 175, 55, .30) !important;
+  color: #f4d15d !important;
+  background: rgba(212, 175, 55, .10) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* INTERNATIONAL TRACKING — true pearl/ice luxury light mode.                 */
+/* -------------------------------------------------------------------------- */
+.dn-it-page.is-light {
+  --dn-text: #06182f !important;
+  --dn-text-secondary: #405e7b !important;
+  --dn-text-muted: #657f99 !important;
+  --dn-card: rgba(250, 253, 255, .88) !important;
+  --dn-card-strong: rgba(248, 252, 255, .95) !important;
+  --dn-panel-soft: rgba(235, 246, 255, .86) !important;
+  --dn-border: rgba(5, 78, 150, .17) !important;
+  --dn-border-strong: rgba(5, 78, 150, .28) !important;
+  --dn-glass: rgba(247, 252, 255, .78) !important;
+  --dn-gold: #b98405 !important;
+  --dn-warm-gold: #9b6a00 !important;
+  --dn-shadow: 0 30px 82px rgba(20, 66, 116, .16), 0 8px 24px rgba(20, 66, 116, .06) !important;
+  --dn-card-shadow: 0 19px 50px rgba(20, 66, 116, .13), inset 0 1px rgba(255, 255, 255, .98) !important;
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 5% 3%, rgba(14, 116, 222, .24), transparent 31rem),
+    radial-gradient(circle at 93% 7%, rgba(76, 190, 250, .18), transparent 28rem),
+    radial-gradient(circle at 84% 82%, rgba(212, 175, 55, .14), transparent 27rem),
+    linear-gradient(137deg, #d9eaff 0%, #edf7ff 29%, #f9fcff 56%, #e5f2ff 100%) !important;
+}
+
+.dn-it-page.is-light::before {
+  opacity: .30 !important;
+  background-image:
+    linear-gradient(rgba(5, 73, 142, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(5, 73, 142, .055) 1px, transparent 1px) !important;
+  background-size: 48px 48px !important;
+}
+
+.dn-it-page.is-light .dn-it-topbar {
+  border-bottom-color: rgba(5, 75, 145, .17) !important;
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 12% -25%, rgba(28, 141, 240, .14), transparent 20rem),
+    linear-gradient(135deg, rgba(252, 254, 255, .91), rgba(232, 244, 255, .84)) !important;
+  box-shadow: 0 18px 46px rgba(22, 66, 116, .13), inset 0 -1px rgba(255, 255, 255, .94) !important;
+  backdrop-filter: blur(24px) saturate(1.20) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.20) !important;
+}
+
+.dn-it-page.is-light .dn-it-brand,
+.dn-it-page.is-light .dn-it-title-lockup strong,
+.dn-it-page.is-light .dn-it-top-actions :is(a, button) {
+  color: #06182f !important;
+}
+
+.dn-it-page.is-light .dn-it-brand-copy small {
+  color: #9a6c00 !important;
+}
+
+.dn-it-page.is-light .dn-it-title-lockup small {
+  color: #55718c !important;
+}
+
+.dn-it-page.is-light .dn-it-top-actions :is(a, button):not(.dn-it-add-button) {
+  border-color: rgba(5, 78, 150, .14) !important;
+  background: rgba(255, 255, 255, .60) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .9) !important;
+}
+
+.dn-it-page.is-light .dn-it-top-actions .dn-it-add-button {
+  color: #06182f !important;
+  background: linear-gradient(135deg, #d9ad35, #f1d36f) !important;
+  box-shadow: 0 12px 28px rgba(185, 132, 5, .18) !important;
+}
+
+.dn-it-page.is-light .dn-it-search-deck {
+  border-color: rgba(5, 78, 150, .17) !important;
+  background:
+    radial-gradient(circle at 8% 0, rgba(16, 130, 233, .10), transparent 20rem),
+    linear-gradient(135deg, rgba(255, 255, 255, .88), rgba(231, 244, 255, .76)) !important;
+  box-shadow: 0 24px 62px rgba(22, 66, 116, .14), inset 0 1px rgba(255, 255, 255, .98) !important;
+  backdrop-filter: blur(20px) saturate(1.14) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.14) !important;
+}
+
+.dn-it-page.is-light .dn-it-search > label strong {
+  color: #082344 !important;
+}
+
+.dn-it-page.is-light .dn-it-search > label small,
+.dn-it-page.is-light .dn-it-search-assurance span {
+  color: #4d6984 !important;
+}
+
+.dn-it-page.is-light .dn-it-search-field input {
+  border-color: rgba(4, 75, 145, .21) !important;
+  color: #06182f !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f9ff 100%) !important;
+  box-shadow: 0 9px 24px rgba(22, 66, 116, .08), inset 0 1px #fff !important;
+}
+
+.dn-it-page.is-light .dn-it-search-field input::placeholder {
+  color: #758da5 !important;
+  opacity: 1 !important;
+}
+
+.dn-it-page.is-light .dn-it-search-field > svg {
+  color: #55718c !important;
+}
+
+.dn-it-page.is-light .dn-it-qr-button {
+  border-color: rgba(5, 91, 177, .19) !important;
+  color: #086fd4 !important;
+  background: rgba(225, 241, 255, .88) !important;
+}
+
+.dn-it-page.is-light .dn-it-track-button {
+  color: #06182f !important;
+  background: linear-gradient(135deg, #d9ad35, #f3d978) !important;
+  box-shadow: 0 13px 30px rgba(185, 132, 5, .19) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-state {
+  isolation: isolate;
+  border-color: rgba(5, 79, 152, .18) !important;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(14, 116, 222, .16), transparent 27rem),
+    radial-gradient(circle at 94% 13%, rgba(84, 191, 249, .12), transparent 24rem),
+    radial-gradient(circle at 84% 92%, rgba(212, 175, 55, .10), transparent 23rem),
+    linear-gradient(135deg, rgba(239, 248, 255, .94), rgba(252, 254, 255, .91) 46%, rgba(238, 247, 255, .88)) !important;
+  box-shadow: 0 34px 92px rgba(21, 67, 118, .17), 0 10px 28px rgba(21, 67, 118, .065), inset 0 1px #fff !important;
+  backdrop-filter: blur(18px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.12) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-state::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, .10), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, .38), transparent 18%);
+}
+
+.dn-it-page.is-light .dn-it-initial-copy {
+  color: #06182f !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-copy::before {
+  content: "";
+  display: block;
+  width: 76px;
+  height: 4px;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0a73da, #42b8ee 58%, #d4af37);
+  box-shadow: 0 6px 18px rgba(10, 115, 218, .14);
+}
+
+.dn-it-page.is-light[dir="rtl"] .dn-it-initial-copy::before {
+  margin-inline-start: auto;
+}
+
+.dn-it-page.is-light .dn-it-eyebrow {
+  border-color: rgba(154, 108, 0, .24) !important;
+  color: #7e5800 !important;
+  background: linear-gradient(135deg, rgba(255, 247, 216, .92), rgba(248, 232, 171, .62)) !important;
+  box-shadow: 0 8px 20px rgba(154, 108, 0, .08), inset 0 1px rgba(255, 255, 255, .75) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-copy h1 {
+  color: #06182f !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .86), 0 12px 30px rgba(20, 66, 116, .08) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-copy p {
+  color: #405e7b !important;
+  font-weight: 650 !important;
+}
+
+.dn-it-page.is-light .dn-it-trust-strip span {
+  border-color: rgba(5, 78, 150, .16) !important;
+  color: #395a77 !important;
+  background: rgba(255, 255, 255, .60) !important;
+  box-shadow: 0 8px 20px rgba(22, 66, 116, .055), inset 0 1px #fff !important;
+}
+
+.dn-it-page.is-light .dn-it-trust-strip svg {
+  color: #a67606 !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-visual {
+  border-radius: 30px;
+  background:
+    radial-gradient(ellipse at 48% 54%, rgba(25, 137, 235, .13), transparent 44%),
+    radial-gradient(circle at 76% 20%, rgba(255, 255, 255, .70), transparent 29rem);
+}
+
+.dn-it-page.is-light .dn-it-initial-visual img {
+  filter: drop-shadow(0 28px 36px rgba(5, 31, 61, .26)) drop-shadow(0 0 22px rgba(23, 130, 224, .08)) !important;
+}
+
+.dn-it-page.is-light .dn-it-global-orbit {
+  border-color: rgba(6, 104, 199, .18) !important;
+  box-shadow: inset 0 0 75px rgba(32, 143, 235, .09), 0 0 68px rgba(32, 143, 235, .08) !important;
+}
+
+.dn-it-page.is-light .dn-it-global-orbit::before {
+  border-color: rgba(177, 125, 6, .26) !important;
+}
+
+.dn-it-page.is-light .dn-it-global-orbit::after {
+  border-color: rgba(6, 104, 199, .22) !important;
+}
+
+.dn-it-page.is-light .dn-it-initial-route {
+  border-top-color: rgba(177, 125, 6, .48) !important;
+}
+
+.dn-it-page.is-light .dn-it-hub {
+  border-color: #fff !important;
+  background: #c5941b !important;
+  box-shadow: 0 0 0 8px rgba(197, 148, 27, .10), 0 0 20px rgba(197, 148, 27, .30) !important;
+}
+
+.dn-it-page.is-light :is(.dn-it-loading-state, .dn-it-error-state, .dn-it-support-card, .dn-it-recent-card) {
+  border-color: rgba(5, 78, 150, .17) !important;
+  color: #06182f !important;
+  background:
+    radial-gradient(circle at 94% 0, rgba(10, 114, 221, .08), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, .92), rgba(232, 245, 255, .82)) !important;
+  box-shadow: 0 18px 48px rgba(22, 66, 116, .12), inset 0 1px #fff !important;
+}
+
+.dn-it-page.is-light .dn-it-support-card strong,
+.dn-it-page.is-light .dn-it-recent-card > header span {
+  color: #082344 !important;
+}
+
+.dn-it-page.is-light .dn-it-support-card small,
+.dn-it-page.is-light .dn-it-recent-card > header button,
+.dn-it-page.is-light .dn-it-recent-card > div > small {
+  color: #526f89 !important;
+}
+
+.dn-it-page.is-light .dn-it-recent-card > div > button {
+  border-color: rgba(5, 78, 150, .14) !important;
+  color: #092541 !important;
+  background: rgba(255, 255, 255, .64) !important;
+}
+
+/* The tracking result map and shipment aircraft hero intentionally remain
+   dark operational anchors; only surrounding light surfaces are bright. */
+.dn-it-page.is-light :is(.dn-it-live-map, .dn-it-shipment-hero) {
+  color: #fff !important;
+}
+
+.dn-it-page.is-light .dn-it-footer {
+  width: min(1660px, calc(100% - 32px));
+  margin: 0 auto 18px;
+  padding: 18px 22px;
+  border: 1px solid rgba(112, 185, 245, .14);
+  border-radius: 18px;
+  color: #aebfd1 !important;
+  background:
+    radial-gradient(circle at 10% 0, rgba(27, 140, 231, .15), transparent 19rem),
+    linear-gradient(135deg, #071f3a, #020c19) !important;
+  box-shadow: 0 18px 46px rgba(4, 28, 55, .18), inset 0 1px rgba(255, 255, 255, .045) !important;
+}
+
+.dn-it-page.is-light .dn-it-footer span {
+  color: #f7fbff !important;
+}
+
+.dn-it-page.is-light .dn-it-footer small {
+  color: #aebfd1 !important;
+}
+
+.dn-it-page.is-light .dn-it-footer a {
+  color: #f0c94f !important;
+}
+
+@media (max-width: 820px) {
+  .dn-it-page.is-light .dn-it-initial-copy::before {
+    margin-inline: auto !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .dn-public-footer .dn-public-footer-content {
+    padding-inline: 16px !important;
+  }
+
+  .dn-it-page.is-light .dn-it-initial-state {
+    border-radius: 24px !important;
+    padding: 28px 20px !important;
+  }
+
+  .dn-it-page.is-light .dn-it-initial-visual {
+    border-radius: 22px;
+  }
+
+  .dn-it-page.is-light .dn-it-footer {
+    width: calc(100% - 16px);
+    flex-wrap: wrap;
+    text-align: center;
+  }
 }
