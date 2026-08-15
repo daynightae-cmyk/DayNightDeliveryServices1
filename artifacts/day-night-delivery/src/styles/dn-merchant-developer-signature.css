@@ -1,0 +1,92 @@
+/* Merchant developer signature — authenticated-shell placement.
+   This is deliberately account-agnostic: MerchantPortalShell renders it once
+   for every authenticated merchant and the rules below only control layout. */
+
+.dn-merchant-app .dn-merchant-engineering-signature {
+  width: 100%;
+  min-width: 0;
+  margin-top: clamp(18px, 2.4vw, 30px);
+  padding-top: 1px;
+}
+
+.dn-merchant-app .dn-merchant-engineering-signature > .dn-developer-signature {
+  width: 100%;
+  max-width: none;
+  padding-inline: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div {
+  width: 100%;
+  max-width: none !important;
+  box-sizing: border-box;
+  border-radius: clamp(20px, 2vw, 28px);
+}
+
+.dn-merchant-app .dn-merchant-engineering-signature a,
+.dn-merchant-app .dn-merchant-engineering-signature span,
+.dn-merchant-app .dn-merchant-engineering-signature p {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .dn-merchant-app .dn-merchant-engineering-signature {
+    margin-top: 18px;
+    margin-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div {
+    gap: 14px;
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .dn-merchant-app .dn-merchant-engineering-signature {
+    margin-top: 14px;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div {
+    border-radius: 20px;
+    padding: 14px !important;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div > div:nth-of-type(3) {
+    min-width: 0;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature a {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (max-width: 430px) {
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div {
+    padding: 13px !important;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div > div:nth-of-type(3) {
+    gap: 10px;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature p[dir="ltr"] {
+    font-size: 9px !important;
+    line-height: 1.5;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 360px) {
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div {
+    padding: 12px !important;
+  }
+
+  .dn-merchant-app .dn-merchant-engineering-signature .dn-developer-signature > div > div:nth-of-type(3) > span:first-child {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+}
