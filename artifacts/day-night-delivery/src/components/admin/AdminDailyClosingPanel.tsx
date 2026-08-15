@@ -3,9 +3,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clipboard,
+  Database,
   FileMinus,
   Landmark,
   Loader2,
+  LockKeyhole,
   PiggyBank,
   Printer,
   RefreshCw,
@@ -16,10 +18,11 @@ import {
 } from "lucide-react";
 import type { Order } from "../../types";
 import {
-  fetchAuthoritativeDailyClosing,
-  saveAuthoritativeDailyClosing,
-} from "../../lib/adminFinanceLedger";
-import { financialsFromOrder } from "../../lib/orderFinancials";
+  fetchDailyClosing,
+  saveDailyClosing,
+  type DailyClosingSnapshot,
+  type DailyClosingStatus,
+} from "../../lib/adminDailyClosingRuntime";
 import type { FinanceSummary, FinanceSummarySource } from "../../lib/adminData";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import { AdminIconBadge, AdminStateChip, type AdminIconName } from "./adminIconSystem";
@@ -34,158 +37,111 @@ type Props = {
   onNavigate?: (id: string) => void;
 };
 
-type ClosingStatus = "draft" | "needs_review" | "closed" | "reopened";
-
-type ClosingSnapshot = Record<string, unknown> & {
-  closing_date: string;
-  total_orders: number;
-  delivered_orders: number;
-  cancelled_orders: number;
-  returned_orders: number;
-  goods_value: number;
-  delivery_income: number;
-  discounts_total: number;
-  customer_total: number;
-  merchant_due: number;
-  cod_total: number;
-  cod_collected: number;
-  cod_pending: number;
-  cod_reconciled: number;
-  expenses_total: number;
-  adjustments_net: number;
-  net_total: number;
-  budget_allocated: number;
-  budget_remaining: number;
-  unassigned_orders: number;
-  pending_review_orders: number;
-  unreconciled_cod: number;
-  unposted_delivered_orders: number;
-  print_jobs_pending: number;
-  status: ClosingStatus;
-  source: "rpc" | "preview";
-  notes?: string;
-};
-
 const num = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
-const money = (value: unknown) => `${num(value).toFixed(2)} AED`;
-const todayKey = () => new Date().toISOString().slice(0, 10);
-const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-const isDelivered = (order: Order) => ["delivered", "completed", "complete"].includes(normalizeStatus(order.status));
 
-function statusText(status: ClosingStatus | "blocked", isArabic: boolean) {
+function dubaiTodayKey() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Dubai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+  return `${read("year")}-${read("month")}-${read("day")}`;
+}
+
+function money(value: unknown, isArabic: boolean) {
+  const formatted = num(value).toLocaleString(isArabic ? "ar-AE" : "en-AE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return isArabic ? `${formatted} درهم` : `AED ${formatted}`;
+}
+
+function statusText(status: DailyClosingStatus | "blocked", isArabic: boolean) {
   const labels: Record<string, [string, string]> = {
     blocked: ["غير متصل بالدفتر المالي", "Finance ledger unavailable"],
-    draft: ["مسودة", "Draft"],
+    draft: ["مفتوح للحساب", "Open for calculation"],
     needs_review: ["يحتاج مراجعة", "Needs review"],
-    closed: ["مغلق", "Closed"],
+    closed: ["مغلق ومثبت", "Closed & locked"],
     reopened: ["أعيد فتحه", "Reopened"],
   };
   return labels[status][isArabic ? 0 : 1];
 }
 
-function normalizeSnapshot(raw: Record<string, unknown>): ClosingSnapshot {
-  const status = normalizeStatus(raw.status);
-  return {
-    ...raw,
-    closing_date: String(raw.closing_date || todayKey()),
-    total_orders: num(raw.total_orders),
-    delivered_orders: num(raw.delivered_orders),
-    cancelled_orders: num(raw.cancelled_orders),
-    returned_orders: num(raw.returned_orders),
-    goods_value: num(raw.goods_value),
-    delivery_income: num(raw.delivery_income),
-    discounts_total: num(raw.discounts_total),
-    customer_total: num(raw.customer_total),
-    merchant_due: num(raw.merchant_due),
-    cod_total: num(raw.cod_total),
-    cod_collected: num(raw.cod_collected),
-    cod_pending: num(raw.cod_pending),
-    cod_reconciled: num(raw.cod_reconciled),
-    expenses_total: num(raw.expenses_total),
-    adjustments_net: num(raw.adjustments_net),
-    net_total: num(raw.net_total),
-    budget_allocated: num(raw.budget_allocated),
-    budget_remaining: num(raw.budget_remaining),
-    unassigned_orders: num(raw.unassigned_orders),
-    pending_review_orders: num(raw.pending_review_orders),
-    unreconciled_cod: num(raw.unreconciled_cod),
-    unposted_delivered_orders: num(raw.unposted_delivered_orders),
-    print_jobs_pending: num(raw.print_jobs_pending),
-    status: ["draft", "needs_review", "closed", "reopened"].includes(status) ? (status as ClosingStatus) : "needs_review",
-    source: raw.source === "rpc" ? "rpc" : "preview",
-    notes: String(raw.notes || "").trim() || undefined,
-  };
+function sourceText(snapshot: DailyClosingSnapshot | null, isArabic: boolean) {
+  if (!snapshot || snapshot.source === "unavailable") return isArabic ? "غير متصل" : "Unavailable";
+  if (snapshot.source === "persisted") return isArabic ? "لقطة إغلاق محفوظة" : "Persisted closing snapshot";
+  if (snapshot.source === "tables") return isArabic ? "جداول الإنتاج المباشرة" : "Direct production tables";
+  return isArabic ? "RPC مالي مباشر" : "Authoritative finance RPC";
 }
 
-function buildPreview(date: string, orders: Order[]): ClosingSnapshot {
-  const dayOrders = orders.filter((order) => String(order.created_at || order.updated_at || "").slice(0, 10) === date);
-  const delivered = dayOrders.filter(isDelivered);
-  const financial = delivered.map((order) => financialsFromOrder(order as Order & Record<string, unknown>));
-  const total = (key: keyof ReturnType<typeof financialsFromOrder>) => financial.reduce((sum, row) => sum + num(row[key]), 0);
-  const collected = delivered.reduce((sum, order) => sum + num(order.collected_amount), 0);
-  const unposted = delivered.filter((order) => !order.financial_posted_at).length;
-  const codTotal = total("customerTotal");
-  return {
-    closing_date: date,
-    total_orders: dayOrders.length,
-    delivered_orders: delivered.length,
-    cancelled_orders: dayOrders.filter((order) => ["cancelled", "canceled", "failed"].includes(normalizeStatus(order.status))).length,
-    returned_orders: dayOrders.filter((order) => normalizeStatus(order.status) === "returned").length,
-    goods_value: total("goodsValue"),
-    delivery_income: total("companyRevenue"),
-    discounts_total: total("discountAmount"),
-    customer_total: codTotal,
-    merchant_due: total("merchantDue"),
-    cod_total: codTotal,
-    cod_collected: collected,
-    cod_pending: Math.max(0, codTotal - collected),
-    cod_reconciled: 0,
-    expenses_total: 0,
-    adjustments_net: 0,
-    net_total: total("companyRevenue"),
-    budget_allocated: 0,
-    budget_remaining: 0,
-    unassigned_orders: dayOrders.filter((order) => !order.driver_name && !(order as Order & { driver_id?: string }).driver_id && !(order as Order & { assigned_driver_id?: string }).assigned_driver_id).length,
-    pending_review_orders: dayOrders.filter((order) => ["pending", "review", "under_review", "confirmed"].includes(normalizeStatus(order.status))).length,
-    unreconciled_cod: Math.max(0, codTotal - collected),
-    unposted_delivered_orders: unposted,
-    print_jobs_pending: 0,
-    status: "needs_review",
-    source: "preview",
-  };
+function generatedText(value: string | undefined, isArabic: boolean) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(isArabic ? "ar-AE" : "en-AE", {
+    timeZone: "Asia/Dubai",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default function AdminDailyClosingPanel({
   isArabic,
-  orders,
+  orders: _orders,
   financeSummary: _legacyFinanceSummary,
   financeSummarySource: _legacyFinanceSource,
   onNavigate,
 }: Props) {
-  const [record, setRecord] = useState<ClosingSnapshot | null>(null);
+  const [selectedDate, setSelectedDate] = useState(dubaiTodayKey);
+  const [record, setRecord] = useState<DailyClosingSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [ledgerReady, setLedgerReady] = useState(false);
-  const date = todayKey();
-  const preview = useMemo(() => buildPreview(date, orders), [date, orders]);
-  const closing = record || preview;
+  const [lastError, setLastError] = useState("");
+
+  const ledgerReady = Boolean(record?.authoritative && record.source !== "unavailable");
+  const isClosed = record?.status === "closed";
 
   async function load() {
     setBusy(true);
     setMessage("");
+    setLastError("");
     try {
-      const raw = await fetchAuthoritativeDailyClosing(date);
-      const next = normalizeSnapshot(raw);
+      const next = await fetchDailyClosing(selectedDate);
       setRecord(next);
-      setLedgerReady(next.source === "rpc");
+      if (next.source === "tables") {
+        setMessage(
+          isArabic
+            ? "الـRPC غير متاح مؤقتًا، لكن الأرقام الحالية محسوبة مباشرة من جداول الإنتاج الفعلية وليست معاينة محلية."
+            : "The RPC is temporarily unavailable, but these values are calculated directly from production finance tables—not a local preview.",
+        );
+      } else if (next.source === "persisted") {
+        setMessage(
+          isArabic
+            ? "هذه لقطة الإغلاق المحفوظة في قاعدة البيانات. الأرقام مثبتة كما كانت وقت الإغلاق."
+            : "This is the database-persisted closing snapshot. Values are locked to the moment the day was closed.",
+        );
+      } else if (next.source === "unavailable") {
+        setLastError(next.reason || "finance_unavailable");
+        setMessage(
+          isArabic
+            ? "تعذر الوصول إلى دفتر مالي موثوق. لن نعرض أصفارًا محلية على أنها أرقام فعلية."
+            : "An authoritative finance source is unavailable. Local zero values will not be presented as real finance data.",
+        );
+      }
     } catch (error) {
       console.warn("Authoritative daily closing unavailable:", error);
       setRecord(null);
-      setLedgerReady(false);
-      setMessage(isArabic ? "الإغلاق اليومي في وضع معاينة فقط. طبّق Migration المالية الجديدة ثم أعد الفحص." : "Daily closing is preview-only. Apply the new finance migration, then retry.");
+      setLastError(error instanceof Error ? error.message : String(error));
+      setMessage(
+        isArabic
+          ? "تعذر تحميل الإغلاق المالي من قاعدة البيانات. لم يتم استخدام أي حفظ محلي أو إجمالي قديم."
+          : "The financial closing could not be loaded from the database. No local persistence or legacy total was used.",
+      );
     } finally {
       setBusy(false);
     }
@@ -193,146 +149,284 @@ export default function AdminDailyClosingPanel({
 
   useEffect(() => {
     void load();
-  }, [date, orders]);
+  }, [selectedDate]);
 
   useEffect(() => {
-    if (!ledgerReady) return;
-    const hasRisk = closing.net_total < 0 || closing.unreconciled_cod > 0 || closing.unposted_delivered_orders > 0;
-    const needsReview = closing.cod_pending > 0 || closing.unassigned_orders > 0 || closing.pending_review_orders > 0;
+    if (!record?.authoritative || record.source === "unavailable") return;
+    const hasRisk = record.net_total < 0 || record.unreconciled_cod > 0 || record.unposted_delivered_orders > 0;
+    const needsReview = record.cod_pending > 0 || record.unassigned_orders > 0 || record.pending_review_orders > 0;
     if (hasRisk) {
       addAdminNotification({
         type: "warning",
         sectionId: "daily_closing",
         priority: "high",
-        dedupeKey: `closing:${date}:risk:${closing.unposted_delivered_orders}:${closing.unreconciled_cod}`,
+        dedupeKey: `closing:${selectedDate}:risk:${record.unposted_delivered_orders}:${record.unreconciled_cod}`,
         audioEvent: "warning",
-        titleAr: "الإغلاق اليومي متوقف",
-        titleEn: "Daily closing blocked",
-        bodyAr: `طلبات مسلّمة غير مُرحّلة ${closing.unposted_delivered_orders}، وتحصيل غير مسوى ${money(closing.unreconciled_cod)}.`,
-        bodyEn: `${closing.unposted_delivered_orders} delivered orders are unposted and ${money(closing.unreconciled_cod)} is unreconciled.`,
+        titleAr: "الإغلاق اليومي يحتاج انتباه",
+        titleEn: "Daily closing requires attention",
+        bodyAr: `طلبات مسلّمة غير مُرحّلة ${record.unposted_delivered_orders}، وتحصيل غير مسوى ${money(record.unreconciled_cod, true)}.`,
+        bodyEn: `${record.unposted_delivered_orders} delivered orders are unposted and ${money(record.unreconciled_cod, false)} is unreconciled.`,
       });
     } else if (needsReview) {
       addAdminNotification({
         type: "daily_closing",
         sectionId: "daily_closing",
         priority: "high",
-        dedupeKey: `closing:${date}:review:${closing.cod_pending}:${closing.unassigned_orders}`,
+        dedupeKey: `closing:${selectedDate}:review:${record.cod_pending}:${record.unassigned_orders}`,
         audioEvent: "daily_closing_warning",
         titleAr: "الإغلاق يحتاج مراجعة",
         titleEn: "Closing needs review",
-        bodyAr: `تحصيل معلق ${money(closing.cod_pending)}، وطلبات بدون مندوب ${closing.unassigned_orders}.`,
-        bodyEn: `Pending collection ${money(closing.cod_pending)} and ${closing.unassigned_orders} unassigned orders.`,
+        bodyAr: `تحصيل معلق ${money(record.cod_pending, true)}، وطلبات بدون مندوب ${record.unassigned_orders}.`,
+        bodyEn: `Pending collection ${money(record.cod_pending, false)} and ${record.unassigned_orders} unassigned orders.`,
       });
     }
-  }, [ledgerReady, closing.cod_pending, closing.unassigned_orders, closing.unreconciled_cod, closing.unposted_delivered_orders, date]);
+  }, [record, selectedDate]);
 
-  async function save(status: ClosingStatus) {
-    if (!ledgerReady) return;
+  async function save(status: DailyClosingStatus) {
+    if (!record || !ledgerReady) return;
+    if (status === "closed") {
+      if (record.unposted_delivered_orders > 0) {
+        setMessage(
+          isArabic
+            ? `لا يمكن تثبيت الإغلاق: يوجد ${record.unposted_delivered_orders} طلب مسلّم لم يُرحّل ماليًا بعد.`
+            : `Closing cannot be locked: ${record.unposted_delivered_orders} delivered orders are not financially posted yet.`,
+        );
+        playAdminAudioEvent("warning");
+        return;
+      }
+      const confirmed = window.confirm(
+        isArabic
+          ? `سيتم تثبيت إغلاق ${selectedDate} في قاعدة البيانات.\n\nصافي التشغيل: ${money(record.net_total, true)}\nالمحصل: ${money(record.cod_collected, true)}\nمستحق التجار: ${money(record.merchant_due, true)}\n\nهل تريد المتابعة؟`
+          : `The ${selectedDate} closing will be locked in the database.\n\nOperating net: ${money(record.net_total, false)}\nCollected: ${money(record.cod_collected, false)}\nMerchant due: ${money(record.merchant_due, false)}\n\nContinue?`,
+      );
+      if (!confirmed) return;
+    }
+
     setBusy(true);
     setMessage("");
     try {
-      const raw = await saveAuthoritativeDailyClosing({ closing_date: date, status, notes: status === "closed" ? "Closing reviewed by admin" : status === "reopened" ? "Reopened by admin" : "Daily finance snapshot" });
-      setRecord(normalizeSnapshot(raw as Record<string, unknown>));
+      const notes =
+        status === "closed"
+          ? "Closing reviewed and locked by admin"
+          : status === "reopened"
+            ? "Closing reopened by admin"
+            : "Authoritative daily finance snapshot";
+      const next = await saveDailyClosing(record, status, notes);
+      setRecord(next);
       playAdminAudioEvent("success");
-      setMessage(status === "closed" ? (isArabic ? "تم إغلاق اليوم وحفظ لقطة مالية فعلية." : "The day was closed with an authoritative finance snapshot.") : status === "reopened" ? (isArabic ? "تمت إعادة فتح اليوم مع تسجيل التدقيق." : "The day was reopened with an audit record.") : (isArabic ? "تم حفظ لقطة الإغلاق في قاعدة البيانات." : "The closing snapshot was saved to the database."));
-      await load();
+      setMessage(
+        status === "closed"
+          ? isArabic
+            ? "تم إغلاق اليوم وتثبيت اللقطة المالية في قاعدة البيانات."
+            : "The day was closed and the finance snapshot was persisted in the database."
+          : status === "reopened"
+            ? isArabic
+              ? "تمت إعادة فتح اليوم مع تسجيل العملية في التدقيق المالي."
+              : "The day was reopened and the finance action was audited."
+            : isArabic
+              ? "تم حفظ لقطة مالية فعلية في قاعدة البيانات."
+              : "An authoritative finance snapshot was saved to the database.",
+      );
     } catch (error) {
       console.warn("Daily closing save failed:", error);
-      setMessage(isArabic ? "لم يتم حفظ الإغلاق. راجع Migration المالية وصلاحيات الأدمن." : "Closing was not saved. Check the finance migration and admin permissions.");
+      const text = error instanceof Error ? error.message : String(error);
+      setLastError(text);
+      setMessage(
+        text.includes("unposted")
+          ? isArabic
+            ? "لا يمكن الإغلاق قبل ترحيل كل الطلبات المسلّمة الخاصة بهذا اليوم."
+            : "The day cannot be closed until its delivered orders are financially posted."
+          : isArabic
+            ? "تعذر حفظ الإغلاق في قاعدة البيانات. تم إيقاف العملية دون إنشاء أرقام محلية أو مزيفة."
+            : "The closing could not be persisted. The operation stopped without creating local or fabricated finance data.",
+      );
+      playAdminAudioEvent("warning");
     } finally {
       setBusy(false);
     }
   }
 
-  const cards: Array<{ ar: string; en: string; value: string | number; icon: AdminIconName; risk?: boolean }> = [
-    { ar: "طلبات اليوم", en: "Today's orders", value: closing.total_orders, icon: "orders" },
-    { ar: "طلبات مسلّمة", en: "Delivered orders", value: closing.delivered_orders, icon: "delivered-orders" },
-    { ar: "قيمة البضاعة", en: "Goods value", value: money(closing.goods_value), icon: "package" },
-    { ar: "دخل التوصيل", en: "Delivery revenue", value: money(closing.delivery_income), icon: "income" },
-    { ar: "الخصومات", en: "Discounts", value: money(closing.discounts_total), icon: "adjustments" },
-    { ar: "إجمالي العملاء", en: "Customer total", value: money(closing.customer_total), icon: "cod" },
-    { ar: "مستحق التجار", en: "Merchant due", value: money(closing.merchant_due), icon: "merchant" },
-    { ar: "المحصل", en: "Collected", value: money(closing.cod_collected), icon: "cash-collection" },
-    { ar: "تحصيل معلق", en: "Pending collection", value: money(closing.cod_pending), icon: "warning", risk: closing.cod_pending > 0 },
-    { ar: "مصروفات معتمدة", en: "Approved expenses", value: money(closing.expenses_total), icon: "expenses" },
-    { ar: "التسويات", en: "Adjustments", value: money(closing.adjustments_net), icon: "adjustments" },
-    { ar: "صافي التشغيل", en: "Operating net", value: money(closing.net_total), icon: "income", risk: closing.net_total < 0 },
-    { ar: "الميزانية", en: "Budget allocated", value: money(closing.budget_allocated), icon: "finance" },
-    { ar: "متبقي الميزانية", en: "Budget remaining", value: money(closing.budget_remaining), icon: "finance", risk: closing.budget_remaining < 0 },
-    { ar: "مُسلّم غير مُرحّل", en: "Delivered, unposted", value: closing.unposted_delivered_orders, icon: "warning", risk: closing.unposted_delivered_orders > 0 },
-    { ar: "طلبات بدون مندوب", en: "Unassigned orders", value: closing.unassigned_orders, icon: "unassigned-orders", risk: closing.unassigned_orders > 0 },
-  ];
+  const cards = useMemo<Array<{ ar: string; en: string; key: keyof DailyClosingSnapshot; icon: AdminIconName; kind?: "money"; risk?: boolean }>>(
+    () => [
+      { ar: "طلبات اليوم", en: "Today's orders", key: "total_orders", icon: "orders" },
+      { ar: "طلبات مسلّمة ومُرحّلة", en: "Delivered & posted", key: "delivered_orders", icon: "delivered-orders" },
+      { ar: "قيمة البضاعة", en: "Goods value", key: "goods_value", icon: "package", kind: "money" },
+      { ar: "دخل التوصيل", en: "Delivery revenue", key: "delivery_income", icon: "income", kind: "money" },
+      { ar: "الخصومات", en: "Discounts", key: "discounts_total", icon: "adjustments", kind: "money" },
+      { ar: "إجمالي العملاء", en: "Customer total", key: "customer_total", icon: "cod", kind: "money" },
+      { ar: "مستحق التجار", en: "Merchant due", key: "merchant_due", icon: "merchant", kind: "money" },
+      { ar: "المحصل", en: "Collected", key: "cod_collected", icon: "cash-collection", kind: "money" },
+      { ar: "تحصيل معلق", en: "Pending collection", key: "cod_pending", icon: "warning", kind: "money", risk: num(record?.cod_pending) > 0 },
+      { ar: "مصروفات معتمدة", en: "Approved expenses", key: "expenses_total", icon: "expenses", kind: "money" },
+      { ar: "التسويات", en: "Adjustments", key: "adjustments_net", icon: "adjustments", kind: "money" },
+      { ar: "صافي التشغيل", en: "Operating net", key: "net_total", icon: "income", kind: "money", risk: num(record?.net_total) < 0 },
+      { ar: "الميزانية", en: "Budget allocated", key: "budget_allocated", icon: "finance", kind: "money" },
+      { ar: "متبقي الميزانية", en: "Budget remaining", key: "budget_remaining", icon: "finance", kind: "money", risk: num(record?.budget_remaining) < 0 },
+      { ar: "مُسلّم غير مُرحّل", en: "Delivered, unposted", key: "unposted_delivered_orders", icon: "warning", risk: num(record?.unposted_delivered_orders) > 0 },
+      { ar: "طلبات بدون مندوب", en: "Unassigned orders", key: "unassigned_orders", icon: "unassigned-orders", risk: num(record?.unassigned_orders) > 0 },
+    ],
+    [record],
+  );
 
-  const summaryText = isArabic
-    ? `إغلاق ${date}: صافي ${money(closing.net_total)}، دخل ${money(closing.delivery_income)}، مصروفات ${money(closing.expenses_total)}، مستحق تجار ${money(closing.merchant_due)}، غير مُرحّل ${closing.unposted_delivered_orders}.`
-    : `Closing ${date}: net ${money(closing.net_total)}, income ${money(closing.delivery_income)}, expenses ${money(closing.expenses_total)}, merchant due ${money(closing.merchant_due)}, unposted ${closing.unposted_delivered_orders}.`;
+  const valueFor = (card: (typeof cards)[number]) => {
+    if (!record || record.source === "unavailable") return "—";
+    const value = record[card.key];
+    return card.kind === "money" ? money(value, isArabic) : num(value).toLocaleString(isArabic ? "ar-AE" : "en-AE");
+  };
+
+  const summaryText = record
+    ? isArabic
+      ? `إغلاق ${selectedDate}: صافي ${money(record.net_total, true)}، دخل ${money(record.delivery_income, true)}، مصروفات ${money(record.expenses_total, true)}، مستحق تجار ${money(record.merchant_due, true)}، غير مُرحّل ${record.unposted_delivered_orders}.`
+      : `Closing ${selectedDate}: net ${money(record.net_total, false)}, income ${money(record.delivery_income, false)}, expenses ${money(record.expenses_total, false)}, merchant due ${money(record.merchant_due, false)}, unposted ${record.unposted_delivered_orders}.`
+    : "";
 
   const pdfPayload = {
     language: isArabic ? ("ar" as const) : ("en" as const),
     sectionTitle: isArabic ? "الإغلاق المالي اليومي" : "Daily financial closing",
-    filters: `${date} · ${ledgerReady ? "RPC" : "PREVIEW"}`,
-    totals: Object.fromEntries(cards.map((card) => [isArabic ? card.ar : card.en, card.value])),
+    filters: `${selectedDate} · ${sourceText(record, isArabic)}`,
+    totals: Object.fromEntries(cards.map((card) => [isArabic ? card.ar : card.en, valueFor(card)])),
     columns: [
       { key: "metric", label: isArabic ? "البند" : "Metric" },
       { key: "value", label: isArabic ? "القيمة" : "Value" },
     ],
-    rows: cards.map((card) => ({ metric: isArabic ? card.ar : card.en, value: card.value })),
+    rows: cards.map((card) => ({ metric: isArabic ? card.ar : card.en, value: valueFor(card) })),
   };
 
   return (
-    <section className={`dn-daily-closing ${closing.status}`} dir={isArabic ? "rtl" : "ltr"}>
+    <section className={`dn-daily-closing ${record?.status || "loading"}`} dir={isArabic ? "rtl" : "ltr"}>
+      <div className="dn-closing-ambient dn-closing-ambient-a" aria-hidden="true" />
+      <div className="dn-closing-ambient dn-closing-ambient-b" aria-hidden="true" />
+
       <header>
         <div className="dn-closing-title">
           <AdminIconBadge name="daily-closing" label={isArabic ? "إغلاق يومي" : "Daily closing"} />
           <div>
-            <AdminStateChip name={ledgerReady ? "database-health" : "warning"} tone={ledgerReady ? "success" : "danger"}>
-              {ledgerReady ? (isArabic ? "RPC مالي فعلي" : "Authoritative finance RPC") : (isArabic ? "معاينة غير قابلة للحفظ" : "Preview only")}
-            </AdminStateChip>
+            <div className="dn-closing-chip-row">
+              <AdminStateChip name={ledgerReady ? "database-health" : "warning"} tone={ledgerReady ? "success" : "danger"}>
+                {ledgerReady ? (isArabic ? "بيانات مالية فعلية" : "Authoritative finance data") : isArabic ? "لا توجد أرقام موثوقة" : "No authoritative values"}
+              </AdminStateChip>
+              {isClosed && (
+                <AdminStateChip name="daily-closing" tone="success">
+                  {isArabic ? "مثبت في قاعدة البيانات" : "Locked in database"}
+                </AdminStateChip>
+              )}
+            </div>
             <h2>{isArabic ? "الإغلاق المالي اليومي" : "Daily Financial Closing"}</h2>
-            <p>{isArabic ? "يُبنى من ترحيلات الطلبات والمصروفات المعتمدة والتسويات والميزانية، ولا يعتمد على إجماليات قديمة أو حفظ محلي." : "Built from posted orders, approved expenses, adjustments, and budgets—never legacy totals or local persistence."}</p>
+            <p>
+              {isArabic
+                ? "مصدر الحقيقة هو ترحيلات الطلبات والمصروفات المعتمدة والتسويات والميزانية في قاعدة البيانات. لا إجماليات قديمة، لا localStorage، ولا أرقام معاينة مزيفة."
+                : "The source of truth is database-posted orders, approved expenses, adjustments, and budgets. No legacy totals, localStorage, or fabricated preview values."}
+            </p>
           </div>
         </div>
-        <AdminStateChip name={ledgerReady ? "daily-closing" : "warning"} tone={ledgerReady && closing.status === "closed" ? "success" : "warning"}>
-          {statusText(ledgerReady ? closing.status : "blocked", isArabic)}
+        <AdminStateChip name={ledgerReady ? "daily-closing" : "warning"} tone={ledgerReady && record?.status === "closed" ? "success" : ledgerReady ? "warning" : "danger"}>
+          {statusText(ledgerReady && record ? record.status : "blocked", isArabic)}
         </AdminStateChip>
       </header>
 
-      {message && <p className="dn-local-review">{message}</p>}
+      <div className="dn-closing-controlbar">
+        <label>
+          <span>{isArabic ? "تاريخ الإغلاق" : "Closing date"}</span>
+          <input
+            type="date"
+            value={selectedDate}
+            max={dubaiTodayKey()}
+            onChange={(event) => setSelectedDate(event.target.value || dubaiTodayKey())}
+            disabled={busy}
+          />
+        </label>
+        <div className="dn-closing-source-card">
+          <Database aria-hidden="true" />
+          <div>
+            <span>{isArabic ? "مصدر البيانات" : "Data source"}</span>
+            <b>{sourceText(record, isArabic)}</b>
+          </div>
+        </div>
+        <div className="dn-closing-source-card">
+          <RefreshCw aria-hidden="true" />
+          <div>
+            <span>{isArabic ? "آخر حساب" : "Last calculated"}</span>
+            <b>{generatedText(record?.generated_at, isArabic)}</b>
+          </div>
+        </div>
+        <div className="dn-closing-source-card">
+          <LockKeyhole aria-hidden="true" />
+          <div>
+            <span>{isArabic ? "الحفظ" : "Persistence"}</span>
+            <b>{isArabic ? "قاعدة البيانات فقط" : "Database only"}</b>
+          </div>
+        </div>
+      </div>
 
-      <div className="dn-closing-grid">
+      {message && <p className={`dn-local-review ${ledgerReady ? "" : "is-error"}`}>{message}</p>}
+      {lastError && !ledgerReady && <code className="dn-closing-error-code">{lastError}</code>}
+
+      <div className="dn-closing-grid" aria-busy={busy}>
         {cards.map((card) => (
-          <article key={card.en} className={card.risk ? "is-risk" : ""}>
+          <article key={card.en} className={`${card.risk ? "is-risk" : ""} ${!record || record.source === "unavailable" ? "is-unavailable" : ""}`}>
             <AdminIconBadge name={card.icon} label={isArabic ? card.ar : card.en} />
             <span>{isArabic ? card.ar : card.en}</span>
-            <b>{card.value}</b>
+            <b>{busy && !record ? <Loader2 aria-hidden="true" className="animate-spin" /> : valueFor(card)}</b>
           </article>
         ))}
       </div>
 
+      {record && ledgerReady && (
+        <div className="dn-closing-integrity-strip">
+          <span><b>{isArabic ? "ملغية" : "Cancelled"}</b>{record.cancelled_orders}</span>
+          <span><b>{isArabic ? "مرتجعة" : "Returned"}</b>{record.returned_orders}</span>
+          <span><b>{isArabic ? "قيد المراجعة" : "Pending review"}</b>{record.pending_review_orders}</span>
+          <span className={record.unreconciled_cod > 0 ? "is-risk" : ""}><b>{isArabic ? "تحصيل غير مسوّى" : "Unreconciled COD"}</b>{money(record.unreconciled_cod, isArabic)}</span>
+          <span><b>{isArabic ? "نسخة البيانات" : "Data version"}</b>{record.data_version || "daily-closing-v3"}</span>
+        </div>
+      )}
+
       {!ledgerReady && (
-        <div className="dn-local-review">
-          <AlertTriangle className="inline h-4 w-4" /> {isArabic ? "تم تعطيل الحفظ والإغلاق حتى يعمل admin_daily_closing_snapshot من قاعدة البيانات." : "Saving and closing are disabled until admin_daily_closing_snapshot is available from the database."}
+        <div className="dn-closing-blocker">
+          <AlertTriangle aria-hidden="true" />
+          <div>
+            <b>{isArabic ? "الحفظ والإغلاق متوقفان لأن مصدر الحقيقة غير متاح" : "Save and close are blocked because the source of truth is unavailable"}</b>
+            <span>
+              {isArabic
+                ? "بعد تطبيق Migration الإغلاق المالي سيقرأ قاعدة الإنتاج مباشرة. وحتى ذلك الوقت لا تُعرض أصفار Preview على أنها نتائج حقيقية."
+                : "Once the finance migration is installed, this panel reads production directly. Until then, preview zeroes are not presented as real results."}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isClosed && record?.reviewed_at && (
+        <div className="dn-closing-locked-note">
+          <LockKeyhole aria-hidden="true" />
+          <span>
+            {isArabic ? "تم تثبيت هذا الإغلاق" : "This closing was locked"} · {generatedText(record.reviewed_at, isArabic)}
+          </span>
         </div>
       )}
 
       <div className="dn-closing-actions">
-        <button type="button" disabled={busy || !ledgerReady} onClick={() => void save("draft")}>
+        <button type="button" disabled={busy || !ledgerReady || isClosed} onClick={() => void save("draft")}>
           {busy ? <Loader2 aria-hidden="true" className="animate-spin" /> : <CheckCircle2 aria-hidden="true" />}
-          {isArabic ? "حفظ لقطة اليوم" : "Save snapshot"}
+          {isArabic ? "حفظ لقطة فعلية" : "Save authoritative snapshot"}
         </button>
-        <button type="button" disabled={busy || !ledgerReady || closing.unposted_delivered_orders > 0} onClick={() => void save("closed")}>
+        <button
+          type="button"
+          className="is-primary"
+          disabled={busy || !ledgerReady || isClosed || num(record?.unposted_delivered_orders) > 0}
+          onClick={() => void save("closed")}
+        >
           <ShieldAlert aria-hidden="true" />
-          {isArabic ? "مراجعة وإغلاق" : "Review and close"}
+          {isArabic ? "مراجعة وتثبيت الإغلاق" : "Review & lock closing"}
         </button>
-        <button type="button" disabled={busy || !ledgerReady} onClick={() => void save("reopened")}>
+        <button type="button" disabled={busy || !ledgerReady || !isClosed} onClick={() => void save("reopened")}>
           <RotateCcw aria-hidden="true" />
           {isArabic ? "إعادة فتح اليوم" : "Reopen day"}
         </button>
-        <button type="button" onClick={() => void load()}>
-          <RefreshCw aria-hidden="true" />
-          {isArabic ? "إعادة الحساب" : "Recalculate"}
+        <button type="button" disabled={busy} onClick={() => void load()}>
+          <RefreshCw aria-hidden="true" className={busy ? "animate-spin" : ""} />
+          {isArabic ? "تحديث من القاعدة" : "Refresh from database"}
         </button>
-        <button type="button" onClick={() => void navigator.clipboard?.writeText(summaryText)}>
+        <button type="button" disabled={!summaryText} onClick={() => void navigator.clipboard?.writeText(summaryText)}>
           <Clipboard aria-hidden="true" />
           {isArabic ? "نسخ الملخص" : "Copy summary"}
         </button>
