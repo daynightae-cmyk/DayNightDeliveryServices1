@@ -38,7 +38,8 @@ async function verify(page, label) {
   await launcher.waitFor({ state:'visible', timeout:60000 });
   await launcher.click();
   await page.locator('.dn-nexus-shell').waitFor({ state:'visible', timeout:30000 });
-  await page.locator('.dn-nexus4').waitFor({ state:'visible', timeout:90000 });
+  const phase4 = page.locator('.dn-nexus4');
+  await phase4.waitFor({ state:'visible', timeout:90000 });
   await waitForPhase4Ready(page, label);
   assert(await page.locator('.dn-nexus4-kpis').isVisible(), `${label}: KPI strip missing`);
   assert((await page.locator('.dn-nexus4-kpis article').count()) === 5, `${label}: expected 5 KPIs`);
@@ -46,7 +47,7 @@ async function verify(page, label) {
   assert(await page.locator('.dn-nexus4-recovery').isVisible(), `${label}: recovery queue missing`);
   assert(await page.locator('.dn-nexus4-friction').isVisible(), `${label}: customer journey signals missing`);
   assert(await page.locator('.dn-nexus4-merchants').isVisible(), `${label}: merchant service promise missing`);
-  const text = await page.locator('.dn-nexus4').innerText();
+  const text = await phase4.innerText();
   assert(/OBSERVED SERVICE BASELINES/i.test(text), `${label}: observed baseline proof missing`);
   assert(/CUSTOMER RECOVERY QUEUE/i.test(text), `${label}: recovery queue proof missing`);
   assert(/CUSTOMER JOURNEY SIGNALS/i.test(text), `${label}: journey signals proof missing`);
@@ -54,8 +55,16 @@ async function verify(page, label) {
   assert(/Read-only|لا تعديل طلبات/i.test(text), `${label}: read-only proof missing`);
   assert(/not a contractual SLA|ليس SLA تعاقد/i.test(text), `${label}: non-contractual baseline disclaimer missing`);
   assert(!/mock data|fake data|sample data/i.test(text), `${label}: fake/sample marker found`);
-  await page.screenshot({ path:path.join(evidenceDir, `${label}-nexus-phase4.png`), fullPage:true });
-  return { label, viewport:page.viewportSize(), kpis:5 };
+
+  await phase4.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const box = await phase4.boundingBox();
+  assert(box && box.width > 0 && box.height > 0, `${label}: Phase 4 has no rendered box`);
+  const viewport = page.viewportSize();
+  assert(viewport && box.x < viewport.width && box.y < viewport.height && box.x + box.width > 0 && box.y + Math.min(box.height, viewport.height) > 0, `${label}: Phase 4 did not enter viewport`);
+  await page.screenshot({ path:path.join(evidenceDir, `${label}-nexus-phase4-visible.png`) });
+  await phase4.screenshot({ path:path.join(evidenceDir, `${label}-nexus-phase4-section.png`) });
+  return { label, viewport, kpis:5, phase4Box:{ x:Math.round(box.x), y:Math.round(box.y), width:Math.round(box.width), height:Math.round(box.height) } };
 }
 
 async function main() {
