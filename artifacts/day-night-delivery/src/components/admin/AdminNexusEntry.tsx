@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Radar, Sparkles } from "lucide-react";
 import AdminNexusControlTower from "./AdminNexusControlTower";
-import AdminNexusPhase2Intelligence from "./AdminNexusPhase2Intelligence";
-import AdminNexusPhase3PredictiveOperations from "./AdminNexusPhase3PredictiveOperations";
-import AdminNexusPhase4ServiceAssurance from "./AdminNexusPhase4ServiceAssurance";
 import "../../styles/dn-nexus-command-launcher.css";
 import "../../styles/dn-nexus-luxury-consolidation.css";
+
+const AdminNexusPhase2Intelligence = lazy(() => import("./AdminNexusPhase2Intelligence"));
+const AdminNexusPhase3PredictiveOperations = lazy(() => import("./AdminNexusPhase3PredictiveOperations"));
+const AdminNexusPhase4ServiceAssurance = lazy(() => import("./AdminNexusPhase4ServiceAssurance"));
 
 function isElementVisible(element: HTMLElement) {
   const style = window.getComputedStyle(element);
@@ -23,6 +24,37 @@ function triggerNexusControlTower() {
   const launcher = internalLaunchers.find((item) => !item.disabled) || null;
   if (launcher) { launcher.click(); return true; }
   return false;
+}
+
+function NexusDeferredIntelligenceLayers() {
+  const [nexusOpen, setNexusOpen] = useState(() => Boolean(document.querySelector(".dn-nexus-overlay")));
+
+  useEffect(() => {
+    let frame = 0;
+    const sync = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        setNexusOpen(Boolean(document.querySelector(".dn-nexus-overlay")));
+      });
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  if (!nexusOpen) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <AdminNexusPhase2Intelligence />
+      <AdminNexusPhase3PredictiveOperations />
+      <AdminNexusPhase4ServiceAssurance />
+    </Suspense>
+  );
 }
 
 function NexusCommandLauncher() {
@@ -77,9 +109,7 @@ function NexusCommandLauncher() {
 export default function AdminNexusEntry() {
   return <>
     <AdminNexusControlTower />
-    <AdminNexusPhase2Intelligence />
-    <AdminNexusPhase3PredictiveOperations />
-    <AdminNexusPhase4ServiceAssurance />
+    <NexusDeferredIntelligenceLayers />
     <NexusCommandLauncher />
   </>;
 }
