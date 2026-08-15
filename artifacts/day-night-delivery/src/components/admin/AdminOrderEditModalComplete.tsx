@@ -630,16 +630,16 @@ export default function AdminOrderEditModalComplete({
           aria-hidden="true"
           className="pointer-events-none absolute -end-24 top-1/3 h-80 w-80 rounded-full bg-brand-gold/8 blur-3xl"
         />
-        <header className="relative z-20 flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#06182d]/82 px-4 py-3 shadow-[0_14px_36px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:px-6 sm:py-4">
+        <header className="dn-admin-audit-header relative z-20 flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#06182d]/82 px-4 py-3 shadow-[0_14px_36px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 text-brand-gold shadow-[0_0_28px_rgba(212,175,55,0.12)]">
+            <span className="dn-admin-audit-icon grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-brand-gold/35 bg-brand-gold/10 shadow-[0_0_28px_rgba(212,175,55,0.12)]">
               <Sparkles className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-brand-gold/75">
+              <span className="dn-admin-audit-eyebrow block text-[10px] font-black uppercase tracking-[0.18em]">
                 {isArabic ? "تعديل آمن ومُدقّق" : "Secure audited edit"}
               </span>
-              <strong className="mt-1 block truncate text-sm font-black text-white sm:text-base" dir="ltr">
+              <strong className="mt-1 block truncate text-sm font-black sm:text-base" dir="ltr">
                 {orderReference(order)}
               </strong>
             </div>
@@ -648,7 +648,7 @@ export default function AdminOrderEditModalComplete({
             <button
               type="submit"
               disabled={busy}
-              className="!inline-flex !items-center !gap-2 !rounded-2xl !bg-brand-gold !px-4 !py-3 !text-xs !font-black !text-brand-deep shadow-[0_12px_30px_rgba(212,175,55,0.18)] transition hover:!-translate-y-0.5 disabled:opacity-40"
+              className="dn-admin-audit-save !inline-flex !items-center !gap-2 !rounded-2xl !bg-brand-gold !px-4 !py-3 !text-xs !font-black shadow-[0_12px_30px_rgba(212,175,55,0.18)] transition hover:!-translate-y-0.5 disabled:opacity-40"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -667,7 +667,7 @@ export default function AdminOrderEditModalComplete({
               type="button"
               onClick={onClose}
               aria-label={isArabic ? "إغلاق" : "Close"}
-              className="!grid !h-11 !w-11 !place-items-center !rounded-2xl !border !border-white/10 !bg-white/5 !p-0 !text-white/70 transition hover:!border-rose-300/30 hover:!bg-rose-400/10 hover:!text-rose-100"
+              className="dn-admin-audit-close !grid !h-11 !w-11 !place-items-center !rounded-2xl !border !border-white/10 !bg-white/5 !p-0 transition hover:!border-rose-300/30 hover:!bg-rose-400/10"
             >
               <X className="h-4 w-4" />
             </button>
@@ -756,38 +756,38 @@ export default function AdminOrderEditModalComplete({
             </section>
           )}
 
-          <div className="mb-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
-              <small className="text-[10px] font-black text-white/45">
+          <div className="dn-admin-audit-summary mb-4 grid gap-3 md:grid-cols-3">
+            <div className="dn-admin-audit-summary-card rounded-2xl border border-white/10 bg-black/15 p-3">
+              <small className="text-[10px] font-black">
                 {isArabic ? "هوية الطلب المحمية" : "Protected order identity"}
               </small>
-              <b className="mt-1 block text-sm text-white" dir="ltr">
+              <b className="mt-1 block text-sm" dir="ltr">
                 {orderReference(order)}
               </b>
-              <span className="mt-1 block text-[10px] text-white/40">
+              <span className="mt-1 block text-[10px]">
                 {isArabic
                   ? "لا يمكن تغيير رقم التتبع أو رقم الفاتورة من محرر البيانات."
                   : "Tracking and invoice identifiers are immutable here."}
               </span>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
-              <small className="text-[10px] font-black text-white/45">
+            <div className="dn-admin-audit-summary-card rounded-2xl border border-white/10 bg-black/15 p-3">
+              <small className="text-[10px] font-black">
                 {isArabic ? "الحالة الحالية" : "Current status"}
               </small>
-              <b className="mt-1 block text-sm text-white">
+              <b className="mt-1 block text-sm">
                 {orderStatusLabel(order.status, isArabic)}
               </b>
-              <span className="mt-1 block text-[10px] text-white/40">
+              <span className="mt-1 block text-[10px]">
                 {isArabic
                   ? "تغيير الحالة أو التراجع عن التسليم له مسار تشغيل منفصل."
                   : "Status changes and delivery reversal use the dedicated workflow."}
               </span>
             </div>
-            <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.06] p-3">
-              <small className="text-[10px] font-black text-brand-gold/75">
+            <div className="dn-admin-audit-summary-card is-gold rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.06] p-3">
+              <small className="text-[10px] font-black">
                 {isArabic ? "نطاق الصلاحية" : "Edit authority"}
               </small>
-              <b className="mt-1 block text-sm text-brand-gold">
+              <b className="mt-1 block text-sm">
                 {personalOrder
                   ? isArabic
                     ? "طلب شخصي"
@@ -796,7 +796,7 @@ export default function AdminOrderEditModalComplete({
                     ? "تعديل شامل مع تدقيق"
                     : "Complete audited edit"}
               </b>
-              <span className="mt-1 block text-[10px] text-white/50">
+              <span className="mt-1 block text-[10px]">
                 {isArabic
                   ? "تُسجَّل كل عملية بالقيم السابقة واللاحقة واسم المسؤول وسبب التعديل."
                   : "Every save records actor, reason, and before/after values."}
@@ -1420,10 +1420,10 @@ export default function AdminOrderEditModalComplete({
           </section>
         </div>
 
-        <footer className="relative z-20 shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,22,43,0.92),rgba(3,15,31,0.99))] p-4 shadow-[0_-24px_60px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:px-6">
+        <footer className="dn-admin-audit-footer relative z-20 shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,22,43,0.92),rgba(3,15,31,0.99))] p-4 shadow-[0_-24px_60px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:px-6">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-center gap-2 text-[10px] font-bold leading-5 text-white/50">
-              <Truck className="h-4 w-4 text-brand-gold" />
+            <p className="flex items-center gap-2 text-[10px] font-bold leading-5">
+              <Truck className="h-4 w-4" />
               {isArabic
                 ? "الحفظ ذري: إما أن تُعتمد جميع التعديلات وسجل التدقيق معًا، أو تُلغى العملية بالكامل دون حفظ جزئي."
                 : "Save is atomic: every change and audit succeeds together, or the entire transaction rolls back with no partial edit."}
@@ -1435,7 +1435,7 @@ export default function AdminOrderEditModalComplete({
               <button
                 type="submit"
                 disabled={busy || !financials}
-                className="!min-w-[220px] !rounded-2xl !bg-brand-gold !px-5 !py-3.5 !font-black !text-brand-deep shadow-[0_14px_34px_rgba(212,175,55,0.2)] transition hover:!-translate-y-0.5 disabled:opacity-40"
+                className="dn-admin-audit-save !min-w-[220px] !rounded-2xl !bg-brand-gold !px-5 !py-3.5 !font-black shadow-[0_14px_34px_rgba(212,175,55,0.2)] transition hover:!-translate-y-0.5 disabled:opacity-40"
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
