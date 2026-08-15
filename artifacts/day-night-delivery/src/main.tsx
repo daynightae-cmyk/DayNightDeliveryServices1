@@ -49,7 +49,7 @@ import "./styles/dn-work-max-foundation.css";
 import "./styles/dn-global-day-mode-closure.css";
 import "./styles/dn-admin-light-contrast-final-v2.css";
 
-const AdminNexusControlTower = lazy(() => import("./components/admin/AdminNexusControlTower"));
+const AdminNexusEntry = lazy(() => import("./components/admin/AdminNexusEntry"));
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 type NativeRole = "driver" | "merchant";
 const isMapTileImage = (img: HTMLImageElement) => img.classList.contains("leaflet-tile");
@@ -63,7 +63,7 @@ function installGlobalRuntimeHandlers() {
   window.addEventListener("unhandledrejection", (event) => reportError(event.reason, "unhandled_rejection"));
 }
 function rootElement() { const root = document.getElementById("root"); if (!root) throw new Error("DAY NIGHT root element is missing"); return root; }
-function mountPublicApplication() { const adminRoute = isAdminPath(); createRoot(rootElement()).render(<StrictMode><AppProvider><ArabicAddressRuntimeBridge /><App />{adminRoute && <AdminExperienceEnhancements />}{adminRoute && <Suspense fallback={null}><AdminNexusControlTower /></Suspense>}<WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge />{adminRoute && <AdminDeferredMerchantAccounting />}<ProductionExperience /></AppProvider></StrictMode>); }
+function mountPublicApplication() { const adminRoute = isAdminPath(); createRoot(rootElement()).render(<StrictMode><AppProvider><ArabicAddressRuntimeBridge /><App />{adminRoute && <AdminExperienceEnhancements />}{adminRoute && <Suspense fallback={null}><AdminNexusEntry /></Suspense>}<WhatsAppRuntimeGuard /><AdminCustomerExperienceLauncher /><AdminRatingsLauncher /><AdminEmployeeLauncher /><MerchantFeedbackSummaryLauncher /><InternationalTrackingEntryLauncher /><MerchantInternationalTrackingLauncher /><ProductionOrderRealtimeBridge />{adminRoute && <AdminDeferredMerchantAccounting />}<ProductionExperience /></AppProvider></StrictMode>); }
 async function mountNativeRoleApplication(role: NativeRole) { const { default: NativeRoleRoot } = await import("./components/native/NativeRoleRoot"); createRoot(rootElement()).render(<StrictMode><BrowserRouter><NativeRoleErrorBoundary role={role}><AppProvider><ArabicAddressRuntimeBridge /><NativeRoleRoot role={role} /><DeveloperSignature /><WhatsAppRuntimeGuard />{role === "merchant" && <MerchantFeedbackSummaryLauncher />}{role === "merchant" && <MerchantInternationalTrackingLauncher />}</AppProvider></NativeRoleErrorBoundary></BrowserRouter></StrictMode>); }
 async function mountStandaloneAdminFeatures() {
   const pathname = window.location.pathname;
