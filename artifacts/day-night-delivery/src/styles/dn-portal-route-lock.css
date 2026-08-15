@@ -70,14 +70,36 @@ body:has(.dn-driver-shell) #root > div > main {
   padding: 0 !important;
 }
 
-/* Footer is the final direct child of the public AppContent shell. */
+/* Portal routes keep the public company footer hidden, but expose the compact
+   developer signature as a lead-generation footer beneath the application. */
 html[data-portal-route="true"] #root > div > main ~ footer,
 body:has(.dn-merchant-login-v3) #root > div > main ~ footer,
 body:has(.dn-merchant-state-v3) #root > div > main ~ footer,
 body:has(.dn-merchant-shell-v3) #root > div > main ~ footer,
 body:has(.dn-driver-login-page) #root > div > main ~ footer,
 body:has(.dn-driver-shell) #root > div > main ~ footer {
+  display: block !important;
+  margin-top: 0 !important;
+  border-top: 0 !important;
+  background: transparent !important;
+}
+
+html[data-portal-route="true"] #root > div > main ~ footer > .dn-public-footer-content,
+body:has(.dn-merchant-login-v3) #root > div > main ~ footer > .dn-public-footer-content,
+body:has(.dn-merchant-state-v3) #root > div > main ~ footer > .dn-public-footer-content,
+body:has(.dn-merchant-shell-v3) #root > div > main ~ footer > .dn-public-footer-content,
+body:has(.dn-driver-login-page) #root > div > main ~ footer > .dn-public-footer-content,
+body:has(.dn-driver-shell) #root > div > main ~ footer > .dn-public-footer-content {
   display: none !important;
+}
+
+html[data-portal-route="true"] #root > div > main ~ footer > .dn-developer-signature,
+body:has(.dn-merchant-login-v3) #root > div > main ~ footer > .dn-developer-signature,
+body:has(.dn-merchant-state-v3) #root > div > main ~ footer > .dn-developer-signature,
+body:has(.dn-merchant-shell-v3) #root > div > main ~ footer > .dn-developer-signature,
+body:has(.dn-driver-login-page) #root > div > main ~ footer > .dn-developer-signature,
+body:has(.dn-driver-shell) #root > div > main ~ footer > .dn-developer-signature {
+  display: block !important;
 }
 
 html[data-theme="light"][data-portal-route="true"],
