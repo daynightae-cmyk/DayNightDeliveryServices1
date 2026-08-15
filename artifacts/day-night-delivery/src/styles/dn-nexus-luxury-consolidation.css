@@ -1,0 +1,539 @@
+/* ========================================================================== */
+/* DAY NIGHT NEXUS — final visual consolidation                              */
+/* Presentation only. Loaded after Phase 1/2/3 styles to unify the command   */
+/* center without changing data, actions, routing, auth, finance, or writes. */
+/* ========================================================================== */
+
+.dn-nexus-overlay {
+  --dn-nexus-navy-950: #031326;
+  --dn-nexus-navy-900: #061a31;
+  --dn-nexus-navy-800: #0a2948;
+  --dn-nexus-blue: #2c9cff;
+  --dn-nexus-sky: #78c8ff;
+  --dn-nexus-gold: #d4af37;
+  --dn-nexus-gold-soft: #f0d36b;
+  --dn-nexus-green: #32cf92;
+  --dn-nexus-red: #ef626c;
+  --dn-nexus-radius-xl: 30px;
+  --dn-nexus-radius-lg: 22px;
+  --dn-nexus-radius-md: 15px;
+  background:
+    radial-gradient(circle at 7% -4%, rgba(49, 158, 255, .20), transparent 33rem),
+    radial-gradient(circle at 94% 3%, rgba(212, 175, 55, .13), transparent 29rem),
+    radial-gradient(circle at 52% 102%, rgba(32, 112, 190, .10), transparent 38rem),
+    linear-gradient(145deg, #020f20 0%, #04192f 48%, #061f39 100%);
+}
+
+.dn-nexus-overlay.is-light {
+  background:
+    radial-gradient(circle at 6% -4%, rgba(49, 158, 255, .18), transparent 31rem),
+    radial-gradient(circle at 95% 2%, rgba(212, 175, 55, .13), transparent 27rem),
+    radial-gradient(circle at 53% 104%, rgba(97, 176, 241, .13), transparent 39rem),
+    linear-gradient(145deg, #dfeffc 0%, #f8fbff 43%, #edf6fd 100%);
+}
+
+.dn-nexus-shell {
+  border-color: rgba(112, 188, 255, .24);
+  border-radius: var(--dn-nexus-radius-xl);
+  background:
+    radial-gradient(circle at 92% -8%, rgba(43, 149, 243, .14), transparent 31rem),
+    radial-gradient(circle at 3% 18%, rgba(212, 175, 55, .055), transparent 24rem),
+    linear-gradient(145deg, rgba(5, 28, 52, .985), rgba(2, 18, 35, .995));
+  box-shadow:
+    0 44px 110px rgba(0, 0, 0, .42),
+    0 0 0 1px rgba(255, 255, 255, .025) inset,
+    0 1px 0 rgba(255,255,255,.07) inset;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus-shell {
+  border-color: rgba(37, 109, 178, .17);
+  background:
+    radial-gradient(circle at 91% -8%, rgba(44, 152, 244, .105), transparent 30rem),
+    radial-gradient(circle at 4% 19%, rgba(212, 175, 55, .075), transparent 24rem),
+    linear-gradient(145deg, rgba(255,255,255,.985), rgba(239,248,255,.975));
+  box-shadow:
+    0 34px 90px rgba(23, 67, 106, .18),
+    0 0 0 1px rgba(255,255,255,.72) inset,
+    0 1px 0 #fff inset;
+}
+
+.dn-nexus-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  min-height: 104px;
+  padding: 18px 22px;
+  border-bottom-color: rgba(110, 184, 246, .18);
+  background:
+    radial-gradient(circle at 7% -35%, rgba(62, 171, 255, .20), transparent 25rem),
+    linear-gradient(180deg, rgba(8, 40, 72, .985), rgba(4, 27, 51, .965));
+  box-shadow: 0 14px 30px rgba(1, 13, 28, .16);
+}
+
+.dn-nexus-overlay.is-light .dn-nexus-header {
+  border-bottom-color: rgba(31, 102, 169, .14);
+  background:
+    radial-gradient(circle at 7% -35%, rgba(50, 158, 244, .14), transparent 25rem),
+    linear-gradient(180deg, rgba(255,255,255,.985), rgba(241,249,255,.975));
+  box-shadow: 0 13px 28px rgba(34, 79, 119, .09);
+}
+
+.dn-nexus-brand-mark,
+.dn-nexus-launcher-icon,
+.dn-nexus2-score {
+  color: #061a2f !important;
+}
+
+.dn-nexus-brand-mark {
+  box-shadow:
+    0 13px 30px rgba(212,175,55,.22),
+    0 0 0 1px rgba(255,255,255,.35) inset,
+    0 1px rgba(255,255,255,.82) inset;
+}
+
+.dn-nexus-content {
+  gap: 20px;
+  padding: 20px;
+}
+
+.dn-nexus-content > * {
+  min-width: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared Phase 2 + Phase 3 framing                                           */
+/* -------------------------------------------------------------------------- */
+
+.dn-nexus2,
+.dn-nexus3 {
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 26px;
+  border-color: rgba(93, 174, 248, .20);
+  box-shadow:
+    0 24px 56px rgba(0, 0, 0, .20),
+    0 1px 0 rgba(255,255,255,.055) inset;
+}
+
+.dn-nexus2 {
+  margin-top: 2px;
+  padding: 21px;
+  background:
+    radial-gradient(circle at 7% -6%, rgba(49, 159, 255, .145), transparent 28rem),
+    radial-gradient(circle at 94% 2%, rgba(212, 175, 55, .085), transparent 24rem),
+    linear-gradient(145deg, rgba(5, 28, 53, .97), rgba(6, 35, 65, .94));
+}
+
+.dn-nexus3 {
+  margin-top: 0;
+  padding: 21px;
+  background:
+    radial-gradient(circle at 93% -5%, rgba(212, 175, 55, .075), transparent 24rem),
+    radial-gradient(circle at 4% 1%, rgba(46, 155, 246, .13), transparent 28rem),
+    linear-gradient(145deg, rgba(5, 25, 49, .965), rgba(7, 37, 68, .93));
+}
+
+.dn-nexus-overlay.is-light .dn-nexus2,
+.dn-nexus-overlay.is-light .dn-nexus3 {
+  border-color: rgba(39, 111, 180, .16);
+  box-shadow:
+    0 22px 50px rgba(37, 80, 121, .12),
+    0 1px 0 rgba(255,255,255,.94) inset;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus2 {
+  background:
+    radial-gradient(circle at 8% -5%, rgba(51, 159, 246, .14), transparent 27rem),
+    radial-gradient(circle at 93% 3%, rgba(212, 175, 55, .095), transparent 23rem),
+    linear-gradient(145deg, rgba(252,254,255,.99), rgba(232,244,255,.965));
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3 {
+  background:
+    radial-gradient(circle at 92% -4%, rgba(212, 175, 55, .085), transparent 23rem),
+    radial-gradient(circle at 6% 0%, rgba(44, 151, 238, .12), transparent 26rem),
+    linear-gradient(145deg, rgba(252,254,255,.99), rgba(235,246,255,.97));
+}
+
+.dn-nexus2-header,
+.dn-nexus3-header {
+  gap: 18px;
+  padding-bottom: 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(112, 185, 245, .14);
+}
+
+.dn-nexus3-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus2-header,.dn-nexus3-header) {
+  border-bottom-color: rgba(35, 103, 166, .13);
+}
+
+.dn-nexus2-header h3,
+.dn-nexus3-header h3 {
+  letter-spacing: -.015em;
+  text-wrap: balance;
+}
+
+.dn-nexus3-header h3 {
+  margin: 7px 0 5px;
+  font-size: clamp(20px, 2vw, 27px);
+  line-height: 1.22;
+}
+
+.dn-nexus3-header p {
+  max-width: 780px;
+  line-height: 1.7;
+}
+
+.dn-nexus2-header-actions > span,
+.dn-nexus3-actions > span {
+  border: 1px solid rgba(50, 208, 149, .20);
+  background: rgba(30, 161, 113, .09);
+}
+
+.dn-nexus2-header-actions button,
+.dn-nexus3-actions button,
+.dn-nexus2-open-section {
+  min-height: 41px;
+  border-color: rgba(99, 177, 246, .22);
+  background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.035));
+  box-shadow: 0 7px 18px rgba(0,0,0,.08), inset 0 1px rgba(255,255,255,.055);
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+.dn-nexus2-header-actions button:hover,
+.dn-nexus3-actions button:hover,
+.dn-nexus2-open-section:hover {
+  transform: translateY(-1px);
+  border-color: rgba(212,175,55,.48);
+  background: linear-gradient(145deg, rgba(212,175,55,.12), rgba(255,255,255,.045));
+  box-shadow: 0 10px 24px rgba(0,0,0,.10), 0 0 0 3px rgba(212,175,55,.055);
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus2-header-actions button,.dn-nexus3-actions button,.dn-nexus2-open-section) {
+  color: #082741;
+  border-color: rgba(31, 105, 175, .15);
+  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(239,247,255,.88));
+  box-shadow: 0 8px 18px rgba(33, 79, 121, .075), inset 0 1px #fff;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 2 surface hierarchy                                                   */
+/* -------------------------------------------------------------------------- */
+
+.dn-nexus2-brief-card,
+.dn-nexus2-panel,
+.dn-nexus2-profit-card,
+.dn-nexus3-panel {
+  border-color: rgba(91, 171, 243, .16);
+  background: linear-gradient(145deg, rgba(255,255,255,.058), rgba(255,255,255,.026));
+  box-shadow:
+    0 12px 28px rgba(0,0,0,.095),
+    0 1px 0 rgba(255,255,255,.045) inset;
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus2-brief-card,.dn-nexus2-panel,.dn-nexus2-profit-card,.dn-nexus3-panel) {
+  border-color: rgba(43, 116, 188, .15);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(63, 158, 238, .045), transparent 17rem),
+    linear-gradient(145deg, rgba(255,255,255,.965), rgba(242,249,255,.885));
+  box-shadow:
+    0 13px 30px rgba(35, 78, 118, .08),
+    0 1px 0 #fff inset;
+}
+
+.dn-nexus2-brief-list article,
+.dn-nexus2-dispatch-card,
+.dn-nexus2-merchant-row,
+.dn-nexus3-list article {
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.dn-nexus2-brief-list article:hover,
+.dn-nexus2-dispatch-card:hover,
+.dn-nexus2-merchant-row:hover,
+.dn-nexus3-list article:hover {
+  transform: translateY(-1px);
+  border-color: rgba(91, 179, 255, .25);
+  box-shadow: 0 10px 22px rgba(0,0,0,.07);
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus2-brief-list article,.dn-nexus2-dispatch-card,.dn-nexus2-merchant-row,.dn-nexus3-list article) {
+  border-color: rgba(43, 111, 177, .12);
+  background: linear-gradient(145deg, rgba(255,255,255,.99), rgba(244,250,255,.92));
+  box-shadow: 0 6px 16px rgba(45, 88, 127, .045), inset 0 1px #fff;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 3 clarity + premium density                                           */
+/* -------------------------------------------------------------------------- */
+
+.dn-nexus3-kpis {
+  gap: 11px;
+  margin: 16px 0 14px;
+}
+
+.dn-nexus3-kpis article {
+  min-height: 76px;
+  padding: 14px 15px;
+  border-radius: 17px;
+  border-color: rgba(104, 182, 249, .17);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(64, 161, 245, .10), transparent 8rem),
+    linear-gradient(145deg, rgba(255,255,255,.062), rgba(255,255,255,.03));
+  box-shadow: 0 10px 22px rgba(0,0,0,.08), inset 0 1px rgba(255,255,255,.045);
+}
+
+.dn-nexus3-kpis svg {
+  width: 20px;
+  height: 20px;
+  color: #63bdff;
+}
+
+.dn-nexus3-kpis span {
+  color: #b8cee2;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.dn-nexus3-kpis b {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-kpis article {
+  border-color: rgba(40, 112, 181, .13);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(48, 151, 239, .075), transparent 8rem),
+    linear-gradient(145deg, #ffffff, #f1f8ff);
+  box-shadow: 0 9px 22px rgba(35, 80, 121, .065), inset 0 1px #fff;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-kpis span {
+  color: #4e6881;
+}
+
+.dn-nexus3-grid {
+  gap: 14px;
+}
+
+.dn-nexus3-panel {
+  padding: 15px;
+  border-radius: 19px;
+}
+
+.dn-nexus3-title {
+  min-height: 44px;
+  padding-bottom: 9px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(104, 181, 245, .10);
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-title {
+  border-bottom-color: rgba(43, 111, 177, .10);
+}
+
+.dn-nexus3-title b {
+  color: #edf8ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-title b {
+  color: #082741;
+}
+
+.dn-nexus3-title span {
+  line-height: 1.45;
+}
+
+.dn-nexus3-list article {
+  padding: 11px 12px;
+  border-radius: 14px;
+  border-color: rgba(255,255,255,.075);
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.025));
+}
+
+.dn-nexus3-list strong {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.dn-nexus3-list small {
+  line-height: 1.5;
+}
+
+.dn-nexus3-list p {
+  color: #b6c8da;
+  line-height: 1.55;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-list p {
+  color: #506b84;
+}
+
+.dn-nexus3-foot {
+  min-height: 36px;
+  margin-top: 13px;
+  padding: 8px 10px;
+  border: 1px solid rgba(104, 180, 244, .10);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+  color: #93aac0;
+  line-height: 1.5;
+}
+
+.dn-nexus-overlay.is-light .dn-nexus3-foot {
+  color: #567088;
+  border-color: rgba(42, 108, 171, .10);
+  background: rgba(255,255,255,.62);
+}
+
+/* Risk colours keep semantic meaning without becoming loud. */
+.dn-nexus3-list :is(.eta-high,.proof-complete,.carrier-healthy) {
+  border-inline-start: 3px solid rgba(50, 207, 146, .72) !important;
+}
+
+.dn-nexus3-list :is(.eta-medium,.proof-partial,.carrier-stale,.anomaly-warning) {
+  border-inline-start: 3px solid rgba(212, 175, 55, .78) !important;
+}
+
+.dn-nexus3-list :is(.eta-low,.proof-weak,.carrier-critical,.anomaly-critical) {
+  border-inline-start: 3px solid rgba(239, 98, 108, .76) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Strict contrast contract                                                    */
+/* -------------------------------------------------------------------------- */
+
+.dn-nexus-overlay :is(.dn-nexus-brand-mark,.dn-nexus-launcher-icon,.dn-nexus2-score),
+.dn-nexus-overlay :is(.dn-nexus-brand-mark,.dn-nexus-launcher-icon,.dn-nexus2-score) * {
+  color: #061a2f !important;
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus-brand h2,.dn-nexus2-header h3,.dn-nexus2-section-title h3,.dn-nexus3-header h3,.dn-nexus3-list strong,.dn-nexus3-title b) {
+  color: #071d34 !important;
+}
+
+.dn-nexus-overlay.is-light :is(.dn-nexus2-header p,.dn-nexus2-section-title p,.dn-nexus2-section-title small,.dn-nexus3-header p,.dn-nexus3-title span,.dn-nexus3-list small,.dn-nexus3-list p,.dn-nexus3-foot) {
+  color: #506b84 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Keyboard, touch and motion                                                  */
+/* -------------------------------------------------------------------------- */
+
+.dn-nexus-overlay button:focus-visible {
+  outline: 3px solid rgba(57, 161, 246, .34);
+  outline-offset: 2px;
+}
+
+.dn-nexus-overlay.is-light button:focus-visible {
+  outline-color: rgba(16, 103, 181, .30);
+}
+
+.dn-nexus-overlay {
+  scrollbar-color: rgba(78, 161, 232, .55) transparent;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 980px) {
+  .dn-nexus-header {
+    position: relative;
+  }
+
+  .dn-nexus-content {
+    padding: 14px;
+    gap: 15px;
+  }
+
+  .dn-nexus2,
+  .dn-nexus3 {
+    padding: 15px;
+    border-radius: 21px;
+  }
+
+  .dn-nexus2-header,
+  .dn-nexus3-header {
+    flex-direction: column;
+  }
+
+  .dn-nexus3-actions,
+  .dn-nexus2-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .dn-nexus-shell {
+    width: min(100%, calc(100vw - 12px));
+    min-height: calc(100dvh - 12px);
+    margin: 6px auto;
+    border-radius: 20px;
+  }
+
+  .dn-nexus-header {
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .dn-nexus-content {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .dn-nexus2,
+  .dn-nexus3 {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .dn-nexus3-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dn-nexus3-kpis article {
+    min-height: 70px;
+    grid-template-columns: auto minmax(0,1fr) auto;
+    padding: 11px;
+  }
+
+  .dn-nexus3-kpis b {
+    font-size: 21px;
+  }
+
+  .dn-nexus3-panel {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  .dn-nexus3-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-nexus2-header-actions button,
+  .dn-nexus3-actions button,
+  .dn-nexus2-open-section {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dn-nexus-overlay *,
+  .dn-nexus-overlay *::before,
+  .dn-nexus-overlay *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
