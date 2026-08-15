@@ -8,17 +8,21 @@ const assert = (condition, message) => {
 };
 
 const componentPath = 'src/components/admin/AdminNexusControlTower.tsx';
+const entryPath = 'src/components/admin/AdminNexusEntry.tsx';
 const enginePath = 'src/lib/nexusRiskEngine.ts';
 const stylePath = 'src/styles/dn-nexus-control-tower.css';
+const launcherStylePath = 'src/styles/dn-nexus-command-launcher.css';
 const mainPath = 'src/main.tsx';
 
-for (const file of [componentPath, enginePath, stylePath, mainPath]) {
+for (const file of [componentPath, entryPath, enginePath, stylePath, launcherStylePath, mainPath]) {
   assert(fs.existsSync(path.join(root, file)), `missing ${file}`);
 }
 
 const component = read(componentPath);
+const entry = read(entryPath);
 const engine = read(enginePath);
 const styles = read(stylePath);
+const launcherStyles = read(launcherStylePath);
 const main = read(mainPath);
 
 const requiredComponentContracts = [
@@ -40,6 +44,16 @@ for (const contract of requiredComponentContracts) {
   assert(component.includes(contract), `component contract missing: ${contract}`);
 }
 
+for (const contract of [
+  '.dncc-navigation',
+  'findVisibleCommandNavigation',
+  'dn-nexus-command-launcher',
+  'window.innerWidth <= 980',
+  'triggerNexusControlTower',
+]) {
+  assert(entry.includes(contract), `active command-center launcher contract missing: ${contract}`);
+}
+
 const forbiddenDirectWrites = [
   '.insert(',
   '.update(',
@@ -53,6 +67,7 @@ const forbiddenDirectWrites = [
 for (const forbidden of forbiddenDirectWrites) {
   assert(!component.includes(forbidden), `direct write detected in control tower: ${forbidden}`);
   assert(!engine.includes(forbidden), `direct write detected in risk engine: ${forbidden}`);
+  assert(!entry.includes(forbidden), `direct write detected in launcher bridge: ${forbidden}`);
 }
 
 const requiredRiskContracts = [
@@ -73,25 +88,28 @@ for (const contract of requiredRiskContracts) {
 }
 
 assert(
-  main.includes('lazy(() => import("./components/admin/AdminNexusControlTower"))'),
-  'NEXUS must remain lazy-loaded',
+  main.includes('lazy(() => import("./components/admin/AdminNexusEntry"))'),
+  'NEXUS entry must remain lazy-loaded',
 );
 assert(
-  main.includes('adminRoute && <Suspense fallback={null}><AdminNexusControlTower /></Suspense>'),
-  'NEXUS must remain Admin-only',
+  main.includes('adminRoute && <Suspense fallback={null}><AdminNexusEntry /></Suspense>'),
+  'NEXUS entry must remain Admin-only',
 );
-assert(!main.includes('import AdminNexusControlTower from'), 'eager NEXUS import detected');
+assert(!main.includes('import AdminNexusEntry from'), 'eager NEXUS entry import detected');
 
 for (const breakpoint of ['max-width: 1360px', 'max-width: 1050px', 'max-width: 760px', 'max-width: 430px']) {
   assert(styles.includes(breakpoint), `responsive contract missing: ${breakpoint}`);
 }
 assert(styles.includes('100dvh'), 'mobile safe viewport contract missing');
 assert(styles.includes('prefers-reduced-motion'), 'reduced-motion contract missing');
+assert(launcherStyles.includes('safe-area-inset-bottom'), 'mobile launcher safe-area contract missing');
+assert(launcherStyles.includes('.dncc-shell[data-theme="light"]'), 'light command-center launcher contract missing');
 
 console.log('NEXUS Phase 1 production gate: PASS');
 console.log('  - real Admin orders / merchants / finance sources required');
 console.log('  - Risk Radar thresholds and financial-posting checks present');
 console.log('  - Action Queue is navigation/recommendation only');
 console.log('  - no direct order/finance write primitives detected');
+console.log('  - active Command Center + mobile launcher enforced');
 console.log('  - Admin-only lazy loading enforced');
 console.log('  - responsive/mobile contracts present');
