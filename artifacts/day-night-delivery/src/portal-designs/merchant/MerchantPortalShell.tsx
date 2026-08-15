@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
+import DeveloperSignature from "../../components/DeveloperSignature";
+import "../../styles/dn-merchant-developer-signature.css";
 import { MerchantBottomNavigation } from "./MerchantBottomNavigation";
 import { MerchantCommandPalette } from "./MerchantCommandPalette";
 import { MerchantDesktopSidebar } from "./MerchantDesktopSidebar";
@@ -65,7 +67,14 @@ export function MerchantPortalShell({ currentSection, data, callbacks, isArabic,
             <span>{data.connection.lastSuccessfulSyncAt ? (isArabic ? `آخر مزامنة: ${data.connection.lastSuccessfulSyncAt}` : `Last sync: ${data.connection.lastSuccessfulSyncAt}`) : ""}</span>
           </div>
         ) : null}
-        <main className="dn-merchant-content"><div className="dn-merchant-content-inner">{children}</div></main>
+        <main className="dn-merchant-content">
+          <div className="dn-merchant-content-inner">
+            {children}
+            <div className="dn-merchant-engineering-signature" data-merchant-developer-signature="universal">
+              <DeveloperSignature embedded />
+            </div>
+          </div>
+        </main>
       </div>
       <MerchantBottomNavigation currentSection={currentSection} isArabic={isArabic} onNavigate={callbacks.onNavigate} />
       <MerchantMobileMoreSheet

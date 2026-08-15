@@ -5,6 +5,10 @@ import { useAppContext } from "../lib/AppContext";
 const DEVELOPER_NAME = "Eng. Sadek Elgazar";
 const DEVELOPER_WHATSAPP = "971503281920";
 
+type DeveloperSignatureProps = {
+  embedded?: boolean;
+};
+
 function sourceLabel(pathname: string, isArabic: boolean) {
   if (/^\/merchant(?:\/|$)/i.test(pathname)) {
     return isArabic ? "بوابة التاجر في DAY NIGHT" : "DAY NIGHT Merchant Portal";
@@ -45,13 +49,18 @@ function leadMessage(pathname: string, isArabic: boolean) {
   ].join("\n");
 }
 
-export default function DeveloperSignature() {
+export default function DeveloperSignature({ embedded = false }: DeveloperSignatureProps) {
   const { language, theme } = useAppContext();
   const location = useLocation();
   const isArabic = language === "ar";
   const isLight = theme === "light";
   const pathname = location.pathname || "/";
+  const isMerchantPath = /^\/merchant(?:\/|$)/i.test(pathname);
 
+  // Merchant uses an internal authenticated scroll shell. Its signature is
+  // mounted inside that shell so every merchant sees it and the public/footer
+  // or native-shell copy does not create a duplicate outside the scroll area.
+  if (isMerchantPath && !embedded) return null;
   if (/^\/(?:admin|auth|customer|update-password)(?:\/|$)/i.test(pathname)) return null;
 
   const whatsappUrl = `https://wa.me/${DEVELOPER_WHATSAPP}?text=${encodeURIComponent(leadMessage(pathname, isArabic))}`;
@@ -65,6 +74,7 @@ export default function DeveloperSignature() {
       className="dn-developer-signature relative z-[5] w-full px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6"
       dir={isArabic ? "rtl" : "ltr"}
       aria-label={isArabic ? "توقيع المهندس والمطور" : "Developer engineering signature"}
+      data-developer-signature-scope={embedded ? "embedded" : "global"}
     >
       <div
         className={`relative mx-auto flex max-w-5xl flex-col gap-4 overflow-hidden rounded-[28px] border p-4 shadow-2xl backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between sm:p-5 ${
