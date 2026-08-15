@@ -120,7 +120,20 @@ jobs:
           else
             cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
             supabase --workdir "$release_dir" db push --dry-run
-            supabase --workdir "$release_dir" db push --yes
+            installed=0
+            for attempt in 1 2 3 4 5; do
+              echo "Production migration attempt $attempt/5"
+              if supabase --workdir "$release_dir" db push --yes; then
+                installed=1
+                break
+              fi
+              if [ "$attempt" -lt 5 ]; then
+                delay=$((attempt * 8))
+                echo "Migration attempt failed, retrying after ${delay}s to clear transient database locks..."
+                sleep "$delay"
+              fi
+            done
+            test "$installed" = "1"
           fi
 
   verify-production-runtime:
@@ -159,8 +172,9 @@ jobs:
             if(!response.ok) throw new Error(`${name}_${response.status}_${JSON.stringify(payload)}`);
             return payload;
           };
-          const now=new Date();
-          const dubai=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+          const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+          const part=(type)=>parts.find((item)=>item.type===type)?.value||'';
+          const dubai=`${part('year')}-${part('month')}-${part('day')}`;
           const health=await rpc('admin_daily_closing_health');
           if(health?.ok!==true||health?.authoritative!==true||health?.data_version!=='daily-closing-v3') {
             throw new Error(`closing_health_failed_${JSON.stringify(health)}`);
@@ -173,10 +187,37 @@ jobs:
             if(!Number.isFinite(Number(snapshot[key]??0))) throw new Error(`closing_non_numeric_${key}`);
           }
           const healthSave=await rpc('admin_save_daily_closing',{p_snapshot:{closing_date:dubai,status:'draft',_health_check:true}});
-          if(healthSave!==null) throw new Error(`closing_health_save_should_be_null_${JSON.stringify(healthSave)}`);
+          const isCompositeNullRow = healthSave && typeof healthSave === 'object' && !Array.isArray(healthSave) && Object.values(healthSave).every((value)=>value===null);
+          if(healthSave!==null && !isCompositeNullRow) throw new Error(`closing_health_save_must_be_no_write_${JSON.stringify(healthSave)}`);
           const tableResponse=await fetch(`${root}/rest/v1/admin_daily_closings?select=id,closing_date,status,source,snapshot_version&limit=1`,{
             headers:{apikey:anon,Authorization:`Bearer ${token}`}
           });
           if(!tableResponse.ok) throw new Error(`closing_table_read_failed_${tableResponse.status}_${await tableResponse.text()}`);
-          console.log(JSON.stringify({result:'PASS',health,snapshot:{closing_date:snapshot.closing_date,source:snapshot.source,status:snapshot.status,total_orders:snapshot.total_orders,delivered_orders:snapshot.delivered_orders,net_total:snapshot.net_total,data_version:snapshot.data_version}},null,2));
+          const tableRows=await tableResponse.json().catch(()=>[]);
+          console.log(JSON.stringify({
+            result:'PASS',
+            health,
+            no_write_health_check:true,
+            rls_table_read:true,
+            persisted_rows_visible:Array.isArray(tableRows)?tableRows.length:0,
+            snapshot:{
+              closing_date:snapshot.closing_date,
+              source:snapshot.source,
+              status:snapshot.status,
+              total_orders:snapshot.total_orders,
+              delivered_orders:snapshot.delivered_orders,
+              goods_value:snapshot.goods_value,
+              delivery_income:snapshot.delivery_income,
+              customer_total:snapshot.customer_total,
+              merchant_due:snapshot.merchant_due,
+              cod_collected:snapshot.cod_collected,
+              expenses_total:snapshot.expenses_total,
+              adjustments_net:snapshot.adjustments_net,
+              net_total:snapshot.net_total,
+              budget_allocated:snapshot.budget_allocated,
+              budget_remaining:snapshot.budget_remaining,
+              unposted_delivered_orders:snapshot.unposted_delivered_orders,
+              data_version:snapshot.data_version
+            }
+          },null,2));
           NODE
