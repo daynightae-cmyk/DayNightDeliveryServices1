@@ -28,9 +28,23 @@ async function waitForPhase4Ready(page, label) {
     const root = document.querySelector('.dn-nexus4');
     if (!root) return false;
     return Boolean(root.querySelector('.dn-nexus4-kpis') || root.querySelector('.dn-nexus4-error'));
-  }, null, { timeout: 90000 });
+  }, null, { timeout:90000 });
   const error = page.locator('.dn-nexus4-error');
   if (await error.isVisible().catch(()=>false)) throw new Error(`NEXUS_PHASE4_BROWSER_FAILED: ${label}: ${(await error.innerText()).trim()}`);
+}
+
+async function scrollNexusToPhase4(page) {
+  return page.evaluate(() => {
+    const phase4 = document.querySelector('.dn-nexus4');
+    const overlay = phase4?.closest('.dn-nexus-overlay');
+    if (!(phase4 instanceof HTMLElement) || !(overlay instanceof HTMLElement)) return null;
+    const overlayBefore = overlay.getBoundingClientRect();
+    const phaseBefore = phase4.getBoundingClientRect();
+    overlay.scrollTop += phaseBefore.top - overlayBefore.top - 12;
+    const max = Math.max(0, overlay.scrollHeight - overlay.clientHeight);
+    overlay.scrollTop = Math.max(0, Math.min(max, overlay.scrollTop));
+    return { scrollTop:overlay.scrollTop, scrollHeight:overlay.scrollHeight, clientHeight:overlay.clientHeight };
+  });
 }
 
 async function verify(page, label) {
@@ -56,15 +70,15 @@ async function verify(page, label) {
   assert(/not a contractual SLA|ليس SLA تعاقد/i.test(text), `${label}: non-contractual baseline disclaimer missing`);
   assert(!/mock data|fake data|sample data/i.test(text), `${label}: fake/sample marker found`);
 
-  await phase4.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(300);
+  const scroll = await scrollNexusToPhase4(page);
+  assert(scroll && scroll.scrollHeight > scroll.clientHeight, `${label}: NEXUS overlay is not scrollable`);
+  await page.waitForTimeout(350);
   const box = await phase4.boundingBox();
-  assert(box && box.width > 0 && box.height > 0, `${label}: Phase 4 has no rendered box`);
   const viewport = page.viewportSize();
-  assert(viewport && box.x < viewport.width && box.y < viewport.height && box.x + box.width > 0 && box.y + Math.min(box.height, viewport.height) > 0, `${label}: Phase 4 did not enter viewport`);
+  assert(box && box.width > 0 && box.height > 0, `${label}: Phase 4 has no rendered box`);
+  assert(viewport && box.x < viewport.width && box.y < viewport.height && box.x + box.width > 0 && box.y + box.height > 0, `${label}: Phase 4 did not enter NEXUS viewport`);
   await page.screenshot({ path:path.join(evidenceDir, `${label}-nexus-phase4-visible.png`) });
-  await phase4.screenshot({ path:path.join(evidenceDir, `${label}-nexus-phase4-section.png`) });
-  return { label, viewport, kpis:5, phase4Box:{ x:Math.round(box.x), y:Math.round(box.y), width:Math.round(box.width), height:Math.round(box.height) } };
+  return { label, viewport, kpis:5, scroll, phase4Box:{ x:Math.round(box.x), y:Math.round(box.y), width:Math.round(box.width), height:Math.round(box.height) } };
 }
 
 async function main() {
