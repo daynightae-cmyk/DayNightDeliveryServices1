@@ -1,0 +1,115 @@
+name: NEXUS Phase 2 Launch Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/nexus-phase2-acceptance.yml"
+      - ".github/scripts/nexus-phase2-browser-acceptance.mjs"
+      - "artifacts/day-night-delivery/src/components/admin/AdminNexusPhase2Intelligence.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminNexusEntry.tsx"
+      - "artifacts/day-night-delivery/src/lib/nexusPhase2Engine.ts"
+      - "artifacts/day-night-delivery/src/lib/nexusRiskEngine.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-nexus-phase2.css"
+      - "artifacts/day-night-delivery/scripts/nexus-phase2-production-gate.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-phase2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  launch-acceptance:
+    name: NEXUS Phase 2 production and browser acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production-runtime-tests
+    env:
+      TEST_BASE_URL: http://127.0.0.1:4173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+      RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Verify protected Admin runtime credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+          done
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: NEXUS Phase 2 static production contract
+        working-directory: artifacts/day-night-delivery
+        run: node scripts/nexus-phase2-production-gate.mjs
+
+      - name: TypeScript and exact production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run web:typecheck
+          pnpm run web:build
+          test -s artifacts/day-night-delivery/dist/public/index.html
+          mkdir -p nexus-phase2-evidence
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > nexus-phase2-evidence/local-web.log 2>&1 &
+          echo $! > nexus-phase2-evidence/local-web.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$TEST_BASE_URL/auth?nosplash=1" | grep -F 'id="root"' >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat nexus-phase2-evidence/local-web.log >&2
+          exit 1
+
+      - name: Install isolated Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          playwright_dir="$RUNNER_TEMP/daynight-nexus2-playwright"
+          mkdir -p "$playwright_dir"
+          cd "$playwright_dir"
+          npm init -y >/dev/null
+          npm install --ignore-scripts playwright@1.56.1
+          npx playwright install chromium
+          echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
+
+      - name: Open NEXUS Phase 2 with protected Admin and verify real surfaces
+        run: node .github/scripts/nexus-phase2-browser-acceptance.mjs
+
+      - name: Stop local app
+        if: always()
+        shell: bash
+        run: |
+          if [ -f nexus-phase2-evidence/local-web.pid ]; then
+            kill "$(cat nexus-phase2-evidence/local-web.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload NEXUS Phase 2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAY-NIGHT-NEXUS-Phase2-Evidence
+          path: nexus-phase2-evidence/
+          if-no-files-found: warn
+          retention-days: 30
