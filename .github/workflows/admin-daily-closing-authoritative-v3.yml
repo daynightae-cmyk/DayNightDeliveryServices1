@@ -1,0 +1,182 @@
+name: Admin Daily Closing Authoritative v3
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260815081500_admin_daily_closing_authoritative_v3.sql"
+      - "artifacts/day-night-delivery/src/components/admin/AdminDailyClosingPanel.tsx"
+      - "artifacts/day-night-delivery/src/lib/adminDailyClosingRuntime.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-daily-closing.css"
+      - ".github/workflows/admin-daily-closing-authoritative-v3.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260815081500_admin_daily_closing_authoritative_v3.sql"
+      - "artifacts/day-night-delivery/src/components/admin/AdminDailyClosingPanel.tsx"
+      - "artifacts/day-night-delivery/src/lib/adminDailyClosingRuntime.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-daily-closing.css"
+      - ".github/workflows/admin-daily-closing-authoritative-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-daily-closing-authoritative-v3-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  code-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript
+        run: pnpm run web:typecheck
+      - name: Production gate
+        run: pnpm run web:gate
+      - name: Production build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: pnpm run web:build
+
+  linked-sql-dry-run:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Validate authoritative closing migration against linked production
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          release_dir="$RUNNER_TEMP/daynight-daily-closing-v3-dry-run"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          target="20260815081500_admin_daily_closing_authoritative_v3.sql"
+          if [ ! -f "$release_dir/supabase/migrations/$target" ]; then
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+          fi
+          supabase --workdir "$release_dir" db push --dry-run
+
+  install-production-schema:
+    if: github.event_name == 'push'
+    needs: code-gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link exact production project and install only pending v3 migration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_ref="$(node -e "const u=new URL(process.env.VITE_SUPABASE_URL);process.stdout.write(u.hostname.split('.')[0])")"
+          test "$project_ref" = "ngdwybpgacauorygoedi"
+          release_dir="$RUNNER_TEMP/daynight-daily-closing-v3-release"
+          mkdir -p "$release_dir/supabase/migrations"
+          cp supabase/config.toml "$release_dir/supabase/config.toml"
+          supabase --workdir "$release_dir" link --project-ref "$project_ref" --password "$SUPABASE_DB_PASSWORD"
+          supabase --workdir "$release_dir" migration fetch --linked
+          target="20260815081500_admin_daily_closing_authoritative_v3.sql"
+          if [ -f "$release_dir/supabase/migrations/$target" ]; then
+            echo "$target already recorded in production"
+          else
+            cp "supabase/migrations/$target" "$release_dir/supabase/migrations/$target"
+            supabase --workdir "$release_dir" db push --dry-run
+            supabase --workdir "$release_dir" db push --yes
+          fi
+
+  verify-production-runtime:
+    if: github.event_name == 'push'
+    needs: install-production-schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-runtime-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify v3 RPC, table access, and no-write save contract with real admin session
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
+          RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          const root=process.env.VITE_SUPABASE_URL.replace(/\/$/,'');
+          const anon=process.env.VITE_SUPABASE_ANON_KEY;
+          for (const [name,value] of Object.entries({root,anon,email:process.env.RUNTIME_ADMIN_EMAIL,password:process.env.RUNTIME_ADMIN_PASSWORD})) {
+            if (!value) throw new Error(`missing_${name}`);
+          }
+          const login=await fetch(`${root}/auth/v1/token?grant_type=password`,{
+            method:'POST',headers:{apikey:anon,'Content-Type':'application/json'},
+            body:JSON.stringify({email:process.env.RUNTIME_ADMIN_EMAIL,password:process.env.RUNTIME_ADMIN_PASSWORD})
+          });
+          const session=await login.json().catch(()=>({}));
+          if(!login.ok||!session.access_token) throw new Error(`admin_login_failed_${login.status}`);
+          const token=session.access_token;
+          const rpc=async(name,body={})=>{
+            const response=await fetch(`${root}/rest/v1/rpc/${name}`,{
+              method:'POST',headers:{apikey:anon,Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)
+            });
+            const payload=await response.json().catch(()=>null);
+            if(!response.ok) throw new Error(`${name}_${response.status}_${JSON.stringify(payload)}`);
+            return payload;
+          };
+          const now=new Date();
+          const dubai=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+          const health=await rpc('admin_daily_closing_health');
+          if(health?.ok!==true||health?.authoritative!==true||health?.data_version!=='daily-closing-v3') {
+            throw new Error(`closing_health_failed_${JSON.stringify(health)}`);
+          }
+          const snapshot=await rpc('admin_daily_closing_snapshot',{p_date:dubai});
+          if(snapshot?.authoritative!==true||!['rpc','persisted'].includes(snapshot?.source)||snapshot?.data_version!=='daily-closing-v3') {
+            throw new Error(`closing_snapshot_contract_failed_${JSON.stringify(snapshot)}`);
+          }
+          for(const key of ['total_orders','delivered_orders','goods_value','delivery_income','customer_total','merchant_due','cod_collected','expenses_total','adjustments_net','net_total','budget_allocated','budget_remaining','unposted_delivered_orders']) {
+            if(!Number.isFinite(Number(snapshot[key]??0))) throw new Error(`closing_non_numeric_${key}`);
+          }
+          const healthSave=await rpc('admin_save_daily_closing',{p_snapshot:{closing_date:dubai,status:'draft',_health_check:true}});
+          if(healthSave!==null) throw new Error(`closing_health_save_should_be_null_${JSON.stringify(healthSave)}`);
+          const tableResponse=await fetch(`${root}/rest/v1/admin_daily_closings?select=id,closing_date,status,source,snapshot_version&limit=1`,{
+            headers:{apikey:anon,Authorization:`Bearer ${token}`}
+          });
+          if(!tableResponse.ok) throw new Error(`closing_table_read_failed_${tableResponse.status}_${await tableResponse.text()}`);
+          console.log(JSON.stringify({result:'PASS',health,snapshot:{closing_date:snapshot.closing_date,source:snapshot.source,status:snapshot.status,total_orders:snapshot.total_orders,delivered_orders:snapshot.delivered_orders,net_total:snapshot.net_total,data_version:snapshot.data_version}},null,2));
+          NODE
