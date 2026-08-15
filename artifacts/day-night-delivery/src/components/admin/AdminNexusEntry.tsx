@@ -5,6 +5,7 @@ import AdminNexusControlTower from "./AdminNexusControlTower";
 import AdminNexusPhase2Intelligence from "./AdminNexusPhase2Intelligence";
 import AdminNexusPhase3PredictiveOperations from "./AdminNexusPhase3PredictiveOperations";
 import "../../styles/dn-nexus-command-launcher.css";
+import "../../styles/dn-nexus-luxury-consolidation.css";
 
 function isElementVisible(element: HTMLElement) {
   const style = window.getComputedStyle(element);
