@@ -4,6 +4,7 @@ import { Radar, Sparkles } from "lucide-react";
 import AdminNexusControlTower from "./AdminNexusControlTower";
 import AdminNexusPhase2Intelligence from "./AdminNexusPhase2Intelligence";
 import AdminNexusPhase3PredictiveOperations from "./AdminNexusPhase3PredictiveOperations";
+import AdminNexusPhase4ServiceAssurance from "./AdminNexusPhase4ServiceAssurance";
 import "../../styles/dn-nexus-command-launcher.css";
 import "../../styles/dn-nexus-luxury-consolidation.css";
 
@@ -78,6 +79,7 @@ export default function AdminNexusEntry() {
     <AdminNexusControlTower />
     <AdminNexusPhase2Intelligence />
     <AdminNexusPhase3PredictiveOperations />
+    <AdminNexusPhase4ServiceAssurance />
     <NexusCommandLauncher />
   </>;
 }
