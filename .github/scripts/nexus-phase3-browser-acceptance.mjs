@@ -23,13 +23,26 @@ async function loginAdmin(page) {
   await page.locator('.dn-admin-fullscreen').waitFor({ state:'visible', timeout:90000 });
 }
 
+async function waitForPhase3Ready(page, label) {
+  await page.waitForFunction(() => {
+    const root = document.querySelector('.dn-nexus3');
+    if (!root) return false;
+    return Boolean(root.querySelector('.dn-nexus3-kpis') || root.querySelector('.dn-nexus3-error'));
+  }, null, { timeout: 90000 });
+  const error = page.locator('.dn-nexus3-error');
+  if (await error.isVisible().catch(()=>false)) {
+    const text = (await error.innerText()).trim();
+    throw new Error(`NEXUS_PHASE3_BROWSER_FAILED: ${label}: Phase 3 error banner visible: ${text}`);
+  }
+}
+
 async function verify(page, label) {
   const launcher = page.locator('.dn-nexus-command-launcher').first();
   await launcher.waitFor({ state:'visible', timeout:60000 });
   await launcher.click();
   await page.locator('.dn-nexus-shell').waitFor({ state:'visible', timeout:30000 });
   await page.locator('.dn-nexus3').waitFor({ state:'visible', timeout:90000 });
-  assert(!(await page.locator('.dn-nexus3-error').isVisible().catch(()=>false)), `${label}: Phase 3 error banner visible`);
+  await waitForPhase3Ready(page, label);
   assert(await page.locator('.dn-nexus3-kpis').isVisible(), `${label}: KPI strip missing`);
   assert(await page.locator('.dn-nexus3-grid').isVisible(), `${label}: Phase 3 grid missing`);
   const panels = await page.locator('.dn-nexus3-panel').count();
