@@ -26,18 +26,22 @@ function required(file, label) {
 console.log("\n--- DAY NIGHT admin deep audit gate ---");
 
 const financeLayerPath = path.join(src, "lib", "adminFinanceLedger.ts");
+const dailyClosingRuntimePath = path.join(src, "lib", "adminDailyClosingRuntime.ts");
 const financeCenterPath = path.join(src, "components", "admin", "AdminFinanceOperationsCenter.tsx");
 const closingPath = path.join(src, "components", "admin", "AdminDailyClosingPanel.tsx");
 const healthPath = path.join(src, "components", "admin", "AdminDatabaseHealthCenter.tsx");
 const orderFinancePath = path.join(src, "lib", "orderFinancials.ts");
 const migrationPath = path.join(repoRoot, "supabase", "migrations", "20260720010000_admin_finance_budget_expenses_hardening.sql");
+const dailyClosingMigrationPath = path.join(repoRoot, "supabase", "migrations", "20260815081500_admin_daily_closing_authoritative_v3.sql");
 
 const financeLayer = required(financeLayerPath, "Authoritative finance data layer");
+const dailyClosingRuntime = required(dailyClosingRuntimePath, "Authoritative daily closing runtime");
 const financeCenter = required(financeCenterPath, "Finance and budget control center");
 const closing = required(closingPath, "Authoritative daily closing panel");
 const health = required(healthPath, "Database and finance health center");
 const orderFinance = required(orderFinancePath, "Order financial formula module");
 const migration = required(migrationPath, "Finance budget and expenses migration");
+const dailyClosingMigration = required(dailyClosingMigrationPath, "Authoritative daily closing v3 migration");
 
 assert(financeLayer.includes("admin_finance_operations_snapshot"), "Finance reads use audited snapshot RPC");
 assert(financeLayer.includes("order_financial_settlements"), "Finance falls back to the authoritative settlement table");
@@ -68,15 +72,34 @@ assert(!financeCenter.includes("deriveMerchantStatementFromOrders"), "Merchant s
 assert(!financeCenter.includes("deriveDriverStatementFromOrders"), "Driver statements no longer invent entries from order count");
 assert(!financeCenter.includes("localStorage"), "Finance center never persists accounting data locally");
 
-assert(closing.includes("fetchAuthoritativeDailyClosing"), "Daily closing is loaded from authoritative finance RPC");
-assert(closing.includes("saveAuthoritativeDailyClosing"), "Daily closing is saved through the finance RPC");
+// Daily closing v3 is intentionally split into a presentation component and a
+// dedicated database runtime. Validate the real contract rather than coupling
+// the gate to old import names inside the React component.
+assert(closing.includes('from "../../lib/adminDailyClosingRuntime"'), "Daily closing UI uses the authoritative v3 runtime");
+assert(closing.includes("fetchDailyClosing"), "Daily closing UI loads from the authoritative runtime");
+assert(closing.includes("saveDailyClosing"), "Daily closing UI saves through the authoritative runtime");
 assert(closing.includes("unposted_delivered_orders"), "Daily closing blocks unposted delivered orders");
 assert(closing.includes("budget_remaining"), "Daily closing includes budget variance");
+assert(closing.includes('type="date"'), "Daily closing supports an explicit closing date");
+assert(closing.includes("قاعدة البيانات فقط"), "Daily closing declares database-only persistence");
+assert(closing.includes('return "—"'), "Unavailable finance data is not represented by fabricated zeroes");
+assert(!closing.includes("buildPreview"), "Daily closing no longer builds a local financial preview");
 assert(!closing.includes("saveDailyClosingSnapshot"), "Daily closing does not use the legacy local-capable save path");
-assert(!closing.includes("localStorage"), "Daily closing never stores financial records locally");
+assert(!closing.includes("localStorage"), "Daily closing UI never stores financial records locally");
+
+assert(dailyClosingRuntime.includes('supabase.rpc("admin_daily_closing_snapshot"'), "Daily closing runtime reads the authoritative RPC first");
+assert(dailyClosingRuntime.includes('supabase.rpc("admin_save_daily_closing"'), "Daily closing runtime saves through the finance RPC first");
+assert(dailyClosingRuntime.includes('from("order_financial_settlements")'), "Daily closing runtime can read authoritative settlement rows directly");
+assert(dailyClosingRuntime.includes('from("admin_expenses")'), "Daily closing runtime reads approved production expenses");
+assert(dailyClosingRuntime.includes('from("admin_adjustments")'), "Daily closing runtime reads production adjustments");
+assert(dailyClosingRuntime.includes('from("admin_finance_budget_status")'), "Daily closing runtime reads production budget status");
+assert(dailyClosingRuntime.includes('from("admin_daily_closings")'), "Daily closing runtime persists snapshots in the database");
+assert(dailyClosingRuntime.includes('source: "unavailable"'), "Daily closing runtime exposes unavailable state instead of invented values");
+assert(dailyClosingRuntime.includes("persistedClosedSnapshot"), "Closed daily closing is read from its persisted frozen snapshot");
+assert(!dailyClosingRuntime.includes("localStorage"), "Daily closing runtime never stores finance in localStorage");
 
 assert(health.includes("fetchFinanceHardeningHealth"), "Database health verifies the finance hardening RPC");
-assert(health.includes("20260720010000_admin_finance_budget_expenses_hardening.sql"), "Health center points to the exact finance migration");
+assert(health.includes("20260720010000_admin_finance_budget_expenses_hardening.sql"), "Health center points to the finance foundation migration");
 
 for (const objectName of [
   "admin_expenses",
@@ -90,7 +113,7 @@ for (const objectName of [
   "admin_set_expense_status",
   "admin_set_adjustment_status",
 ]) {
-  assert(migration.includes(objectName), `Migration defines ${objectName}`);
+  assert(migration.includes(objectName), `Finance foundation migration defines ${objectName}`);
 }
 assert(migration.includes("enable row level security"), "Finance tables have RLS enabled");
 assert(migration.includes("public.is_admin_or_support()"), "Finance operations enforce admin/support authorization");
@@ -98,6 +121,27 @@ assert(migration.includes("financial_account_entries"), "Approved expenses and a
 assert(migration.includes("daynight_admin_finance_audit"), "Finance writes create audit events");
 assert(!migration.toLowerCase().includes("truncate table"), "Finance migration never truncates business data");
 assert(!migration.toLowerCase().includes("drop table"), "Finance migration never drops business tables");
+
+for (const objectName of [
+  "admin_daily_closing_live_snapshot",
+  "admin_daily_closing_snapshot",
+  "admin_save_daily_closing",
+  "admin_daily_closing_health",
+  "snapshot_version",
+  "admin_audit_events",
+]) {
+  assert(dailyClosingMigration.includes(objectName), `Daily closing v3 migration defines ${objectName}`);
+}
+assert(dailyClosingMigration.includes("daily-closing-v3"), "Daily closing migration versions authoritative snapshots");
+assert(dailyClosingMigration.includes("financial_posted_at is null"), "Daily closing migration detects unposted delivered orders");
+assert(dailyClosingMigration.includes("coalesce(o.updated_at,o.created_at)::date = d"), "Unposted delivered risk is scoped to the selected closing date");
+assert(dailyClosingMigration.includes("saved.status = 'closed'"), "Closed-day reads use the persisted frozen snapshot");
+assert(dailyClosingMigration.includes("live_drift"), "Closed-day snapshot exposes post-close live drift without mutating the frozen values");
+assert(dailyClosingMigration.includes("_health_check"), "Daily closing save RPC has a no-write production verification path");
+assert(dailyClosingMigration.includes("public.is_admin_or_support()"), "Daily closing v3 enforces admin/support authorization");
+assert(dailyClosingMigration.includes("enable row level security"), "Daily closing v3 enables RLS");
+assert(!dailyClosingMigration.toLowerCase().includes("truncate table"), "Daily closing v3 never truncates business data");
+assert(!dailyClosingMigration.toLowerCase().includes("drop table"), "Daily closing v3 never drops business tables");
 
 assert(orderFinance.includes("customer_pays"), "Order finance supports customer-paid delivery");
 assert(orderFinance.includes("deduct_from_merchant"), "Order finance supports merchant-deducted delivery");
