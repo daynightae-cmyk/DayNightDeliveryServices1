@@ -6,6 +6,7 @@ import { translations } from "../data/translations";
 import companyMeta from "../data/companyMeta";
 import localAssets, { withRemoteFallback } from "../data/localAssets";
 import { getCompanySocialLinks } from "./ui/SocialLinks";
+import DeveloperSignature from "./DeveloperSignature";
 import "../styles/dn-day-mode.css";
 
 export default function Footer() {
@@ -63,7 +64,7 @@ export default function Footer() {
 
   return (
     <footer className={`${isLight ? "bg-white/55 border-brand-deep/10" : "bg-brand-deep/80 border-white/10"} border-t mt-16`} dir={isArabic ? "rtl" : "ltr"}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="dn-public-footer-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-10">
           <img src={localAssets.logo} onError={(event) => withRemoteFallback(event, localAssets.remote.logo)} alt="DAY NIGHT" className="mx-auto h-16 w-16 rounded-full border border-brand-gold/40 object-contain" />
           <h2 className={`mt-4 text-2xl font-black ${isLight ? "text-brand-deep" : "text-white"}`}>DAY NIGHT DELIVERY SERVICES</h2>
@@ -105,6 +106,7 @@ export default function Footer() {
           <motion.div whileHover={{ scale: 1.02 }} className="flex items-center gap-2 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-2 text-brand-gold font-black"><Code2 className="w-4 h-4" />{isArabic ? "منصة تشغيل DAY NIGHT الرقمية" : "DAY NIGHT Digital Operations Platform"}</motion.div>
         </div>
       </div>
+      <DeveloperSignature />
     </footer>
   );
 }
