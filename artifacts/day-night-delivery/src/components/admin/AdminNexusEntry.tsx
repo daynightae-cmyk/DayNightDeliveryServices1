@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Radar, Sparkles } from "lucide-react";
 import AdminNexusControlTower from "./AdminNexusControlTower";
+import AdminNexusPhase2Intelligence from "./AdminNexusPhase2Intelligence";
 import "../../styles/dn-nexus-command-launcher.css";
 
 function isElementVisible(element: HTMLElement) {
@@ -109,6 +110,7 @@ export default function AdminNexusEntry() {
   return (
     <>
       <AdminNexusControlTower />
+      <AdminNexusPhase2Intelligence />
       <NexusCommandLauncher />
     </>
   );
