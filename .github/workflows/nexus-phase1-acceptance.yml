@@ -7,8 +7,11 @@ on:
       - ".github/workflows/nexus-phase1-acceptance.yml"
       - ".github/scripts/nexus-phase1-browser-acceptance.mjs"
       - "artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminNexusEntry.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminNexusRouteBridge.tsx"
       - "artifacts/day-night-delivery/src/lib/nexusRiskEngine.ts"
       - "artifacts/day-night-delivery/src/styles/dn-nexus-control-tower.css"
+      - "artifacts/day-night-delivery/src/styles/dn-nexus-command-launcher.css"
       - "artifacts/day-night-delivery/src/main.tsx"
       - "artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs"
   workflow_dispatch:
