@@ -46,6 +46,7 @@ import "./styles/dn-merchant-brand-v114.css";
 import "./styles/dn-international-map-resilience.css";
 import "./styles/dn-admin-inp-acceptance.css";
 import "./styles/dn-work-max-foundation.css";
+import "./styles/dn-global-day-mode-closure.css";
 
 const FALLBACK_LOGO = "https://i.postimg.cc/BnMJh77T/Chat-GPT-Image-Jun-23-2026-05-21-26-PM.png";
 type NativeRole = "driver" | "merchant";
