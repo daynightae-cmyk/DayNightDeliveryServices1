@@ -9,17 +9,27 @@ const assert = (condition, message) => {
 
 const componentPath = 'src/components/admin/AdminNexusControlTower.tsx';
 const entryPath = 'src/components/admin/AdminNexusEntry.tsx';
+const routeBridgePath = 'src/components/admin/AdminNexusRouteBridge.tsx';
 const enginePath = 'src/lib/nexusRiskEngine.ts';
 const stylePath = 'src/styles/dn-nexus-control-tower.css';
 const launcherStylePath = 'src/styles/dn-nexus-command-launcher.css';
 const mainPath = 'src/main.tsx';
 
-for (const file of [componentPath, entryPath, enginePath, stylePath, launcherStylePath, mainPath]) {
+for (const file of [
+  componentPath,
+  entryPath,
+  routeBridgePath,
+  enginePath,
+  stylePath,
+  launcherStylePath,
+  mainPath,
+]) {
   assert(fs.existsSync(path.join(root, file)), `missing ${file}`);
 }
 
 const component = read(componentPath);
 const entry = read(entryPath);
+const routeBridge = read(routeBridgePath);
 const engine = read(enginePath);
 const styles = read(stylePath);
 const launcherStyles = read(launcherStylePath);
@@ -54,6 +64,16 @@ for (const contract of [
   assert(entry.includes(contract), `active command-center launcher contract missing: ${contract}`);
 }
 
+for (const contract of [
+  'lazy(() => import("./AdminNexusEntry"))',
+  'isAdminLocation',
+  '/^\\/admin(?:\\/|$)/i',
+  'window.setInterval(sync, 500)',
+  '<AdminNexusEntry />',
+]) {
+  assert(routeBridge.includes(contract), `SPA-aware route bridge contract missing: ${contract}`);
+}
+
 const forbiddenDirectWrites = [
   '.insert(',
   '.update(',
@@ -68,6 +88,7 @@ for (const forbidden of forbiddenDirectWrites) {
   assert(!component.includes(forbidden), `direct write detected in control tower: ${forbidden}`);
   assert(!engine.includes(forbidden), `direct write detected in risk engine: ${forbidden}`);
   assert(!entry.includes(forbidden), `direct write detected in launcher bridge: ${forbidden}`);
+  assert(!routeBridge.includes(forbidden), `direct write detected in route bridge: ${forbidden}`);
 }
 
 const requiredRiskContracts = [
@@ -88,14 +109,13 @@ for (const contract of requiredRiskContracts) {
 }
 
 assert(
-  main.includes('lazy(() => import("./components/admin/AdminNexusEntry"))'),
-  'NEXUS entry must remain lazy-loaded',
+  main.includes('import AdminNexusRouteBridge from "./components/admin/AdminNexusRouteBridge";'),
+  'main must mount the lightweight NEXUS route bridge',
 );
-assert(
-  main.includes('adminRoute && <Suspense fallback={null}><AdminNexusEntry /></Suspense>'),
-  'NEXUS entry must remain Admin-only',
-);
+assert(main.includes('<AdminNexusRouteBridge />'), 'main must render the NEXUS route bridge');
 assert(!main.includes('import AdminNexusEntry from'), 'eager NEXUS entry import detected');
+assert(!main.includes('import AdminNexusControlTower from'), 'eager NEXUS control tower import detected');
+assert(!main.includes('lazy(() => import("./components/admin/AdminNexusEntry"))'), 'NEXUS lazy loading must live inside the SPA-aware route bridge');
 
 for (const breakpoint of ['max-width: 1360px', 'max-width: 1050px', 'max-width: 760px', 'max-width: 430px']) {
   assert(styles.includes(breakpoint), `responsive contract missing: ${breakpoint}`);
@@ -111,5 +131,5 @@ console.log('  - Risk Radar thresholds and financial-posting checks present');
 console.log('  - Action Queue is navigation/recommendation only');
 console.log('  - no direct order/finance write primitives detected');
 console.log('  - active Command Center + mobile launcher enforced');
-console.log('  - Admin-only lazy loading enforced');
+console.log('  - SPA-aware Admin-only lazy loading enforced');
 console.log('  - responsive/mobile contracts present');
