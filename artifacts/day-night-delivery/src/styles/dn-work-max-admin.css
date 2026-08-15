@@ -30,24 +30,24 @@
 }
 
 .dn-admin-fullscreen.is-light {
-  --dna-bg: #eaf4ff;
-  --dna-bg-2: #f8fbff;
-  --dna-surface: #ffffff;
-  --dna-surface-2: #f0f7ff;
-  --dna-surface-3: #deedff;
-  --dna-text: #071a33;
-  --dna-muted: #536d87;
-  --dna-line: rgba(7, 67, 126, .14);
+  --dna-bg: #dfeeff;
+  --dna-bg-2: #fbfdff;
+  --dna-surface: rgba(255, 255, 255, .93);
+  --dna-surface-2: rgba(239, 247, 255, .96);
+  --dna-surface-3: #d9ebff;
+  --dna-text: #061a34;
+  --dna-muted: #405e7c;
+  --dna-line: rgba(5, 68, 130, .18);
   --dna-blue: #086bd7;
   --dna-sky: #168fce;
-  --dna-gold: #bd9014;
-  --dna-shadow: 0 24px 58px rgba(31, 76, 124, .14);
-  --dna-shadow-soft: 0 10px 28px rgba(31, 76, 124, .1);
+  --dna-gold: #956b00;
+  --dna-shadow: 0 26px 64px rgba(22, 65, 113, .19), 0 3px 10px rgba(22, 65, 113, .07);
+  --dna-shadow-soft: 0 12px 32px rgba(22, 65, 113, .13), 0 1px 5px rgba(22, 65, 113, .06);
   color: var(--dna-text) !important;
   background:
-    radial-gradient(circle at 8% 0, rgba(38, 151, 244, .14), transparent 35rem),
-    radial-gradient(circle at 96% 100%, rgba(212, 175, 55, .11), transparent 30rem),
-    linear-gradient(145deg, #e9f3ff, #fbfdff 58%, #eef6ff) !important;
+    radial-gradient(circle at 8% 0, rgba(18, 129, 231, .19), transparent 35rem),
+    radial-gradient(circle at 96% 100%, rgba(212, 175, 55, .13), transparent 30rem),
+    linear-gradient(145deg, #dcecff, #fbfdff 56%, #e7f2ff) !important;
 }
 
 body:has(.dn-admin-fullscreen.is-dark) {
@@ -57,7 +57,7 @@ body:has(.dn-admin-fullscreen.is-dark) {
 
 body:has(.dn-admin-fullscreen.is-light) {
   color: #071a33 !important;
-  background: #eaf4ff !important;
+  background: #dfeeff !important;
 }
 
 .dn-admin-fullscreen::before {
@@ -732,6 +732,314 @@ html[data-dn-admin-theme] body:has(.dn-admin-fullscreen) .dn-admin-fullscreen .d
   background:
     radial-gradient(circle at 50% 15%, rgba(38, 151, 244, .1), transparent 38%),
     var(--dna-surface) !important;
+}
+
+/* Final light-depth pass and the real Admin new-order workspace. */
+.dn-admin-fullscreen.is-light .dn-admin-top-strip {
+  border-color: rgba(5, 68, 130, .16) !important;
+  background: rgba(250, 253, 255, .84) !important;
+  box-shadow: 0 12px 34px rgba(22, 65, 113, .1), inset 0 -1px rgba(255, 255, 255, .9) !important;
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+.dn-admin-fullscreen.is-light :is(
+  .dn-admin-command-card,
+  .dn-admin-current-section,
+  .dn-admin-dashboard-kpis > article,
+  .dn-admin-section-kpis > article,
+  .dn-section-kpis > article,
+  .dn-admin-secondary-panel,
+  .dn-section-panels > article,
+  .dn-section-table-card,
+  .dn-admin-core-full
+) {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(233, 244, 255, .9)),
+    radial-gradient(circle at 92% 0, rgba(8, 107, 215, .09), transparent 18rem) !important;
+  box-shadow: var(--dna-shadow-soft), inset 0 1px rgba(255, 255, 255, .98) !important;
+}
+
+/* Day mode uses a true pearl-blue glass rail so legacy dark copy remains
+   readable without leaving a dark block visually detached from the shell. */
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full {
+  border-color: rgba(5, 68, 130, .16) !important;
+  color: #061a34 !important;
+  background:
+    radial-gradient(circle at 50% -4%, rgba(36, 151, 242, .14), transparent 22rem),
+    linear-gradient(180deg, rgba(252, 254, 255, .97), rgba(225, 239, 255, .94)) !important;
+  box-shadow: -18px 0 50px rgba(22, 65, 113, .14), inset 1px 0 rgba(255, 255, 255, .92) !important;
+  backdrop-filter: blur(22px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.15) !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full :is(.dn-admin-brand-block, .dn-admin-user-mini) {
+  border-color: rgba(5, 68, 130, .14) !important;
+  color: #061a34 !important;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(231, 242, 255, .92)) !important;
+  box-shadow: 0 12px 30px rgba(22, 65, 113, .09), inset 0 1px rgba(255, 255, 255, .98) !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full :is(.dn-admin-brand-block, .dn-admin-user-mini) :is(h1, h2, h3, strong) {
+  color: #061a34 !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full :is(.dn-admin-brand-block, .dn-admin-user-mini) :is(p, span, small) {
+  color: #496783 !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full .dn-admin-side-nav h3 {
+  color: #876100 !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full .dn-admin-side-nav button,
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full .dn-admin-side-nav button span {
+  border-color: rgba(5, 68, 130, .1) !important;
+  color: #244663 !important;
+  background: rgba(255, 255, 255, .64) !important;
+}
+
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full .dn-admin-side-nav button:is(:hover, .is-active),
+.dn-admin-fullscreen.is-light .dn-admin-sidebar-full .dn-admin-side-nav button:is(:hover, .is-active) span {
+  border-color: rgba(135, 97, 0, .34) !important;
+  color: #06182f !important;
+  background: linear-gradient(135deg, #f4d978, #d7ad36) !important;
+}
+
+/* The executive launcher is another intentional dark anchor. */
+.dn-admin-fullscreen.is-light .abu-khalifa-launcher {
+  color: #f7fbff !important;
+}
+
+.dn-admin-fullscreen.is-light .abu-khalifa-launcher .abu-khalifa-launcher__copy strong {
+  color: #f8fbff !important;
+}
+
+.dn-admin-fullscreen.is-light .abu-khalifa-launcher .abu-khalifa-launcher__copy small,
+.dn-admin-fullscreen.is-light .abu-khalifa-launcher .abu-khalifa-launcher__open {
+  color: #f2cc55 !important;
+}
+
+.dn-admin-fullscreen.is-light .abu-khalifa-launcher .abu-khalifa-launcher__status {
+  color: #8debc9 !important;
+}
+
+/* The audited order editor is a dark operational dialog even when the shell is
+   in day mode. Keep its dark anchors legible while its form cards stay light. */
+html[data-dn-admin-theme="day"] .dn-admin-action-modal {
+  color: #f5faff !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > header,
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > footer {
+  border-color: rgba(166, 211, 247, .14) !important;
+  color: #f5faff !important;
+  background: linear-gradient(180deg, rgba(8, 35, 65, .97), rgba(3, 17, 35, .98)) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > header :is(strong, h1, h2, h3),
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > footer :is(strong, h1, h2, h3) {
+  color: #f8fbff !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > header :is(p, span, small),
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > footer :is(p, span, small) {
+  color: #b8cce0 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class~="bg-black/15"] {
+  border-color: rgba(163, 207, 244, .14) !important;
+  color: #f5faff !important;
+  background: rgba(2, 17, 36, .52) !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class~="bg-black/15"] :is(b, strong) {
+  color: #f8fbff !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class~="bg-black/15"] :is(small, span) {
+  color: #afc5d9 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class*="bg-brand-gold/"] :is(small, b, strong) {
+  color: #f0ca5a !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class*="bg-brand-gold/"] span {
+  color: #b8cce0 !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal [class~="!bg-brand-gold"] {
+  color: #06182f !important;
+  text-shadow: none !important;
+}
+
+html[data-dn-admin-theme="day"] .dn-admin-action-modal > footer button:not([type="submit"]) {
+  border-color: rgba(184, 216, 241, .17) !important;
+  color: #d8e8f5 !important;
+  background: rgba(255, 255, 255, .07) !important;
+}
+
+/* Semantic anchors make the audited editor immune to global light utilities;
+   the editor is intentionally navy in both application themes. */
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-header,
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-footer {
+  border-color: rgba(166, 211, 247, .14) !important;
+  color: #f5faff !important;
+  background: linear-gradient(180deg, rgba(8, 35, 65, .97), rgba(3, 17, 35, .98)) !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-header :is(strong, h1, h2, h3) {
+  color: #f8fbff !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-header .dn-admin-audit-eyebrow {
+  color: #f0ca5a !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-icon {
+  color: #f0ca5a !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-close {
+  color: #d8e8f5 !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card {
+  border-color: rgba(163, 207, 244, .14) !important;
+  color: #f5faff !important;
+  background: rgba(2, 17, 36, .64) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .04) !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card :is(b, strong) {
+  color: #f8fbff !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card :is(small, span) {
+  color: #afc5d9 !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card.is-gold {
+  border-color: rgba(224, 186, 68, .28) !important;
+  background: linear-gradient(145deg, rgba(224, 186, 68, .12), rgba(2, 17, 36, .64)) !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card.is-gold :is(small, b, strong) {
+  color: #f0ca5a !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-summary-card.is-gold span {
+  color: #c1d2e2 !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-save,
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-save :is(span, strong, small, b, svg) {
+  color: #06182f !important;
+  text-shadow: none !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-footer :is(p, span, small) {
+  color: #b8cce0 !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-footer p > svg {
+  color: #f0ca5a !important;
+}
+
+:root:is(.light-theme, .dark-theme) .dn-admin-action-modal .dn-admin-audit-footer button:not(.dn-admin-audit-save) {
+  border-color: rgba(184, 216, 241, .17) !important;
+  color: #d8e8f5 !important;
+  background: rgba(255, 255, 255, .07) !important;
+}
+
+.dn-admin-fullscreen :is([data-admin-new-order-form="merchant"], [data-admin-unified-personal-order-entry="true"] > div:first-child) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(18px, 2.4vw, 30px) !important;
+  border: 1px solid color-mix(in srgb, var(--dna-blue) 28%, var(--dna-line)) !important;
+  border-radius: 28px !important;
+  color: var(--dna-text) !important;
+  background:
+    radial-gradient(circle at 96% 0, rgba(38, 151, 244, .12), transparent 28rem),
+    radial-gradient(circle at 4% 100%, rgba(224, 186, 68, .08), transparent 24rem),
+    var(--dna-surface) !important;
+  box-shadow: var(--dna-shadow), inset 0 1px rgba(255, 255, 255, .08) !important;
+}
+
+.dn-admin-fullscreen :is([data-admin-new-order-form="merchant"], [data-admin-unified-personal-order-entry="true"] > div:first-child)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--dna-blue) 28%, var(--dna-gold) 72%, transparent);
+  opacity: .85;
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] > header {
+  padding-block-end: 18px;
+  border-block-end: 1px solid var(--dna-line);
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] :is(h2, h3, label > span, strong) {
+  color: var(--dna-text) !important;
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] :is(p, small) {
+  color: var(--dna-muted) !important;
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] > section.grid > div {
+  border: 1px solid var(--dna-line) !important;
+  border-radius: 20px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .025), transparent 54%),
+    var(--dna-surface-2) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .055), 0 12px 30px rgba(0, 8, 24, .08) !important;
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] > div[class*="grid-cols-2"] {
+  border-color: var(--dna-line) !important;
+  background: var(--dna-surface-2) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .06) !important;
+}
+
+.dn-admin-fullscreen [data-admin-financial-preview-version="verified-v1"] {
+  border: 1px solid color-mix(in srgb, var(--dna-gold) 42%, var(--dna-line)) !important;
+  background:
+    radial-gradient(circle at 96% 0, rgba(224, 186, 68, .14), transparent 24rem),
+    radial-gradient(circle at 5% 100%, rgba(38, 151, 244, .1), transparent 27rem),
+    var(--dna-surface-2) !important;
+  box-shadow: 0 20px 48px rgba(0, 8, 24, .13), inset 0 1px rgba(255, 255, 255, .07) !important;
+}
+
+.dn-admin-fullscreen.is-light [data-admin-new-order-form="merchant"] :is(input, select, textarea) {
+  border-color: rgba(5, 68, 130, .18) !important;
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 1), 0 7px 18px rgba(22, 65, 113, .06) !important;
+}
+
+.dn-admin-fullscreen.is-light [data-admin-new-order-form="merchant"] > header > span {
+  border-color: rgba(14, 132, 91, .25) !important;
+  color: #0c684a !important;
+  background: rgba(21, 185, 128, .1) !important;
+}
+
+.dn-admin-fullscreen.is-light [data-admin-new-order-form="merchant"] [class*="border-rose-400"] {
+  color: #9d2538 !important;
+}
+
+.dn-admin-fullscreen.is-light [data-admin-new-order-form="merchant"] [class*="border-emerald-400"] {
+  color: #0b6847 !important;
+}
+
+.dn-admin-fullscreen [data-admin-new-order-form="merchant"] [class~="bg-brand-gold"] {
+  border-color: rgba(117, 80, 0, .2) !important;
+  color: #06182f !important;
+  background: linear-gradient(135deg, #d6aa2f, #f2d576) !important;
+  box-shadow: 0 12px 28px rgba(212, 175, 55, .2) !important;
 }
 
 /* Responsive command center */
