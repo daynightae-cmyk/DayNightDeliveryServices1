@@ -30,24 +30,24 @@
 }
 
 .dn-merchant-app.is-light {
-  --dnm-bg: #edf5ff;
-  --dnm-bg-2: #f8fbff;
-  --dnm-surface: rgba(255, 255, 255, .94);
-  --dnm-surface-2: rgba(240, 247, 255, .98);
-  --dnm-surface-3: rgba(225, 239, 255, .98);
-  --dnm-text: #071a33;
-  --dnm-muted: #526c87;
-  --dnm-border: rgba(7, 67, 126, .14);
+  --dnm-bg: #e1efff;
+  --dnm-bg-2: #fbfdff;
+  --dnm-surface: rgba(255, 255, 255, .93);
+  --dnm-surface-2: rgba(239, 247, 255, .97);
+  --dnm-surface-3: rgba(219, 236, 255, .98);
+  --dnm-text: #061a34;
+  --dnm-muted: #405f7d;
+  --dnm-border: rgba(5, 68, 130, .18);
   --dnm-blue: #076ad9;
   --dnm-sky: #149bd8;
   --dnm-navy: #082344;
-  --dnm-gold: #c99d20;
-  --dnm-shadow: 0 22px 52px rgba(31, 78, 126, .14);
-  --dnm-shadow-soft: 0 10px 26px rgba(31, 78, 126, .1);
+  --dnm-gold: #956b00;
+  --dnm-shadow: 0 25px 62px rgba(22, 65, 113, .18), 0 3px 10px rgba(22, 65, 113, .07);
+  --dnm-shadow-soft: 0 12px 32px rgba(22, 65, 113, .13), 0 1px 5px rgba(22, 65, 113, .06);
   background:
-    radial-gradient(circle at 8% 2%, rgba(29, 140, 255, .15), transparent 34rem),
-    radial-gradient(circle at 96% 100%, rgba(212, 175, 55, .12), transparent 29rem),
-    linear-gradient(145deg, #eaf4ff, #f9fcff 56%, #eef6ff);
+    radial-gradient(circle at 8% 2%, rgba(20, 132, 235, .19), transparent 34rem),
+    radial-gradient(circle at 96% 100%, rgba(212, 175, 55, .13), transparent 29rem),
+    linear-gradient(145deg, #deedff, #fbfdff 56%, #e8f3ff);
 }
 
 .dn-merchant-app::before {
@@ -66,7 +66,7 @@
 }
 
 body:has(.dn-merchant-app.is-dark) { background: #041226 !important; }
-body:has(.dn-merchant-app.is-light) { background: #edf5ff !important; }
+body:has(.dn-merchant-app.is-light) { background: #e1efff !important; }
 
 /* ProductionExperience mounts the toast stack beside the Merchant app. Keep
    broad portal scroll rules from treating that fixed overlay as an app shell. */
@@ -732,6 +732,41 @@ body:has(.dn-merchant-app) #root > .dn-production-stack::after {
   color: var(--dnm-text);
   background: var(--dnm-surface);
   background: color-mix(in srgb, var(--dnm-warning) 12%, var(--dnm-surface));
+}
+
+.dn-merchant-app.is-light .dn-merchant-header {
+  border-color: rgba(5, 68, 130, .16) !important;
+  background: rgba(250, 253, 255, .84) !important;
+  box-shadow: 0 12px 34px rgba(22, 65, 113, .1), inset 0 -1px rgba(255, 255, 255, .9) !important;
+}
+
+.dn-merchant-app.is-light :is(
+  .dn-merchant-card,
+  .dn-merchant-metric,
+  .dn-merchant-quick-grid button,
+  .dn-merchant-order-card,
+  .dn-merchant-finance-snapshot-v3,
+  .dn-merchant-finance-grid-v3 > article,
+  .dn-merchant-settlement-card-v3,
+  .dn-merchant-finance-table-v3
+) {
+  border-color: var(--dnm-border) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(232, 243, 255, .9)),
+    radial-gradient(circle at 92% 0, rgba(7, 106, 217, .09), transparent 20rem) !important;
+  box-shadow: var(--dnm-shadow-soft), inset 0 1px rgba(255, 255, 255, .98) !important;
+}
+
+.dn-merchant-app.is-light :is(.dn-merchant-field input, .dn-merchant-field select, .dn-merchant-field textarea, .dn-merchant-search input) {
+  border-color: rgba(5, 68, 130, .18) !important;
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 1), 0 7px 18px rgba(22, 65, 113, .06) !important;
+}
+
+.dn-merchant-app .dn-merchant-button.is-gold,
+.dn-merchant-app .dn-merchant-bottom-nav button.is-primary {
+  color: #06182f !important;
+  text-shadow: none !important;
 }
 
 /* Mobile app experience */

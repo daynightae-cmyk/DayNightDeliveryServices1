@@ -289,7 +289,7 @@ export default function DriverCustomerCommunication({ order, isArabic, busy = fa
   }
 
   return (
-    <section className="mt-4 rounded-3xl border border-[#0057B8]/20 bg-white/95 p-4 shadow-[0_18px_50px_rgba(7,26,51,0.08)]" dir={isArabic ? "rtl" : "ltr"}>
+    <section className="dn-driver-customer-communication mt-4 rounded-3xl border border-[#0057B8]/20 bg-white/95 p-4 shadow-[0_18px_50px_rgba(7,26,51,0.08)]" dir={isArabic ? "rtl" : "ltr"}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0057B8]">DAY NIGHT SMART CONTACT</span>
