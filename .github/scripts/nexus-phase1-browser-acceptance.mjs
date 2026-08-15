@@ -43,7 +43,7 @@ async function loginAdmin(page) {
 }
 
 async function openNexus(page) {
-  const launcher = page.locator('.dn-nexus-launcher').first();
+  const launcher = page.locator('.dn-nexus-command-launcher').first();
   await launcher.waitFor({ state: 'visible', timeout: 60000 });
   await launcher.click();
   const shell = page.locator('.dn-nexus-shell');
@@ -85,7 +85,7 @@ async function verifyNexus(page, label) {
     signalCount: await page.locator('.dn-nexus-signal').count(),
     actionCount: await page.locator('.dn-nexus-action').count(),
     sourceText,
-    launcherVisible: await page.locator('.dn-nexus-launcher').first().isVisible(),
+    commandLauncherVisible: await page.locator('.dn-nexus-command-launcher').first().isVisible(),
     mapVisible: await mapSurface.isVisible(),
     viewport: page.viewportSize(),
   };
