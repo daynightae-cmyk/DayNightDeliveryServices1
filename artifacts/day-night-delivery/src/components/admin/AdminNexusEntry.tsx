@@ -1,10 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Radar, Sparkles } from "lucide-react";
-import AdminNexusControlTower from "./AdminNexusControlTower";
 import "../../styles/dn-nexus-command-launcher.css";
 import "../../styles/dn-nexus-luxury-consolidation.css";
 
+const AdminNexusControlTower = lazy(() => import("./AdminNexusControlTower"));
 const AdminNexusPhase2Intelligence = lazy(() => import("./AdminNexusPhase2Intelligence"));
 const AdminNexusPhase3PredictiveOperations = lazy(() => import("./AdminNexusPhase3PredictiveOperations"));
 const AdminNexusPhase4ServiceAssurance = lazy(() => import("./AdminNexusPhase4ServiceAssurance"));
@@ -42,7 +42,7 @@ function NexusDeferredIntelligenceLayers() {
   );
 }
 
-function NexusCommandLauncher() {
+function NexusCommandLauncher({ onRequestOpen }: { onRequestOpen: () => void }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [mobile, setMobile] = useState(() => window.innerWidth <= 980);
   const [isArabic, setIsArabic] = useState(true);
@@ -107,13 +107,8 @@ function NexusCommandLauncher() {
     };
   }, []);
 
-  const openNexus = () => {
-    if (triggerNexusControlTower()) return;
-    window.setTimeout(() => { triggerNexusControlTower(); }, 120);
-  };
-
   const button = (
-    <button type="button" className={`dn-nexus-command-launcher ${mobile ? "is-mobile" : ""}`} onClick={openNexus}
+    <button type="button" className={`dn-nexus-command-launcher ${mobile ? "is-mobile" : ""}`} onClick={onRequestOpen}
       aria-label={isArabic ? "فتح NEXUS AI برج التحكم الذكي" : "Open NEXUS AI control tower"}>
       <span className="dn-nexus-command-icon"><Radar size={18} /></span>
       <span className="dn-nexus-command-copy"><b>NEXUS AI</b><small>{isArabic ? "برج التحكم الذكي" : "AI Control Tower"}</small></span>
@@ -126,9 +121,26 @@ function NexusCommandLauncher() {
 }
 
 export default function AdminNexusEntry() {
+  const [controlTowerMounted, setControlTowerMounted] = useState(false);
+
+  const requestNexusOpen = useCallback(() => {
+    setControlTowerMounted(true);
+
+    const openWhenReady = (attempt: number) => {
+      if (triggerNexusControlTower()) return;
+      if (attempt >= 20) return;
+      window.setTimeout(() => openWhenReady(attempt + 1), 75);
+    };
+    window.setTimeout(() => openWhenReady(0), 0);
+  }, []);
+
   return <>
-    <AdminNexusControlTower />
-    <NexusDeferredIntelligenceLayers />
-    <NexusCommandLauncher />
+    {controlTowerMounted && (
+      <Suspense fallback={null}>
+        <AdminNexusControlTower />
+      </Suspense>
+    )}
+    {controlTowerMounted && <NexusDeferredIntelligenceLayers />}
+    <NexusCommandLauncher onRequestOpen={requestNexusOpen} />
   </>;
 }
