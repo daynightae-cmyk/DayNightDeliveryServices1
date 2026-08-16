@@ -1,0 +1,58 @@
+/* DAY NIGHT Admin — mobile compositor budget
+   Keep phone/tablet interactions on compositor-safe properties only.
+   This file is intentionally loaded last in the Admin command-center bundle.
+*/
+
+@media (max-width: 1023px) {
+  /*
+   * Production Chrome traces showed non-composited color/background/border/
+   * shadow transitions forcing repeated full layer-tree rebuilds while the
+   * mobile command drawer and heavy Admin workspaces were changing. Static
+   * visual states remain identical; interpolation is limited to properties the
+   * compositor can handle without repainting the complete Admin tree.
+   */
+  .dncc-shell *,
+  .dncc-shell *::before,
+  .dncc-shell *::after {
+    transition-property: opacity, transform, translate, scale, rotate !important;
+  }
+
+  /* The drawer is already a fixed overlay. Its entrance keyframe caused several
+     expensive Layerize passes on mid-range Android CPUs. */
+  .dncc-mobile-drawer {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  /* Replace live blur with a denser translucent surface on mobile. */
+  .dncc-mobile-backdrop {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: rgba(3, 10, 20, 0.84) !important;
+  }
+
+  .dncc-shell .dncc-topbar,
+  .dncc-shell .dn-admin-command-deck {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Infinite loader rotation keeps scheduling frames while large order/finance
+     trees are mounting. The loading icon remains visible without continuous
+     layer invalidation. */
+  .dncc-shell .animate-spin {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dncc-shell *,
+  .dncc-shell *::before,
+  .dncc-shell *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
