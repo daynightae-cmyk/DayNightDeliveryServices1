@@ -27,8 +27,8 @@ function syncRootClasses() {
   const active = isAdminRoute();
   document.documentElement.classList.toggle(ADMIN_ROOT_CLASS, active);
   document.documentElement.classList.toggle(COMMAND_ROOT_CLASS, active);
-  document.body.classList.toggle(ADMIN_ROOT_CLASS, active);
-  document.body.classList.toggle(COMMAND_ROOT_CLASS, active);
+  document.body?.classList.toggle(ADMIN_ROOT_CLASS, active);
+  document.body?.classList.toggle(COMMAND_ROOT_CLASS, active);
 }
 
 function rewriteSelector(selector: string) {
@@ -63,6 +63,11 @@ function rewriteRuleList(rules: CSSRuleList): number {
 }
 
 function rewriteLoadedStyleSheets() {
+  // The optimization is Admin-only. Avoid touching the CSSOM on auth, public,
+  // merchant, driver, tracking, or native-role routes so their startup cost and
+  // rendering path remain completely unchanged.
+  if (!isAdminRoute()) return;
+
   let rewritten = 0;
 
   for (const sheet of Array.from(document.styleSheets)) {
@@ -113,8 +118,8 @@ function patchHistoryNavigation(sync: () => void) {
  *
  * This fast path preserves the exact selector semantics with route-scoped root
  * classes and rewrites only those two known root guards in same-origin CSSOM.
- * It runs once per application lifetime and also handles late-loaded Admin CSS
- * chunks. No business data, auth, routing destination, or visual declaration is
+ * It is dormant outside /admin and also handles late-loaded Admin CSS chunks.
+ * No business data, auth behavior, route destination, or visual declaration is
  * changed.
  */
 export function installAdminCssSelectorFastPath() {
@@ -124,16 +129,20 @@ export function installAdminCssSelectorFastPath() {
   if (fastPathWindow[FAST_PATH_FLAG]) return;
   fastPathWindow[FAST_PATH_FLAG] = true;
 
-  syncRootClasses();
-  rewriteLoadedStyleSheets();
-
   const resync = () => {
     syncRootClasses();
     rewriteLoadedStyleSheets();
   };
 
-  patchHistoryNavigation(syncRootClasses);
-  window.addEventListener("popstate", syncRootClasses, { passive: true });
+  // This first sync is cheap on every route; the CSSOM walk below is a no-op
+  // unless the browser is currently on /admin.
+  resync();
+
+  // SPA transitions from /auth -> /admin must activate both the root classes and
+  // the selector rewrite after the URL changes. Leaving /admin removes classes;
+  // already-rewritten Admin selectors then remain inert outside the Admin route.
+  patchHistoryNavigation(resync);
+  window.addEventListener("popstate", resync, { passive: true });
   window.addEventListener("load", resync, { once: true });
 
   document.addEventListener(
@@ -147,8 +156,8 @@ export function installAdminCssSelectorFastPath() {
     true,
   );
 
-  // Admin route chunks can finish after the bootstrap module. These one-time
-  // passes close that race without observing or walking the application DOM.
+  // Admin route chunks can finish after the bootstrap module. Outside /admin all
+  // of these callbacks return immediately without enumerating document.styleSheets.
   queueMicrotask(rewriteLoadedStyleSheets);
   window.setTimeout(rewriteLoadedStyleSheets, 120);
   window.setTimeout(rewriteLoadedStyleSheets, 600);
