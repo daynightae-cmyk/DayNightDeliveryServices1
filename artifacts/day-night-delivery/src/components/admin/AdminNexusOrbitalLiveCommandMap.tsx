@@ -433,12 +433,13 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
                 type: "raster",
                 source: "dn-nexus-satellite-imagery",
                 paint: {
-                  "raster-opacity": 0.94,
+                  "raster-opacity": 0.88,
                   "raster-saturation": 0.06,
                   "raster-contrast": 0.05,
                   "raster-brightness-max": 0.98,
                 },
-                slot: "bottom",
+                // Standard middle slot keeps authored 3D buildings/landmarks above imagery.
+                slot: "middle",
               } as any);
             } catch (cause) {
               console.warn("NEXUS satellite raster overlay unavailable; Standard 3D remains active.", cause);
