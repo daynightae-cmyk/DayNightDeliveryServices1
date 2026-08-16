@@ -1,0 +1,61 @@
+name: NEXUS Hybrid Satellite 3D Temp
+
+on:
+  push:
+    branches:
+      - feature/nexus-earth-live-3d-20260816
+    paths:
+      - .github/workflows/nexus-hybrid-satellite-3d-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/nexus-earth-live-3d-20260816
+          fetch-depth: 0
+
+      - name: Replace conflicting extrusion with Standard 3D plus real satellite raster
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old_style = '''          style: styleMode === "satellite"\n            ? "mapbox://styles/mapbox/standard-satellite"\n            : "mapbox://styles/mapbox/standard",'''
+          new_style = '''          // Standard owns the authoritative 3D scene. Satellite mode is composited\n          // underneath its roads, labels and 3D objects after style load.\n          style: "mapbox://styles/mapbox/standard",'''
+          if old_style not in s:
+              raise SystemExit('style mode anchor not found')
+          s = s.replace(old_style, new_style, 1)
+
+          start = s.find('          // Explicit real building-height geometry guarantees visible street-level volume')
+          end = s.find('          const topSlot = { slot: "top" } as any;', start)
+          if start < 0 or end < 0:
+              raise SystemExit('explicit extrusion block not found')
+
+          hybrid = '''          // Hybrid Earth view: real Mapbox Satellite imagery stays below Standard's\n          // roads, labels, 3D buildings, landmarks, trees and facades. This avoids\n          // a flat satellite-only scene while preserving authentic aerial imagery.\n          if (styleMode === "satellite") {\n            try {\n              localMap.addSource("dn-nexus-satellite-imagery", {\n                type: "raster",\n                url: "mapbox://mapbox.satellite",\n                tileSize: 256,\n              });\n              localMap.addLayer({\n                id: "dn-nexus-satellite-imagery",\n                type: "raster",\n                source: "dn-nexus-satellite-imagery",\n                paint: {\n                  "raster-opacity": 0.94,\n                  "raster-saturation": 0.06,\n                  "raster-contrast": 0.05,\n                  "raster-brightness-max": 0.98,\n                },\n                slot: "bottom",\n              } as any);\n            } catch (cause) {\n              console.warn("NEXUS satellite raster overlay unavailable; Standard 3D remains active.", cause);\n            }\n          }\n\n'''
+          s = s[:start] + hybrid + s[end:]
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          grep -q 'style: "mapbox://styles/mapbox/standard"' artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          grep -q 'mapbox://mapbox.satellite' artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          grep -q 'slot: "bottom"' artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          ! grep -q 'dn-nexus-real-building-extrusions' artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          git diff --check
+
+      - name: Commit hybrid Earth Live scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'DAY NIGHT NEXUS Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          git diff --cached --check
+          git commit -m 'fix(nexus): compose real satellite below Standard 3D scene'
+          git push origin HEAD:feature/nexus-earth-live-3d-20260816
