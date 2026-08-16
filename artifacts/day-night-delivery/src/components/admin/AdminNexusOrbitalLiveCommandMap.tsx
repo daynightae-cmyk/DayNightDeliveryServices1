@@ -418,6 +418,46 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             // Terrain is visual only.
           }
 
+          // Explicit real building-height geometry guarantees visible street-level volume
+          // over Standard Satellite even where the basemap's authored 3D treatment is subtle.
+          try {
+            localMap.addSource("dn-nexus-real-buildings", {
+              type: "vector",
+              url: "mapbox://mapbox.mapbox-streets-v8",
+            });
+            localMap.addLayer({
+              id: "dn-nexus-real-building-extrusions",
+              source: "dn-nexus-real-buildings",
+              "source-layer": "building",
+              type: "fill-extrusion",
+              minzoom: 14.25,
+              filter: ["==", ["get", "extrude"], "true"],
+              paint: {
+                "fill-extrusion-color": [
+                  "interpolate", ["linear"], ["coalesce", ["to-number", ["get", "height"]], 0],
+                  0, "#dbe5ed",
+                  80, "#cbd8e5",
+                  220, "#f0dca4",
+                ],
+                "fill-extrusion-height": [
+                  "interpolate", ["linear"], ["zoom"],
+                  14.25, 0,
+                  15.15, ["coalesce", ["to-number", ["get", "height"]], 8],
+                ],
+                "fill-extrusion-base": [
+                  "interpolate", ["linear"], ["zoom"],
+                  14.25, 0,
+                  15.15, ["coalesce", ["to-number", ["get", "min_height"]], 0],
+                ],
+                "fill-extrusion-opacity": 0.62,
+                "fill-extrusion-vertical-gradient": true,
+              },
+              slot: "middle",
+            } as any);
+          } catch (cause) {
+            console.warn("NEXUS explicit 3D building layer unavailable; Standard 3D remains active.", cause);
+          }
+
           const topSlot = { slot: "top" } as any;
           localMap.addSource("dn-nexus-live-traffic", {
             type: "vector",
