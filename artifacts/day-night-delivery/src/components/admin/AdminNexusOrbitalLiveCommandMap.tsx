@@ -66,7 +66,22 @@ type DispatchCandidate = {
 };
 
 const CLOSED = /deliver|cancel|return|complete|failed/i;
-const UAE_ORBIT_CENTER: NexusLngLat = [54.55, 24.42];
+type LiveCityCamera = {
+  name: string;
+  center: NexusLngLat;
+  zoom: number;
+  pitch: number;
+  bearing: number;
+};
+
+const UAE_LIVE_CITY_TOUR: LiveCityCamera[] = [
+  { name: "Dubai Marina", center: [55.1412, 25.0782], zoom: 16.35, pitch: 76, bearing: 28 },
+  { name: "Dubai Downtown", center: [55.2744, 25.1972], zoom: 16.05, pitch: 74, bearing: -28 },
+  { name: "Abu Dhabi Corniche", center: [54.3773, 24.4539], zoom: 15.9, pitch: 73, bearing: -18 },
+  { name: "Sharjah Waterfront", center: [55.3839, 25.3514], zoom: 15.85, pitch: 72, bearing: 32 },
+  { name: "Al Ain", center: [55.7606, 24.2075], zoom: 15.7, pitch: 71, bearing: -12 },
+];
+const EARTH_LIVE_START = UAE_LIVE_CITY_TOUR[0];
 
 function normalize(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -183,6 +198,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
   const mapHostRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const orbitTimerRef = useRef<number | null>(null);
+  const liveTourIndexRef = useRef(0);
   const [mapReadyNonce, setMapReadyNonce] = useState(0);
   const [mapError, setMapError] = useState("");
   const [styleMode, setStyleMode] = useState<MapStyleMode>("satellite");
@@ -321,16 +337,32 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
         ]);
         if (cancelled || !mapHostRef.current) return;
         mapboxgl.accessToken = accessToken;
+        const satelliteStreetMode = styleMode === "satellite";
         localMap = new mapboxgl.Map({
           container: mapHostRef.current,
-          style: styleMode === "satellite"
-            ? "mapbox://styles/mapbox/standard-satellite"
+          // Satellite mode uses one coherent classic style: authentic aerial imagery +
+          // Streets vector data. We then extrude its own building layer in 3D.
+          style: satelliteStreetMode
+            ? "mapbox://styles/mapbox/satellite-streets-v12"
             : "mapbox://styles/mapbox/standard",
-          center: UAE_ORBIT_CENTER,
-          zoom: 6.35,
-          pitch: 54,
-          bearing: -24,
-          projection: "globe",
+          center: EARTH_LIVE_START.center,
+          zoom: EARTH_LIVE_START.zoom,
+          pitch: EARTH_LIVE_START.pitch,
+          bearing: EARTH_LIVE_START.bearing,
+          projection: "mercator",
+          ...(satelliteStreetMode ? {} : {
+            config: {
+              basemap: {
+                lightPreset: "day",
+                showRoadsAndTransit: true,
+                showPedestrianRoads: true,
+                showRoadLabels: true,
+                showPlaceLabels: true,
+                showPointOfInterestLabels: true,
+                showTransitLabels: true,
+              },
+            },
+          }),
           attributionControl: true,
           antialias: true,
         });
@@ -347,21 +379,36 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
           }
         });
         localMap.on("load", () => {
-          try {
-            localMap.setConfigProperty("basemap", "lightPreset", lightPresetForDubai(new Date()));
-            localMap.setConfigProperty("basemap", "showRoadsAndTransit", true);
-            localMap.setConfigProperty("basemap", "showRoadLabels", true);
-            localMap.setConfigProperty("basemap", "showPlaceLabels", true);
-          } catch {
-            // Standard style config is best-effort; data truth does not depend on it.
+          const visualConfig: Record<string, string | boolean | number> = {
+            lightPreset: "day",
+            showRoadsAndTransit: true,
+            showPedestrianRoads: true,
+            showRoadLabels: true,
+            showPlaceLabels: true,
+            showPointOfInterestLabels: true,
+            showTransitLabels: true,
+            show3dObjects: true,
+            show3dBuildings: true,
+            show3dTrees: true,
+            show3dLandmarks: true,
+            show3dFacades: true,
+          };
+          if (!satelliteStreetMode) {
+            for (const [key, value] of Object.entries(visualConfig)) {
+              try {
+                localMap.setConfigProperty("basemap", key, value);
+              } catch {
+                // Individual visual capabilities vary by Standard style revision.
+              }
+            }
           }
           try {
             localMap.setFog({
-              range: [0.6, 8],
-              color: "#10233f",
-              "high-color": "#24588e",
-              "space-color": "#020713",
-              "star-intensity": 0.32,
+              range: [1.5, 12],
+              color: "#dbeeff",
+              "high-color": "#b8ddff",
+              "space-color": "#07162a",
+              "star-intensity": 0,
             });
           } catch {
             // Atmosphere is visual only.
@@ -378,7 +425,52 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             // Terrain is visual only.
           }
 
-          const topSlot = { slot: "top" } as any;
+          // Satellite Streets already contains the real aerial imagery and the Mapbox
+          // Streets composite vector source. Extrude the same mapped building footprints
+          // with their real height/min_height attributes so imagery remains visible.
+          if (satelliteStreetMode) {
+            try {
+              const styleLayers = localMap.getStyle()?.layers || [];
+              const firstTextLabel = styleLayers.find((layer: any) =>
+                layer.type === "symbol" && layer.layout?.["text-field"],
+              )?.id;
+              if (localMap.getSource("composite") && !localMap.getLayer("dn-nexus-satellite-buildings-3d")) {
+                localMap.addLayer({
+                  id: "dn-nexus-satellite-buildings-3d",
+                  source: "composite",
+                  "source-layer": "building",
+                  filter: ["==", "extrude", "true"],
+                  type: "fill-extrusion",
+                  minzoom: 14.2,
+                  paint: {
+                    "fill-extrusion-color": [
+                      "interpolate", ["linear"], ["coalesce", ["get", "height"], 0],
+                      0, "#d8d3c9",
+                      70, "#ddd7cc",
+                      180, "#e7ddc5",
+                      400, "#f0e3bd",
+                    ],
+                    "fill-extrusion-height": [
+                      "interpolate", ["linear"], ["zoom"],
+                      14.2, 0,
+                      14.75, ["get", "height"],
+                    ],
+                    "fill-extrusion-base": [
+                      "interpolate", ["linear"], ["zoom"],
+                      14.2, 0,
+                      14.75, ["get", "min_height"],
+                    ],
+                    "fill-extrusion-opacity": 0.78,
+                    "fill-extrusion-vertical-gradient": true,
+                  },
+                } as any, firstTextLabel);
+              }
+            } catch (cause) {
+              console.warn("NEXUS Satellite Streets 3D buildings unavailable.", cause);
+            }
+          }
+
+          const topSlot = satelliteStreetMode ? ({} as any) : ({ slot: "top" } as any);
           localMap.addSource("dn-nexus-live-traffic", {
             type: "vector",
             url: "mapbox://mapbox.mapbox-traffic-v1",
@@ -541,7 +633,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
               setCandidateDriverId(id);
             }
             const coordinates = feature.geometry?.coordinates;
-            if (Array.isArray(coordinates)) localMap.easeTo({ center: coordinates, zoom: Math.max(localMap.getZoom(), 12.5), pitch: 63, duration: 850 });
+            if (Array.isArray(coordinates)) localMap.easeTo({ center: coordinates, zoom: Math.max(localMap.getZoom(), 16.2), pitch: 70, bearing: localMap.getBearing(), duration: 1050 });
           });
           localMap.on("click", "dn-nexus-order-points", (event: any) => {
             const id = String(event.features?.[0]?.properties?.id || "");
@@ -557,7 +649,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             if (!Number.isFinite(clusterId) || !source?.getClusterExpansionZoom) return;
             const zoom = await source.getClusterExpansionZoom(clusterId);
             setOrbitalMode(false);
-            localMap.easeTo({ center: feature.geometry.coordinates, zoom, pitch: 55 });
+            localMap.easeTo({ center: feature.geometry.coordinates, zoom: Math.max(zoom, 14.5), pitch: 66 });
           });
           for (const id of ["dn-nexus-driver-points", "dn-nexus-order-points", "dn-nexus-driver-clusters"]) {
             localMap.on("mouseenter", id, () => { localMap.getCanvas().style.cursor = "pointer"; });
@@ -598,7 +690,9 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     try {
-      map.setConfigProperty("basemap", "lightPreset", lightPresetForDubai(now));
+      // Keep the operational scene readable and photorealistic even during UAE dusk/night.
+      // The real UAE clock remains live in the HUD; this is a visualization choice only.
+      map.setConfigProperty("basemap", "lightPreset", "day");
     } catch {
       // Visual synchronization only.
     }
@@ -609,17 +703,22 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
     orbitTimerRef.current = null;
     const map = mapRef.current;
     if (!map || !orbitalMode || selectedOrder || selectedDriver) return;
-    orbitTimerRef.current = window.setInterval(() => {
+    const moveToNextLiveCity = () => {
       const current = mapRef.current;
-      if (!current) return;
-      current.easeTo({
-        bearing: current.getBearing() + 9,
-        pitch: 55,
-        duration: 4500,
-        easing: (value: number) => value,
+      if (!current || document.visibilityState !== "visible") return;
+      liveTourIndexRef.current = (liveTourIndexRef.current + 1) % UAE_LIVE_CITY_TOUR.length;
+      const target = UAE_LIVE_CITY_TOUR[liveTourIndexRef.current];
+      current.flyTo({
+        center: target.center,
+        zoom: target.zoom,
+        pitch: target.pitch,
+        bearing: target.bearing,
+        duration: 6500,
+        curve: 1.15,
         essential: false,
       });
-    }, 4800);
+    };
+    orbitTimerRef.current = window.setInterval(moveToNextLiveCity, 18000);
     return () => {
       if (orbitTimerRef.current) window.clearInterval(orbitTimerRef.current);
       orbitTimerRef.current = null;
@@ -640,7 +739,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
     });
     if (routes[0]?.geometry?.coordinates?.length) {
       const bounds = boundsFromPoints(routes[0].geometry.coordinates);
-      if (bounds) map.fitBounds(bounds, { padding: 110, maxZoom: 14, duration: 850, pitch: 58 });
+      if (bounds) map.fitBounds(bounds, { padding: 110, maxZoom: 16, duration: 1050, pitch: 66 });
     }
   }, [routes, mapReadyNonce]);
 
@@ -748,7 +847,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
           order_id: orderId(selectedOrder),
           driver_id: candidateDriverId,
           action,
-          note: "DAY NIGHT NEXUS ORBITAL LIVE command center",
+          note: "DAY NIGHT DAY NIGHT NEXUS EARTH LIVE 3D command center",
           force: false,
         },
       });
@@ -772,8 +871,16 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
     setSelectedDriverId("");
     setCandidateDriverId("");
     setRoutes([]);
+    liveTourIndexRef.current = 0;
     setOrbitalMode(true);
-    map.easeTo({ center: UAE_ORBIT_CENTER, zoom: 6.35, pitch: 54, bearing: -24, duration: 1200 });
+    map.flyTo({
+      center: EARTH_LIVE_START.center,
+      zoom: EARTH_LIVE_START.zoom,
+      pitch: EARTH_LIVE_START.pitch,
+      bearing: EARTH_LIVE_START.bearing,
+      duration: 1800,
+      essential: false,
+    });
   }, []);
 
   const fitOperations = useCallback(() => {
@@ -785,8 +892,8 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
     ];
     const bounds = boundsFromPoints(points);
     setOrbitalMode(false);
-    if (bounds) map.fitBounds(bounds, { padding: 100, maxZoom: 12.5, duration: 850, pitch: 55 });
-    else map.easeTo({ center: UAE_ORBIT_CENTER, zoom: 7, pitch: 55, duration: 850 });
+    if (bounds) map.fitBounds(bounds, { padding: 100, maxZoom: 15.5, duration: 1050, pitch: 66 });
+    else map.flyTo({ center: EARTH_LIVE_START.center, zoom: EARTH_LIVE_START.zoom, pitch: EARTH_LIVE_START.pitch, bearing: EARTH_LIVE_START.bearing, duration: 1400, essential: false });
   }, [driverFeatures, orderFeatures]);
 
   const primaryRoute = routes[0] || null;
@@ -812,7 +919,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
           </div>
         )}
         {mapError && <div className="dn-nexus-command-map__map-error" role="alert"><AlertTriangle size={16} />{mapError}</div>}
-        <div ref={mapHostRef} className="dn-nexus-command-map__canvas" aria-label={isArabic ? "NEXUS ORBITAL LIVE فوق الإمارات" : "NEXUS ORBITAL LIVE over the UAE"} />
+        <div ref={mapHostRef} className="dn-nexus-command-map__canvas" aria-label={isArabic ? "NEXUS EARTH LIVE 3D للشوارع والمباني فوق الإمارات" : "NEXUS EARTH LIVE 3D streets and buildings over the UAE"} />
         <div className="dn-nexus-command-map__scan" aria-hidden="true"><span /></div>
         <div className="dn-nexus-command-map__vignette" aria-hidden="true" />
 
@@ -820,8 +927,8 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
           <div className="dn-nexus-command-map__identity">
             <span className="dn-nexus-command-map__radar"><Activity size={17} /></span>
             <div>
-              <b>NEXUS ORBITAL LIVE · UAE</b>
-              <small>{isArabic ? "قمر صناعي + حركة طرق حقيقية + عمليات DAY NIGHT" : "Satellite imagery + real traffic + DAY NIGHT operations"}</small>
+              <b>NEXUS EARTH LIVE 3D · UAE</b>
+              <small>{isArabic ? "شوارع فضائية + مبانٍ ومجسمات 3D + حركة طرق حقيقية + عمليات DAY NIGHT" : "Satellite streets + real 3D environment + real traffic + DAY NIGHT operations"}</small>
             </div>
           </div>
           <div className="dn-nexus-command-map__live-clock">
@@ -849,7 +956,7 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             ))}
           </div>
           <div className="dn-nexus-command-map__map-actions">
-            <button type="button" className={orbitalMode ? "is-active" : ""} onClick={resetOrbit}><Activity size={15} /> ORBIT</button>
+            <button type="button" className={orbitalMode ? "is-active" : ""} onClick={resetOrbit}><Activity size={15} /> LIVE 3D</button>
             <button type="button" className={trafficVisible ? "is-active" : ""} onClick={() => setTrafficVisible((value) => !value)}><Zap size={15} /> TRAFFIC</button>
             <button type="button" onClick={() => setStyleMode((mode) => mode === "satellite" ? "streets" : "satellite")}><Layers3 size={15} />{styleMode === "satellite" ? (isArabic ? "شوارع" : "Streets") : (isArabic ? "فضائي" : "Satellite")}</button>
             <button type="button" onClick={fitOperations}><Crosshair size={15} />{isArabic ? "العمليات" : "Ops"}</button>
@@ -858,9 +965,9 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
         </div>
 
         <div className="dn-nexus-command-map__ambient-status">
-          <span><Activity size={12} /> SATELLITE IMAGERY</span>
+          <span><Activity size={12} /> SATELLITE + 3D BUILDINGS</span>
           <span className={trafficVisible ? "is-live" : ""}><Zap size={12} /> TRAFFIC ~8 MIN</span>
-          <span><Clock3 size={12} /> {lightPresetForDubai(now).toUpperCase()}</span>
+          <span><Clock3 size={12} /> UAE {lightPresetForDubai(now).toUpperCase()} · 3D DAY VISIBILITY</span>
           <span><LocateFixed size={12} /> {locatedObjects} {isArabic ? "عنصر GPS/طلب محدد" : "located ops objects"}</span>
         </div>
 

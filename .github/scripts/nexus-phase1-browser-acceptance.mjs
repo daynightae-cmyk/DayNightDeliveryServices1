@@ -89,12 +89,20 @@ async function verifyNexus(page, label) {
   const canvasBox = await mapSurface.boundingBox();
   assert(canvasBox && canvasBox.width > 260 && canvasBox.height > 250, `${label}: Mapbox canvas has invalid geometry`);
 
+  const earthIdentity = (await page.locator('.dn-nexus-command-map__identity').innerText()).trim();
+  const ambientStatus = (await page.locator('.dn-nexus-command-map__ambient-status').innerText()).trim();
+  assert(/NEXUS EARTH LIVE 3D/i.test(earthIdentity), `${label}: Earth Live 3D identity is not active`);
+  assert(/SATELLITE\s*\+\s*3D BUILDINGS/i.test(ambientStatus), `${label}: 3D satellite status is not active`);
+
   const truthStrip = page.locator('.dn-nexus-command-map__truth-strip');
   const pendingPanel = page.locator('.dn-nexus-command-map__order-list');
   const search = page.locator('.dn-nexus-command-map__search input');
   assert(await truthStrip.isVisible(), `${label}: real-data truth strip is not visible`);
   assert(await pendingPanel.isVisible(), `${label}: pending dispatch panel is not visible`);
   assert(await search.isVisible(), `${label}: NEXUS search control is not visible`);
+
+  // Let Standard Satellite, 3D objects and close-view tiles settle before visual evidence.
+  await page.waitForTimeout(label === 'desktop' ? 6500 : 4200);
 
   const result = {
     label,
@@ -106,6 +114,8 @@ async function verifyNexus(page, label) {
     commandLauncherVisible: await page.locator('.dn-nexus-command-launcher').first().isVisible(),
     mapVisible: await mapSurface.isVisible(),
     mapCanvas: canvasBox,
+    earthIdentity,
+    ambientStatus,
     pendingRows: await page.locator('.dn-nexus-command-map__order-list button').count(),
     driverStats: (await page.locator('.dn-nexus-command-map__stats').innerText()).trim(),
     truthText: (await truthStrip.innerText()).trim(),
@@ -175,7 +185,7 @@ async function main() {
         successfulMapboxRequests: mapboxRequests.filter((item) => item.status >= 200 && item.status < 400).length,
       }, null, 2),
     );
-    console.log('NEXUS live command center browser acceptance: PASS');
+    console.log('NEXUS Earth Live 3D browser acceptance: PASS');
   } finally {
     await context.close();
     await browser.close();
