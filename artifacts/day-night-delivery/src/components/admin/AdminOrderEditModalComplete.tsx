@@ -346,15 +346,10 @@ export default function AdminOrderEditModalComplete({
   const [error, setError] = useState("");
   const [errorReference, setErrorReference] = useState("");
   const [errorDiagnostic, setErrorDiagnostic] = useState("");
-  const [contentReady, setContentReady] = useState(false);
   const personalOrder = Boolean(order && isPersonalAdminOrder(order));
 
   useEffect(() => {
-    if (!open || !order) {
-      setContentReady(false);
-      return;
-    }
-
+    if (!open || !order) return;
     setForm(initialForm(order, merchants));
     setBusy(false);
     setMessage("");
@@ -362,18 +357,6 @@ export default function AdminOrderEditModalComplete({
     setError("");
     setErrorReference("");
     setErrorDiagnostic("");
-    setContentReady(false);
-
-    let firstFrame = 0;
-    let secondFrame = 0;
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => setContentReady(true));
-    });
-
-    return () => {
-      if (firstFrame) window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    };
   }, [merchants, open, order]);
 
   const selectedMerchant = useMemo(
@@ -531,7 +514,6 @@ export default function AdminOrderEditModalComplete({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!contentReady) return;
     const validation = validate();
     if (validation) {
       setError(validation);
@@ -639,7 +621,6 @@ export default function AdminOrderEditModalComplete({
       <form
         className="dn-admin-action-modal relative flex h-[95dvh] max-h-[95dvh] !max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-cyan-200/20 !bg-[linear-gradient(155deg,rgba(7,29,54,0.98),rgba(2,16,34,0.99)_52%,rgba(5,25,47,0.98))] shadow-[0_38px_120px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.03)] ring-1 ring-white/5"
         onSubmit={save}
-        aria-busy={!contentReady}
       >
         <div
           aria-hidden="true"
@@ -666,7 +647,7 @@ export default function AdminOrderEditModalComplete({
           <div className="flex items-center gap-2">
             <button
               type="submit"
-              disabled={busy || !contentReady}
+              disabled={busy}
               className="dn-admin-audit-save !inline-flex !items-center !gap-2 !rounded-2xl !bg-brand-gold !px-4 !py-3 !text-xs !font-black shadow-[0_12px_30px_rgba(212,175,55,0.18)] transition hover:!-translate-y-0.5 disabled:opacity-40"
             >
               {busy ? (
@@ -694,8 +675,6 @@ export default function AdminOrderEditModalComplete({
         </header>
 
         <div className="relative z-10 min-h-0 flex-1 scroll-smooth overflow-y-auto px-2 pb-5 pt-3 sm:px-5 sm:pt-4">
-          {contentReady ? (
-            <>
           {message && (
             <section className="sticky top-0 z-40 mb-4 overflow-hidden rounded-[1.4rem] border border-emerald-300/30 bg-[linear-gradient(135deg,rgba(6,78,59,0.9),rgba(3,35,39,0.96))] p-4 text-emerald-50 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-xl">
               <div className="flex items-start gap-3">
@@ -1439,25 +1418,6 @@ export default function AdminOrderEditModalComplete({
               </span>
             </div>
           </section>
-            </>
-          ) : (
-            <div
-              className="grid min-h-[42vh] place-items-center px-4 py-10 text-center"
-              data-admin-order-editor-stage="shell"
-            >
-              <div className="max-w-sm rounded-[1.6rem] border border-cyan-200/15 bg-white/[0.035] px-6 py-7 shadow-[0_18px_48px_rgba(0,0,0,0.16)]">
-                <Sparkles className="mx-auto h-6 w-6 text-brand-gold" />
-                <strong className="mt-3 block text-sm font-black text-white">
-                  {isArabic ? "تجهيز محرر الطلب" : "Preparing order editor"}
-                </strong>
-                <p className="mt-2 text-[11px] font-bold leading-5 text-white/45">
-                  {isArabic
-                    ? "يتم تجهيز الحقول المالية والتشغيلية الكاملة دون تعطيل فتح الكارت."
-                    : "Preparing the complete operational and financial fields without blocking the modal opening."}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         <footer className="dn-admin-audit-footer relative z-20 shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,22,43,0.92),rgba(3,15,31,0.99))] p-4 shadow-[0_-24px_60px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:px-6">
@@ -1474,7 +1434,7 @@ export default function AdminOrderEditModalComplete({
               </button>
               <button
                 type="submit"
-                disabled={busy || !financials || !contentReady}
+                disabled={busy || !financials}
                 className="dn-admin-audit-save !min-w-[220px] !rounded-2xl !bg-brand-gold !px-5 !py-3.5 !font-black shadow-[0_14px_34px_rgba(212,175,55,0.2)] transition hover:!-translate-y-0.5 disabled:opacity-40"
               >
                 {busy ? (
