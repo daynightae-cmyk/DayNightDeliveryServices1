@@ -22,6 +22,7 @@ type DeferredOrder = {
   updated_at?: string | null;
 };
 
+const ADMIN_COMMAND_SECTION_EVENT = "dn-admin-command-section-change";
 const clean = (value: unknown) => String(value ?? "").trim();
 const amount = (value: unknown) => {
   const parsed = Number(value ?? 0);
@@ -58,25 +59,57 @@ export default function AdminDeferredMerchantAccounting() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const timers = new Set<number>();
+    let acquisitionTimer = 0;
+    let attempts = 0;
+
     const sync = () => {
       const nextHost = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
       const onAdmin = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
-      setHost(nextHost);
+      setHost((current) => current === nextHost ? current : nextHost);
       setVisible(Boolean(onAdmin && nextHost && isAccountingSection(activeAdminSectionText())));
+      return Boolean(nextHost);
+    };
+    const laterSync = (delay: number) => {
+      const id = window.setTimeout(() => {
+        timers.delete(id);
+        sync();
+      }, delay);
+      timers.add(id);
+    };
+    const acquire = () => {
+      attempts += 1;
+      if (sync() || attempts >= 40) {
+        if (acquisitionTimer) window.clearInterval(acquisitionTimer);
+        acquisitionTimer = 0;
+      }
+    };
+    const scheduleAfterNavigation = () => {
+      laterSync(0);
+      laterSync(100);
+      laterSync(320);
+    };
+    const onAdminClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".dn-admin-side-nav button, .dncc-navigation button")) scheduleAfterNavigation();
+    };
+    const onCommandSection = (event: Event) => {
+      const section = clean((event as CustomEvent<string>).detail);
+      if (section) setVisible(section === "accounts" || section === "merchant_statements");
+      scheduleAfterNavigation();
     };
 
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["class", "aria-current"],
-    });
-    window.addEventListener("popstate", sync);
+    acquire();
+    if (!acquisitionTimer) acquisitionTimer = window.setInterval(acquire, 250);
+    document.addEventListener("click", onAdminClick, true);
+    window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, onCommandSection);
+    window.addEventListener("popstate", scheduleAfterNavigation);
     return () => {
-      observer.disconnect();
-      window.removeEventListener("popstate", sync);
+      timers.forEach((id) => window.clearTimeout(id));
+      if (acquisitionTimer) window.clearInterval(acquisitionTimer);
+      document.removeEventListener("click", onAdminClick, true);
+      window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, onCommandSection);
+      window.removeEventListener("popstate", scheduleAfterNavigation);
     };
   }, []);
 

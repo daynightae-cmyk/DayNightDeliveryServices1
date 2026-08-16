@@ -8,6 +8,11 @@ const originals = new WeakMap<Text, string>();
 const tracked = new Set<Text>();
 const localizedWrites = new WeakSet<Text>();
 
+type IdleWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 const UAE_LOCATION_PARTS = [
   "mohammed bin zayed city",
   "mohamed bin zayed city",
@@ -141,15 +146,46 @@ export default function ArabicAddressRuntimeBridge() {
     }
 
     const root = document.getElementById("root") || document.body;
+    const pending = new Set<Node>();
+    let idleHandle = 0;
+    let timeoutHandle = 0;
+
+    const flush = () => {
+      idleHandle = 0;
+      timeoutHandle = 0;
+      const nodes = Array.from(pending);
+      pending.clear();
+      nodes.forEach((node) => {
+        if (node.isConnected || node === root) walk(node);
+      });
+    };
+    const schedule = (node: Node) => {
+      pending.add(node);
+      if (idleHandle || timeoutHandle) return;
+      const idleWindow = window as IdleWindow;
+      if (idleWindow.requestIdleCallback) {
+        idleHandle = idleWindow.requestIdleCallback(flush, { timeout: 500 });
+      } else {
+        timeoutHandle = window.setTimeout(flush, 32);
+      }
+    };
+
+    // Preserve immediate localization for the already-rendered surface. New
+    // React nodes are localized off the interaction frame below.
     walk(root);
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.type === "characterData") processText(mutation.target as Text);
-        mutation.addedNodes.forEach(walk);
+        if (mutation.type === "characterData") schedule(mutation.target);
+        mutation.addedNodes.forEach(schedule);
       }
     });
     observer.observe(root, { subtree: true, childList: true, characterData: true });
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      const idleWindow = window as IdleWindow;
+      if (idleHandle && idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(idleHandle);
+      if (timeoutHandle) window.clearTimeout(timeoutHandle);
+    };
   }, [language]);
 
   return null;
