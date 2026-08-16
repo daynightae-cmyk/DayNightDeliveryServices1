@@ -13,6 +13,7 @@ type NavTarget = { element: HTMLElement; surface: NavSurface };
 
 const CUSTOMER_EXPERIENCE_PATH = "/admin/customer-experience";
 const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
+const ADMIN_COMMAND_SECTION_EVENT = "dn-admin-command-section-change";
 const RETURNED_LABELS = ["الطلبات الراجعة", "Returned Orders"];
 const FINANCE_LABELS = ["المالية", "Finance"];
 
@@ -107,7 +108,6 @@ function ensureNavigationTargets(isArabic: boolean) {
     if (host) targets.push({ element: host, surface: "legacy" });
   });
 
-
   return targets;
 }
 
@@ -197,6 +197,8 @@ export default function AdminCustomerExperienceLauncher() {
       return;
     }
 
+    let timer = 0;
+    let attempts = 0;
     const syncTargets = () => {
       const livePath = currentPathname();
       setPathname((current) => (current === livePath ? current : livePath));
@@ -204,26 +206,27 @@ export default function AdminCustomerExperienceLauncher() {
       setNavTargets((current) => (sameTargets(current, nextTargets) ? current : nextTargets));
       const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
       setWorkspaceTarget((current) => (current === nextWorkspace ? current : nextWorkspace));
+      return Boolean(nextTargets.length && nextWorkspace);
+    };
+    const acquire = () => {
+      attempts += 1;
+      if (syncTargets() || attempts >= 40) {
+        if (timer) window.clearInterval(timer);
+        timer = 0;
+      }
+    };
+    const reacquire = () => {
+      attempts = 0;
+      if (syncTargets()) return;
+      if (!timer) timer = window.setInterval(acquire, 250);
     };
 
-    let scheduledFrame = 0;
-    const scheduleSync = () => {
-      if (scheduledFrame) return;
-      scheduledFrame = window.requestAnimationFrame(() => {
-        scheduledFrame = 0;
-        syncTargets();
-      });
-    };
-
-    syncTargets();
-    const observer = new MutationObserver(scheduleSync);
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setInterval(scheduleSync, 1600);
-
+    acquire();
+    if (!timer) timer = window.setInterval(acquire, 250);
+    window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     return () => {
-      observer.disconnect();
-      window.clearInterval(timer);
-      if (scheduledFrame) window.cancelAnimationFrame(scheduledFrame);
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     };
   }, [isAdminRoute, isArabic]);
 
