@@ -9,8 +9,6 @@ const AdminNexusPhase2Intelligence = lazy(() => import("./AdminNexusPhase2Intell
 const AdminNexusPhase3PredictiveOperations = lazy(() => import("./AdminNexusPhase3PredictiveOperations"));
 const AdminNexusPhase4ServiceAssurance = lazy(() => import("./AdminNexusPhase4ServiceAssurance"));
 
-const NEXUS_OPEN_EVENT = "dn-nexus-open-state";
-
 function triggerNexusControlTower() {
   const launcher = document.querySelector<HTMLButtonElement>(".dn-nexus-launcher:not(:disabled)");
   if (!launcher) return false;
@@ -22,14 +20,16 @@ function NexusDeferredIntelligenceLayers() {
   const [nexusOpen, setNexusOpen] = useState(false);
 
   useEffect(() => {
-    const syncFromDom = () => setNexusOpen(Boolean(document.querySelector(".dn-nexus-overlay")));
-    const onOpenState = (event: Event) => {
-      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
-      setNexusOpen(Boolean(detail?.open));
+    let last = false;
+    const sync = () => {
+      const next = Boolean(document.querySelector(".dn-nexus-overlay"));
+      if (next === last) return;
+      last = next;
+      setNexusOpen(next);
     };
-    syncFromDom();
-    window.addEventListener(NEXUS_OPEN_EVENT, onOpenState as EventListener);
-    return () => window.removeEventListener(NEXUS_OPEN_EVENT, onOpenState as EventListener);
+    sync();
+    const timer = window.setInterval(sync, 250);
+    return () => window.clearInterval(timer);
   }, []);
 
   if (!nexusOpen) return null;
@@ -91,16 +91,12 @@ function NexusCommandLauncher() {
     };
 
     acquire();
-    if (!createdHost && window.innerWidth > 980) {
-      acquisitionTimer = window.setInterval(acquire, 250);
-    }
+    if (!createdHost && window.innerWidth > 980) acquisitionTimer = window.setInterval(acquire, 250);
 
     const onResize = () => {
       attempts = 0;
       const ready = sync();
-      if (!ready && !acquisitionTimer && window.innerWidth > 980) {
-        acquisitionTimer = window.setInterval(acquire, 250);
-      }
+      if (!ready && !acquisitionTimer && window.innerWidth > 980) acquisitionTimer = window.setInterval(acquire, 250);
     };
     window.addEventListener("resize", onResize, { passive: true });
 
