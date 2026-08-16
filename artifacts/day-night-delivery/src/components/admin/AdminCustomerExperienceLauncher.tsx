@@ -199,6 +199,7 @@ export default function AdminCustomerExperienceLauncher() {
 
     let timer = 0;
     let attempts = 0;
+    let syncFrame = 0;
     const syncTargets = () => {
       const livePath = currentPathname();
       setPathname((current) => (current === livePath ? current : livePath));
@@ -207,6 +208,14 @@ export default function AdminCustomerExperienceLauncher() {
       const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
       setWorkspaceTarget((current) => (current === nextWorkspace ? current : nextWorkspace));
       return Boolean(nextTargets.length && nextWorkspace);
+    };
+    const requestSyncFrame = () => window.requestAnimationFrame(() => {
+      syncFrame = 0;
+      syncTargets();
+    });
+    const scheduleSync = () => {
+      if (syncFrame) window.cancelAnimationFrame(syncFrame);
+      syncFrame = requestSyncFrame();
     };
     const acquire = () => {
       attempts += 1;
@@ -217,7 +226,7 @@ export default function AdminCustomerExperienceLauncher() {
     };
     const reacquire = () => {
       attempts = 0;
-      if (syncTargets()) return;
+      scheduleSync();
       if (!timer) timer = window.setInterval(acquire, 250);
     };
 
@@ -226,6 +235,7 @@ export default function AdminCustomerExperienceLauncher() {
     window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     return () => {
       if (timer) window.clearInterval(timer);
+      if (syncFrame) window.cancelAnimationFrame(syncFrame);
       window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     };
   }, [isAdminRoute, isArabic]);
