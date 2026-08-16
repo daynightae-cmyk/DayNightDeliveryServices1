@@ -127,7 +127,7 @@ for (const forbidden of forbiddenLiveMapFallbacks) {
 for (const contract of [
   'NEXUS EARTH LIVE 3D · UAE',
   'UAE_LIVE_CITY_TOUR',
-  'zoom: 15.55',
+  'zoom: 16.35',
   'projection: "mercator"',
   'show3dObjects: true',
   'show3dBuildings: true',

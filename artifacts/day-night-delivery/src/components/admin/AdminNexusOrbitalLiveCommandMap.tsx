@@ -75,11 +75,11 @@ type LiveCityCamera = {
 };
 
 const UAE_LIVE_CITY_TOUR: LiveCityCamera[] = [
-  { name: "Dubai Downtown", center: [55.2744, 25.1972], zoom: 15.55, pitch: 70, bearing: -28 },
-  { name: "Dubai Marina", center: [55.1412, 25.0782], zoom: 15.65, pitch: 72, bearing: 24 },
-  { name: "Abu Dhabi Corniche", center: [54.3773, 24.4539], zoom: 15.35, pitch: 69, bearing: -18 },
-  { name: "Sharjah Waterfront", center: [55.3839, 25.3514], zoom: 15.25, pitch: 68, bearing: 32 },
-  { name: "Al Ain", center: [55.7606, 24.2075], zoom: 15.1, pitch: 67, bearing: -12 },
+  { name: "Dubai Marina", center: [55.1412, 25.0782], zoom: 16.35, pitch: 76, bearing: 28 },
+  { name: "Dubai Downtown", center: [55.2744, 25.1972], zoom: 16.05, pitch: 74, bearing: -28 },
+  { name: "Abu Dhabi Corniche", center: [54.3773, 24.4539], zoom: 15.9, pitch: 73, bearing: -18 },
+  { name: "Sharjah Waterfront", center: [55.3839, 25.3514], zoom: 15.85, pitch: 72, bearing: 32 },
+  { name: "Al Ain", center: [55.7606, 24.2075], zoom: 15.7, pitch: 71, bearing: -12 },
 ];
 const EARTH_LIVE_START = UAE_LIVE_CITY_TOUR[0];
 
