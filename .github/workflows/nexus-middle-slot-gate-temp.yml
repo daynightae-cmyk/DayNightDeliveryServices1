@@ -1,0 +1,44 @@
+name: NEXUS Middle Slot Gate Temp
+
+on:
+  push:
+    branches:
+      - feature/nexus-earth-live-3d-20260816
+    paths:
+      - .github/workflows/nexus-middle-slot-gate-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  align:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/nexus-earth-live-3d-20260816
+          fetch-depth: 0
+      - name: Align static gate with middle satellite slot
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("  'slot: \"bottom\"',", "  'slot: \"middle\"',", 1)
+          s = s.replace('real Mapbox Satellite raster in bottom slot required', 'real Mapbox Satellite raster in middle slot behind Standard 3D required', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          grep -q "'slot: \"middle\"'" artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          ! grep -q "'slot: \"bottom\"'" artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          git diff --check
+      - name: Commit gate alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'DAY NIGHT NEXUS Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          git diff --cached --check
+          git commit -m 'test(nexus): require visible satellite middle slot'
+          git push origin HEAD:feature/nexus-earth-live-3d-20260816
