@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -220,6 +220,37 @@ function FinancialCell({ order, isArabic }: { order: Order; isArabic: boolean })
   );
 }
 
+type AdminOrderEditorHandle = {
+  open: (order: Order) => void;
+  close: () => void;
+};
+
+const AdminIsolatedOrderEditor = forwardRef<
+  AdminOrderEditorHandle,
+  { merchants: Merchant[]; isArabic: boolean }
+>(function AdminIsolatedOrderEditor({ merchants, isArabic }, ref) {
+  const [order, setOrder] = useState<Order | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      open: (nextOrder) => setOrder(nextOrder),
+      close: () => setOrder(null),
+    }),
+    [],
+  );
+
+  return (
+    <AdminOrderEditModal
+      order={order}
+      merchants={merchants}
+      isArabic={isArabic}
+      open={Boolean(order)}
+      onClose={() => setOrder(null)}
+    />
+  );
+});
+
 export default function AdminSectionWorkspaceComplete({
   id,
   isArabic,
@@ -239,7 +270,7 @@ export default function AdminSectionWorkspaceComplete({
   const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
   const [statusBusy, setStatusBusy] = useState("");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
-  const [editOrder, setEditOrder] = useState<Order | null>(null);
+  const orderEditorRef = useRef<AdminOrderEditorHandle>(null);
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null);
   const [assignOrder, setAssignOrder] = useState<Order | null>(null);
   const refresh = onRefresh || (async () => undefined);
@@ -249,7 +280,7 @@ export default function AdminSectionWorkspaceComplete({
     setNotice("");
     setStatusDrafts({});
     setStatusBusy("");
-    setEditOrder(null);
+    orderEditorRef.current?.close();
     setDeleteOrder(null);
     setAssignOrder(null);
   }, [id]);
@@ -621,7 +652,7 @@ export default function AdminSectionWorkspaceComplete({
                       <div className="flex min-w-[300px] flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditOrder(order)}
+                          onClick={() => orderEditorRef.current?.open(order)}
                           className="inline-flex items-center gap-1 rounded-lg border border-brand-sky/25 px-3 py-2 text-xs font-black"
                         >
                           <Pencil className="h-4 w-4" />
@@ -717,17 +748,10 @@ export default function AdminSectionWorkspaceComplete({
         </div>
       </article>
 
-      <AdminOrderEditModal
-        order={editOrder}
+      <AdminIsolatedOrderEditor
+        ref={orderEditorRef}
         merchants={merchants}
         isArabic={isArabic}
-        open={Boolean(editOrder)}
-        onClose={() => setEditOrder(null)}
-        onSaved={async () => {
-          setNotice(isArabic ? "تم حفظ بيانات الطلب وحسابه." : "Order and financials saved.");
-          setEditOrder(null);
-          await refresh();
-        }}
       />
       <AdminOrderDeleteModal
         order={deleteOrder}
