@@ -1,0 +1,126 @@
+name: Apply Admin Order Editor Isolation Patch
+
+on:
+  push:
+    branches:
+      - perf/admin-order-editor-isolation-20260816
+    paths:
+      - .github/workflows/apply-admin-order-editor-isolation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/admin-order-editor-isolation-20260816
+          fetch-depth: 0
+
+      - name: Isolate order editor state from the large workspace
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceCompleteLegacy.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = []
+
+          old = 'import { useEffect, useMemo, useState } from "react";'
+          new = 'import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";'
+          assert text.count(old) == 1, 'react import anchor mismatch'
+          text = text.replace(old, new, 1)
+
+          anchor = '\nexport default function AdminSectionWorkspaceComplete({'
+          assert text.count(anchor) == 1, 'component export anchor mismatch'
+          isolated_editor = r'''
+
+type AdminOrderEditorHandle = {
+  open: (order: Order) => void;
+  close: () => void;
+};
+
+const AdminIsolatedOrderEditor = forwardRef<
+  AdminOrderEditorHandle,
+  { merchants: Merchant[]; isArabic: boolean }
+>(function AdminIsolatedOrderEditor({ merchants, isArabic }, ref) {
+  const [order, setOrder] = useState<Order | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      open: (nextOrder) => setOrder(nextOrder),
+      close: () => setOrder(null),
+    }),
+    [],
+  );
+
+  return (
+    <AdminOrderEditModal
+      order={order}
+      merchants={merchants}
+      isArabic={isArabic}
+      open={Boolean(order)}
+      onClose={() => setOrder(null)}
+    />
+  );
+});
+'''
+          text = text.replace(anchor, isolated_editor + anchor, 1)
+
+          old = '  const [editOrder, setEditOrder] = useState<Order | null>(null);\n'
+          new = '  const orderEditorRef = useRef<AdminOrderEditorHandle>(null);\n'
+          assert text.count(old) == 1, 'editOrder state anchor mismatch'
+          text = text.replace(old, new, 1)
+
+          old = '    setEditOrder(null);\n'
+          new = '    orderEditorRef.current?.close();\n'
+          assert text.count(old) == 1, 'section reset edit anchor mismatch'
+          text = text.replace(old, new, 1)
+
+          old = '                          onClick={() => setEditOrder(order)}\n'
+          new = '                          onClick={() => orderEditorRef.current?.open(order)}\n'
+          assert text.count(old) == 1, 'edit button anchor mismatch'
+          text = text.replace(old, new, 1)
+
+          old = '''      <AdminOrderEditModal
+        order={editOrder}
+        merchants={merchants}
+        isArabic={isArabic}
+        open={Boolean(editOrder)}
+        onClose={() => setEditOrder(null)}
+        onSaved={async () => {
+          setNotice(isArabic ? "تم حفظ بيانات الطلب وحسابه." : "Order and financials saved.");
+          setEditOrder(null);
+          await refresh();
+        }}
+      />'''
+          new = '''      <AdminIsolatedOrderEditor
+        ref={orderEditorRef}
+        merchants={merchants}
+        isArabic={isArabic}
+      />'''
+          assert text.count(old) == 1, 'legacy editor mount anchor mismatch'
+          text = text.replace(old, new, 1)
+
+          assert 'editOrder' not in text, 'legacy editOrder state still present'
+          assert 'setEditOrder' not in text, 'legacy setEditOrder call still present'
+          assert text.count('AdminIsolatedOrderEditor') >= 2, 'isolated editor was not installed'
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit isolated editor patch
+        shell: bash
+        run: |
+          git config user.name "DAY NIGHT DELIVERY SERVICES"
+          git config user.email "293348050+daynightae-cmyk@users.noreply.github.com"
+          git add artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceCompleteLegacy.tsx
+          git diff --cached --check
+          git commit -m "perf(admin): isolate order editor state from workspace"
+          git push origin HEAD:perf/admin-order-editor-isolation-20260816
