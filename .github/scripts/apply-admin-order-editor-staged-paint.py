@@ -1,0 +1,128 @@
+from pathlib import Path
+
+path = Path("artifacts/day-night-delivery/src/components/admin/AdminOrderEditModalComplete.tsx")
+text = path.read_text(encoding="utf-8")
+
+old = '  const [errorDiagnostic, setErrorDiagnostic] = useState("");\n  const personalOrder = Boolean(order && isPersonalAdminOrder(order));\n'
+new = '  const [errorDiagnostic, setErrorDiagnostic] = useState("");\n  const [contentReady, setContentReady] = useState(false);\n  const personalOrder = Boolean(order && isPersonalAdminOrder(order));\n'
+assert text.count(old) == 1, "state anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''  useEffect(() => {
+    if (!open || !order) return;
+    setForm(initialForm(order, merchants));
+    setBusy(false);
+    setMessage("");
+    setWarnings([]);
+    setError("");
+    setErrorReference("");
+    setErrorDiagnostic("");
+  }, [merchants, open, order]);'''
+new = '''  useEffect(() => {
+    if (!open || !order) {
+      setContentReady(false);
+      return;
+    }
+
+    setForm(initialForm(order, merchants));
+    setBusy(false);
+    setMessage("");
+    setWarnings([]);
+    setError("");
+    setErrorReference("");
+    setErrorDiagnostic("");
+    setContentReady(false);
+
+    let firstFrame = 0;
+    let secondFrame = 0;
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setContentReady(true));
+    });
+
+    return () => {
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [merchants, open, order]);'''
+assert text.count(old) == 1, "effect anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const validation = validate();'''
+new = '''  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!contentReady) return;
+    const validation = validate();'''
+assert text.count(old) == 1, "save guard anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''      <form
+        className="dn-admin-action-modal relative flex h-[95dvh] max-h-[95dvh] !max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-cyan-200/20 !bg-[linear-gradient(155deg,rgba(7,29,54,0.98),rgba(2,16,34,0.99)_52%,rgba(5,25,47,0.98))] shadow-[0_38px_120px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.03)] ring-1 ring-white/5"
+        onSubmit={save}
+      >'''
+new = '''      <form
+        className="dn-admin-action-modal relative flex h-[95dvh] max-h-[95dvh] !max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-cyan-200/20 !bg-[linear-gradient(155deg,rgba(7,29,54,0.98),rgba(2,16,34,0.99)_52%,rgba(5,25,47,0.98))] shadow-[0_38px_120px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.03)] ring-1 ring-white/5"
+        onSubmit={save}
+        aria-busy={!contentReady}
+      >'''
+assert text.count(old) == 1, "form anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''              type="submit"
+              disabled={busy}
+              className="dn-admin-audit-save'''
+new = '''              type="submit"
+              disabled={busy || !contentReady}
+              className="dn-admin-audit-save'''
+assert text.count(old) == 1, "header save anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''        <div className="relative z-10 min-h-0 flex-1 scroll-smooth overflow-y-auto px-2 pb-5 pt-3 sm:px-5 sm:pt-4">
+          {message && ('''
+new = '''        <div className="relative z-10 min-h-0 flex-1 scroll-smooth overflow-y-auto px-2 pb-5 pt-3 sm:px-5 sm:pt-4">
+          {contentReady ? (
+            <>
+          {message && ('''
+assert text.count(old) == 1, "body start anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '''          </section>
+        </div>
+
+        <footer className="dn-admin-audit-footer'''
+new = '''          </section>
+            </>
+          ) : (
+            <div
+              className="grid min-h-[42vh] place-items-center px-4 py-10 text-center"
+              data-admin-order-editor-stage="shell"
+            >
+              <div className="max-w-sm rounded-[1.6rem] border border-cyan-200/15 bg-white/[0.035] px-6 py-7 shadow-[0_18px_48px_rgba(0,0,0,0.16)]">
+                <Sparkles className="mx-auto h-6 w-6 text-brand-gold" />
+                <strong className="mt-3 block text-sm font-black text-white">
+                  {isArabic ? "تجهيز محرر الطلب" : "Preparing order editor"}
+                </strong>
+                <p className="mt-2 text-[11px] font-bold leading-5 text-white/45">
+                  {isArabic
+                    ? "يتم تجهيز الحقول المالية والتشغيلية الكاملة دون تعطيل فتح الكارت."
+                    : "Preparing the complete operational and financial fields without blocking the modal opening."}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <footer className="dn-admin-audit-footer'''
+assert text.count(old) == 1, "body end anchor mismatch"
+text = text.replace(old, new, 1)
+
+old = '                disabled={busy || !financials}\n                className="dn-admin-audit-save'
+new = '                disabled={busy || !financials || !contentReady}\n                className="dn-admin-audit-save'
+assert text.count(old) == 1, "footer save anchor mismatch"
+text = text.replace(old, new, 1)
+
+assert text.count('data-admin-order-editor-stage="shell"') == 1
+assert text.count("setContentReady(true)") == 1
+assert text.count("disabled={busy || !contentReady}") == 1
+path.write_text(text, encoding="utf-8")
