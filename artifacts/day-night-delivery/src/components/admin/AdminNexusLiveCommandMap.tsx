@@ -19,5 +19,6 @@
  * cluster: true
  * dn-nexus-command-map__truth-strip
  */
-export { default } from "./AdminNexusOrbitalLiveCommandMap";
+import "../../styles/dn-nexus-orbital-shell.css";
+export { default } from "./AdminNexusOrbitalLiveResizer";
 export type { AdminNexusLiveCommandMapProps } from "./AdminNexusOrbitalLiveCommandMap";
