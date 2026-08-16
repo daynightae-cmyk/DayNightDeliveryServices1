@@ -1,0 +1,52 @@
+name: NEXUS Marina 3D Camera Temp
+
+on:
+  push:
+    branches:
+      - feature/nexus-earth-live-3d-20260816
+    paths:
+      - .github/workflows/nexus-marina-3d-camera-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  tune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/nexus-earth-live-3d-20260816
+          fetch-depth: 0
+      - name: Start on dense Dubai Marina 3D skyline
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = '''const UAE_LIVE_CITY_TOUR: LiveCityCamera[] = [\n  { name: "Dubai Downtown", center: [55.2744, 25.1972], zoom: 15.55, pitch: 70, bearing: -28 },\n  { name: "Dubai Marina", center: [55.1412, 25.0782], zoom: 15.65, pitch: 72, bearing: 24 },\n  { name: "Abu Dhabi Corniche", center: [54.3773, 24.4539], zoom: 15.35, pitch: 69, bearing: -18 },\n  { name: "Sharjah Waterfront", center: [55.3839, 25.3514], zoom: 15.25, pitch: 68, bearing: 32 },\n  { name: "Al Ain", center: [55.7606, 24.2075], zoom: 15.1, pitch: 67, bearing: -12 },\n];'''
+          new = '''const UAE_LIVE_CITY_TOUR: LiveCityCamera[] = [\n  { name: "Dubai Marina", center: [55.1412, 25.0782], zoom: 16.35, pitch: 76, bearing: 28 },\n  { name: "Dubai Downtown", center: [55.2744, 25.1972], zoom: 16.05, pitch: 74, bearing: -28 },\n  { name: "Abu Dhabi Corniche", center: [54.3773, 24.4539], zoom: 15.9, pitch: 73, bearing: -18 },\n  { name: "Sharjah Waterfront", center: [55.3839, 25.3514], zoom: 15.85, pitch: 72, bearing: 32 },\n  { name: "Al Ain", center: [55.7606, 24.2075], zoom: 15.7, pitch: 71, bearing: -12 },\n];'''
+          if old not in s:
+              raise SystemExit('live city tour camera contract not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          g = Path('artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs')
+          t = g.read_text(encoding='utf-8')
+          t = t.replace("  'zoom: 15.55',", "  'zoom: 16.35',", 1)
+          g.write_text(t, encoding='utf-8')
+          PY
+          grep -q 'Dubai Marina.*zoom: 16.35.*pitch: 76' artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx
+          grep -q "'zoom: 16.35'" artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          git diff --check
+      - name: Commit closer opening camera
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'DAY NIGHT NEXUS Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          git diff --cached --check
+          git commit -m 'feat(nexus): open on dense Dubai Marina 3D skyline'
+          git push origin HEAD:feature/nexus-earth-live-3d-20260816
