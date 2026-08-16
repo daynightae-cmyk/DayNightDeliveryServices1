@@ -6,6 +6,13 @@ import "../styles/dn-admin-executive-polish.css";
 const DECK_ID = "dn-admin-executive-polish";
 const POLISHED_ATTR = "data-dn-admin-polished";
 let executiveDeckRefreshPromise: Promise<void> | null = null;
+let activeAdminRoot: HTMLElement | null = null;
+let deckRefreshTimer: number | null = null;
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 const textReplacements: Array<[string, string]> = [
   ["المصدر: قاعدة البيانات", "متزامن مع سجلات التشغيل"],
@@ -41,12 +48,16 @@ type DeckSnapshot = {
   refreshedAt: Date;
 };
 
+function getAdminRoot() {
+  return document.querySelector<HTMLElement>(".dn-admin-fullscreen");
+}
+
 function isAdminMounted() {
-  return Boolean(document.querySelector(".dn-admin-fullscreen"));
+  return Boolean(getAdminRoot());
 }
 
 function isArabicAdmin() {
-  return document.querySelector(".dn-admin-fullscreen")?.getAttribute("dir") !== "ltr";
+  return getAdminRoot()?.getAttribute("dir") !== "ltr";
 }
 
 function money(value: number) {
@@ -77,36 +88,36 @@ function activeMerchants(merchants: Merchant[]) {
   }).length;
 }
 
-function replaceVisibleText(root: ParentNode = document.body) {
-  if (!isAdminMounted()) return;
+function replaceVisibleText(root: ParentNode) {
+  const adminRoot = getAdminRoot();
+  if (!adminRoot) return;
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      if (!parent.closest(".dn-admin-fullscreen")) return NodeFilter.FILTER_REJECT;
+      if (!parent || !adminRoot.contains(parent)) return NodeFilter.FILTER_REJECT;
       if (["SCRIPT", "STYLE", "TEXTAREA", "INPUT"].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
       if (parent.closest(`#${DECK_ID}`)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
 
-  const nodes: Text[] = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-
-  nodes.forEach((node) => {
+  const changes: Array<{ node: Text; value: string }> = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
     let next = node.nodeValue || "";
-    textReplacements.forEach(([from, to]) => {
+    for (const [from, to] of textReplacements) {
       if (next.includes(from)) next = next.replaceAll(from, to);
-    });
-    if (next !== node.nodeValue) node.nodeValue = next;
-  });
+    }
+    if (next !== node.nodeValue) changes.push({ node, value: next });
+  }
+  for (const change of changes) change.node.nodeValue = change.value;
 }
 
 function ensureDeck() {
-  if (!isAdminMounted()) return null;
-  const host = document.querySelector(".dn-admin-content-full") || document.querySelector(".dn-admin-fullscreen");
-  if (!host) return null;
+  const adminRoot = getAdminRoot();
+  if (!adminRoot) return null;
+  const host = adminRoot.querySelector<HTMLElement>(".dn-admin-content-full") || adminRoot;
 
   let deck = document.getElementById(DECK_ID);
   if (!deck) {
@@ -114,17 +125,14 @@ function ensureDeck() {
     deck.id = DECK_ID;
     deck.className = "dn-admin-executive-polish";
     deck.setAttribute("aria-live", "polite");
-
     const topStrip = host.querySelector(".dn-admin-top-strip");
     if (topStrip?.nextSibling) host.insertBefore(deck, topStrip.nextSibling);
     else host.prepend(deck);
   }
-
   return deck;
 }
 
 function loadingDeck() {
-  if (!isAdminMounted()) return;
   const isArabic = isArabicAdmin();
   const deck = ensureDeck();
   if (!deck || deck.getAttribute(POLISHED_ATTR) === "ready") return;
@@ -176,18 +184,10 @@ function renderDeck(snapshot: DeckSnapshot) {
       <p>${isArabic ? "مؤشرات مختصرة مرتبطة بالطلبات والتجار والتحصيل دون أي بيانات إضافية مصطنعة." : "Compact indicators linked to orders, merchants, and collections without synthetic data."}</p>
     </div>
     <div class="dn-admin-executive-cards">
-      ${cards
-        .map(
-          (card) => `
-            <article class="dn-admin-executive-card" data-tone="${card.tone}">
-              <small>${card.meta}</small>
-              <strong>${card.value}</strong>
-              <span>${card.label}</span>
-              <em>${card.hint}</em>
-            </article>
-          `,
-        )
-        .join("")}
+      ${cards.map((card) => `
+        <article class="dn-admin-executive-card" data-tone="${card.tone}">
+          <small>${card.meta}</small><strong>${card.value}</strong><span>${card.label}</span><em>${card.hint}</em>
+        </article>`).join("")}
     </div>
     <div class="dn-admin-executive-foot">
       <span>${isArabic ? "قائمة تحتاج متابعة" : "Attention queue"}: <b>${attention}</b></span>
@@ -202,14 +202,13 @@ function refreshExecutiveDeck(): Promise<void> {
 
   loadingDeck();
   ensureDeck()?.setAttribute(POLISHED_ATTR, "loading");
-
   executiveDeckRefreshPromise = (async () => {
     const [ordersResult, merchantsResult, financeResult] = await Promise.allSettled([
       fetchAdminOrders(),
       fetchMerchants(),
       fetchFinanceSummary(),
     ]);
-
+    if (!isAdminMounted()) return;
     renderDeck({
       orders: ordersResult.status === "fulfilled" && Array.isArray(ordersResult.value) ? ordersResult.value : [],
       merchants: merchantsResult.status === "fulfilled" && Array.isArray(merchantsResult.value) ? merchantsResult.value : [],
@@ -219,35 +218,48 @@ function refreshExecutiveDeck(): Promise<void> {
   })().finally(() => {
     executiveDeckRefreshPromise = null;
   });
-
   return executiveDeckRefreshPromise;
+}
+
+function runWhenIdle(callback: () => void, timeout = 3000) {
+  const idleWindow = window as IdleWindow;
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    idleWindow.requestIdleCallback(() => callback(), { timeout });
+  } else {
+    window.setTimeout(callback, Math.min(timeout, 1200));
+  }
+}
+
+function initializeAdminPolish(root: HTMLElement) {
+  activeAdminRoot = root;
+  ensureDeck();
+  runWhenIdle(() => {
+    if (activeAdminRoot !== root || !document.contains(root)) return;
+    replaceVisibleText(root);
+    void refreshExecutiveDeck();
+  }, 2200);
+
+  if (deckRefreshTimer) window.clearInterval(deckRefreshTimer);
+  deckRefreshTimer = window.setInterval(() => {
+    if (!isAdminMounted()) return;
+    runWhenIdle(() => void refreshExecutiveDeck(), 2500);
+  }, 60_000);
+}
+
+function checkAdminLifecycle() {
+  const root = getAdminRoot();
+  if (!root) {
+    activeAdminRoot = null;
+    return;
+  }
+  if (root === activeAdminRoot) return;
+  initializeAdminPolish(root);
 }
 
 function startAdminPolish() {
   if (typeof document === "undefined") return;
-  if (isAdminMounted()) {
-    replaceVisibleText();
-    ensureDeck();
-    void refreshExecutiveDeck();
-  }
-
-  let queued = false;
-  const observer = new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    window.requestAnimationFrame(() => {
-      queued = false;
-      if (!isAdminMounted()) return;
-      replaceVisibleText();
-      const deck = ensureDeck();
-      if (deck && deck.getAttribute(POLISHED_ATTR) !== "ready") void refreshExecutiveDeck();
-    });
-  });
-
-  observer.observe(document.body, { childList: true, characterData: true, subtree: true });
-  window.setInterval(() => {
-    if (isAdminMounted()) void refreshExecutiveDeck();
-  }, 60_000);
+  checkAdminLifecycle();
+  window.setInterval(checkAdminLifecycle, 1500);
 }
 
 if (typeof window !== "undefined") {
