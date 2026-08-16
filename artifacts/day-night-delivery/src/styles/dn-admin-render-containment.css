@@ -1,0 +1,127 @@
+/*
+ * DAY NIGHT Admin interaction containment.
+ *
+ * These rules do not change business behaviour. They keep fixed overlays and
+ * below-the-fold form/finance regions from invalidating the full Admin layout,
+ * especially on mid-range Android where the command center is internally
+ * scrollable and the document body itself does not need to be locked.
+ */
+
+/* Abu Khalifa already lives in a fixed portal above the internally scrolling
+ * Admin shell. Keep the body's computed overflow stable when the legacy class
+ * is toggled so opening the card does not relayout thousands of Admin nodes. */
+body.executive-panel-open {
+  overflow: visible !important;
+}
+
+.dn-admin-modal-backdrop {
+  contain: layout paint style;
+  overscroll-behavior: contain;
+}
+
+.dn-admin-action-modal {
+  contain: layout paint style;
+  isolation: isolate;
+}
+
+/* The editor renders a long audited form inside its own scrollport. Sections
+ * below that scrollport's viewport can safely skip style/layout/paint work until
+ * the operator approaches them. The intrinsic size prevents scroll jumps. */
+.dn-admin-action-modal section,
+.dn-admin-action-modal .dn-admin-audit-summary-card {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: 240px;
+}
+
+.dn-admin-action-modal .dn-admin-audit-summary {
+  contain: layout style;
+}
+
+.dn-admin-finance-performance-scope {
+  contain: layout paint style;
+  isolation: isolate;
+}
+
+.dn-admin-finance-performance-scope > section > :where(header, nav, section, div) {
+  contain: layout paint style;
+}
+
+.dn-admin-finance-performance-scope > section > :where(section, div):not(:first-child) {
+  content-visibility: auto;
+  contain-intrinsic-size: 220px;
+}
+
+.dn-admin-edit-warmup {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(1, 7, 18, 0.72);
+}
+
+.dn-admin-edit-warmup__panel {
+  display: grid;
+  width: min(92vw, 420px);
+  gap: 8px;
+  place-items: center;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 24px;
+  padding: 26px;
+  color: #f8fbff;
+  text-align: center;
+  background: linear-gradient(155deg, rgba(7, 29, 54, 0.98), rgba(2, 16, 34, 0.99));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  contain: layout paint style;
+}
+
+.dn-admin-edit-warmup__panel strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.dn-admin-edit-warmup__panel small {
+  color: rgba(248, 251, 255, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dn-admin-edit-warmup__pulse {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(114, 200, 255, 0.2);
+  border-top-color: #d4af37;
+  border-radius: 999px;
+  animation: dn-admin-edit-warmup-spin 700ms linear infinite;
+}
+
+@keyframes dn-admin-edit-warmup-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 980px) {
+  /* Backdrop blur is visually subtle on small screens but expensive because it
+   * forces compositing/paint across the full Admin surface. Fixed opaque glass
+   * retains the same visual hierarchy without reprocessing the background. */
+  .dn-admin-modal-backdrop,
+  .abu-khalifa-backdrop {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .dn-admin-action-modal section {
+    contain-intrinsic-size: 300px;
+  }
+
+  .dn-admin-finance-performance-scope > section > :where(section, div):not(:first-child) {
+    contain-intrinsic-size: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dn-admin-edit-warmup__pulse {
+    animation-duration: 1.4s;
+  }
+}
