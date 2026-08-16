@@ -493,7 +493,7 @@ export default function AdminNexusLiveCommandMap({ isArabic, orders }: AdminNexu
         if (rpcError) throw rpcError;
         const raw = (Array.isArray(data) ? data : []) as DispatchCandidate[];
         const target = explicitOrderPickup(selectedOrder) || explicitOrderDestination(selectedOrder);
-        let next = raw.map((item) => ({ ...item, etaSeconds: null, routeDistanceMeters: null }));
+        let next: DispatchCandidate[] = raw.map((item) => ({ ...item, etaSeconds: null, routeDistanceMeters: null }));
         if (accessToken && target) {
           const routable = next
             .filter((item) => Boolean(driverLocationPoint(item)))
@@ -695,7 +695,7 @@ export default function AdminNexusLiveCommandMap({ isArabic, orders }: AdminNexu
                 const selected = orderId(order) === selectedOrderId;
                 return (
                   <button key={orderId(order)} type="button" className={selected ? "is-selected" : ""} onClick={() => { setSelectedOrderId(orderId(order)); setSelectedDriverId(""); }}>
-                    <span><b dir="ltr">{orderReference(order)}</b><small>{String(order.receiver_city || order.delivery_city || order.receiver_name || "—")}</small></span>
+                    <span><b dir="ltr">{orderReference(order)}</b><small>{String(order.receiver_city || order.receiver_name || "—")}</small></span>
                     <em className={point ? "has-location" : "no-location"}>{point ? <LocateFixed size={13} /> : <AlertTriangle size={13} />}{point ? (isArabic ? "موقع" : "Located") : (isArabic ? "لا إحداثيات" : "No coordinates")}</em>
                   </button>
                 );
