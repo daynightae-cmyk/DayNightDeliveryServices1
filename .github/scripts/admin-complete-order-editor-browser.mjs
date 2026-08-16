@@ -135,22 +135,22 @@ async function verifyEditor(page, label) {
   await dialog.waitFor({ state: 'visible', timeout: 30000 });
   const merchant = dialog.locator('[data-admin-complete-order-merchant="true"]');
   const coupon = dialog.locator('[data-admin-complete-order-coupon="true"]');
-  const reason = dialog.locator('[data-admin-complete-order-reason="true"]');
-  const confirmation = dialog.locator('[data-admin-complete-order-confirm="true"]');
+  const manualReason = dialog.locator('[data-admin-complete-order-reason="true"]');
+  const manualConfirmation = dialog.locator('[data-admin-complete-order-confirm="true"]');
+  const automaticAudit = dialog.locator('[data-admin-automatic-audit-reason="true"]');
 
   await merchant.waitFor({ state: 'visible', timeout: 30000 });
   await coupon.waitFor({ state: 'visible', timeout: 30000 });
-  await reason.waitFor({ state: 'visible', timeout: 30000 });
-  await confirmation.waitFor({ state: 'visible', timeout: 30000 });
+  await automaticAudit.waitFor({ state: 'visible', timeout: 30000 });
 
   assert(!(await merchant.isDisabled()), `${label}: merchant selector is disabled.`);
   assert((await merchant.inputValue()) === ilytkId, `${label}: merchant UUID is not ILYTK.`);
   assert((await coupon.inputValue()).trim() === '003860', `${label}: coupon is not 003860.`);
-  assert(!(await reason.isDisabled()), `${label}: edit reason is disabled.`);
-  assert(!(await confirmation.isDisabled()), `${label}: confirmation is disabled.`);
+  assert((await manualReason.count()) === 0, `${label}: obsolete manual edit reason is present.`);
+  assert((await manualConfirmation.count()) === 0, `${label}: obsolete manual confirmation is present.`);
   assert(
     (await dialog.getByText(
-      /رقم التتبع والفاتورة لا بيتغيروش|Tracking and invoice identifiers are immutable/,
+      /لا يمكن تغيير رقم التتبع أو رقم الفاتورة من محرر البيانات|Tracking and invoice identifiers are immutable/,
     ).count()) > 0,
     `${label}: immutable identity guidance is missing.`,
   );
