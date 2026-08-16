@@ -59,17 +59,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Verify protected Admin runtime and Mapbox configuration
+      - name: Verify protected Admin runtime credentials
         shell: bash
         run: |
           set -euo pipefail
-          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD VITE_MAPBOX_ACCESS_TOKEN; do
-            test -n "${!name:-}" || { echo "Missing required NEXUS environment value: $name" >&2; exit 2; }
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing protected Admin runtime value: $name" >&2; exit 2; }
           done
-          case "$VITE_MAPBOX_ACCESS_TOKEN" in
-            pk.*) ;;
-            *) echo "VITE_MAPBOX_ACCESS_TOKEN must be a public Mapbox pk token" >&2; exit 2 ;;
-          esac
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -98,6 +94,20 @@ jobs:
           done
           cat nexus-phase1-evidence/local-web.log >&2
           exit 1
+
+      - name: Verify Mapbox browser acceptance environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VITE_MAPBOX_ACCESS_TOKEN:-}" || {
+            echo "Missing required external configuration: VITE_MAPBOX_ACCESS_TOKEN" >&2
+            echo "Static/type/build validation already passed; real Mapbox browser acceptance remains blocked." >&2
+            exit 2
+          }
+          case "$VITE_MAPBOX_ACCESS_TOKEN" in
+            pk.*) ;;
+            *) echo "VITE_MAPBOX_ACCESS_TOKEN must be a public Mapbox pk token" >&2; exit 2 ;;
+          esac
 
       - name: Install isolated Chromium
         shell: bash
