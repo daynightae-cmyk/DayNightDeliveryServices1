@@ -9,6 +9,9 @@ const assert = (condition, message) => {
 
 const componentPath = 'src/components/admin/AdminNexusControlTower.tsx';
 const commandMapPath = 'src/components/admin/AdminNexusLiveCommandMap.tsx';
+const orbitalMapPath = 'src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx';
+const orbitalResizerPath = 'src/components/admin/AdminNexusOrbitalLiveResizer.tsx';
+const orbitalMapStylePath = 'src/styles/dn-nexus-orbital-live.css';
 const mapboxPath = 'src/lib/nexusMapbox.ts';
 const commandMapStylePath = 'src/styles/dn-nexus-live-command-map.css';
 const entryPath = 'src/components/admin/AdminNexusEntry.tsx';
@@ -22,6 +25,9 @@ const packagePath = 'package.json';
 for (const file of [
   componentPath,
   commandMapPath,
+  orbitalMapPath,
+  orbitalResizerPath,
+  orbitalMapStylePath,
   mapboxPath,
   commandMapStylePath,
   entryPath,
@@ -37,6 +43,9 @@ for (const file of [
 
 const component = read(componentPath);
 const commandMap = read(commandMapPath);
+const orbitalMap = read(orbitalMapPath);
+const orbitalResizer = read(orbitalResizerPath);
+const orbitalMapStyles = read(orbitalMapStylePath);
 const mapbox = read(mapboxPath);
 const commandMapStyles = read(commandMapStylePath);
 const entry = read(entryPath);
@@ -66,6 +75,14 @@ for (const contract of requiredComponentContracts) {
   assert(component.includes(contract), `component contract missing: ${contract}`);
 }
 
+for (const contract of [
+  'AdminNexusOrbitalLiveResizer',
+  'AdminNexusOrbitalLiveCommandMap',
+]) {
+  assert(commandMap.includes(contract), `stable NEXUS map wrapper contract missing: ${contract}`);
+}
+assert(orbitalResizer.includes('AdminNexusOrbitalLiveCommandMap'), 'orbital resizer must render the live implementation');
+
 const requiredLiveMapContracts = [
   'useAdminDrivers()',
   'VITE_MAPBOX_ACCESS_TOKEN',
@@ -85,7 +102,7 @@ const requiredLiveMapContracts = [
   'dn-nexus-command-map__truth-strip',
 ];
 for (const contract of requiredLiveMapContracts) {
-  assert(commandMap.includes(contract), `live command map contract missing: ${contract}`);
+  assert(orbitalMap.includes(contract), `live command map implementation contract missing: ${contract}`);
 }
 
 const forbiddenLiveMapFallbacks = [
@@ -99,8 +116,29 @@ const forbiddenLiveMapFallbacks = [
   'simulated courier',
 ];
 for (const forbidden of forbiddenLiveMapFallbacks) {
-  assert(!commandMap.includes(forbidden), `fake/derived location fallback detected: ${forbidden}`);
+  assert(!orbitalMap.includes(forbidden), `fake/derived location fallback detected: ${forbidden}`);
 }
+
+for (const contract of [
+  'NEXUS EARTH LIVE 3D · UAE',
+  'UAE_LIVE_CITY_TOUR',
+  'zoom: 15.55',
+  'projection: "mercator"',
+  'show3dObjects: true',
+  'show3dBuildings: true',
+  'show3dTrees: true',
+  'show3dLandmarks: true',
+  'show3dFacades: true',
+  'showPedestrianRoads: true',
+  'SATELLITE + 3D BUILDINGS',
+  'lightPreset: "day"',
+  'duration: 6500',
+]) {
+  assert(orbitalMap.includes(contract), `Earth Live 3D visual contract missing: ${contract}`);
+}
+assert(!orbitalMap.includes('zoom: 6.35'), 'high-altitude radar default must not return');
+assert(!orbitalMap.includes('projection: "globe"'), 'Earth Live 3D must start in close mercator street mode');
+assert(orbitalMapStyles.includes('display: none'), 'legacy radar scan overlay must remain disabled');
 
 for (const contract of [
   '/directions/v5/mapbox/driving-traffic/',
@@ -154,9 +192,9 @@ for (const forbidden of forbiddenDirectWrites) {
   assert(!entry.includes(forbidden), `direct write detected in launcher bridge: ${forbidden}`);
   assert(!routeBridge.includes(forbidden), `direct write detected in route bridge: ${forbidden}`);
 }
-assert(!commandMap.includes('.from("orders").update('), 'NEXUS map must not bypass canonical dispatch RPC');
-assert(!commandMap.includes('.from("orders").insert('), 'NEXUS map must not create orders directly');
-assert(!commandMap.includes('.from("orders").delete('), 'NEXUS map must not delete orders directly');
+assert(!orbitalMap.includes('.from("orders").update('), 'NEXUS map must not bypass canonical dispatch RPC');
+assert(!orbitalMap.includes('.from("orders").insert('), 'NEXUS map must not create orders directly');
+assert(!orbitalMap.includes('.from("orders").delete('), 'NEXUS map must not delete orders directly');
 
 const requiredRiskContracts = [
   'financial_posted_at',
@@ -201,6 +239,7 @@ console.log('  - real Admin orders / merchants / finance sources required');
 console.log('  - real driver_locations via isolated useAdminDrivers hook required');
 console.log('  - explicit order coordinates only; no interpolated/fabricated courier GPS');
 console.log('  - Mapbox GL loaded lazily inside NEXUS only');
+console.log('  - Earth Live 3D close street camera + Standard 3D buildings/trees/landmarks/facades required');
 console.log('  - driving-traffic Directions + Matrix + returned congestion required');
 console.log('  - canonical dispatch candidate/runtime RPCs required for assignment');
 console.log('  - no direct order/finance table writes from NEXUS');
