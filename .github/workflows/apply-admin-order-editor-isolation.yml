@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +28,6 @@ jobs:
           path = Path('artifacts/day-night-delivery/src/components/admin/AdminSectionWorkspaceCompleteLegacy.tsx')
           text = path.read_text(encoding='utf-8')
 
-          replacements = []
-
           old = 'import { useEffect, useMemo, useState } from "react";'
           new = 'import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";'
           assert text.count(old) == 1, 'react import anchor mismatch'
@@ -38,39 +35,35 @@ jobs:
 
           anchor = '\nexport default function AdminSectionWorkspaceComplete({'
           assert text.count(anchor) == 1, 'component export anchor mismatch'
-          isolated_editor = r'''
-
-type AdminOrderEditorHandle = {
-  open: (order: Order) => void;
-  close: () => void;
-};
-
-const AdminIsolatedOrderEditor = forwardRef<
-  AdminOrderEditorHandle,
-  { merchants: Merchant[]; isArabic: boolean }
->(function AdminIsolatedOrderEditor({ merchants, isArabic }, ref) {
-  const [order, setOrder] = useState<Order | null>(null);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      open: (nextOrder) => setOrder(nextOrder),
-      close: () => setOrder(null),
-    }),
-    [],
-  );
-
-  return (
-    <AdminOrderEditModal
-      order={order}
-      merchants={merchants}
-      isArabic={isArabic}
-      open={Boolean(order)}
-      onClose={() => setOrder(null)}
-    />
-  );
-});
-'''
+          isolated_editor = (
+              '\ntype AdminOrderEditorHandle = {\n'
+              '  open: (order: Order) => void;\n'
+              '  close: () => void;\n'
+              '};\n\n'
+              'const AdminIsolatedOrderEditor = forwardRef<\n'
+              '  AdminOrderEditorHandle,\n'
+              '  { merchants: Merchant[]; isArabic: boolean }\n'
+              '>(function AdminIsolatedOrderEditor({ merchants, isArabic }, ref) {\n'
+              '  const [order, setOrder] = useState<Order | null>(null);\n\n'
+              '  useImperativeHandle(\n'
+              '    ref,\n'
+              '    () => ({\n'
+              '      open: (nextOrder) => setOrder(nextOrder),\n'
+              '      close: () => setOrder(null),\n'
+              '    }),\n'
+              '    [],\n'
+              '  );\n\n'
+              '  return (\n'
+              '    <AdminOrderEditModal\n'
+              '      order={order}\n'
+              '      merchants={merchants}\n'
+              '      isArabic={isArabic}\n'
+              '      open={Boolean(order)}\n'
+              '      onClose={() => setOrder(null)}\n'
+              '    />\n'
+              '  );\n'
+              '});\n'
+          )
           text = text.replace(anchor, isolated_editor + anchor, 1)
 
           old = '  const [editOrder, setEditOrder] = useState<Order | null>(null);\n'
@@ -88,30 +81,33 @@ const AdminIsolatedOrderEditor = forwardRef<
           assert text.count(old) == 1, 'edit button anchor mismatch'
           text = text.replace(old, new, 1)
 
-          old = '''      <AdminOrderEditModal
-        order={editOrder}
-        merchants={merchants}
-        isArabic={isArabic}
-        open={Boolean(editOrder)}
-        onClose={() => setEditOrder(null)}
-        onSaved={async () => {
-          setNotice(isArabic ? "تم حفظ بيانات الطلب وحسابه." : "Order and financials saved.");
-          setEditOrder(null);
-          await refresh();
-        }}
-      />'''
-          new = '''      <AdminIsolatedOrderEditor
-        ref={orderEditorRef}
-        merchants={merchants}
-        isArabic={isArabic}
-      />'''
+          old = (
+              '      <AdminOrderEditModal\n'
+              '        order={editOrder}\n'
+              '        merchants={merchants}\n'
+              '        isArabic={isArabic}\n'
+              '        open={Boolean(editOrder)}\n'
+              '        onClose={() => setEditOrder(null)}\n'
+              '        onSaved={async () => {\n'
+              '          setNotice(isArabic ? "تم حفظ بيانات الطلب وحسابه." : "Order and financials saved.");\n'
+              '          setEditOrder(null);\n'
+              '          await refresh();\n'
+              '        }}\n'
+              '      />'
+          )
+          new = (
+              '      <AdminIsolatedOrderEditor\n'
+              '        ref={orderEditorRef}\n'
+              '        merchants={merchants}\n'
+              '        isArabic={isArabic}\n'
+              '      />'
+          )
           assert text.count(old) == 1, 'legacy editor mount anchor mismatch'
           text = text.replace(old, new, 1)
 
           assert 'editOrder' not in text, 'legacy editOrder state still present'
           assert 'setEditOrder' not in text, 'legacy setEditOrder call still present'
           assert text.count('AdminIsolatedOrderEditor') >= 2, 'isolated editor was not installed'
-
           path.write_text(text, encoding='utf-8')
           PY
 
