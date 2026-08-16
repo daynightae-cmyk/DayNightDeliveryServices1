@@ -7,6 +7,7 @@ import { reportError } from "./lib/monitoring";
 import { initializeDayNightNativeRuntime } from "./lib/nativeAndroidRuntime";
 import { ensureCurrentProtectedDeployment, initializeLiveDeploymentWatcher } from "./lib/liveDeploymentRuntime";
 import { installMerchantCredentialAutofill } from "./lib/merchantCredentialAutofill";
+import { installAdminCssSelectorFastPath } from "./lib/adminCssSelectorFastPath";
 import { installAlAinLocationOptions } from "./data/installAlAinLocation";
 import ProductionExperience from "./components/ProductionExperience";
 import ProductionOrderRealtimeBridge from "./components/ProductionOrderRealtimeBridge";
@@ -78,4 +79,5 @@ async function bootstrapApplication() {
   const nativeRole = nativeRoleFromLocation(); if (nativeRole) { try { await mountNativeRoleApplication(nativeRole); return; } catch (error) { reportError(error, "native_role_mount"); } }
   mountPublicApplication();
 }
+installAdminCssSelectorFastPath();
 void bootstrapApplication();
