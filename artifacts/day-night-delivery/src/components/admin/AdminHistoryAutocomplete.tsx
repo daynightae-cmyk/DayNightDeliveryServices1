@@ -39,6 +39,11 @@ type SuggestionMenuState = {
   width: number;
 };
 
+type IdleWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 const EMPTY_MENU: SuggestionMenuState = {
   input: null,
   values: [],
@@ -47,6 +52,22 @@ const EMPTY_MENU: SuggestionMenuState = {
   left: 0,
   width: 0,
 };
+
+const AUTOCOMPLETE_SELECTOR = [
+  'input:not([type="hidden"])',
+  ':not([type="password"])',
+  ':not([type="file"])',
+  ':not([type="checkbox"])',
+  ':not([type="radio"])',
+  ':not([type="date"])',
+  ':not([type="datetime-local"])',
+  ':not([type="number"])',
+  ':not([inputmode="decimal"])',
+  ':not([inputmode="numeric"])',
+  ':not([data-admin-financial-input="true"])',
+  ':not([readonly])',
+  ':not([disabled])',
+].join("");
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
@@ -195,6 +216,12 @@ function menuGeometry(input: HTMLInputElement) {
   };
 }
 
+function asAutocompleteInput(target: EventTarget | null, root: HTMLElement) {
+  if (!(target instanceof HTMLInputElement)) return null;
+  if (!root.contains(target) || !target.matches(AUTOCOMPLETE_SELECTOR)) return null;
+  return target;
+}
+
 export default function AdminHistoryAutocomplete({
   isArabic,
   orders,
@@ -292,7 +319,17 @@ export default function AdminHistoryAutocomplete({
       setMenu(next);
     };
     const close = () => publish(EMPTY_MENU);
+    const enhance = (input: HTMLInputElement) => {
+      if (input.dataset.adminSmartAutocompleteBound === "true") return;
+      input.setAttribute("autocomplete", "off");
+      input.setAttribute("data-admin-smart-autocomplete-bound", "true");
+      input.dataset.adminSmartAutocomplete = catalogFor(input);
+      input.title ||= isArabic
+        ? "ابدأ بكتابة حرف أو رقم لإظهار القيم المشابهة المسجلة سابقًا."
+        : "Type a letter or number to show similar values entered previously.";
+    };
     const openFor = (input: HTMLInputElement) => {
+      enhance(input);
       const key = catalogFor(input);
       const values = rankedSuggestions(catalogs[key], input.value);
       if (!values.length) {
@@ -307,103 +344,67 @@ export default function AdminHistoryAutocomplete({
       close();
     };
 
-    const bound = new Map<
-      HTMLInputElement,
-      {
-        focus: () => void;
-        input: () => void;
-        blur: () => void;
-        keydown: (event: KeyboardEvent) => void;
-      }
-    >();
-
-    const bind = () => {
-      const inputs = root.querySelectorAll<HTMLInputElement>(
-        'input:not([type="hidden"]):not([type="password"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="datetime-local"]):not([type="number"]):not([inputmode="decimal"]):not([inputmode="numeric"]):not([data-admin-financial-input="true"]):not([readonly]):not([disabled])',
-      );
-      for (const input of inputs) {
-        if (
-          input.dataset.adminFinancialInput === "true" ||
-          input.type === "number" ||
-          input.inputMode === "decimal" ||
-          input.inputMode === "numeric"
-        ) {
-          continue;
-        }
-        if (bound.has(input)) continue;
-        const focus = () => openFor(input);
-        const handleInput = () => openFor(input);
-        const blur = () => {
-          window.setTimeout(() => {
-            if (menuRef.current.input === input) close();
-          }, 120);
-        };
-        const keydown = (event: KeyboardEvent) => {
-          const current = menuRef.current;
-          if (current.input !== input || !current.values.length) return;
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            publish({
-              ...current,
-              selectedIndex: (current.selectedIndex + 1) % current.values.length,
-            });
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            publish({
-              ...current,
-              selectedIndex:
-                (current.selectedIndex - 1 + current.values.length) % current.values.length,
-            });
-          } else if (event.key === "Enter") {
-            event.preventDefault();
-            commit(input, current.values[current.selectedIndex]);
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            close();
-          }
-        };
-
-        input.addEventListener("focus", focus);
-        input.addEventListener("input", handleInput);
-        input.addEventListener("blur", blur);
-        input.addEventListener("keydown", keydown);
-        input.setAttribute("autocomplete", "off");
-        input.setAttribute("data-admin-smart-autocomplete-bound", "true");
-        input.dataset.adminSmartAutocomplete = catalogFor(input);
-        input.title ||= isArabic
-          ? "ابدأ بكتابة حرف أو رقم لإظهار القيم المشابهة المسجلة سابقًا."
-          : "Type a letter or number to show similar values entered previously.";
-        bound.set(input, { focus, input: handleInput, blur, keydown });
+    const onFocusIn = (event: FocusEvent) => {
+      const input = asAutocompleteInput(event.target, root);
+      if (input) openFor(input);
+    };
+    const onInput = (event: Event) => {
+      const input = asAutocompleteInput(event.target, root);
+      if (input) openFor(input);
+    };
+    const onFocusOut = (event: FocusEvent) => {
+      const input = asAutocompleteInput(event.target, root);
+      if (!input) return;
+      window.setTimeout(() => {
+        if (menuRef.current.input === input) close();
+      }, 120);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const input = asAutocompleteInput(event.target, root);
+      if (!input) return;
+      const current = menuRef.current;
+      if (current.input !== input || !current.values.length) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        publish({ ...current, selectedIndex: (current.selectedIndex + 1) % current.values.length });
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        publish({
+          ...current,
+          selectedIndex: (current.selectedIndex - 1 + current.values.length) % current.values.length,
+        });
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        commit(input, current.values[current.selectedIndex]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        close();
       }
     };
 
     const reposition = () => {
       const current = menuRef.current;
       if (!current.input || !document.contains(current.input)) {
-        close();
+        if (current.input) close();
         return;
       }
       publish({ ...current, ...menuGeometry(current.input) });
     };
 
-    bind();
-    const observer = new MutationObserver(bind);
-    observer.observe(root, { childList: true, subtree: true });
+    root.addEventListener("focusin", onFocusIn);
+    root.addEventListener("input", onInput);
+    root.addEventListener("focusout", onFocusOut);
+    root.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", reposition, true);
 
     return () => {
-      observer.disconnect();
+      root.removeEventListener("focusin", onFocusIn);
+      root.removeEventListener("input", onInput);
+      root.removeEventListener("focusout", onFocusOut);
+      root.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
-      for (const [input, handlers] of bound) {
-        input.removeEventListener("focus", handlers.focus);
-        input.removeEventListener("input", handlers.input);
-        input.removeEventListener("blur", handlers.blur);
-        input.removeEventListener("keydown", handlers.keydown);
-        delete input.dataset.adminSmartAutocompleteBound;
-        delete input.dataset.adminSmartAutocomplete;
-      }
       close();
     };
   }, [catalogs, isArabic, safeScope]);
@@ -415,70 +416,97 @@ export default function AdminHistoryAutocomplete({
     const originalText = new Map<Text, string>();
     const originalAttributes = new Map<Element, Map<string, string>>();
     const attributes = ["placeholder", "title", "aria-label"];
+    const queuedNodes = new Set<Node>();
+    let idleHandle = 0;
+    let timeoutHandle = 0;
 
-    const translateCurrencies = () => {
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let node = walker.nextNode();
-      while (node) {
-        const textNode = node as Text;
-        const parent = textNode.parentElement;
-        if (parent && !["SCRIPT", "STYLE"].includes(parent.tagName)) {
-          const current = textNode.nodeValue || "";
-          const previousOriginal = originalText.get(textNode);
-          const previousTranslated =
-            previousOriginal === undefined
-              ? undefined
-              : normalizeAdminCurrencyText(previousOriginal, true);
-
-          // A React render can reuse the same Text node with a new value. Only
-          // preserve the prior source while the current value is our own
-          // localized projection; otherwise adopt React's latest value as the
-          // new source of truth before translating it.
-          if (
-            previousOriginal === undefined ||
-            current !== previousTranslated
-          ) {
-            originalText.set(textNode, current);
-          }
-
-          const original = originalText.get(textNode) || "";
-          const translated = normalizeAdminCurrencyText(original, true);
-          if (translated !== current) textNode.nodeValue = translated;
-        }
-        node = walker.nextNode();
+    const translateText = (textNode: Text) => {
+      const parent = textNode.parentElement;
+      if (!parent || ["SCRIPT", "STYLE"].includes(parent.tagName)) return;
+      const current = textNode.nodeValue || "";
+      const previousOriginal = originalText.get(textNode);
+      const previousTranslated = previousOriginal === undefined
+        ? undefined
+        : normalizeAdminCurrencyText(previousOriginal, true);
+      if (previousOriginal === undefined || current !== previousTranslated) {
+        originalText.set(textNode, current);
       }
+      const original = originalText.get(textNode) || "";
+      const translated = normalizeAdminCurrencyText(original, true);
+      if (translated !== current) textNode.nodeValue = translated;
+    };
 
-      for (const element of root.querySelectorAll<HTMLElement>("[placeholder], [title], [aria-label]")) {
-        let stored = originalAttributes.get(element);
-        if (!stored) {
-          stored = new Map<string, string>();
-          originalAttributes.set(element, stored);
-        }
-        for (const attribute of attributes) {
-          const value = element.getAttribute(attribute);
-          if (!value) continue;
-          const previousOriginal = stored.get(attribute);
-          const previousTranslated =
-            previousOriginal === undefined
-              ? undefined
-              : normalizeAdminCurrencyText(previousOriginal, true);
-          if (
-            previousOriginal === undefined ||
-            value !== previousTranslated
-          ) {
-            stored.set(attribute, value);
-          }
-          const translated = normalizeAdminCurrencyText(
-            stored.get(attribute) || value,
-            true,
-          );
-          if (translated !== value) element.setAttribute(attribute, translated);
-        }
+    const translateAttributes = (element: Element) => {
+      let stored = originalAttributes.get(element);
+      if (!stored) {
+        stored = new Map<string, string>();
+        originalAttributes.set(element, stored);
+      }
+      for (const attribute of attributes) {
+        const value = element.getAttribute(attribute);
+        if (!value) continue;
+        const previousOriginal = stored.get(attribute);
+        const previousTranslated = previousOriginal === undefined
+          ? undefined
+          : normalizeAdminCurrencyText(previousOriginal, true);
+        if (previousOriginal === undefined || value !== previousTranslated) stored.set(attribute, value);
+        const original = stored.get(attribute) || value;
+        const translated = normalizeAdminCurrencyText(original, true);
+        if (translated !== value) element.setAttribute(attribute, translated);
       }
     };
 
-    translateCurrencies();
-    const observer = new MutationObserver(translateCurrencies);
+    const translateSubtree = (node: Node) => {
+      if (node instanceof Text) {
+        translateText(node);
+        return;
+      }
+      if (!(node instanceof Element)) return;
+      translateAttributes(node);
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let current = walker.nextNode();
+      while (current) {
+        translateText(current as Text);
+        current = walker.nextNode();
+      }
+      node.querySelectorAll<HTMLElement>("[placeholder], [title], [aria-label]").forEach(translateAttributes);
+    };
+
+    const flush = () => {
+      idleHandle = 0;
+      timeoutHandle = 0;
+      const batch = Array.from(queuedNodes);
+      queuedNodes.clear();
+      batch.forEach(translateSubtree);
+    };
+
+    const schedule = (node: Node) => {
+      queuedNodes.add(node);
+      if (idleHandle || timeoutHandle) return;
+      const idleWindow = window as IdleWindow;
+      if (idleWindow.requestIdleCallback) {
+        idleHandle = idleWindow.requestIdleCallback(flush, { timeout: 450 });
+      } else {
+        timeoutHandle = window.setTimeout(flush, 32);
+      }
+    };
+
+    // One initial normalization pass is safe after the workspace has mounted.
+    translateSubtree(root);
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "characterData") {
+          schedule(mutation.target);
+          continue;
+        }
+        if (mutation.type === "attributes") {
+          schedule(mutation.target);
+          continue;
+        }
+        mutation.addedNodes.forEach(schedule);
+      }
+    });
     observer.observe(root, {
       childList: true,
       subtree: true,
@@ -489,6 +517,9 @@ export default function AdminHistoryAutocomplete({
 
     return () => {
       observer.disconnect();
+      const idleWindow = window as IdleWindow;
+      if (idleHandle && idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(idleHandle);
+      if (timeoutHandle) window.clearTimeout(timeoutHandle);
       for (const [node, value] of originalText) {
         if (document.contains(node)) node.nodeValue = value;
       }
