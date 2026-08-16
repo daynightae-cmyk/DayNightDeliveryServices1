@@ -6,6 +6,7 @@ import AdminRatingsCenter from "./AdminRatingsCenter";
 import "../../styles/dn-customer-experience-navigation.css";
 
 const PATH_EVENT = "dn-ratings-center-path";
+const ADMIN_COMMAND_SECTION_EVENT = "dn-admin-command-section-change";
 
 function locationKey() {
   return `${window.location.pathname}${window.location.search}`;
@@ -61,24 +62,39 @@ export default function AdminRatingsLauncher() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    let frame = 0;
+    let timer = 0;
+    let attempts = 0;
+
     const sync = () => {
-      setNavTarget(ensureRatingsTarget(isArabic));
-      setWorkspace(document.querySelector<HTMLElement>(".dn-admin-workspace-host"));
-      setPath(locationKey());
+      const nextNav = ensureRatingsTarget(isArabic);
+      const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
+      setNavTarget((current) => current === nextNav ? current : nextNav);
+      setWorkspace((current) => current === nextWorkspace ? current : nextWorkspace);
+      setPath((current) => {
+        const next = locationKey();
+        return current === next ? current : next;
+      });
+      return Boolean(nextNav && nextWorkspace);
     };
-    const schedule = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; sync(); });
+    const acquire = () => {
+      attempts += 1;
+      if (sync() || attempts >= 40) {
+        if (timer) window.clearInterval(timer);
+        timer = 0;
+      }
     };
-    sync();
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setInterval(schedule, 1500);
+    const reacquire = () => {
+      attempts = 0;
+      if (sync()) return;
+      if (!timer) timer = window.setInterval(acquire, 250);
+    };
+
+    acquire();
+    if (!timer && (!navTarget || !workspace)) timer = window.setInterval(acquire, 250);
+    window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     return () => {
-      observer.disconnect();
-      clearInterval(timer);
-      if (frame) cancelAnimationFrame(frame);
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
     };
   }, [isAdmin, isArabic]);
 
