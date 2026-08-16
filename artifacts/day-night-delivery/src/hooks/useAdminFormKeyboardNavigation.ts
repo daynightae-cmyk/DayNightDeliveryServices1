@@ -101,14 +101,17 @@ function nearestScrollable(element: HTMLElement) {
   return null;
 }
 
+function enhanceNumericInput(input: HTMLInputElement) {
+  if (input.type !== "number" || !input.closest(ADMIN_FORM_SCOPE)) return;
+  if (input.dataset.dnNumberEnhanced === "true") return;
+  const step = input.getAttribute("step");
+  const integerOnly = step === "1" || input.dataset.integer === "true";
+  input.inputMode = integerOnly ? "numeric" : "decimal";
+  input.dataset.dnNumberEnhanced = "true";
+}
+
 function applyNumericInputMode(root: ParentNode) {
-  root.querySelectorAll<HTMLInputElement>("input[type='number']").forEach((input) => {
-    if (!input.closest(ADMIN_FORM_SCOPE)) return;
-    const step = input.getAttribute("step");
-    const integerOnly = step === "1" || input.dataset.integer === "true";
-    input.inputMode = integerOnly ? "numeric" : "decimal";
-    input.dataset.dnNumberEnhanced = "true";
-  });
+  root.querySelectorAll<HTMLInputElement>("input[type='number']").forEach(enhanceNumericInput);
 }
 
 export function useAdminFormKeyboardNavigation(enabled: boolean) {
@@ -116,7 +119,6 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
     if (!enabled) return;
 
     let adminRoot: HTMLElement | null = null;
-    let adminObserver: MutationObserver | null = null;
     let bootstrapObserver: MutationObserver | null = null;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -146,6 +148,10 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
       }
     };
 
+    const handleFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof HTMLInputElement) enhanceNumericInput(event.target);
+    };
+
     const connectToAdminRoot = () => {
       const nextRoot = document.querySelector<HTMLElement>(ADMIN_ROOT_SELECTOR);
       if (!nextRoot || nextRoot === adminRoot) return Boolean(nextRoot);
@@ -153,22 +159,14 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
       if (adminRoot) {
         adminRoot.removeEventListener("keydown", handleKeyDown, true);
         adminRoot.removeEventListener("wheel", handleWheel, true);
+        adminRoot.removeEventListener("focusin", handleFocusIn, true);
       }
-      adminObserver?.disconnect();
 
       adminRoot = nextRoot;
       applyNumericInputMode(adminRoot);
       adminRoot.addEventListener("keydown", handleKeyDown, true);
       adminRoot.addEventListener("wheel", handleWheel, { capture: true, passive: false });
-
-      adminObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          mutation.addedNodes.forEach((node) => {
-            if (node instanceof HTMLElement) applyNumericInputMode(node);
-          });
-        }
-      });
-      adminObserver.observe(adminRoot, { childList: true, subtree: true });
+      adminRoot.addEventListener("focusin", handleFocusIn, true);
       return true;
     };
 
@@ -184,10 +182,10 @@ export function useAdminFormKeyboardNavigation(enabled: boolean) {
 
     return () => {
       bootstrapObserver?.disconnect();
-      adminObserver?.disconnect();
       if (adminRoot) {
         adminRoot.removeEventListener("keydown", handleKeyDown, true);
         adminRoot.removeEventListener("wheel", handleWheel, true);
+        adminRoot.removeEventListener("focusin", handleFocusIn, true);
       }
     };
   }, [enabled]);
