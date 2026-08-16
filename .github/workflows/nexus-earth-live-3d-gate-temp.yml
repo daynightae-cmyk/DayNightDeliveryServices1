@@ -1,0 +1,116 @@
+name: NEXUS Earth Live 3D Gate Temp
+
+on:
+  push:
+    branches:
+      - feature/nexus-earth-live-3d-20260816
+    paths:
+      - .github/workflows/nexus-earth-live-3d-gate-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/nexus-earth-live-3d-20260816
+          fetch-depth: 0
+
+      - name: Make Phase 1 inspect the real 3D implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/nexus-phase1-acceptance.yml')
+          gate = Path('artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs')
+          browser = Path('.github/scripts/nexus-phase1-browser-acceptance.mjs')
+
+          w = workflow.read_text(encoding='utf-8')
+          anchor = '      - "artifacts/day-night-delivery/src/components/admin/AdminNexusLiveCommandMap.tsx"\n'
+          addition = anchor + '''      - "artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx"\n      - "artifacts/day-night-delivery/src/components/admin/AdminNexusOrbitalLiveResizer.tsx"\n      - "artifacts/day-night-delivery/src/styles/dn-nexus-orbital-live.css"\n      - "artifacts/day-night-delivery/src/styles/dn-nexus-orbital-shell.css"\n'''
+          if anchor not in w:
+              raise SystemExit('Missing Phase 1 path anchor')
+          w = w.replace(anchor, addition, 1)
+          workflow.write_text(w, encoding='utf-8')
+
+          g = gate.read_text(encoding='utf-8')
+          g = g.replace(
+              "const commandMapPath = 'src/components/admin/AdminNexusLiveCommandMap.tsx';\n",
+              "const commandMapPath = 'src/components/admin/AdminNexusLiveCommandMap.tsx';\nconst orbitalMapPath = 'src/components/admin/AdminNexusOrbitalLiveCommandMap.tsx';\nconst orbitalResizerPath = 'src/components/admin/AdminNexusOrbitalLiveResizer.tsx';\nconst orbitalMapStylePath = 'src/styles/dn-nexus-orbital-live.css';\n",
+              1,
+          )
+          g = g.replace(
+              '  commandMapPath,\n  mapboxPath,',
+              '  commandMapPath,\n  orbitalMapPath,\n  orbitalResizerPath,\n  orbitalMapStylePath,\n  mapboxPath,',
+              1,
+          )
+          g = g.replace(
+              'const commandMap = read(commandMapPath);\nconst mapbox = read(mapboxPath);',
+              'const commandMap = read(commandMapPath);\nconst orbitalMap = read(orbitalMapPath);\nconst orbitalResizer = read(orbitalResizerPath);\nconst orbitalMapStyles = read(orbitalMapStylePath);\nconst mapbox = read(mapboxPath);',
+              1,
+          )
+          g = g.replace(
+              '  assert(commandMap.includes(contract), `live command map contract missing: ${contract}`);',
+              '  assert(orbitalMap.includes(contract), `live command map implementation contract missing: ${contract}`);',
+              1,
+          )
+          g = g.replace(
+              '  assert(!commandMap.includes(forbidden), `fake/derived location fallback detected: ${forbidden}`);',
+              '  assert(!orbitalMap.includes(forbidden), `fake/derived location fallback detected: ${forbidden}`);',
+              1,
+          )
+          wrapper_anchor = '''for (const forbidden of forbiddenLiveMapFallbacks) {\n  assert(!orbitalMap.includes(forbidden), `fake/derived location fallback detected: ${forbidden}`);\n}\n'''
+          wrapper_addition = wrapper_anchor + '''\nfor (const contract of [\n  'AdminNexusOrbitalLiveResizer',\n  'AdminNexusOrbitalLiveCommandMap',\n]) {\n  assert(commandMap.includes(contract), `stable NEXUS map wrapper contract missing: ${contract}`);\n}\nassert(orbitalResizer.includes('AdminNexusOrbitalLiveCommandMap'), 'orbital resizer must render the live implementation');\n\nfor (const contract of [\n  'NEXUS EARTH LIVE 3D · UAE',\n  'UAE_LIVE_CITY_TOUR',\n  'zoom: 15.55',\n  'show3dObjects: true',\n  'show3dBuildings: true',\n  'show3dTrees: true',\n  'show3dLandmarks: true',\n  'show3dFacades: true',\n  'showPedestrianRoads: true',\n  'SATELLITE + 3D BUILDINGS',\n  'lightPreset: "day"',\n  'duration: 6500',\n]) {\n  assert(orbitalMap.includes(contract), `Earth Live 3D visual contract missing: ${contract}`);\n}\nassert(!orbitalMap.includes('zoom: 6.35'), 'high-altitude radar default must not return');\nassert(!orbitalMap.includes('projection: "globe"'), 'Earth Live 3D must start in close mercator street mode');\nassert(orbitalMapStyles.includes('display: none'), 'legacy radar scan overlay must remain disabled');\n'''
+          if wrapper_anchor not in g:
+              raise SystemExit('Missing gate fallback anchor')
+          g = g.replace(wrapper_anchor, wrapper_addition, 1)
+          g = g.replace(
+              "assert(!commandMap.includes('.from(\"orders\").update('), 'NEXUS map must not bypass canonical dispatch RPC');\nassert(!commandMap.includes('.from(\"orders\").insert('), 'NEXUS map must not create orders directly');\nassert(!commandMap.includes('.from(\"orders\").delete('), 'NEXUS map must not delete orders directly');",
+              "assert(!orbitalMap.includes('.from(\"orders\").update('), 'NEXUS map must not bypass canonical dispatch RPC');\nassert(!orbitalMap.includes('.from(\"orders\").insert('), 'NEXUS map must not create orders directly');\nassert(!orbitalMap.includes('.from(\"orders\").delete('), 'NEXUS map must not delete orders directly');",
+              1,
+          )
+          g = g.replace(
+              "console.log('  - Mapbox GL loaded lazily inside NEXUS only');",
+              "console.log('  - Mapbox GL loaded lazily inside NEXUS only');\nconsole.log('  - Earth Live 3D close street camera + Standard 3D buildings/trees/landmarks/facades required');",
+              1,
+          )
+          gate.write_text(g, encoding='utf-8')
+
+          b = browser.read_text(encoding='utf-8')
+          anchor = '''  const canvasBox = await mapSurface.boundingBox();\n  assert(canvasBox && canvasBox.width > 260 && canvasBox.height > 250, `${label}: Mapbox canvas has invalid geometry`);\n'''
+          addition = anchor + '''\n  const earthIdentity = (await page.locator('.dn-nexus-command-map__identity').innerText()).trim();\n  const ambientStatus = (await page.locator('.dn-nexus-command-map__ambient-status').innerText()).trim();\n  assert(/NEXUS EARTH LIVE 3D/i.test(earthIdentity), `${label}: Earth Live 3D identity is not active`);\n  assert(/SATELLITE\\s*\\+\\s*3D BUILDINGS/i.test(ambientStatus), `${label}: 3D satellite status is not active`);\n  await page.waitForTimeout(label === 'desktop' ? 6500 : 4200);\n'''
+          if anchor not in b:
+              raise SystemExit('Missing browser canvas anchor')
+          b = b.replace(anchor, addition, 1)
+          b = b.replace(
+              '''    mapCanvas: canvasBox,\n    pendingRows:''',
+              '''    mapCanvas: canvasBox,\n    earthIdentity,\n    ambientStatus,\n    pendingRows:''',
+              1,
+          )
+          browser.write_text(b, encoding='utf-8')
+          PY
+
+      - name: Verify acceptance source
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'AdminNexusOrbitalLiveCommandMap.tsx' .github/workflows/nexus-phase1-acceptance.yml
+          grep -q 'Earth Live 3D visual contract' artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          grep -q 'Earth Live 3D identity is not active' .github/scripts/nexus-phase1-browser-acceptance.mjs
+          git diff --check
+
+      - name: Commit acceptance hardening and remove temp workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'DAY NIGHT NEXUS Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/nexus-earth-live-3d-gate-temp.yml
+          git add .github/workflows/nexus-phase1-acceptance.yml .github/scripts/nexus-phase1-browser-acceptance.mjs artifacts/day-night-delivery/scripts/nexus-phase1-production-gate.mjs
+          git diff --cached --check
+          git commit -m 'test(nexus): enforce Earth Live 3D browser contract'
+          git push origin HEAD:feature/nexus-earth-live-3d-20260816
