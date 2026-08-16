@@ -77,6 +77,12 @@ type AdminCommandCenterShellProps = {
   children: React.ReactNode;
 };
 
+const MOBILE_COMMAND_QUERY = "(max-width: 1023px)";
+
+function mobileCommandViewport() {
+  return typeof window !== "undefined" && window.matchMedia(MOBILE_COMMAND_QUERY).matches;
+}
+
 function formatSyncTime(date: Date | null, isArabic: boolean) {
   if (!date) return isArabic ? "لم تتم المزامنة بعد" : "Not synced yet";
   return date.toLocaleTimeString(isArabic ? "ar-AE" : "en-AE", {
@@ -118,6 +124,7 @@ export default function AdminCommandCenterShell({
 }: AdminCommandCenterShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(mobileCommandViewport);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement | null>(null);
@@ -141,6 +148,16 @@ export default function AdminCommandCenterShell({
       : searchItems;
     return source.slice(0, 12);
   }, [query, searchItems]);
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_COMMAND_QUERY);
+    const syncViewport = (event: MediaQueryListEvent) => {
+      setIsMobileViewport(event.matches);
+      if (!event.matches) setMobileOpen(false);
+    };
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
 
   useEffect(() => {
     const handlePointer = (event: MouseEvent) => {
@@ -253,9 +270,9 @@ export default function AdminCommandCenterShell({
       dir={isArabic ? "rtl" : "ltr"}
       data-theme={theme}
     >
-      <div className="dncc-desktop-sidebar">{sidebar}</div>
+      {!isMobileViewport && <div className="dncc-desktop-sidebar">{sidebar}</div>}
 
-      {mobileOpen && (
+      {isMobileViewport && mobileOpen && (
         <div className="dncc-mobile-layer" role="dialog" aria-modal="true">
           <button
             type="button"
@@ -274,6 +291,20 @@ export default function AdminCommandCenterShell({
             </button>
             {sidebar}
           </div>
+        </div>
+      )}
+
+      {isMobileViewport && (
+        <div hidden aria-hidden="true" data-admin-mobile-route-registry="true">
+          {menu.map((item) => (
+            <button
+              type="button"
+              key={`mobile-route:${item.id}`}
+              tabIndex={-1}
+              data-dn-command-section={item.id}
+              onClick={() => onNavigate(item.id)}
+            />
+          ))}
         </div>
       )}
 
