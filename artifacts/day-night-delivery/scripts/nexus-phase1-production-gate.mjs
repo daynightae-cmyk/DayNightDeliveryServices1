@@ -87,9 +87,12 @@ const requiredLiveMapContracts = [
   'useAdminDrivers()',
   'VITE_MAPBOX_ACCESS_TOKEN',
   'import("mapbox-gl")',
-  'style: "mapbox://styles/mapbox/standard"',
-  'mapbox://mapbox.satellite',
-  'slot: "middle"',
+  'mapbox://styles/mapbox/satellite-streets-v12',
+  'mapbox://styles/mapbox/standard',
+  'satelliteStreetMode',
+  'dn-nexus-satellite-buildings-3d',
+  '"source-layer": "building"',
+  'type: "fill-extrusion"',
   'admin_dispatch_candidates',
   'admin_dispatch_order_runtime',
   'fetchMapboxTrafficRoutes(',
@@ -135,14 +138,16 @@ for (const contract of [
   'SATELLITE + 3D BUILDINGS',
   'lightPreset: "day"',
   'duration: 6500',
-  'dn-nexus-satellite-imagery',
-  'type: "raster"',
+  'dn-nexus-satellite-buildings-3d',
+  '"fill-extrusion-height"',
+  '"fill-extrusion-base"',
 ]) {
   assert(orbitalMap.includes(contract), `Earth Live 3D visual contract missing: ${contract}`);
 }
 assert(!orbitalMap.includes('zoom: 6.35'), 'high-altitude radar default must not return');
 assert(!orbitalMap.includes('projection: "globe"'), 'Earth Live 3D must start in close mercator street mode');
-assert(!orbitalMap.includes('dn-nexus-real-building-extrusions'), 'conflicting explicit extrusion layer must stay removed');
+assert(!orbitalMap.includes('dn-nexus-real-building-extrusions'), 'conflicting external-source extrusion layer must stay removed');
+assert(!orbitalMap.includes('dn-nexus-satellite-imagery'), 'Standard raster-compositing experiment must stay removed');
 assert(orbitalMapStyles.includes('display: none'), 'legacy radar scan overlay must remain disabled');
 
 for (const contract of [
@@ -244,7 +249,7 @@ console.log('  - real Admin orders / merchants / finance sources required');
 console.log('  - real driver_locations via isolated useAdminDrivers hook required');
 console.log('  - explicit order coordinates only; no interpolated/fabricated courier GPS');
 console.log('  - Mapbox GL loaded lazily inside NEXUS only');
-console.log('  - Standard 3D scene + real Mapbox Satellite raster in middle slot behind Standard 3D required');
+console.log('  - Satellite Streets imagery + its own composite building heights required in satellite mode');
 console.log('  - Earth Live 3D close street camera + 3D buildings/trees/landmarks/facades required');
 console.log('  - driving-traffic Directions + Matrix + returned congestion required');
 console.log('  - canonical dispatch candidate/runtime RPCs required for assignment');

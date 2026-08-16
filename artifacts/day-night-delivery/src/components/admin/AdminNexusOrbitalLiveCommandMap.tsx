@@ -337,27 +337,32 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
         ]);
         if (cancelled || !mapHostRef.current) return;
         mapboxgl.accessToken = accessToken;
+        const satelliteStreetMode = styleMode === "satellite";
         localMap = new mapboxgl.Map({
           container: mapHostRef.current,
-          // Standard owns the authoritative 3D scene. Satellite mode is composited
-          // underneath its roads, labels and 3D objects after style load.
-          style: "mapbox://styles/mapbox/standard",
+          // Satellite mode uses one coherent classic style: authentic aerial imagery +
+          // Streets vector data. We then extrude its own building layer in 3D.
+          style: satelliteStreetMode
+            ? "mapbox://styles/mapbox/satellite-streets-v12"
+            : "mapbox://styles/mapbox/standard",
           center: EARTH_LIVE_START.center,
           zoom: EARTH_LIVE_START.zoom,
           pitch: EARTH_LIVE_START.pitch,
           bearing: EARTH_LIVE_START.bearing,
           projection: "mercator",
-          config: {
-            basemap: {
-              lightPreset: "day",
-              showRoadsAndTransit: true,
-              showPedestrianRoads: true,
-              showRoadLabels: true,
-              showPlaceLabels: true,
-              showPointOfInterestLabels: true,
-              showTransitLabels: true,
+          ...(satelliteStreetMode ? {} : {
+            config: {
+              basemap: {
+                lightPreset: "day",
+                showRoadsAndTransit: true,
+                showPedestrianRoads: true,
+                showRoadLabels: true,
+                showPlaceLabels: true,
+                showPointOfInterestLabels: true,
+                showTransitLabels: true,
+              },
             },
-          },
+          }),
           attributionControl: true,
           antialias: true,
         });
@@ -388,11 +393,13 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             show3dLandmarks: true,
             show3dFacades: true,
           };
-          for (const [key, value] of Object.entries(visualConfig)) {
-            try {
-              localMap.setConfigProperty("basemap", key, value);
-            } catch {
-              // Individual visual capabilities vary by Standard style revision.
+          if (!satelliteStreetMode) {
+            for (const [key, value] of Object.entries(visualConfig)) {
+              try {
+                localMap.setConfigProperty("basemap", key, value);
+              } catch {
+                // Individual visual capabilities vary by Standard style revision.
+              }
             }
           }
           try {
@@ -418,35 +425,52 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             // Terrain is visual only.
           }
 
-          // Hybrid Earth view: real Mapbox Satellite imagery stays below Standard's
-          // roads, labels, 3D buildings, landmarks, trees and facades. This avoids
-          // a flat satellite-only scene while preserving authentic aerial imagery.
-          if (styleMode === "satellite") {
+          // Satellite Streets already contains the real aerial imagery and the Mapbox
+          // Streets composite vector source. Extrude the same mapped building footprints
+          // with their real height/min_height attributes so imagery remains visible.
+          if (satelliteStreetMode) {
             try {
-              localMap.addSource("dn-nexus-satellite-imagery", {
-                type: "raster",
-                url: "mapbox://mapbox.satellite",
-                tileSize: 256,
-              });
-              localMap.addLayer({
-                id: "dn-nexus-satellite-imagery",
-                type: "raster",
-                source: "dn-nexus-satellite-imagery",
-                paint: {
-                  "raster-opacity": 0.88,
-                  "raster-saturation": 0.06,
-                  "raster-contrast": 0.05,
-                  "raster-brightness-max": 0.98,
-                },
-                // Standard middle slot keeps authored 3D buildings/landmarks above imagery.
-                slot: "middle",
-              } as any);
+              const styleLayers = localMap.getStyle()?.layers || [];
+              const firstTextLabel = styleLayers.find((layer: any) =>
+                layer.type === "symbol" && layer.layout?.["text-field"],
+              )?.id;
+              if (localMap.getSource("composite") && !localMap.getLayer("dn-nexus-satellite-buildings-3d")) {
+                localMap.addLayer({
+                  id: "dn-nexus-satellite-buildings-3d",
+                  source: "composite",
+                  "source-layer": "building",
+                  filter: ["==", "extrude", "true"],
+                  type: "fill-extrusion",
+                  minzoom: 14.2,
+                  paint: {
+                    "fill-extrusion-color": [
+                      "interpolate", ["linear"], ["coalesce", ["get", "height"], 0],
+                      0, "#d8d3c9",
+                      70, "#ddd7cc",
+                      180, "#e7ddc5",
+                      400, "#f0e3bd",
+                    ],
+                    "fill-extrusion-height": [
+                      "interpolate", ["linear"], ["zoom"],
+                      14.2, 0,
+                      14.75, ["get", "height"],
+                    ],
+                    "fill-extrusion-base": [
+                      "interpolate", ["linear"], ["zoom"],
+                      14.2, 0,
+                      14.75, ["get", "min_height"],
+                    ],
+                    "fill-extrusion-opacity": 0.78,
+                    "fill-extrusion-vertical-gradient": true,
+                  },
+                } as any, firstTextLabel);
+              }
             } catch (cause) {
-              console.warn("NEXUS satellite raster overlay unavailable; Standard 3D remains active.", cause);
+              console.warn("NEXUS Satellite Streets 3D buildings unavailable.", cause);
             }
           }
 
-          const topSlot = { slot: "top" } as any;
+          const topSlot = satelliteStreetMode ? ({} as any) : ({ slot: "top" } as any);
           localMap.addSource("dn-nexus-live-traffic", {
             type: "vector",
             url: "mapbox://mapbox.mapbox-traffic-v1",
