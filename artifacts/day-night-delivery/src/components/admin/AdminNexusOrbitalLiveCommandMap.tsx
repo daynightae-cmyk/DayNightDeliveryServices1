@@ -339,9 +339,9 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
         mapboxgl.accessToken = accessToken;
         localMap = new mapboxgl.Map({
           container: mapHostRef.current,
-          style: styleMode === "satellite"
-            ? "mapbox://styles/mapbox/standard-satellite"
-            : "mapbox://styles/mapbox/standard",
+          // Standard owns the authoritative 3D scene. Satellite mode is composited
+          // underneath its roads, labels and 3D objects after style load.
+          style: "mapbox://styles/mapbox/standard",
           center: EARTH_LIVE_START.center,
           zoom: EARTH_LIVE_START.zoom,
           pitch: EARTH_LIVE_START.pitch,
@@ -418,44 +418,31 @@ export default function AdminNexusOrbitalLiveCommandMap({ isArabic, orders }: Ad
             // Terrain is visual only.
           }
 
-          // Explicit real building-height geometry guarantees visible street-level volume
-          // over Standard Satellite even where the basemap's authored 3D treatment is subtle.
-          try {
-            localMap.addSource("dn-nexus-real-buildings", {
-              type: "vector",
-              url: "mapbox://mapbox.mapbox-streets-v8",
-            });
-            localMap.addLayer({
-              id: "dn-nexus-real-building-extrusions",
-              source: "dn-nexus-real-buildings",
-              "source-layer": "building",
-              type: "fill-extrusion",
-              minzoom: 14.25,
-              filter: ["==", ["get", "extrude"], "true"],
-              paint: {
-                "fill-extrusion-color": [
-                  "interpolate", ["linear"], ["coalesce", ["to-number", ["get", "height"]], 0],
-                  0, "#dbe5ed",
-                  80, "#cbd8e5",
-                  220, "#f0dca4",
-                ],
-                "fill-extrusion-height": [
-                  "interpolate", ["linear"], ["zoom"],
-                  14.25, 0,
-                  15.15, ["coalesce", ["to-number", ["get", "height"]], 8],
-                ],
-                "fill-extrusion-base": [
-                  "interpolate", ["linear"], ["zoom"],
-                  14.25, 0,
-                  15.15, ["coalesce", ["to-number", ["get", "min_height"]], 0],
-                ],
-                "fill-extrusion-opacity": 0.62,
-                "fill-extrusion-vertical-gradient": true,
-              },
-              slot: "middle",
-            } as any);
-          } catch (cause) {
-            console.warn("NEXUS explicit 3D building layer unavailable; Standard 3D remains active.", cause);
+          // Hybrid Earth view: real Mapbox Satellite imagery stays below Standard's
+          // roads, labels, 3D buildings, landmarks, trees and facades. This avoids
+          // a flat satellite-only scene while preserving authentic aerial imagery.
+          if (styleMode === "satellite") {
+            try {
+              localMap.addSource("dn-nexus-satellite-imagery", {
+                type: "raster",
+                url: "mapbox://mapbox.satellite",
+                tileSize: 256,
+              });
+              localMap.addLayer({
+                id: "dn-nexus-satellite-imagery",
+                type: "raster",
+                source: "dn-nexus-satellite-imagery",
+                paint: {
+                  "raster-opacity": 0.94,
+                  "raster-saturation": 0.06,
+                  "raster-contrast": 0.05,
+                  "raster-brightness-max": 0.98,
+                },
+                slot: "bottom",
+              } as any);
+            } catch (cause) {
+              console.warn("NEXUS satellite raster overlay unavailable; Standard 3D remains active.", cause);
+            }
           }
 
           const topSlot = { slot: "top" } as any;
