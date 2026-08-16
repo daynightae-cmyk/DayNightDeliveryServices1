@@ -26,16 +26,18 @@ function setAutoSaveState(
   control.setAttribute("aria-busy", state === "pending" || state === "saving" ? "true" : "false");
 }
 
-function enhanceStatusControls() {
+function enhanceStatusControl(control: HTMLElement) {
+  if (control.dataset.autoSaveEnabled === "true") return;
   const arabic = isArabicInterface();
-  document.querySelectorAll<HTMLElement>(STATUS_CONTROL_SELECTOR).forEach((control) => {
-    if (control.dataset.autoSaveEnabled === "true") return;
-    setAutoSaveState(
-      control,
-      "idle",
-      arabic ? "يُحفظ تلقائياً عند اختيار الحالة" : "Saves automatically when selected",
-    );
-  });
+  setAutoSaveState(
+    control,
+    "idle",
+    arabic ? "يُحفظ تلقائياً عند اختيار الحالة" : "Saves automatically when selected",
+  );
+}
+
+function enhanceStatusControls(root: ParentNode = document) {
+  root.querySelectorAll<HTMLElement>(STATUS_CONTROL_SELECTOR).forEach(enhanceStatusControl);
 }
 
 type RealtimeRow = Record<string, unknown>;
@@ -135,6 +137,7 @@ export default function ProductionOrderRealtimeBridge() {
     if (!supabase || !window.location.pathname.startsWith("/admin")) return;
 
     const managedTimers = new Set<number>();
+    let idleEnhanceHandle = 0;
     const later = (callback: () => void, delay: number) => {
       const id = window.setTimeout(() => {
         managedTimers.delete(id);
@@ -142,6 +145,25 @@ export default function ProductionOrderRealtimeBridge() {
       }, delay);
       managedTimers.add(id);
       return id;
+    };
+
+    const scheduleEnhance = () => {
+      if (idleEnhanceHandle) return;
+      const idleWindow = window as Window & typeof globalThis & {
+        requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+      if (idleWindow.requestIdleCallback) {
+        idleEnhanceHandle = idleWindow.requestIdleCallback(() => {
+          idleEnhanceHandle = 0;
+          enhanceStatusControls();
+        }, { timeout: 1000 });
+      } else {
+        idleEnhanceHandle = later(() => {
+          idleEnhanceHandle = 0;
+          enhanceStatusControls();
+        }, 120);
+      }
     };
 
     const channel = supabase
@@ -163,13 +185,24 @@ export default function ProductionOrderRealtimeBridge() {
       )
       .subscribe();
 
-    const localStatusHandler = () =>
+    const localStatusHandler = () => {
       publishProductionChange({ source: "local-status-event" });
+      scheduleEnhance();
+    };
+    const productionChangeHandler = () => scheduleEnhance();
     window.addEventListener("dn-admin-order-status-change", localStatusHandler);
+    window.addEventListener("dn-admin-orders-updated", productionChangeHandler);
 
-    enhanceStatusControls();
-    const controlsObserver = new MutationObserver(() => enhanceStatusControls());
-    controlsObserver.observe(document.body, { childList: true, subtree: true });
+    // One deferred initial pass preserves the existing visual affordance without
+    // scanning the complete document for every React mutation.
+    scheduleEnhance();
+
+    const focusStatusControl = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      const control = target?.closest<HTMLElement>(STATUS_CONTROL_SELECTOR);
+      if (control) enhanceStatusControl(control);
+    };
+    document.addEventListener("focusin", focusStatusControl, true);
 
     const autoSaveStatus = (event: Event) => {
       const select = event.target;
@@ -177,6 +210,7 @@ export default function ProductionOrderRealtimeBridge() {
 
       const control = select.closest<HTMLElement>(STATUS_CONTROL_SELECTOR);
       if (!control) return;
+      enhanceStatusControl(control);
 
       const saveButton = control.querySelector<HTMLButtonElement>(":scope > button");
       if (!saveButton) return;
@@ -269,9 +303,6 @@ export default function ProductionOrderRealtimeBridge() {
         if (!control.isConnected) return;
         enableAttempts += 1;
 
-        // Before React commits the newly selected option, the legacy button is
-        // still disabled because draft === current. Wait for that commit, then
-        // trigger exactly one verified save without requiring another click.
         if (saveButton.disabled) {
           if (enableAttempts >= 24) {
             setAutoSaveState(
@@ -299,9 +330,14 @@ export default function ProductionOrderRealtimeBridge() {
     return () => {
       managedTimers.forEach((id) => window.clearTimeout(id));
       managedTimers.clear();
-      controlsObserver.disconnect();
+      const idleWindow = window as Window & typeof globalThis & {
+        cancelIdleCallback?: (handle: number) => void;
+      };
+      if (idleEnhanceHandle && idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(idleEnhanceHandle);
+      document.removeEventListener("focusin", focusStatusControl, true);
       document.removeEventListener("change", autoSaveStatus);
       window.removeEventListener("dn-admin-order-status-change", localStatusHandler);
+      window.removeEventListener("dn-admin-orders-updated", productionChangeHandler);
       void supabase?.removeChannel(channel);
     };
   }, []);
