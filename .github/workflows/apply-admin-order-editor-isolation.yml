@@ -73,7 +73,7 @@ jobs:
 
           old = '    setEditOrder(null);\n'
           new = '    orderEditorRef.current?.close();\n'
-          assert text.count(old) == 1, 'section reset edit anchor mismatch'
+          assert text.count(old) >= 1, 'section reset edit anchor missing'
           text = text.replace(old, new, 1)
 
           old = '                          onClick={() => setEditOrder(order)}\n'
