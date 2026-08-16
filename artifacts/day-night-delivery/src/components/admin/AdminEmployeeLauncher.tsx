@@ -11,6 +11,7 @@ type Target = { element: HTMLElement; surface: Surface; mode: EmployeeCenterMode
 type EmployeeRouteState = "/admin" | "employee:new" | "employee:directory";
 
 export const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
+const ADMIN_COMMAND_SECTION_EVENT = "dn-admin-command-section-change";
 const ADMIN_PATH = "/admin";
 const LEGACY_NEW_EMPLOYEE_PATH = "/admin/new-employee";
 const LEGACY_EMPLOYEES_PATH = "/admin/employees";
@@ -27,7 +28,6 @@ function routeState(): EmployeeRouteState | string {
   if (typeof window === "undefined") return "";
   const path = normalizedPathname();
 
-  // Compatibility for an already-open legacy URL before Vercel redirects it.
   if (path === LEGACY_NEW_EMPLOYEE_PATH) return NEW_EMPLOYEE_ROUTE;
   if (path === LEGACY_EMPLOYEES_PATH) return EMPLOYEES_ROUTE;
   if (path !== ADMIN_PATH) return path;
@@ -61,9 +61,6 @@ function replaceRoute(route: EmployeeRouteState) {
   if (route === EMPLOYEES_ROUTE) url.searchParams.set("hr", "employees");
 
   window.history.replaceState(window.history.state, "", url);
-
-  // BrowserRouter only reacts to history events. Dispatching popstate keeps the
-  // URL, React Router and the embedded HR workspace synchronized immediately.
   window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
   window.dispatchEvent(new CustomEvent<EmployeeRouteState>(EMPLOYEE_PATH_EVENT, { detail: route }));
 }
@@ -135,6 +132,9 @@ export default function AdminEmployeeLauncher() {
       setWorkspace(null);
       return;
     }
+
+    let timer = 0;
+    let attempts = 0;
     const sync = () => {
       const liveRoute = routeState();
       setRoute((current) => current === liveRoute ? current : liveRoute);
@@ -142,12 +142,28 @@ export default function AdminEmployeeLauncher() {
       setTargets((current) => sameTargets(current, nextTargets) ? current : nextTargets);
       const nextWorkspace = document.querySelector<HTMLElement>(".dn-admin-workspace-host");
       setWorkspace((current) => current === nextWorkspace ? current : nextWorkspace);
+      return Boolean(nextTargets.length >= 2 && nextWorkspace);
     };
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true });
-    const timer = window.setInterval(sync, 1200);
-    return () => { observer.disconnect(); window.clearInterval(timer); };
+    const acquire = () => {
+      attempts += 1;
+      if (sync() || attempts >= 40) {
+        if (timer) window.clearInterval(timer);
+        timer = 0;
+      }
+    };
+    const reacquire = () => {
+      attempts = 0;
+      if (sync()) return;
+      if (!timer) timer = window.setInterval(acquire, 250);
+    };
+
+    acquire();
+    if (!timer) timer = window.setInterval(acquire, 250);
+    window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
+    return () => {
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, reacquire);
+    };
   }, [isAdminRoute]);
 
   useEffect(() => {
