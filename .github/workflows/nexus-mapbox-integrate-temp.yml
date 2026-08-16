@@ -1,0 +1,62 @@
+name: NEXUS Mapbox Integration Temp
+
+on:
+  push:
+    branches:
+      - feature/nexus-live-operations-command-center-20260816
+    paths:
+      - .github/workflows/nexus-mapbox-integrate-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/nexus-live-operations-command-center-20260816
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install current workspace
+        run: pnpm install --frozen-lockfile
+      - name: Add Mapbox GL JS and patch NEXUS entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --dir artifacts/day-night-delivery add mapbox-gl@^3.25.0
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx')
+          text = path.read_text()
+          old_import = 'import AdminLiveOperationsMap from "./AdminLiveOperationsMap";'
+          new_import = 'import AdminNexusLiveCommandMap from "./AdminNexusLiveCommandMap";'
+          old_render = '<AdminLiveOperationsMap isArabic={isArabic} orders={orders} />'
+          new_render = '<AdminNexusLiveCommandMap isArabic={isArabic} orders={orders} />'
+          assert text.count(old_import) == 1, 'expected one legacy NEXUS map import'
+          assert text.count(old_render) == 1, 'expected one legacy NEXUS map render'
+          text = text.replace(old_import, new_import).replace(old_render, new_render)
+          path.write_text(text)
+          PY
+          git diff --check
+      - name: TypeScript acceptance
+        run: pnpm --dir artifacts/day-night-delivery run typecheck
+      - name: Commit integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DAY NIGHT DELIVERY SERVICES"
+          git config user.email "293348050+daynightae-cmyk@users.noreply.github.com"
+          git add artifacts/day-night-delivery/package.json pnpm-lock.yaml artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx
+          git diff --cached --check
+          git commit -m "feat(nexus): integrate lazy Mapbox live command map"
+          git push origin HEAD:feature/nexus-live-operations-command-center-20260816
