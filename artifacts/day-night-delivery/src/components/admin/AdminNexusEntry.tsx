@@ -9,45 +9,30 @@ const AdminNexusPhase2Intelligence = lazy(() => import("./AdminNexusPhase2Intell
 const AdminNexusPhase3PredictiveOperations = lazy(() => import("./AdminNexusPhase3PredictiveOperations"));
 const AdminNexusPhase4ServiceAssurance = lazy(() => import("./AdminNexusPhase4ServiceAssurance"));
 
-function isElementVisible(element: HTMLElement) {
-  const style = window.getComputedStyle(element);
-  return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
-}
-
-function findVisibleCommandNavigation() {
-  const navigations = Array.from(document.querySelectorAll<HTMLElement>(".dncc-navigation"));
-  return navigations.find(isElementVisible) || null;
-}
+const NEXUS_OPEN_EVENT = "dn-nexus-open-state";
 
 function triggerNexusControlTower() {
-  const internalLaunchers = Array.from(document.querySelectorAll<HTMLButtonElement>(".dn-nexus-launcher"));
-  const launcher = internalLaunchers.find((item) => !item.disabled) || null;
-  if (launcher) { launcher.click(); return true; }
-  return false;
+  const launcher = document.querySelector<HTMLButtonElement>(".dn-nexus-launcher:not(:disabled)");
+  if (!launcher) return false;
+  launcher.click();
+  return true;
 }
 
 function NexusDeferredIntelligenceLayers() {
-  const [nexusOpen, setNexusOpen] = useState(() => Boolean(document.querySelector(".dn-nexus-overlay")));
+  const [nexusOpen, setNexusOpen] = useState(false);
 
   useEffect(() => {
-    let frame = 0;
-    const sync = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        setNexusOpen(Boolean(document.querySelector(".dn-nexus-overlay")));
-      });
+    const syncFromDom = () => setNexusOpen(Boolean(document.querySelector(".dn-nexus-overlay")));
+    const onOpenState = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
+      setNexusOpen(Boolean(detail?.open));
     };
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-      window.cancelAnimationFrame(frame);
-    };
+    syncFromDom();
+    window.addEventListener(NEXUS_OPEN_EVENT, onOpenState as EventListener);
+    return () => window.removeEventListener(NEXUS_OPEN_EVENT, onOpenState as EventListener);
   }, []);
 
   if (!nexusOpen) return null;
-
   return (
     <Suspense fallback={null}>
       <AdminNexusPhase2Intelligence />
@@ -64,14 +49,27 @@ function NexusCommandLauncher() {
 
   useEffect(() => {
     let createdHost: HTMLElement | null = null;
+    let acquisitionTimer: number | null = null;
+    let attempts = 0;
+
     const sync = () => {
       const shell = document.querySelector<HTMLElement>(".dncc-shell");
-      setIsArabic(shell?.getAttribute("dir") !== "ltr");
       const nextMobile = window.innerWidth <= 980;
       setMobile(nextMobile);
-      if (nextMobile) { setHost(null); return; }
-      const navigation = findVisibleCommandNavigation();
-      if (!navigation) { setHost(null); return; }
+      setIsArabic(shell?.getAttribute("dir") !== "ltr");
+
+      if (nextMobile) {
+        setHost(null);
+        return Boolean(shell);
+      }
+
+      const navigation = document.querySelector<HTMLElement>(".dncc-shell .dncc-navigation")
+        || document.querySelector<HTMLElement>(".dncc-navigation");
+      if (!navigation) {
+        setHost(null);
+        return false;
+      }
+
       let nextHost = navigation.querySelector<HTMLElement>(":scope > .dn-nexus-command-host");
       if (!nextHost) {
         nextHost = document.createElement("div");
@@ -80,12 +78,37 @@ function NexusCommandLauncher() {
       }
       createdHost = nextHost;
       setHost(nextHost);
+      return true;
     };
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener("resize", sync, { passive: true });
-    return () => { observer.disconnect(); window.removeEventListener("resize", sync); createdHost?.remove(); };
+
+    const acquire = () => {
+      attempts += 1;
+      const ready = sync();
+      if (ready || attempts >= 40) {
+        if (acquisitionTimer) window.clearInterval(acquisitionTimer);
+        acquisitionTimer = null;
+      }
+    };
+
+    acquire();
+    if (!createdHost && window.innerWidth > 980) {
+      acquisitionTimer = window.setInterval(acquire, 250);
+    }
+
+    const onResize = () => {
+      attempts = 0;
+      const ready = sync();
+      if (!ready && !acquisitionTimer && window.innerWidth > 980) {
+        acquisitionTimer = window.setInterval(acquire, 250);
+      }
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+
+    return () => {
+      if (acquisitionTimer) window.clearInterval(acquisitionTimer);
+      window.removeEventListener("resize", onResize);
+      createdHost?.remove();
+    };
   }, []);
 
   const openNexus = () => {
