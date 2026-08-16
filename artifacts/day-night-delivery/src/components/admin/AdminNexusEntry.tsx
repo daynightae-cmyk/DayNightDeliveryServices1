@@ -9,6 +9,11 @@ const AdminNexusPhase2Intelligence = lazy(() => import("./AdminNexusPhase2Intell
 const AdminNexusPhase3PredictiveOperations = lazy(() => import("./AdminNexusPhase3PredictiveOperations"));
 const AdminNexusPhase4ServiceAssurance = lazy(() => import("./AdminNexusPhase4ServiceAssurance"));
 
+function findVisibleCommandNavigation() {
+  return document.querySelector<HTMLElement>(".dncc-shell .dncc-navigation")
+    || document.querySelector<HTMLElement>(".dncc-navigation");
+}
+
 function triggerNexusControlTower() {
   const launcher = document.querySelector<HTMLButtonElement>(".dn-nexus-launcher:not(:disabled)");
   if (!launcher) return false;
@@ -63,8 +68,7 @@ function NexusCommandLauncher({ onRequestOpen }: { onRequestOpen: () => void }) 
         return Boolean(shell);
       }
 
-      const navigation = document.querySelector<HTMLElement>(".dncc-shell .dncc-navigation")
-        || document.querySelector<HTMLElement>(".dncc-navigation");
+      const navigation = findVisibleCommandNavigation();
       if (!navigation) {
         setHost(null);
         return false;
