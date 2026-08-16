@@ -294,6 +294,20 @@ export default function AdminCommandCenterShell({
         </div>
       )}
 
+      {isMobileViewport && (
+        <div hidden aria-hidden="true" data-admin-mobile-route-registry="true">
+          {menu.map((item) => (
+            <button
+              type="button"
+              key={`mobile-route:${item.id}`}
+              tabIndex={-1}
+              data-dn-command-section={item.id}
+              onClick={() => onNavigate(item.id)}
+            />
+          ))}
+        </div>
+      )}
+
       {khalifaOpen && (
         <button
           type="button"
