@@ -36,16 +36,28 @@ jobs:
           pnpm --dir artifacts/day-night-delivery add mapbox-gl@^3.25.0
           python - <<'PY'
           from pathlib import Path
-          path = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx')
-          text = path.read_text()
+
+          tower = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx')
+          tower_text = tower.read_text()
           old_import = 'import AdminLiveOperationsMap from "./AdminLiveOperationsMap";'
           new_import = 'import AdminNexusLiveCommandMap from "./AdminNexusLiveCommandMap";'
           old_render = '<AdminLiveOperationsMap isArabic={isArabic} orders={orders} />'
           new_render = '<AdminNexusLiveCommandMap isArabic={isArabic} orders={orders} />'
-          assert text.count(old_import) == 1, 'expected one legacy NEXUS map import'
-          assert text.count(old_render) == 1, 'expected one legacy NEXUS map render'
-          text = text.replace(old_import, new_import).replace(old_render, new_render)
-          path.write_text(text)
+          assert tower_text.count(old_import) == 1, 'expected one legacy NEXUS map import'
+          assert tower_text.count(old_render) == 1, 'expected one legacy NEXUS map render'
+          tower_text = tower_text.replace(old_import, new_import).replace(old_render, new_render)
+          tower.write_text(tower_text)
+
+          command_map = Path('artifacts/day-night-delivery/src/components/admin/AdminNexusLiveCommandMap.tsx')
+          map_text = command_map.read_text()
+          old_candidates = 'let next = raw.map((item) => ({ ...item, etaSeconds: null, routeDistanceMeters: null }));'
+          new_candidates = 'let next: DispatchCandidate[] = raw.map((item) => ({ ...item, etaSeconds: null, routeDistanceMeters: null }));'
+          old_city = 'order.receiver_city || order.delivery_city || order.receiver_name || "—"'
+          new_city = 'order.receiver_city || order.receiver_name || "—"'
+          assert map_text.count(old_candidates) == 1, 'expected candidate inference line'
+          assert map_text.count(old_city) == 1, 'expected order city display line'
+          map_text = map_text.replace(old_candidates, new_candidates).replace(old_city, new_city)
+          command_map.write_text(map_text)
           PY
           git diff --check
       - name: TypeScript acceptance
@@ -56,7 +68,11 @@ jobs:
           set -euo pipefail
           git config user.name "DAY NIGHT DELIVERY SERVICES"
           git config user.email "293348050+daynightae-cmyk@users.noreply.github.com"
-          git add artifacts/day-night-delivery/package.json pnpm-lock.yaml artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx
+          git add \
+            artifacts/day-night-delivery/package.json \
+            pnpm-lock.yaml \
+            artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx \
+            artifacts/day-night-delivery/src/components/admin/AdminNexusLiveCommandMap.tsx
           git diff --cached --check
           git commit -m "feat(nexus): integrate lazy Mapbox live command map"
           git push origin HEAD:feature/nexus-live-operations-command-center-20260816
