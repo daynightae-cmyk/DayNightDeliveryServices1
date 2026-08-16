@@ -48,6 +48,7 @@ import "../../../styles/dn-admin-command-center-v1.css";
 
 const EMPLOYEE_PATH_EVENT = "dn-employee-hr-path";
 const CUSTOMER_EXPERIENCE_PATH_EVENT = "dn-customer-experience-path";
+const ADMIN_COMMAND_SECTION_EVENT = "dn-admin-command-section-change";
 const LEGACY_NEW_EMPLOYEE_PATH = "/admin/new-employee";
 const LEGACY_EMPLOYEES_PATH = "/admin/employees";
 const LEGACY_CUSTOMER_EXPERIENCE_PATH = "/admin/customer-experience";
@@ -136,6 +137,10 @@ function announceCustomerExperienceRoute(active: boolean) {
   window.dispatchEvent(new CustomEvent<string>(CUSTOMER_EXPERIENCE_PATH_EVENT, {
     detail: active ? CUSTOMER_EXPERIENCE_ROUTE : "/admin",
   }));
+}
+
+function announceCommandSection(id: AdminCommandSectionId) {
+  window.dispatchEvent(new CustomEvent<AdminCommandSectionId>(ADMIN_COMMAND_SECTION_EVENT, { detail: id }));
 }
 
 function normalizeMenuText(value: unknown) {
@@ -283,23 +288,24 @@ export default function AdminPanelCommandCenter() {
   }, []);
 
   useEffect(() => {
-  const syncRoute = () => {
-    const section = specialSectionFromLocation();
-    if (section) setActive(section);
-  };
-  window.addEventListener("popstate", syncRoute);
-  window.addEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
-  window.addEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
-  syncRoute();
-  return () => {
-    window.removeEventListener("popstate", syncRoute);
-    window.removeEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
-    window.removeEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
-  };
-}, []);
+    const syncRoute = () => {
+      const section = specialSectionFromLocation();
+      if (section) setActive(section);
+    };
+    window.addEventListener("popstate", syncRoute);
+    window.addEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+    window.addEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+    syncRoute();
+    return () => {
+      window.removeEventListener("popstate", syncRoute);
+      window.removeEventListener(EMPLOYEE_PATH_EVENT, syncRoute);
+      window.removeEventListener(CUSTOMER_EXPERIENCE_PATH_EVENT, syncRoute);
+    };
+  }, []);
 
-useEffect(() => {
-  const syncFromLegacyPanel = () => {
+  useEffect(() => {
+    const timers = new Set<number>();
+    const syncFromLegacyPanel = () => {
       const specialSection = specialSectionFromLocation();
       if (specialSection) {
         setActive(specialSection);
@@ -312,46 +318,81 @@ useEffect(() => {
       const errorNode = document.querySelector<HTMLElement>(".dn-admin-error-banner");
       setLoading(isLoading);
       setError(errorNode?.textContent?.trim() || "");
-      if (!isLoading && document.querySelector(".dn-admin-fullscreen")) setLastSyncAt((current) => current ?? new Date());
+      if (!isLoading && document.querySelector(".dn-admin-fullscreen")) {
+        setLastSyncAt((current) => current ?? new Date());
+      }
     };
-    syncFromLegacyPanel();
-    const observer = new MutationObserver(syncFromLegacyPanel);
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "dir"] });
-    return () => observer.disconnect();
+    const laterSync = (delay: number) => {
+      const id = window.setTimeout(() => {
+        timers.delete(id);
+        syncFromLegacyPanel();
+      }, delay);
+      timers.add(id);
+    };
+    const syncBurst = () => {
+      syncFromLegacyPanel();
+      [80, 220, 520, 1100, 2200].forEach(laterSync);
+    };
+    const onAdminClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".dn-admin-side-nav button, .dncc-navigation button, .dn-admin-top-actions button")) return;
+      laterSync(0);
+      laterSync(180);
+      laterSync(650);
+    };
+    const onCommandSection = (event: Event) => {
+      const id = (event as CustomEvent<AdminCommandSectionId>).detail;
+      if (id) setActive(id);
+      syncBurst();
+    };
+
+    syncBurst();
+    document.addEventListener("click", onAdminClick, true);
+    window.addEventListener(ADMIN_COMMAND_SECTION_EVENT, onCommandSection);
+    window.addEventListener("dn-admin-orders-updated", syncFromLegacyPanel);
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      document.removeEventListener("click", onAdminClick, true);
+      window.removeEventListener(ADMIN_COMMAND_SECTION_EVENT, onCommandSection);
+      window.removeEventListener("dn-admin-orders-updated", syncFromLegacyPanel);
+    };
   }, []);
 
   const navigate = (id: AdminCommandSectionId) => {
-  if (isEmployeeSection(id)) {
-    navigateRouter(employeeRouteFor(id));
+    if (isEmployeeSection(id)) {
+      navigateRouter(employeeRouteFor(id));
+      setActive(id);
+      announceCommandSection(id);
+      window.setTimeout(() => announceEmployeeRoute(id), 0);
+      return;
+    }
+
+    if (isCustomerExperienceSection(id)) {
+      navigateRouter(CUSTOMER_EXPERIENCE_ROUTE);
+      setActive(id);
+      announceCommandSection(id);
+      window.setTimeout(() => announceCustomerExperienceRoute(true), 0);
+      return;
+    }
+
+    if (!isLegacySection(id)) return;
+    const button = legacySidebarButtonFor(id);
+    const currentSpecialSection = specialSectionFromLocation();
+    if (currentSpecialSection) {
+      navigateRouter("/admin");
+      announceEmployeeRoute(null);
+      announceCustomerExperienceRoute(false);
+      window.setTimeout(() => button?.click(), 0);
+    } else if (button) {
+      button.click();
+    } else if (id === "logout") {
+      navigateRouter("/auth");
+    }
     setActive(id);
-    window.setTimeout(() => announceEmployeeRoute(id), 0);
-    return;
-  }
+    announceCommandSection(id);
+  };
 
-  if (isCustomerExperienceSection(id)) {
-    navigateRouter(CUSTOMER_EXPERIENCE_ROUTE);
-    setActive(id);
-    window.setTimeout(() => announceCustomerExperienceRoute(true), 0);
-    return;
-  }
-
-  if (!isLegacySection(id)) return;
-  const button = legacySidebarButtonFor(id);
-  const currentSpecialSection = specialSectionFromLocation();
-  if (currentSpecialSection) {
-    navigateRouter("/admin");
-    announceEmployeeRoute(null);
-    announceCustomerExperienceRoute(false);
-    window.setTimeout(() => button?.click(), 0);
-  } else if (button) {
-    button.click();
-  } else if (id === "logout") {
-    navigateRouter("/auth");
-  }
-  setActive(id);
-};
-
-const selectSearchItem = (item: AdminCommandSearchItem) => {
+  const selectSearchItem = (item: AdminCommandSearchItem) => {
     if (item.kind === "merchant" && item.entityId) {
       window.dispatchEvent(new CustomEvent("dn-admin-open-merchant-orders", { detail: { merchantId: item.entityId } }));
       return;
