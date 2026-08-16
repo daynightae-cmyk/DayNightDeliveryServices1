@@ -6,10 +6,16 @@ on:
     paths:
       - ".github/workflows/nexus-phase1-acceptance.yml"
       - ".github/scripts/nexus-phase1-browser-acceptance.mjs"
+      - "artifacts/day-night-delivery/.env.example"
+      - "artifacts/day-night-delivery/package.json"
+      - "pnpm-lock.yaml"
       - "artifacts/day-night-delivery/src/components/admin/AdminNexusControlTower.tsx"
+      - "artifacts/day-night-delivery/src/components/admin/AdminNexusLiveCommandMap.tsx"
       - "artifacts/day-night-delivery/src/components/admin/AdminNexusEntry.tsx"
       - "artifacts/day-night-delivery/src/components/admin/AdminNexusRouteBridge.tsx"
+      - "artifacts/day-night-delivery/src/lib/nexusMapbox.ts"
       - "artifacts/day-night-delivery/src/lib/nexusRiskEngine.ts"
+      - "artifacts/day-night-delivery/src/styles/dn-nexus-live-command-map.css"
       - "artifacts/day-night-delivery/src/styles/dn-nexus-control-tower.css"
       - "artifacts/day-night-delivery/src/styles/dn-nexus-command-launcher.css"
       - "artifacts/day-night-delivery/src/main.tsx"
@@ -35,6 +41,7 @@ jobs:
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       RUNTIME_ADMIN_EMAIL: ${{ secrets.RUNTIME_ADMIN_EMAIL }}
       RUNTIME_ADMIN_PASSWORD: ${{ secrets.RUNTIME_ADMIN_PASSWORD }}
+      VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN || vars.VITE_MAPBOX_ACCESS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RUNTIME_ADMIN_EMAIL RUNTIME_ADMIN_PASSWORD; do
-            test -n "${!name:-}" || { echo "Missing protected secret: $name" >&2; exit 2; }
+            test -n "${!name:-}" || { echo "Missing protected Admin runtime value: $name" >&2; exit 2; }
           done
 
       - name: Install dependencies
@@ -74,7 +81,11 @@ jobs:
           pnpm run web:typecheck
           pnpm run web:build
           test -s artifacts/day-night-delivery/dist/public/index.html
+          test -s artifacts/day-night-delivery/dist/public/version.json
           mkdir -p nexus-phase1-evidence
+          cp artifacts/day-night-delivery/dist/public/version.json nexus-phase1-evidence/version.json
+          find artifacts/day-night-delivery/dist/public/assets -maxdepth 1 -type f -printf '%f\n' | sort > nexus-phase1-evidence/asset-manifest.txt
+          grep -Ei 'mapbox|AdminNexusLiveCommandMap|AdminNexus' nexus-phase1-evidence/asset-manifest.txt > nexus-phase1-evidence/nexus-mapbox-chunks.txt || true
           nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > nexus-phase1-evidence/local-web.log 2>&1 &
           echo $! > nexus-phase1-evidence/local-web.pid
           for attempt in $(seq 1 60); do
@@ -84,11 +95,26 @@ jobs:
           cat nexus-phase1-evidence/local-web.log >&2
           exit 1
 
+      - name: Verify Mapbox browser acceptance environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VITE_MAPBOX_ACCESS_TOKEN:-}" || {
+            echo "Missing required external configuration: VITE_MAPBOX_ACCESS_TOKEN" >&2
+            echo "Static/type/build validation already passed; real Mapbox browser acceptance remains blocked." >&2
+            exit 2
+          }
+          case "$VITE_MAPBOX_ACCESS_TOKEN" in
+            pk.*) ;;
+            *) echo "VITE_MAPBOX_ACCESS_TOKEN must be a public Mapbox pk token" >&2; exit 2 ;;
+          esac
+
       - name: Install isolated Chromium
         shell: bash
         run: |
           set -euo pipefail
           playwright_dir="$RUNNER_TEMP/daynight-nexus-playwright"
+          rm -rf "$playwright_dir"
           mkdir -p "$playwright_dir"
           cd "$playwright_dir"
           npm init -y >/dev/null
@@ -96,7 +122,7 @@ jobs:
           npx playwright install chromium
           echo "PLAYWRIGHT_NODE_PATH=$playwright_dir/node_modules" >> "$GITHUB_ENV"
 
-      - name: Open NEXUS with protected Admin and verify real surfaces
+      - name: Open NEXUS with protected Admin and verify real Mapbox surfaces
         run: node .github/scripts/nexus-phase1-browser-acceptance.mjs
 
       - name: Stop local app
@@ -111,7 +137,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DAY-NIGHT-NEXUS-Phase1-Evidence
+          name: DAY-NIGHT-NEXUS-Live-Command-Center-Evidence
           path: nexus-phase1-evidence/
           if-no-files-found: warn
           retention-days: 30

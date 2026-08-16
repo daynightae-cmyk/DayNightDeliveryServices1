@@ -34,7 +34,7 @@ import {
 } from "../../lib/nexusRiskEngine";
 import { supabase } from "../../supabase";
 import type { Order } from "../../types";
-import AdminLiveOperationsMap from "./AdminLiveOperationsMap";
+import AdminNexusLiveCommandMap from "./AdminNexusLiveCommandMap";
 import "../../styles/dn-nexus-control-tower.css";
 
 const NAV_LABELS: Record<NexusActionTarget, string[]> = {
@@ -403,7 +403,7 @@ export default function AdminNexusControlTower() {
                       </div>
                     </div>
                     <div className="dn-nexus-map-host">
-                      <AdminLiveOperationsMap isArabic={isArabic} orders={orders} />
+                      <AdminNexusLiveCommandMap isArabic={isArabic} orders={orders} />
                     </div>
                   </article>
 
