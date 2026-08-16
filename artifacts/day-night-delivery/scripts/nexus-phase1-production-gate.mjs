@@ -89,7 +89,7 @@ const requiredLiveMapContracts = [
   'import("mapbox-gl")',
   'style: "mapbox://styles/mapbox/standard"',
   'mapbox://mapbox.satellite',
-  'slot: "bottom"',
+  'slot: "middle"',
   'admin_dispatch_candidates',
   'admin_dispatch_order_runtime',
   'fetchMapboxTrafficRoutes(',
@@ -244,7 +244,7 @@ console.log('  - real Admin orders / merchants / finance sources required');
 console.log('  - real driver_locations via isolated useAdminDrivers hook required');
 console.log('  - explicit order coordinates only; no interpolated/fabricated courier GPS');
 console.log('  - Mapbox GL loaded lazily inside NEXUS only');
-console.log('  - Standard 3D scene + real Mapbox Satellite raster in bottom slot required');
+console.log('  - Standard 3D scene + real Mapbox Satellite raster in middle slot behind Standard 3D required');
 console.log('  - Earth Live 3D close street camera + 3D buildings/trees/landmarks/facades required');
 console.log('  - driving-traffic Directions + Matrix + returned congestion required');
 console.log('  - canonical dispatch candidate/runtime RPCs required for assignment');
