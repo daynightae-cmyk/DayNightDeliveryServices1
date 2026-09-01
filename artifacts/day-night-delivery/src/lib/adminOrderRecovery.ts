@@ -108,6 +108,7 @@ async function fetchPage(page: number): Promise<OrderPage> {
       supabase
         .from("orders")
         .select("*", { count: "exact" })
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .range(from, to),
       `admin_orders_page_${page}_attempt_${attempt + 1}`,
@@ -139,10 +140,10 @@ async function fetchPage(page: number): Promise<OrderPage> {
 }
 
 /**
- * Reads the complete protected admin order set with bounded retries. Every page
- * comes from the authenticated orders table and the function fails closed when
- * any page is incomplete, so merchant ownership can never be inferred from a
- * partial or mixed browser fallback.
+ * Reads the complete active protected admin order set with bounded retries.
+ * Soft-deleted rows are deliberately excluded here so the normal Delete action
+ * cannot reappear after a live refresh. Trash/audit flows use their dedicated
+ * mutation/audit contracts instead of this active-operations reader.
  */
 export async function fetchAdminOrdersResilient(): Promise<Order[]> {
   await waitForAdminOperationalSession();

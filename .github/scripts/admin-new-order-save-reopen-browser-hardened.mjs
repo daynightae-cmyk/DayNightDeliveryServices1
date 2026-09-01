@@ -150,6 +150,81 @@ replaceRequired(
   'submission_trace',
 );
 
+replaceRequired(
+  /    const search = page\.locator\('\[data-admin-order-search="true"\]'\);[\s\S]*?    await savedRow\.scrollIntoViewIfNeeded\(\);/,
+  [
+    `    const search = page`,
+    `      .getByPlaceholder(/ابحث بالتتبع|Search tracking/i)`,
+    `      .first();`,
+    `    await search.waitFor({ state: 'visible', timeout: 90000 });`,
+    `    await search.fill(testCoupon);`,
+    ``,
+    `    const savedRow = page.locator('table tbody tr').filter({ hasText: testCoupon }).first();`,
+    `    await savedRow.waitFor({ state: 'visible', timeout: 90000 });`,
+    `    await savedRow.scrollIntoViewIfNeeded();`,
+  ].join('\n'),
+  'professional_order_row_lookup',
+);
+
+replaceRequired(
+  `    await dialog.screenshot({
+      path: \`${'${evidenceDirectory}'}/financial-save-reopen-dialog.png\`,
+    });`,
+  [
+    `    await dialog.screenshot({`,
+    `      path: \`${'${evidenceDirectory}'}/financial-save-reopen-dialog.png\`,`,
+    `    });`,
+    ``,
+    `    const cancelEdit = dialog.getByRole('button', { name: /إلغاء|Cancel/ }).last();`,
+    `    await cancelEdit.click();`,
+    `    await dialog.waitFor({ state: 'hidden', timeout: 15000 });`,
+    ``,
+    `    const deleteRow = page.locator('table tbody tr').filter({ hasText: testCoupon }).first();`,
+    `    await deleteRow.waitFor({ state: 'visible', timeout: 30000 });`,
+    `    const deleteButton = deleteRow.locator('button[title="حذف"],button[title="Delete"]').first();`,
+    `    await deleteButton.waitFor({ state: 'visible', timeout: 15000 });`,
+    `    await deleteButton.click();`,
+    ``,
+    `    let softDeleted = null;`,
+    `    for (let attempt = 0; attempt < 40; attempt += 1) {`,
+    `      const { data, error } = await serviceClient`,
+    `        .from('orders')`,
+    `        .select('id,is_deleted,deleted_at')`,
+    `        .eq('id', createdOrder.id)`,
+    `        .maybeSingle();`,
+    `      if (error) throw new Error('delete_readback_failed:' + error.message);`,
+    `      if (data?.is_deleted && data?.deleted_at) { softDeleted = data; break; }`,
+    `      await page.waitForTimeout(250);`,
+    `    }`,
+    `    assert(softDeleted?.is_deleted === true, 'admin_delete_button_soft_delete_not_confirmed');`,
+    ``,
+    `    await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });`,
+    `    await page.locator('.dncc-shell').waitFor({ state: 'visible', timeout: 90000 });`,
+    `    await openSection(page, 'all_orders', 'all_orders_after_delete');`,
+    `    const postDeleteSearch = page`,
+    `      .getByPlaceholder(/ابحث بالتتبع|Search tracking/i)`,
+    `      .first();`,
+    `    await postDeleteSearch.waitFor({ state: 'visible', timeout: 90000 });`,
+    `    await postDeleteSearch.fill(testCoupon);`,
+    `    await page.waitForTimeout(1200);`,
+    `    assert(`,
+    `      (await page.locator('table tbody tr').filter({ hasText: testCoupon }).count()) === 0,`,
+    `      'soft_deleted_order_reappeared_after_refresh',`,
+    `    );`,
+    `    fs.writeFileSync(`,
+    `      evidenceDirectory + '/admin-order-delete-button-readback.json',`,
+    `      JSON.stringify({ result: 'PASS', orderId: createdOrder.id, testCoupon, softDeleted }, null, 2),`,
+    `    );`,
+  ].join('\n'),
+  'delete_button_readback',
+);
+
+replaceRequired(
+  `      reopen: 'PASS',`,
+  `      reopen: 'PASS',\n      deleteButton: 'PASS',\n      refreshAfterDelete: 'PASS',`,
+  'delete_report',
+);
+
 fs.writeFileSync(temporaryPath, source, 'utf8');
 try {
   await import(`${pathToFileURL(temporaryPath).href}?run=${Date.now()}`);
