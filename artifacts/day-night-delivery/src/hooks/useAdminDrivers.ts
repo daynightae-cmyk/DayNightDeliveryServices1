@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { resolveDriverAvatarUrls } from "../lib/driverData";
+import {
+  fetchAdminOrdersResilient,
+  waitForAdminOperationalSession,
+} from "../lib/adminOrderRecovery";
 import type {
   DriverAssignmentHistory,
   DriverEvent,
@@ -16,8 +20,6 @@ export type AdminDriverRow = DriverOverviewRow;
 
 const CLOSED_STATUSES = new Set(["delivered", "cancelled", "returned"]);
 const IN_PROGRESS_STATUSES = new Set(["accepted", "picked_up", "in_transit"]);
-const ORDER_PAGE_SIZE = 1000;
-const ORDER_SAFETY_LIMIT = 20_000;
 
 const statusKey = (value: unknown) =>
   String(value || "")
@@ -158,40 +160,37 @@ export function useAdminDrivers() {
     setError("");
 
     try {
-      const [profilesResult, locationsResult, trailResult, eventsResult, assignmentsResult] =
-        await Promise.all([
-          client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
-          client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
-          client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
-          client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
-          client.from("driver_assignment_history").select("*").order("created_at", { ascending: false }).limit(5000),
-        ]);
+      // The protected Admin shell can render before Supabase restores its access
+      // token. Starting the direct orders query during that hydration window can
+      // legitimately return an empty RLS result and leave Driver Statements at 0
+      // until a later database mutation. Wait for the verified Admin session first
+      // and reuse the same resilient complete-orders reader as the orders workspace.
+      await waitForAdminOperationalSession();
 
-      const orderRows: DriverOrder[] = [];
-      let ordersError = "";
-      for (let from = 0; from < ORDER_SAFETY_LIMIT; from += ORDER_PAGE_SIZE) {
-        const page = await client
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .range(from, from + ORDER_PAGE_SIZE - 1);
-        if (page.error) {
-          ordersError = page.error.message;
-          break;
-        }
-        const data = (page.data || []) as DriverOrder[];
-        orderRows.push(...data);
-        if (data.length < ORDER_PAGE_SIZE) break;
-      }
+      const [
+        profilesResult,
+        locationsResult,
+        trailResult,
+        eventsResult,
+        assignmentsResult,
+        recoveredOrders,
+      ] = await Promise.all([
+        client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
+        client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
+        client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
+        client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
+        client.from("driver_assignment_history").select("*").order("created_at", { ascending: false }).limit(5000),
+        fetchAdminOrdersResilient(),
+      ]);
 
       const coreError =
         profilesResult.error || locationsResult.error || trailResult.error || eventsResult.error;
       if (coreError) setError(coreError.message);
-      else if (ordersError) setError(ordersError);
       else if (assignmentsResult.error && !optionalDispatchTableError(assignmentsResult.error.message)) {
         setError(assignmentsResult.error.message);
       }
 
+      const orderRows = (recoveredOrders || []) as DriverOrder[];
       const rawProfiles = (profilesResult.data || []) as DriverProfile[];
       const profiles = await resolveDriverAvatarUrls(rawProfiles);
       const locations = (locationsResult.data || []) as DriverLocation[];
