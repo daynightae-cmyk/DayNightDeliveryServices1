@@ -24,16 +24,19 @@ export default function AdminPdfExportButton({ payload, label }: Props) {
   const [error, setError] = useState("");
   const isArabic = payload.language === "ar";
 
-  async function authorize<T>(operation: (value: AdminPdfPayload) => T | Promise<T>) {
+  async function authorize<T>(
+    operation: (value: AdminPdfPayload) => T | Promise<T>,
+    value: AdminPdfPayload,
+  ) {
     setBusy(true);
     setError("");
     try {
       await requireAdminStepUp("export_sensitive_data");
-      return await operation(payload);
+      return await operation(value);
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : "admin_step_up_failed";
       if (!/cancelled/i.test(reason)) {
-        setError(isArabic ? "يجب إكمال التحقق الأمني قبل تنزيل الملف." : "Complete security verification before downloading the file.");
+        setError(value.language === "ar" ? "يجب إكمال التحقق الأمني قبل تنزيل الملف." : "Complete security verification before downloading the file.");
       }
       return undefined;
     } finally {
@@ -59,9 +62,9 @@ export default function AdminPdfExportButton({ payload, label }: Props) {
       open={open}
       payload={payload}
       onClose={() => setOpen(false)}
-      onExportPdf={() => authorize(buildAdminPdf)}
-      onExportCsv={() => authorize(buildAdminCsv)}
-      onExportDoc={() => authorize(buildAdminDoc)}
+      onExportPdf={(value) => authorize(buildAdminPdf, value)}
+      onExportCsv={(value) => authorize(buildAdminCsv, value)}
+      onExportDoc={(value) => authorize(buildAdminDoc, value)}
     />
   </>;
 }
