@@ -7,7 +7,7 @@ import AdminPdfPreviewModal from "./AdminPdfPreviewModal";
 type Props = { payload: AdminPdfPayload; label?: string };
 
 function cleanButtonLabel(label: string | undefined, isArabic: boolean) {
-  const fallback = isArabic ? "ملف التقرير" : "Report file";
+  const fallback = isArabic ? "تصدير الملفات" : "Export files";
   if (!label) return fallback;
   const cleaned = label
     .replace(/تصدير\s*/g, "")
@@ -33,7 +33,7 @@ export default function AdminPdfExportButton({ payload, label }: Props) {
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : "admin_step_up_failed";
       if (!/cancelled/i.test(reason)) {
-        setError(isArabic ? "يجب إكمال التحقق الأمني قبل تصدير البيانات." : "Complete security verification before exporting data.");
+        setError(isArabic ? "يجب إكمال التحقق الأمني قبل تنزيل الملف." : "Complete security verification before downloading the file.");
       }
       return undefined;
     } finally {
@@ -41,24 +41,16 @@ export default function AdminPdfExportButton({ payload, label }: Props) {
     }
   }
 
-  async function openPreview() {
-    setBusy(true);
+  function openPreview() {
+    // The preview contains only the same rows already visible to the authenticated
+    // admin on screen. Step-up remains mandatory for the actual PDF/CSV/Word
+    // download, so a browser/passkey prompt can never make the report button look dead.
     setError("");
-    try {
-      await requireAdminStepUp("export_sensitive_data");
-      setOpen(true);
-    } catch (cause) {
-      const reason = cause instanceof Error ? cause.message : "admin_step_up_failed";
-      if (!/cancelled/i.test(reason)) {
-        setError(isArabic ? "يجب إكمال التحقق الأمني قبل فتح التقرير." : "Complete security verification before opening the report.");
-      }
-    } finally {
-      setBusy(false);
-    }
+    setOpen(true);
   }
 
   return <>
-    <button type="button" className="dn-admin-pdf-button" onClick={() => void openPreview()} disabled={busy}>
+    <button type="button" className="dn-admin-pdf-button" onClick={openPreview} disabled={busy}>
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
       {cleanButtonLabel(label, isArabic)}
     </button>
