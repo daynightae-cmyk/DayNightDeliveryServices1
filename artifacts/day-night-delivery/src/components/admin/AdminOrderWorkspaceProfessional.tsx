@@ -69,6 +69,7 @@ type ExtendedOrder = Order & {
 
 type SortMode = "newest" | "oldest" | "tracking" | "amount_desc";
 
+const REGISTER_PAGE_SIZE = 50;
 const ORDER_STATUS_OPTIONS = [
   ["pending", "قيد الانتظار", "Pending"],
   ["review", "قيد المراجعة", "Under review"],
@@ -209,6 +210,7 @@ export default function AdminOrderWorkspaceProfessional({
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
@@ -223,6 +225,7 @@ export default function AdminOrderWorkspaceProfessional({
     setDateTo("");
     setStatusFilter("all");
     setSortMode("newest");
+    setPage(0);
     setSelected([]);
     setStatusDrafts({});
     setStatusBusy("");
@@ -265,6 +268,21 @@ export default function AdminOrderWorkspaceProfessional({
     });
   }, [dateFrom, dateTo, id, isArabic, query, searchManaged, sectionRows, sortMode, statusFilter]);
 
+  const pageCount = Math.max(1, Math.ceil(visibleRows.length / REGISTER_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(
+    () => visibleRows.slice(safePage * REGISTER_PAGE_SIZE, (safePage + 1) * REGISTER_PAGE_SIZE),
+    [safePage, visibleRows],
+  );
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [dateFrom, dateTo, query, sortMode, statusFilter]);
+
   useEffect(() => {
     const visible = new Set(visibleRows.map(rowKey));
     setSelected((current) => current.filter((key) => visible.has(key)));
@@ -276,7 +294,7 @@ export default function AdminOrderWorkspaceProfessional({
     [selectedSet, visibleRows],
   );
   const exportRows = selectedRows.length ? selectedRows : visibleRows;
-  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((order) => selectedSet.has(rowKey(order)));
+  const allPageSelected = pageRows.length > 0 && pageRows.every((order) => selectedSet.has(rowKey(order)));
 
   const sectionTotals = useMemo(() => {
     return sectionRows.reduce(
@@ -398,11 +416,19 @@ export default function AdminOrderWorkspaceProfessional({
     setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
   }
 
-  function toggleAllVisible() {
-    setSelected(allVisibleSelected ? [] : visibleRows.map(rowKey));
+  function togglePage() {
+    const pageKeys = pageRows.map(rowKey);
+    setSelected((current) => {
+      const next = new Set(current);
+      const pageIsSelected = pageKeys.length > 0 && pageKeys.every((key) => next.has(key));
+      pageKeys.forEach((key) => pageIsSelected ? next.delete(key) : next.add(key));
+      return [...next];
+    });
   }
 
   const hasFilters = Boolean(query || dateFrom || dateTo || statusFilter !== "all");
+  const rangeStart = visibleRows.length ? safePage * REGISTER_PAGE_SIZE + 1 : 0;
+  const rangeEnd = Math.min((safePage + 1) * REGISTER_PAGE_SIZE, visibleRows.length);
 
   return (
     <section className="dn-order-pro" dir={isArabic ? "rtl" : "ltr"} data-order-section={id}>
@@ -456,9 +482,9 @@ export default function AdminOrderWorkspaceProfessional({
             <h2>{visibleRows.length} {isArabic ? "طلبية مرتبة" : "organized orders"}</h2>
           </div>
           <div className="dn-order-pro-selection-actions">
-            <button type="button" onClick={toggleAllVisible} disabled={!visibleRows.length}>
-              <span className={`dn-order-pro-check ${allVisibleSelected ? "is-checked" : ""}`}>{allVisibleSelected ? "✓" : ""}</span>
-              {allVisibleSelected ? (isArabic ? "إلغاء تحديد الكل" : "Clear all") : (isArabic ? "تحديد الظاهر" : "Select visible")}
+            <button type="button" onClick={togglePage} disabled={!pageRows.length}>
+              <span className={`dn-order-pro-check ${allPageSelected ? "is-checked" : ""}`}>{allPageSelected ? "✓" : ""}</span>
+              {allPageSelected ? (isArabic ? "إلغاء تحديد الصفحة" : "Clear page") : (isArabic ? "تحديد هذه الصفحة" : "Select this page")}
             </button>
             {selectedRows.length > 0 && <button type="button" onClick={() => setSelected([])}>{isArabic ? "إلغاء التحديد" : "Clear selection"}</button>}
           </div>
@@ -482,7 +508,7 @@ export default function AdminOrderWorkspaceProfessional({
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((order) => {
+              {pageRows.map((order) => {
                 const key = rowKey(order);
                 const financial = financialsFromOrder(order as Order & Record<string, unknown>);
                 const selectedRow = selectedSet.has(key);
@@ -511,6 +537,17 @@ export default function AdminOrderWorkspaceProfessional({
           </table>
           {!visibleRows.length && <div className="dn-order-pro-empty"><PackageCheck /><strong>{isArabic ? "لا توجد طلبيات مطابقة" : "No matching orders"}</strong><p>{id === "abu_dhabi" ? (isArabic ? "تم فحص المدينة والإمارة والمنطقة والعنوان والبيانات العربية. غيّر الفترة أو البحث إذا لزم." : "City, emirate, area, address, and Arabic location fields were checked. Adjust filters if needed.") : (isArabic ? "غيّر البحث أو الفلاتر، أو حدّث البيانات مباشرة." : "Change the filters or refresh live data.")}</p><button type="button" onClick={() => void refresh()}><RefreshCw />{isArabic ? "تحديث" : "Refresh"}</button></div>}
         </div>
+
+        {visibleRows.length > REGISTER_PAGE_SIZE && (
+          <div className="dn-admin-order-pagination" dir={isArabic ? "rtl" : "ltr"}>
+            <span>{isArabic ? "عرض" : "Showing"} {rangeStart}–{rangeEnd} / {visibleRows.length}</span>
+            <div>
+              <button type="button" disabled={safePage === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{isArabic ? "السابق" : "Previous"}</button>
+              <strong>{safePage + 1} / {pageCount}</strong>
+              <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}>{isArabic ? "التالي" : "Next"}</button>
+            </div>
+          </div>
+        )}
       </section>
 
       <aside className={`dn-order-pro-export-bar ${selectedRows.length ? "has-selection" : ""}`}>
