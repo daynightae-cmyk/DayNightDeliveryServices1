@@ -9,6 +9,7 @@ on:
       - ".github/scripts/final-preview-browser-acceptance-hardened.mjs"
       - ".github/scripts/admin-new-order-save-reopen-browser.mjs"
       - ".github/scripts/admin-new-order-save-reopen-browser-hardened.mjs"
+      - ".github/scripts/purge-financial-acceptance-orders.mjs"
       - ".github/scripts/admin-financial-event-ownership-diagnostic.mjs"
       - ".github/scripts/admin-fetch-loop-ownership-diagnostic.mjs"
       - "artifacts/day-night-delivery/**"
@@ -87,6 +88,13 @@ jobs:
           done
           cat preview-browser-evidence/local-web.log >&2
           exit 1
+
+      - name: Purge leaked financial acceptance orders
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/purge-financial-acceptance-orders.mjs
+          node .github/scripts/purge-financial-acceptance-orders.mjs
 
       - name: Install isolated Chromium acceptance runtime
         shell: bash
