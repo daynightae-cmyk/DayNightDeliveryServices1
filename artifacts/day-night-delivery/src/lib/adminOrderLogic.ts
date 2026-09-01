@@ -36,7 +36,7 @@ const UAE_COUNTRY_RE =
 const INTERNATIONAL_RE =
   /international|external|gcc|world|worldwide|global|saudi|ksa|kuwait|qatar|bahrain|oman|usa|uk|europe|canada|australia|دولي|خارجي|خليجي|عالمي|السعودية|الكويت|قطر|البحرين|عمان/;
 const ABU_DHABI_RE =
-  /abu\s*dhabi|mussafah|khalifa|mbz|mohammed\s*bin\s*zayed|baniyas|shahama|al\s*ain|أبوظبي|ابوظبي|العين|مصفح|خليفة|محمد بن زايد|بني ياس|الشهامة/;
+  /abu\s*dhabi|abu[-_\s]*zabi|mussafah|musaffah|musaffa|khalifa|mbz|mohammed\s*bin\s*zayed|mohamed\s*bin\s*zayed|baniyas|shahama|al\s*ain|alain|أبو\s*ظبي|ابو\s*ظبي|أبوظبي|ابوظبي|مصفح|مُصفح|خليفة|محمد\s*بن\s*زايد|بني\s*ياس|الشهامة|الشّهامة|العين/;
 const OTHER_EMIRATES_RE =
   /dubai|sharjah|ajman|umm\s*al\s*quwain|ras\s*al\s*khaimah|fujairah|khor\s*fakkan|دبي|الشارقة|عجمان|أم القيوين|ام القيوين|رأس الخيمة|راس الخيمة|الفجيرة|خورفكان/;
 
@@ -132,12 +132,20 @@ export function normalizeOrderStatus(
   return "pending";
 }
 
+/**
+ * Returns the complete operational location text used by the Admin regional buckets.
+ * Orders have existed across several schema generations: some rows contain explicit
+ * city/emirate columns, while older rows only carry area/address/landmark (including
+ * Arabic mirror fields). Keeping all those real fields here prevents valid Abu Dhabi
+ * work from disappearing simply because one normalized city column was not populated.
+ */
 function locationText(order: OrderLike) {
   return [
     field(order, "shipping_scope"),
     field(order, "order_type"),
     field(order, "service_type"),
     field(order, "destination_country"),
+    field(order, "destination_country_ar"),
     field(order, "sender_city"),
     field(order, "receiver_city"),
     field(order, "pickup_city"),
@@ -146,6 +154,36 @@ function locationText(order: OrderLike) {
     field(order, "receiver_emirate"),
     field(order, "pickup_emirate"),
     field(order, "delivery_emirate"),
+    field(order, "sender_area"),
+    field(order, "receiver_area"),
+    field(order, "pickup_area"),
+    field(order, "delivery_area"),
+    field(order, "sender_address"),
+    field(order, "receiver_address"),
+    field(order, "pickup_address"),
+    field(order, "delivery_address"),
+    field(order, "sender_landmark"),
+    field(order, "receiver_landmark"),
+    field(order, "pickup_landmark"),
+    field(order, "delivery_landmark"),
+    field(order, "sender_city_ar"),
+    field(order, "receiver_city_ar"),
+    field(order, "pickup_city_ar"),
+    field(order, "delivery_city_ar"),
+    field(order, "sender_emirate_ar"),
+    field(order, "receiver_emirate_ar"),
+    field(order, "pickup_emirate_ar"),
+    field(order, "delivery_emirate_ar"),
+    field(order, "sender_area_ar"),
+    field(order, "receiver_area_ar"),
+    field(order, "pickup_area_ar"),
+    field(order, "delivery_area_ar"),
+    field(order, "sender_address_ar"),
+    field(order, "receiver_address_ar"),
+    field(order, "pickup_address_ar"),
+    field(order, "delivery_address_ar"),
+    field(order, "sender_landmark_ar"),
+    field(order, "receiver_landmark_ar"),
     field(order, "route"),
     field(order, "zone"),
   ].join(" ");
