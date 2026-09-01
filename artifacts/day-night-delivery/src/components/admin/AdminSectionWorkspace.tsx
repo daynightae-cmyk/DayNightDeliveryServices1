@@ -27,6 +27,17 @@ const ORDER_SECTIONS = new Set([
   "out_scope",
 ]);
 
+const PROFESSIONAL_ORDER_SECTIONS = new Set([
+  "all_orders",
+  "cancelled",
+  "review",
+  "postponed",
+  "returned",
+  "pickup",
+  "abu_dhabi",
+  "out_scope",
+]);
+
 type WorkspaceProps = ComponentProps<typeof AdminSectionWorkspaceComplete>;
 type WorkspaceOrder = WorkspaceProps["orders"][number];
 type AdminSectionWorkspaceProps = WorkspaceProps & {
@@ -177,6 +188,11 @@ async function withOperationalRetry<T>(task: () => Promise<T>, label: string): P
 
 export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps) {
   const showBulkConsole = ORDER_SECTIONS.has(props.id);
+  const useProfessionalOrderRegister = PROFESSIONAL_ORDER_SECTIONS.has(props.id);
+  // The new order register owns selection/search/export for its sections. Keep the
+  // legacy bulk console only for the specialized International workspace so Admin
+  // never renders two competing selection/export systems on the same page.
+  const showLegacyBulkUi = showBulkConsole && !useProfessionalOrderRegister;
   const [merchantFilterId, setMerchantFilterId] = useState(() => clean(props.initialMerchantId));
   const [bulkQuery, setBulkQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -326,7 +342,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
     [filteredOrders, props.id],
   );
 
-  const shouldPageWorkspace = showBulkConsole && props.id !== "external";
+  const shouldPageWorkspace = showLegacyBulkUi && props.id !== "external";
   const pageCount = Math.max(1, Math.ceil(visibleSectionOrders.length / ORDER_PAGE_SIZE));
   const safePage = Math.min(orderPage, pageCount - 1);
   const pagedSectionOrders = useMemo(
@@ -437,7 +453,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
         </div>
       )}
 
-      {showBulkConsole && (
+      {showLegacyBulkUi && (
         <div className="mb-4">
           <AdminOrderBulkOperations
             sectionId={props.id}
@@ -495,7 +511,7 @@ export default function AdminSectionWorkspace(props: AdminSectionWorkspaceProps)
           allOrders={visibleSectionOrders}
           merchants={effectiveMerchants}
           onRefresh={refreshCurrentWorkspace}
-          searchManaged={showBulkConsole}
+          searchManaged={showLegacyBulkUi}
         />
       )}
     </section>
