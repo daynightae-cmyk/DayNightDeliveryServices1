@@ -133,11 +133,9 @@ export function normalizeOrderStatus(
 }
 
 /**
- * Returns the complete operational location text used by the Admin regional buckets.
- * Orders have existed across several schema generations: some rows contain explicit
- * city/emirate columns, while older rows only carry area/address/landmark (including
- * Arabic mirror fields). Keeping all those real fields here prevents valid Abu Dhabi
- * work from disappearing simply because one normalized city column was not populated.
+ * Complete physical-location text for regional buckets. Older production rows
+ * can have only area/address/landmark values while newer rows have normalized
+ * city/emirate columns; Arabic mirror fields are equally authoritative.
  */
 function locationText(order: OrderLike) {
   return [
@@ -189,6 +187,21 @@ function locationText(order: OrderLike) {
   ].join(" ");
 }
 
+/** Scope-only text for international classification. Street addresses are kept
+ * out so names such as "World Trade Center Abu Dhabi" cannot turn a UAE order
+ * into an international order merely because the word "World" appears there. */
+function internationalText(order: OrderLike) {
+  return [
+    field(order, "shipping_scope"),
+    field(order, "order_type"),
+    field(order, "service_type"),
+    field(order, "destination_country"),
+    field(order, "destination_country_ar"),
+    field(order, "route"),
+    field(order, "zone"),
+  ].join(" ");
+}
+
 export function isPersonalAdminOrder(order: Order) {
   const o = order as OrderLike;
   const source = normalizeAdminKey(o.source_channel);
@@ -210,7 +223,7 @@ export function isInternationalAdminOrder(order: Order) {
   if (["international", "gcc", "worldwide", "global"].includes(scope))
     return true;
   if (country && !UAE_COUNTRY_RE.test(country)) return true;
-  return INTERNATIONAL_RE.test(cleanAdminText(locationText(o)));
+  return INTERNATIONAL_RE.test(cleanAdminText(internationalText(o)));
 }
 
 export function isAbuDhabiAdminOrder(order: Order) {
