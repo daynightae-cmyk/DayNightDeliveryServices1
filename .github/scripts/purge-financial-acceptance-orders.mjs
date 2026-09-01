@@ -13,6 +13,7 @@ const evidenceDirectory = 'preview-browser-evidence';
 const acceptanceName = 'DAY NIGHT FINANCIAL TEST';
 const acceptancePhone = '0500000000';
 const acceptanceMerchantId = '325bb302-75c3-48cc-84ba-e58817d6d148';
+const MAX_DEPENDENCY_RETRIES = 20;
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error('financial_acceptance_cleanup_credentials_missing');
@@ -37,29 +38,71 @@ async function findAcceptanceRows() {
   return Array.isArray(data) ? data : [];
 }
 
-async function deleteOptionalChildren(orderId) {
+async function deleteChildRows(table, orderId) {
+  const { error } = await client.from(table).delete().eq('order_id', orderId);
+  if (error && !/does not exist|schema cache|not found|relation .* does not exist/i.test(String(error.message || ''))) {
+    throw new Error(`financial_acceptance_cleanup_${table}_failed:${error.message}`);
+  }
+}
+
+async function deleteKnownChildren(orderId) {
+  // These are the known non-cascading operational/audit references. Further
+  // restrictive dependencies are discovered from PostgreSQL's FK error below
+  // and removed only for this exact synthetic acceptance order ID.
   const tables = [
     'merchant_statement_dispatch_log',
+    'order_merchant_audit_snapshot',
     'admin_order_reconciliation_queue',
     'admin_order_mutation_audit_v3',
   ];
+  for (const table of tables) await deleteChildRows(table, orderId);
+}
 
-  for (const table of tables) {
-    const { error } = await client.from(table).delete().eq('order_id', orderId);
-    if (error && !/does not exist|schema cache|not found|relation .* does not exist/i.test(String(error.message || ''))) {
-      throw new Error(`financial_acceptance_cleanup_${table}_failed:${error.message}`);
+function restrictedTableFrom(error) {
+  const message = String(error?.message || '');
+  const details = String(error?.details || '');
+  const combined = `${message} ${details}`;
+  const match = combined.match(/on table ["']([^"']+)["']/i);
+  return match?.[1] || '';
+}
+
+async function deleteExactAcceptanceOrder(orderId) {
+  await deleteKnownChildren(orderId);
+  const clearedDependencies = [];
+
+  for (let attempt = 0; attempt < MAX_DEPENDENCY_RETRIES; attempt += 1) {
+    const { error } = await client.from('orders').delete().eq('id', orderId);
+    if (!error) return clearedDependencies;
+
+    // Production has accumulated several audit/dispatch tables over time. Rather
+    // than hard-coding a broad destructive list, react only to the FK table that
+    // PostgreSQL says blocks this one exact synthetic order, delete its rows for
+    // the same order_id, then retry. Real customer orders are never selected.
+    if (String(error.code || '') !== '23503') {
+      throw new Error(`financial_acceptance_order_delete_failed:${orderId}:${error.message}`);
     }
+    const table = restrictedTableFrom(error);
+    if (!table || table === 'orders' || clearedDependencies.includes(table)) {
+      throw new Error(`financial_acceptance_order_fk_unresolved:${orderId}:${error.message}`);
+    }
+    await deleteChildRows(table, orderId);
+    clearedDependencies.push(table);
   }
+
+  throw new Error(`financial_acceptance_order_dependency_retry_exhausted:${orderId}`);
 }
 
 const before = await findAcceptanceRows();
 const deleted = [];
 
 for (const row of before) {
-  await deleteOptionalChildren(row.id);
-  const { error } = await client.from('orders').delete().eq('id', row.id);
-  if (error) throw new Error(`financial_acceptance_order_delete_failed:${row.id}:${error.message}`);
-  deleted.push({ id: row.id, coupon_number: row.coupon_number, tracking_number: row.tracking_number });
+  const clearedDependencies = await deleteExactAcceptanceOrder(row.id);
+  deleted.push({
+    id: row.id,
+    coupon_number: row.coupon_number,
+    tracking_number: row.tracking_number,
+    clearedDependencies,
+  });
 }
 
 const after = await findAcceptanceRows();
