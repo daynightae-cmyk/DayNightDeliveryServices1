@@ -42,8 +42,13 @@ function visibleColumns(payload: AdminPdfPayload) {
   return payload.columns.filter((column) => !secretPattern.test(column.key));
 }
 
+/**
+ * Administrative exports are accounting/operations records. Never silently trim
+ * them: the caller already controls the filtered/selected dataset and expects the
+ * PDF, CSV and Word files to contain exactly those rows.
+ */
 function safeRows(payload: AdminPdfPayload) {
-  return payload.rows.slice(0, 500);
+  return payload.rows;
 }
 
 function reportOrientation(payload: AdminPdfPayload) {
