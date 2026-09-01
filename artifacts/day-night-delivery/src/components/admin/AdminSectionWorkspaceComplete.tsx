@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 import "../../styles/dn-merchant-finance-files.css";
 import AdminFinanceOperationsCenter, { type FinanceArea } from "./AdminFinanceOperationsCenter";
 import AdminMerchantAccountsRoute from "./AdminMerchantAccountsRoute";
+import AdminOrderWorkspaceProfessional from "./AdminOrderWorkspaceProfessional";
 import AdminSectionWorkspaceCompleteLegacy from "./AdminSectionWorkspaceCompleteLegacy";
 
 type Props = ComponentProps<typeof AdminSectionWorkspaceCompleteLegacy>;
@@ -17,14 +18,26 @@ const FINANCE_SECTIONS = new Set<Props["id"]>([
   "audit_log",
 ]);
 
+const ORDER_SECTIONS = new Set<Props["id"]>([
+  "personal_orders",
+  "all_orders",
+  "cancelled",
+  "review",
+  "postponed",
+  "returned",
+  "pickup",
+  "abu_dhabi",
+  "external",
+  "out_scope",
+]);
+
 /**
- * Performance boundary for the two heaviest admin workspaces.
+ * Performance boundary for the heaviest Admin workspaces.
  *
- * Merchant accounts stay on their dedicated safe route. Finance views are
- * rendered directly here so switching Finance tabs remains local to the finance
- * center instead of changing the parent Admin section and remounting the whole
- * workspace. Navigation is still escalated when a finance child explicitly
- * targets a non-finance Admin section.
+ * Merchant accounts stay on their dedicated safe route. Finance views are kept
+ * local to the finance center. Operational order sections use one shared,
+ * selectable register so every bucket has the same filters, bulk selection,
+ * PDF/CSV/Word export contract and responsive DAY NIGHT presentation.
  */
 export default function AdminSectionWorkspaceComplete(props: Props) {
   if (props.id === "accounts") {
@@ -57,6 +70,10 @@ export default function AdminSectionWorkspaceComplete(props: Props) {
         />
       </div>
     );
+  }
+
+  if (ORDER_SECTIONS.has(props.id)) {
+    return <AdminOrderWorkspaceProfessional {...props} />;
   }
 
   return <AdminSectionWorkspaceCompleteLegacy {...props} />;
