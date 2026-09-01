@@ -11,6 +11,8 @@ type Props = {
   onExportDoc: (payload: AdminPdfPayload) => void | Promise<void>;
 };
 
+const LARGE_EXPORT_WARNING_ROWS = 1000;
+
 export default function AdminPdfPreviewModal({ open, payload, onClose, onExportPdf, onExportCsv, onExportDoc }: Props) {
   const [language, setLanguage] = useState<AdminPdfLanguage>(payload.language);
   const [orientation, setOrientation] = useState<"portrait" | "landscape">(payload.orientation || (payload.columns.length > 5 ? "landscape" : "portrait"));
@@ -32,6 +34,7 @@ export default function AdminPdfPreviewModal({ open, payload, onClose, onExportP
   const previewPayload = useMemo<AdminPdfPayload>(() => ({ ...payload, language, orientation, includeSummary, includeFilters }), [payload, language, orientation, includeSummary, includeFilters]);
   if (!open) return null;
   const isArabic = language === "ar";
+  const isLargeExport = payload.rows.length > LARGE_EXPORT_WARNING_ROWS;
 
   async function run(format: "pdf" | "csv" | "doc") {
     setBusyFormat(format);
@@ -56,6 +59,7 @@ export default function AdminPdfPreviewModal({ open, payload, onClose, onExportP
         <label className="dn-admin-pdf-check"><input type="checkbox" checked={includeFilters} onChange={(event) => setIncludeFilters(event.target.checked)} />{isArabic ? "الفلاتر" : "Filters"}</label>
       </div>
       <div className="dn-admin-pdf-totals"><span><b>{isArabic ? "عدد السجلات" : "Rows"}</b>{payload.rows.length}</span>{Object.entries(payload.totals || {}).map(([key, value]) => <span key={key}><b>{key}</b>{String(value)}</span>)}</div>
+      {isLargeExport && <small className="dn-admin-pdf-hint" role="status">{isArabic ? `الملف كبير (${payload.rows.length} سجل). سيُصدر كاملاً بدون حذف صفوف وقد يحتاج وقتاً إضافياً، خصوصاً PDF.` : `Large export (${payload.rows.length} rows). It will be generated in full with no rows removed and may take longer, especially PDF.`}</small>}
       <div className="dn-admin-pdf-scroll"><table><thead><tr>{payload.columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead><tbody>{payload.rows.length ? payload.rows.slice(0, 12).map((row, index) => <tr key={index}>{payload.columns.map((c) => <td key={c.key}>{String(row[c.key] ?? "—")}</td>)}</tr>) : <tr><td colSpan={payload.columns.length || 1}>{isArabic ? "لا توجد بيانات للمعاينة" : "No rows to preview"}</td></tr>}</tbody></table></div>
       {payload.rows.length > 12 && <small className="dn-admin-pdf-hint">{isArabic ? `المعاينة تعرض أول 12 صفًا فقط، لكن الملف سيحتوي على كل ${payload.rows.length} سجل.` : `Preview shows the first 12 rows; the exported file contains all ${payload.rows.length} records.`}</small>}
       <div className="dn-admin-pdf-actions" aria-label={isArabic ? "صيغ الملف" : "File formats"}>
