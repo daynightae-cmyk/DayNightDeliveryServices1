@@ -97,33 +97,49 @@ function latestAssignmentByOrder(assignments: DriverAssignmentHistory[]) {
   return map;
 }
 
+type DriverMatchIdentity = {
+  ids: Set<string>;
+  phone: string;
+  names: Set<string>;
+};
+
+function buildDriverMatchIdentity(driver: DriverProfile): DriverMatchIdentity {
+  return {
+    ids: new Set(
+      [driver.id, driver.user_id]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+    phone: phoneDigits(driver.phone),
+    names: new Set(
+      [compactText(driver.full_name), compactText(driver.name)].filter(Boolean),
+    ),
+  };
+}
+
 function orderBelongsToDriver(
   order: DriverOrder,
-  driver: DriverProfile,
+  driver: DriverMatchIdentity,
   assignmentMap: Map<string, string | null>,
 ) {
-  const canonicalAssignment = assignmentMap.get(String(order.id || "").trim());
-  const driverIds = new Set(
-    [driver.id, driver.user_id]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean),
-  );
+  const orderId = String(order.id || "").trim();
+  const hasCanonicalAssignment = Boolean(orderId && assignmentMap.has(orderId));
+  const canonicalAssignment = hasCanonicalAssignment ? assignmentMap.get(orderId) : undefined;
   const orderIds = [order.driver_id, order.assigned_driver_id, canonicalAssignment, order.driver_code]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
-  if (orderIds.some((value) => driverIds.has(value))) return true;
+  if (orderIds.some((value) => driver.ids.has(value))) return true;
 
-  // If history explicitly says the order is currently assigned elsewhere, do not
-  // let a stale legacy name/phone field attach it to the previous driver.
-  if (canonicalAssignment && !driverIds.has(canonicalAssignment)) return false;
+  // Explicit assignment history is authoritative. If its latest entry says the
+  // order is unassigned or assigned elsewhere, stale legacy name/phone fields
+  // must not attach the order to an old driver statement.
+  if (hasCanonicalAssignment) return false;
 
-  const profilePhone = phoneDigits(driver.phone);
   const orderPhone = phoneDigits(order.driver_phone);
-  if (profilePhone && orderPhone && profilePhone === orderPhone) return true;
+  if (driver.phone && orderPhone && driver.phone === orderPhone) return true;
 
-  const profileNames = new Set([compactText(driver.full_name), compactText(driver.name)].filter(Boolean));
   const orderName = compactText(order.driver_name);
-  return Boolean(orderName && profileNames.has(orderName));
+  return Boolean(orderName && driver.names.has(orderName));
 }
 
 export function useAdminDrivers() {
@@ -192,7 +208,8 @@ export function useAdminDrivers() {
         profiles.map((driver) => {
           const rawLocation = locations.find((row) => row.driver_id === driver.id) || null;
           const location = normalizeLocation(rawLocation);
-          const orders = orderRows.filter((order) => orderBelongsToDriver(order, driver, assignmentMap));
+          const identity = buildDriverMatchIdentity(driver);
+          const orders = orderRows.filter((order) => orderBelongsToDriver(order, identity, assignmentMap));
           const activeOrders = orders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status)));
           const deliveredToday = orders.filter(
             (order) =>
