@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,9 +20,9 @@ import {
   XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Order } from "../../types";
+import type { Merchant, Order } from "../../types";
 import { useAdminDrivers } from "../../hooks/useAdminDrivers";
-import { updateOrderStatus } from "../../lib/adminData";
+import { fetchMerchants, updateOrderStatus } from "../../lib/adminData";
 import type { AdminPdfPayload } from "../../lib/adminPdfExport";
 import AdminPdfExportButton from "./AdminPdfExportButton";
 import { matchesSearchQuery } from "../../lib/searchNormalization";
@@ -36,26 +36,64 @@ type Props = {
 };
 
 const CLOSED_STATUSES = new Set(["delivered", "cancelled", "returned"]);
-
 const clean = (value: unknown) => String(value ?? "").trim();
-const normalize = (value: unknown) => clean(value).toLowerCase().replace(/[\s_-]+/g, "");
+const statusKey = (value: unknown) => clean(value).toLowerCase().replace(/[\s-]+/g, "_");
 const numberValue = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 const money = (value: unknown, isArabic: boolean) =>
   isArabic ? `${numberValue(value).toFixed(2)} درهم` : `${numberValue(value).toFixed(2)} AED`;
-const orderReference = (order: Order) =>
-  clean(order.tracking_number || order.tracking_code || order.invoice_number || order.id || "—");
 const orderDate = (order: Order) => clean(order.created_at || order.updated_at).slice(0, 10);
-const statusKey = (value: unknown) => clean(value).toLowerCase().replace(/[\s-]+/g, "_");
+
+function couponNumber(order: Order) {
+  return clean(
+    order.coupon_number ||
+      order.invoice_number ||
+      order.tracking_number ||
+      order.tracking_code ||
+      order.id ||
+      "—",
+  );
+}
+
+function orderStatementPrice(order: Order) {
+  const candidates = [
+    order.customer_total,
+    order.total_amount,
+    order.total_price,
+    order.total,
+    order.amount,
+    order.cod_amount,
+    order.delivery_price,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined || candidate === "") continue;
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function customerName(order: Order) {
+  return clean(order.receiver_name || order.customer_name || "—");
+}
+
+function customerPhone(order: Order) {
+  return clean(order.receiver_phone || order.customer_phone || "—");
+}
+
+function orderArea(order: Order, isArabic: boolean) {
+  const localized = isArabic
+    ? [order.receiver_area_ar, order.receiver_area, order.receiver_city_ar, order.receiver_city, order.receiver_address_ar, order.receiver_address]
+    : [order.receiver_area, order.receiver_city, order.receiver_address, order.receiver_area_ar, order.receiver_city_ar, order.receiver_address_ar];
+  return clean(localized.find((value) => clean(value)) || "—");
+}
 
 function normalizePeriodBounds(dateFrom: string, dateTo: string) {
   const from = clean(dateFrom);
   const to = clean(dateTo);
-  if (from && to && from > to) {
-    return { from: to, to: from, reversed: true };
-  }
+  if (from && to && from > to) return { from: to, to: from, reversed: true };
   return { from, to, reversed: false };
 }
 
@@ -121,6 +159,7 @@ export default function AdminDriverStatementsCenter({
   onNavigate: _onNavigate,
 }: Props) {
   const { drivers, loading, error, refresh } = useAdminDrivers();
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [driverId, setDriverId] = useState("");
   const [driverQuery, setDriverQuery] = useState("");
   const [orderQuery, setOrderQuery] = useState("");
@@ -128,22 +167,42 @@ export default function AdminDriverStatementsCenter({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    let active = true;
+    void fetchMerchants()
+      .then((rows) => {
+        if (active) setMerchants(rows);
+      })
+      .catch(() => {
+        if (active) setMerchants([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const period = useMemo(() => normalizePeriodBounds(dateFrom, dateTo), [dateFrom, dateTo]);
   const driver = drivers.find((item) => item.id === driverId) || null;
+  const merchantById = useMemo(
+    () => new Map(merchants.map((merchant) => [merchant.id, merchant])),
+    [merchants],
+  );
 
-  const visibleDrivers = useMemo(() => {
-    return drivers.filter((item) =>
-      matchesSearchQuery([
-        item.full_name,
-        item.name,
-        item.phone,
-        item.vehicle_plate,
-        item.vehicle_type,
-        item.emirate,
-        item.work_area,
-      ], `${query} ${driverQuery}`),
-    );
-  }, [driverQuery, drivers, query]);
+  const merchantName = (order: Order) => {
+    const merchant = order.merchant_id ? merchantById.get(order.merchant_id) : undefined;
+    return clean(order.merchant_name || merchant?.trade_name || order.sender_name || "—");
+  };
+
+  const visibleDrivers = useMemo(
+    () =>
+      drivers.filter((item) =>
+        matchesSearchQuery(
+          [item.full_name, item.name, item.phone, item.vehicle_plate, item.vehicle_type, item.emirate, item.work_area],
+          `${query} ${driverQuery}`,
+        ),
+      ),
+    [driverQuery, drivers, query],
+  );
 
   const visibleOrders = useMemo(() => {
     if (!driver) return [];
@@ -151,23 +210,27 @@ export default function AdminDriverStatementsCenter({
       .filter((order) => {
         const date = orderDate(order);
         const insidePeriod = (!period.from || date >= period.from) && (!period.to || date <= period.to);
-        const matches = matchesSearchQuery([
-            orderReference(order),
-            order.coupon_number,
-            order.invoice_number,
-            order.receiver_name,
-            order.receiver_phone,
-            order.receiver_city,
-            order.sender_city,
+        const merchant = order.merchant_id ? merchantById.get(order.merchant_id) : undefined;
+        const matches = matchesSearchQuery(
+          [
+            couponNumber(order),
+            order.merchant_name,
+            merchant?.trade_name,
+            customerName(order),
+            customerPhone(order),
+            orderArea(order, isArabic),
             order.status,
-          ], orderQuery);
+          ],
+          orderQuery,
+        );
         return insidePeriod && matches;
       })
-      .sort((left, right) =>
-        new Date(right.created_at || right.updated_at || 0).getTime() -
-        new Date(left.created_at || left.updated_at || 0).getTime(),
+      .sort(
+        (left, right) =>
+          new Date(right.created_at || right.updated_at || 0).getTime() -
+          new Date(left.created_at || left.updated_at || 0).getTime(),
       );
-  }, [driver, orderQuery, period.from, period.to]);
+  }, [driver, isArabic, merchantById, orderQuery, period.from, period.to]);
 
   const selectedOrders = visibleOrders.filter((order) => selected.includes(order.id));
   const exportOrders = selectedOrders.length ? selectedOrders : visibleOrders;
@@ -202,32 +265,28 @@ export default function AdminDriverStatementsCenter({
     filters: `${period.from || "—"} → ${period.to || "—"}`,
     totals: {
       [isArabic ? "إجمالي الطلبيات" : "Total orders"]: exportOrders.length,
-      [isArabic ? "قيد التنفيذ" : "Active"]: exportOrders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status))).length,
-      [isArabic ? "تم التسليم" : "Delivered"]: exportOrders.filter((order) => statusKey(order.status) === "delivered").length,
-      [isArabic ? "إجمالي COD" : "Total COD"]: money(
-        exportOrders.reduce((sum, order) => sum + numberValue(order.cod_amount), 0),
+      [isArabic ? "إجمالي قيمة الطلبات" : "Total order value"]: money(
+        exportOrders.reduce((sum, order) => sum + orderStatementPrice(order), 0),
         isArabic,
       ),
     },
     columns: [
-      { key: "reference", label: isArabic ? "الطلب" : "Order" },
-      { key: "date", label: isArabic ? "التاريخ" : "Date" },
-      { key: "recipient", label: isArabic ? "المستلم" : "Recipient" },
-      { key: "phone", label: isArabic ? "الهاتف" : "Phone" },
-      { key: "route", label: isArabic ? "المسار" : "Route" },
-      { key: "cod", label: "COD" },
-      { key: "status", label: isArabic ? "الحالة" : "Status" },
+      { key: "coupon", label: isArabic ? "رقم الكوبون" : "Coupon number" },
+      { key: "merchant", label: isArabic ? "اسم التاجر" : "Merchant name" },
+      { key: "customer", label: isArabic ? "اسم العميل" : "Customer name" },
+      { key: "phone", label: isArabic ? "رقم تليفون العميل" : "Customer phone" },
+      { key: "area", label: isArabic ? "المنطقة" : "Area" },
+      { key: "price", label: isArabic ? "سعر الطلبية" : "Order price" },
     ],
     rows: exportOrders.map((order) => ({
-      reference: orderReference(order),
-      date: orderDate(order) || "—",
-      recipient: order.receiver_name || order.customer_name || "—",
-      phone: order.receiver_phone || "—",
-      route: `${order.sender_city || "—"} → ${order.receiver_city || "—"}`,
-      cod: money(order.cod_amount, isArabic),
-      status: statusLabel(order.status, isArabic),
+      coupon: couponNumber(order),
+      merchant: merchantName(order),
+      customer: customerName(order),
+      phone: customerPhone(order),
+      area: orderArea(order, isArabic),
+      price: money(orderStatementPrice(order), isArabic),
     })),
-    orientation: "landscape",
+    orientation: "portrait",
   };
 
   const whatsappSummary = useMemo(() => {
@@ -256,13 +315,8 @@ export default function AdminDriverStatementsCenter({
               {isArabic ? "كشوفات طلبيات المناديب" : "Driver order statements"}
             </span>
             <h2 className="mt-2 text-2xl font-black text-white">
-              {isArabic ? "اختر المندوب لعرض الطلبيات المسندة إليه" : "Choose a driver to view assigned orders"}
+              {isArabic ? "اختر المندوب لعرض كشفه" : "Choose a driver to open the statement"}
             </h2>
-            <p className="mt-2 max-w-3xl text-xs font-bold leading-6 text-white/45">
-              {isArabic
-                ? "هذا القسم للطلبيات والتشغيل والتحصيل فقط. الرواتب والسلف والخصومات تُدار حصريًا من قسم الموظفين."
-                : "This section is only for assigned orders, operations, and COD. Salaries, advances, and deductions are managed exclusively in Employees."}
-            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#071a33] px-4 py-3">
@@ -347,7 +401,7 @@ export default function AdminDriverStatementsCenter({
               {driver.avatar_url ? <img src={driver.avatar_url} className="h-full w-full object-cover" alt="" /> : <UserRound />}
             </span>
             <div>
-              <span className="text-[10px] font-black text-brand-gold">{isArabic ? "كشف الطلبيات المسندة" : "ASSIGNED ORDERS STATEMENT"}</span>
+              <span className="text-[10px] font-black text-brand-gold">{isArabic ? "كشف طلبيات المندوب" : "DRIVER ORDER STATEMENT"}</span>
               <h2 className="mt-1 text-2xl font-black text-white">{driver.full_name || driver.name}</h2>
               <p className="mt-1 text-[11px] text-white/48">
                 <Phone className="inline h-3.5 w-3.5" /> {driver.phone || "—"} · <MapPin className="inline h-3.5 w-3.5" /> {driver.emirate || driver.work_area || "—"}
@@ -356,13 +410,13 @@ export default function AdminDriverStatementsCenter({
           </div>
           <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[10px] font-black text-emerald-200">
             <ShieldCheck className="h-4 w-4" />
-            {isArabic ? "بيانات حقيقية ومزامنة مباشرة" : "Live production data"}
+            {isArabic ? "البيانات من الطلبات الحقيقية" : "Live production order data"}
           </span>
         </div>
       </header>
 
       {message ? <p className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-xs font-bold leading-6 text-brand-gold">{message}</p> : null}
-      {period.reversed ? <p className="rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-xs font-black text-amber-100">{isArabic ? `تم تصحيح الفترة تلقائيًا لأن تاريخ البداية كان بعد تاريخ النهاية: ${period.from} → ${period.to}` : `The period was corrected automatically because the start date was after the end date: ${period.from} → ${period.to}`}</p> : null}
+      {period.reversed ? <p className="rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-xs font-black text-amber-100">{isArabic ? `تم تصحيح الفترة تلقائيًا: ${period.from} → ${period.to}` : `The period was corrected automatically: ${period.from} → ${period.to}`}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Metric label={isArabic ? "إجمالي المسند" : "Assigned"} value={String(visibleOrders.length)} icon={PackageCheck} tone="gold" />
@@ -373,16 +427,16 @@ export default function AdminDriverStatementsCenter({
         <Metric label={isArabic ? "إجمالي COD" : "Total COD"} value={money(codTotal, isArabic)} icon={Banknote} tone="gold" />
       </div>
 
-      <section className="rounded-[1.8rem] border border-white/10 bg-[#031226]">
+      <section className="overflow-hidden rounded-[1.8rem] border border-white/10 bg-[#031226]">
         <header className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-xl font-black text-white">{visibleOrders.length} {isArabic ? "طلبية مسندة للمندوب" : "assigned driver orders"}</h3>
+            <h3 className="text-xl font-black text-white">{visibleOrders.length} {isArabic ? "طلبية في الكشف" : "orders in statement"}</h3>
             <p className="mt-1 text-xs text-white/45" dir="ltr">{period.from || "—"} → {period.to || "—"}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#071a33] px-3 py-2">
               <Search className="h-4 w-4 text-white/35" />
-              <input value={orderQuery} onChange={(event) => setOrderQuery(event.target.value)} className="bg-transparent text-xs text-white outline-none" placeholder={isArabic ? "بحث في الطلبيات" : "Search orders"} />
+              <input value={orderQuery} onChange={(event) => setOrderQuery(event.target.value)} className="bg-transparent text-xs text-white outline-none" placeholder={isArabic ? "بحث في الكشف" : "Search statement"} />
             </label>
             <button
               type="button"
@@ -393,58 +447,143 @@ export default function AdminDriverStatementsCenter({
             </button>
           </div>
         </header>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-xs">
-            <thead className="bg-white/[.04] text-white/55">
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[920px] table-fixed text-xs">
+            <thead className="bg-brand-gold text-[#03101f]">
               <tr>
-                <th className="px-4 py-3">✓</th>
-                <th className="px-4 py-3">{isArabic ? "الطلب" : "Order"}</th>
-                <th className="px-4 py-3">{isArabic ? "التاريخ" : "Date"}</th>
-                <th className="px-4 py-3">{isArabic ? "المستلم" : "Recipient"}</th>
-                <th className="px-4 py-3">{isArabic ? "الهاتف" : "Phone"}</th>
-                <th className="px-4 py-3">{isArabic ? "المسار" : "Route"}</th>
-                <th className="px-4 py-3">COD</th>
-                <th className="px-4 py-3">{isArabic ? "الحالة" : "Status"}</th>
-                <th className="px-4 py-3">{isArabic ? "متابعة" : "Track"}</th>
+                <th className="w-[15%] px-3 py-3 text-start font-black">{isArabic ? "رقم الكوبون" : "Coupon number"}</th>
+                <th className="w-[18%] px-3 py-3 text-start font-black">{isArabic ? "اسم التاجر" : "Merchant name"}</th>
+                <th className="w-[17%] px-3 py-3 text-start font-black">{isArabic ? "اسم العميل" : "Customer name"}</th>
+                <th className="w-[17%] px-3 py-3 text-start font-black">{isArabic ? "رقم تليفون العميل" : "Customer phone"}</th>
+                <th className="w-[18%] px-3 py-3 text-start font-black">{isArabic ? "المنطقة" : "Area"}</th>
+                <th className="w-[15%] px-3 py-3 text-start font-black">{isArabic ? "سعر الطلبية" : "Order price"}</th>
               </tr>
             </thead>
             <tbody>
               {visibleOrders.map((order) => {
-                const reference = orderReference(order);
+                const coupon = couponNumber(order);
                 return (
-                  <tr key={order.id} className="border-t border-white/7 text-white/75">
-                    <td className="px-4 py-3"><input type="checkbox" checked={selected.includes(order.id)} onChange={() => setSelected((current) => current.includes(order.id) ? current.filter((id) => id !== order.id) : [...current, order.id])} /></td>
-                    <td className="px-4 py-3 font-black text-white" dir="ltr">{reference}</td>
-                    <td className="px-4 py-3" dir="ltr">{orderDate(order) || "—"}</td>
-                    <td className="px-4 py-3">{order.receiver_name || order.customer_name || "—"}</td>
-                    <td className="px-4 py-3" dir="ltr">{order.receiver_phone || "—"}</td>
-                    <td className="px-4 py-3">{order.sender_city || "—"} → {order.receiver_city || "—"}</td>
-                    <td className="px-4 py-3 font-black text-brand-gold" dir="ltr">{money(order.cod_amount, isArabic)}</td>
-                    <td className="px-4 py-3">
-                      <select value={statusKey(order.status)} onChange={(event) => void changeStatus(order, event.target.value)} disabled={busy} className="rounded-lg border border-white/10 bg-[#071a33] px-3 py-2 text-xs text-white">
-                        <option value="pending">{isArabic ? "جديد" : "Pending"}</option>
-                        <option value="review">{isArabic ? "قيد المراجعة" : "Under review"}</option>
-                        <option value="confirmed">{isArabic ? "بدأ المهمة" : "Mission started"}</option>
-                        <option value="assigned">{isArabic ? "مسند" : "Assigned"}</option>
-                        <option value="picked_up">{isArabic ? "تم الاستلام" : "Picked up"}</option>
-                        <option value="in_transit">{isArabic ? "في الطريق" : "In transit"}</option>
-                        <option value="delivered">{isArabic ? "تم التسليم" : "Delivered"}</option>
-                        <option value="postponed">{isArabic ? "مؤجل" : "Postponed"}</option>
-                        <option value="returned">{isArabic ? "راجع" : "Returned"}</option>
-                        <option value="cancelled">{isArabic ? "ملغي" : "Cancelled"}</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <a href={`/tracking?code=${encodeURIComponent(reference)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-brand-sky/25 bg-brand-sky/10 px-3 py-2 font-black text-brand-sky">
-                        <ExternalLink className="h-3.5 w-3.5" />{isArabic ? "متابعة" : "Track"}
-                      </a>
-                    </td>
-                  </tr>
+                  <Fragment key={order.id}>
+                    <tr className="border-t border-white/8 text-white/80">
+                      <td className="px-3 py-4 align-top">
+                        <label className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(order.id)}
+                            onChange={() => setSelected((current) => current.includes(order.id) ? current.filter((id) => id !== order.id) : [...current, order.id])}
+                            className="mt-0.5"
+                          />
+                          <strong className="break-words text-white" dir="ltr">{coupon}</strong>
+                        </label>
+                      </td>
+                      <td className="px-3 py-4 align-top font-bold text-white">{merchantName(order)}</td>
+                      <td className="px-3 py-4 align-top">{customerName(order)}</td>
+                      <td className="px-3 py-4 align-top" dir="ltr">{customerPhone(order)}</td>
+                      <td className="px-3 py-4 align-top">{orderArea(order, isArabic)}</td>
+                      <td className="px-3 py-4 align-top font-black text-brand-gold" dir="ltr">{money(orderStatementPrice(order), isArabic)}</td>
+                    </tr>
+                    <tr className="border-t border-white/5 bg-white/[.025]">
+                      <td colSpan={6} className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/50">
+                          <span dir="ltr">{orderDate(order) || "—"}</span>
+                          <select
+                            value={statusKey(order.status)}
+                            onChange={(event) => void changeStatus(order, event.target.value)}
+                            disabled={busy}
+                            className="rounded-lg border border-white/10 bg-[#071a33] px-2 py-1.5 text-[10px] text-white"
+                          >
+                            <option value="pending">{isArabic ? "جديد" : "Pending"}</option>
+                            <option value="review">{isArabic ? "قيد المراجعة" : "Under review"}</option>
+                            <option value="confirmed">{isArabic ? "بدأ المهمة" : "Mission started"}</option>
+                            <option value="assigned">{isArabic ? "مسند" : "Assigned"}</option>
+                            <option value="picked_up">{isArabic ? "تم الاستلام" : "Picked up"}</option>
+                            <option value="in_transit">{isArabic ? "في الطريق" : "In transit"}</option>
+                            <option value="delivered">{isArabic ? "تم التسليم" : "Delivered"}</option>
+                            <option value="postponed">{isArabic ? "مؤجل" : "Postponed"}</option>
+                            <option value="returned">{isArabic ? "راجع" : "Returned"}</option>
+                            <option value="cancelled">{isArabic ? "ملغي" : "Cancelled"}</option>
+                          </select>
+                          <span>{statusLabel(order.status, isArabic)}</span>
+                          <a
+                            href={`/tracking?code=${encodeURIComponent(coupon)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-brand-sky/25 bg-brand-sky/10 px-2 py-1.5 font-black text-brand-sky"
+                          >
+                            <ExternalLink className="h-3 w-3" />{isArabic ? "متابعة" : "Track"}
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         </div>
+
+        <div className="space-y-3 p-3 md:hidden">
+          {visibleOrders.map((order) => {
+            const coupon = couponNumber(order);
+            const fields = [
+              [isArabic ? "رقم الكوبون" : "Coupon number", coupon],
+              [isArabic ? "اسم التاجر" : "Merchant name", merchantName(order)],
+              [isArabic ? "اسم العميل" : "Customer name", customerName(order)],
+              [isArabic ? "رقم تليفون العميل" : "Customer phone", customerPhone(order)],
+              [isArabic ? "المنطقة" : "Area", orderArea(order, isArabic)],
+              [isArabic ? "سعر الطلبية" : "Order price", money(orderStatementPrice(order), isArabic)],
+            ];
+            return (
+              <article key={order.id} className="rounded-2xl border border-white/10 bg-[#071a33] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(order.id)}
+                    onChange={() => setSelected((current) => current.includes(order.id) ? current.filter((id) => id !== order.id) : [...current, order.id])}
+                  />
+                  <span className="text-[10px] text-white/40" dir="ltr">{orderDate(order) || "—"}</span>
+                </div>
+                <dl className="space-y-2">
+                  {fields.map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[42%_1fr] gap-3 border-b border-white/5 pb-2 last:border-0">
+                      <dt className="text-[10px] font-black text-brand-gold">{label}</dt>
+                      <dd className="break-words text-xs font-bold text-white">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-3 flex items-center gap-2">
+                  <select
+                    value={statusKey(order.status)}
+                    onChange={(event) => void changeStatus(order, event.target.value)}
+                    disabled={busy}
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#031226] px-2 py-2 text-[10px] text-white"
+                  >
+                    <option value="pending">{isArabic ? "جديد" : "Pending"}</option>
+                    <option value="review">{isArabic ? "قيد المراجعة" : "Under review"}</option>
+                    <option value="confirmed">{isArabic ? "بدأ المهمة" : "Mission started"}</option>
+                    <option value="assigned">{isArabic ? "مسند" : "Assigned"}</option>
+                    <option value="picked_up">{isArabic ? "تم الاستلام" : "Picked up"}</option>
+                    <option value="in_transit">{isArabic ? "في الطريق" : "In transit"}</option>
+                    <option value="delivered">{isArabic ? "تم التسليم" : "Delivered"}</option>
+                    <option value="postponed">{isArabic ? "مؤجل" : "Postponed"}</option>
+                    <option value="returned">{isArabic ? "راجع" : "Returned"}</option>
+                    <option value="cancelled">{isArabic ? "ملغي" : "Cancelled"}</option>
+                  </select>
+                  <a
+                    href={`/tracking?code=${encodeURIComponent(coupon)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg border border-brand-sky/25 bg-brand-sky/10 px-3 py-2 text-[10px] font-black text-brand-sky"
+                  >
+                    <ExternalLink className="h-3 w-3" />{isArabic ? "متابعة" : "Track"}
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
         {!visibleOrders.length ? <p className="py-12 text-center text-sm text-white/45">{isArabic ? "لا توجد طلبيات مسندة ضمن الفترة المحددة." : "No assigned orders in the selected period."}</p> : null}
       </section>
 
@@ -456,7 +595,7 @@ export default function AdminDriverStatementsCenter({
         </strong>
         <div className="flex flex-wrap gap-2">
           {exportOrders.length ? (
-            <AdminPdfExportButton payload={ordersPdf} label={isArabic ? "تصدير كشف الطلبيات" : "Export order statement"} />
+            <AdminPdfExportButton payload={ordersPdf} label={isArabic ? "تصدير كشف المندوب بالطول" : "Export portrait driver statement"} />
           ) : (
             <button type="button" disabled className="dn-admin-pdf-button opacity-40"><FileDown className="h-4 w-4" />{isArabic ? "لا توجد طلبيات" : "No orders"}</button>
           )}
