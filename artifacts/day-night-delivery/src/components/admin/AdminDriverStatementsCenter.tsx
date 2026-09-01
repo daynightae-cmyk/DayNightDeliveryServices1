@@ -58,7 +58,7 @@ function couponNumber(order: Order) {
 }
 
 function orderStatementPrice(order: Order) {
-  const candidates = [
+  const candidates: unknown[] = [
     order.customer_total,
     order.total_amount,
     order.total_price,
