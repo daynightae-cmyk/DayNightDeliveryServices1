@@ -16,12 +16,28 @@ export type AdminDriverRow = DriverOverviewRow;
 
 const CLOSED_STATUSES = new Set(["delivered", "cancelled", "returned"]);
 const IN_PROGRESS_STATUSES = new Set(["accepted", "picked_up", "in_transit"]);
+const ORDER_PAGE_SIZE = 1000;
+const ORDER_SAFETY_LIMIT = 20_000;
 
 const statusKey = (value: unknown) =>
   String(value || "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "_");
+
+const compactText = (value: unknown) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[ـ]/g, "")
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, "");
+
+const phoneDigits = (value: unknown) => {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length >= 9) digits = `971${digits.slice(1)}`;
+  return digits;
+};
 
 export function driverPresence(lastSeen?: string | null, onlineFlag?: boolean | null): DriverPresence {
   if (!lastSeen || onlineFlag === false) return "offline";
@@ -64,6 +80,52 @@ function optionalDispatchTableError(message?: string | null) {
   return Boolean(message && /driver_assignment_history|schema cache|does not exist/i.test(message));
 }
 
+/**
+ * The production database contains orders created by several generations of the
+ * admin/driver apps. New rows have driver_id/assigned_driver_id, while older rows
+ * may only keep driver_name/driver_phone/driver_code. Assignment history is the
+ * canonical fallback when the order row itself was not backfilled.
+ */
+function latestAssignmentByOrder(assignments: DriverAssignmentHistory[]) {
+  const map = new Map<string, string | null>();
+  for (const entry of assignments) {
+    const orderId = String(entry.order_id || "").trim();
+    if (!orderId || map.has(orderId)) continue;
+    const action = statusKey(entry.action);
+    map.set(orderId, action === "unassigned" ? null : String(entry.driver_id || "").trim() || null);
+  }
+  return map;
+}
+
+function orderBelongsToDriver(
+  order: DriverOrder,
+  driver: DriverProfile,
+  assignmentMap: Map<string, string | null>,
+) {
+  const canonicalAssignment = assignmentMap.get(String(order.id || "").trim());
+  const driverIds = new Set(
+    [driver.id, driver.user_id]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean),
+  );
+  const orderIds = [order.driver_id, order.assigned_driver_id, canonicalAssignment, order.driver_code]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (orderIds.some((value) => driverIds.has(value))) return true;
+
+  // If history explicitly says the order is currently assigned elsewhere, do not
+  // let a stale legacy name/phone field attach it to the previous driver.
+  if (canonicalAssignment && !driverIds.has(canonicalAssignment)) return false;
+
+  const profilePhone = phoneDigits(driver.phone);
+  const orderPhone = phoneDigits(order.driver_phone);
+  if (profilePhone && orderPhone && profilePhone === orderPhone) return true;
+
+  const profileNames = new Set([compactText(driver.full_name), compactText(driver.name)].filter(Boolean));
+  const orderName = compactText(order.driver_name);
+  return Boolean(orderName && profileNames.has(orderName));
+}
+
 export function useAdminDrivers() {
   const [drivers, setDrivers] = useState<AdminDriverRow[]>([]);
   const [dispatchOrders, setDispatchOrders] = useState<DriverOrder[]>([]);
@@ -79,70 +141,90 @@ export function useAdminDrivers() {
     setLoading(true);
     setError("");
 
-    const [profilesResult, locationsResult, ordersResult, trailResult, eventsResult, assignmentsResult] =
-      await Promise.all([
-        client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
-        client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
-        client.from("orders").select("*").order("created_at", { ascending: false }).limit(2000),
-        client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
-        client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
-        client.from("driver_assignment_history").select("*").order("created_at", { ascending: false }).limit(2000),
-      ]);
+    try {
+      const [profilesResult, locationsResult, trailResult, eventsResult, assignmentsResult] =
+        await Promise.all([
+          client.from("driver_profiles").select("*").order("created_at", { ascending: false }),
+          client.from("driver_locations").select("*").order("last_seen_at", { ascending: false }),
+          client.from("driver_location_history").select("*").order("recorded_at", { ascending: false }).limit(3000),
+          client.from("driver_events").select("*").order("created_at", { ascending: false }).limit(1500),
+          client.from("driver_assignment_history").select("*").order("created_at", { ascending: false }).limit(5000),
+        ]);
 
-    const coreError =
-      profilesResult.error || locationsResult.error || ordersResult.error || trailResult.error || eventsResult.error;
-    if (coreError) setError(coreError.message);
-    else if (assignmentsResult.error && !optionalDispatchTableError(assignmentsResult.error.message)) {
-      setError(assignmentsResult.error.message);
+      const orderRows: DriverOrder[] = [];
+      let ordersError = "";
+      for (let from = 0; from < ORDER_SAFETY_LIMIT; from += ORDER_PAGE_SIZE) {
+        const page = await client
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, from + ORDER_PAGE_SIZE - 1);
+        if (page.error) {
+          ordersError = page.error.message;
+          break;
+        }
+        const data = (page.data || []) as DriverOrder[];
+        orderRows.push(...data);
+        if (data.length < ORDER_PAGE_SIZE) break;
+      }
+
+      const coreError =
+        profilesResult.error || locationsResult.error || trailResult.error || eventsResult.error;
+      if (coreError) setError(coreError.message);
+      else if (ordersError) setError(ordersError);
+      else if (assignmentsResult.error && !optionalDispatchTableError(assignmentsResult.error.message)) {
+        setError(assignmentsResult.error.message);
+      }
+
+      const rawProfiles = (profilesResult.data || []) as DriverProfile[];
+      const profiles = await resolveDriverAvatarUrls(rawProfiles);
+      const locations = (locationsResult.data || []) as DriverLocation[];
+      const trails = (trailResult.data || []) as DriverTrailPoint[];
+      const events = (eventsResult.data || []) as DriverEvent[];
+      const assignments = (assignmentsResult.data || []) as DriverAssignmentHistory[];
+      const assignmentMap = latestAssignmentByOrder(assignments);
+      const today = new Date().toDateString();
+
+      setDispatchOrders(orderRows.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status))));
+      setAssignmentHistory(assignments);
+
+      setDrivers(
+        profiles.map((driver) => {
+          const rawLocation = locations.find((row) => row.driver_id === driver.id) || null;
+          const location = normalizeLocation(rawLocation);
+          const orders = orderRows.filter((order) => orderBelongsToDriver(order, driver, assignmentMap));
+          const activeOrders = orders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status)));
+          const deliveredToday = orders.filter(
+            (order) =>
+              statusKey(order.status) === "delivered" &&
+              new Date(order.updated_at || order.created_at).toDateString() === today,
+          ).length;
+          const driverTrail = trails
+            .filter((point) => point.driver_id === driver.id)
+            .map(normalizeTrailPoint)
+            .filter((point): point is DriverTrailPoint => Boolean(point))
+            .slice(0, 180)
+            .reverse();
+
+          return {
+            ...driver,
+            location,
+            orders,
+            trail: driverTrail,
+            events: events.filter((event) => event.driver_id === driver.id).slice(0, 40),
+            presence: driverPresence(location?.last_seen_at, location?.is_online),
+            active_orders: activeOrders.length,
+            delivered_today: deliveredToday,
+            cod_active: activeOrders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0),
+          };
+        }),
+      );
+      setLastUpdatedAt(new Date().toISOString());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLoading(false);
     }
-
-    const rawProfiles = (profilesResult.data || []) as DriverProfile[];
-    const profiles = await resolveDriverAvatarUrls(rawProfiles);
-    const locations = (locationsResult.data || []) as DriverLocation[];
-    const orderRows = (ordersResult.data || []) as DriverOrder[];
-    const trails = (trailResult.data || []) as DriverTrailPoint[];
-    const events = (eventsResult.data || []) as DriverEvent[];
-    const assignments = (assignmentsResult.data || []) as DriverAssignmentHistory[];
-    const today = new Date().toDateString();
-
-    setDispatchOrders(orderRows.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status))));
-    setAssignmentHistory(assignments);
-
-    setDrivers(
-      profiles.map((driver) => {
-        const rawLocation = locations.find((row) => row.driver_id === driver.id) || null;
-        const location = normalizeLocation(rawLocation);
-        const orders = orderRows.filter(
-          (order) => order.driver_id === driver.id || order.assigned_driver_id === driver.id,
-        );
-        const activeOrders = orders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status)));
-        const deliveredToday = orders.filter(
-          (order) =>
-            statusKey(order.status) === "delivered" &&
-            new Date(order.updated_at || order.created_at).toDateString() === today,
-        ).length;
-        const driverTrail = trails
-          .filter((point) => point.driver_id === driver.id)
-          .map(normalizeTrailPoint)
-          .filter((point): point is DriverTrailPoint => Boolean(point))
-          .slice(0, 180)
-          .reverse();
-
-        return {
-          ...driver,
-          location,
-          orders,
-          trail: driverTrail,
-          events: events.filter((event) => event.driver_id === driver.id).slice(0, 40),
-          presence: driverPresence(location?.last_seen_at, location?.is_online),
-          active_orders: activeOrders.length,
-          delivered_today: deliveredToday,
-          cod_active: activeOrders.reduce((sum, order) => sum + Number(order.cod_amount || 0), 0),
-        };
-      }),
-    );
-    setLastUpdatedAt(new Date().toISOString());
-    setLoading(false);
   }, []);
 
   const scheduleRefresh = useCallback(() => {
