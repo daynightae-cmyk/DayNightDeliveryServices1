@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileArchive, FileSpreadsheet, FileText } from "lucide-react";
 import type { AdminPdfLanguage, AdminPdfPayload } from "../../lib/adminPdfExport";
 
@@ -17,14 +17,17 @@ export default function AdminPdfPreviewModal({ open, payload, onClose, onExportP
   const [includeSummary, setIncludeSummary] = useState(payload.includeSummary !== false);
   const [includeFilters, setIncludeFilters] = useState(payload.includeFilters !== false);
   const [busyFormat, setBusyFormat] = useState<"pdf" | "csv" | "doc" | null>(null);
+  const latestPayloadRef = useRef(payload);
+  latestPayloadRef.current = payload;
 
   useEffect(() => {
     if (!open) return;
-    setLanguage(payload.language);
-    setOrientation(payload.orientation || (payload.columns.length > 5 ? "landscape" : "portrait"));
-    setIncludeSummary(payload.includeSummary !== false);
-    setIncludeFilters(payload.includeFilters !== false);
-  }, [open, payload]);
+    const openingPayload = latestPayloadRef.current;
+    setLanguage(openingPayload.language);
+    setOrientation(openingPayload.orientation || (openingPayload.columns.length > 5 ? "landscape" : "portrait"));
+    setIncludeSummary(openingPayload.includeSummary !== false);
+    setIncludeFilters(openingPayload.includeFilters !== false);
+  }, [open]);
 
   const previewPayload = useMemo<AdminPdfPayload>(() => ({ ...payload, language, orientation, includeSummary, includeFilters }), [payload, language, orientation, includeSummary, includeFilters]);
   if (!open) return null;
