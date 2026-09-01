@@ -19,6 +19,7 @@ const source = fs
 fs.writeFileSync(temporaryPath, source, "utf8");
 try {
   await import(`${pathToFileURL(temporaryPath).href}?run=${Date.now()}`);
+  await import(`${pathToFileURL(path.join(directory, "driver-statements-visibility-gate.mjs")).href}?run=${Date.now()}`);
 } finally {
   fs.rmSync(temporaryPath, { force: true });
 }
