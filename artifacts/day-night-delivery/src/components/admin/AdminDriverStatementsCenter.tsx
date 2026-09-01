@@ -50,6 +50,15 @@ const orderReference = (order: Order) =>
 const orderDate = (order: Order) => clean(order.created_at || order.updated_at).slice(0, 10);
 const statusKey = (value: unknown) => clean(value).toLowerCase().replace(/[\s-]+/g, "_");
 
+function normalizePeriodBounds(dateFrom: string, dateTo: string) {
+  const from = clean(dateFrom);
+  const to = clean(dateTo);
+  if (from && to && from > to) {
+    return { from: to, to: from, reversed: true };
+  }
+  return { from, to, reversed: false };
+}
+
 function phoneForWhatsApp(value: unknown) {
   let digits = clean(value).replace(/\D/g, "");
   if (digits.startsWith("00")) digits = digits.slice(2);
@@ -119,6 +128,7 @@ export default function AdminDriverStatementsCenter({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  const period = useMemo(() => normalizePeriodBounds(dateFrom, dateTo), [dateFrom, dateTo]);
   const driver = drivers.find((item) => item.id === driverId) || null;
 
   const visibleDrivers = useMemo(() => {
@@ -140,7 +150,7 @@ export default function AdminDriverStatementsCenter({
     return driver.orders
       .filter((order) => {
         const date = orderDate(order);
-        const insidePeriod = (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
+        const insidePeriod = (!period.from || date >= period.from) && (!period.to || date <= period.to);
         const matches = matchesSearchQuery([
             orderReference(order),
             order.coupon_number,
@@ -157,7 +167,7 @@ export default function AdminDriverStatementsCenter({
         new Date(right.created_at || right.updated_at || 0).getTime() -
         new Date(left.created_at || left.updated_at || 0).getTime(),
       );
-  }, [dateFrom, dateTo, driver, orderQuery]);
+  }, [driver, orderQuery, period.from, period.to]);
 
   const selectedOrders = visibleOrders.filter((order) => selected.includes(order.id));
   const exportOrders = selectedOrders.length ? selectedOrders : visibleOrders;
@@ -189,7 +199,7 @@ export default function AdminDriverStatementsCenter({
   const ordersPdf: AdminPdfPayload = {
     language: isArabic ? "ar" : "en",
     sectionTitle: `${isArabic ? "كشف طلبيات المندوب" : "Driver assigned-orders statement"} · ${driver?.full_name || driver?.name || "DAY NIGHT"}`,
-    filters: `${dateFrom || "—"} → ${dateTo || "—"}`,
+    filters: `${period.from || "—"} → ${period.to || "—"}`,
     totals: {
       [isArabic ? "إجمالي الطلبيات" : "Total orders"]: exportOrders.length,
       [isArabic ? "قيد التنفيذ" : "Active"]: exportOrders.filter((order) => !CLOSED_STATUSES.has(statusKey(order.status))).length,
@@ -224,7 +234,7 @@ export default function AdminDriverStatementsCenter({
     if (!driver) return "";
     return [
       `السلام عليكم ${driver.full_name || driver.name || "مندوبنا الكريم"}،`,
-      `ملخص طلبيات DAY NIGHT المسندة لك للفترة ${dateFrom || "—"} إلى ${dateTo || "—"}:`,
+      `ملخص طلبيات DAY NIGHT المسندة لك للفترة ${period.from || "—"} إلى ${period.to || "—"}:`,
       `إجمالي الطلبيات: ${visibleOrders.length}`,
       `قيد التنفيذ: ${activeOrders.length}`,
       `تم التسليم: ${deliveredOrders.length}`,
@@ -234,7 +244,7 @@ export default function AdminDriverStatementsCenter({
       "",
       "يرجى مراجعة المهام من تطبيق المندوب والتواصل مع مركز العمليات عند وجود أي ملاحظة.",
     ].join("\n");
-  }, [activeOrders.length, cancelledOrders.length, codTotal, dateFrom, dateTo, deliveredOrders.length, driver, returnedOrders.length, visibleOrders.length]);
+  }, [activeOrders.length, cancelledOrders.length, codTotal, deliveredOrders.length, driver, period.from, period.to, returnedOrders.length, visibleOrders.length]);
 
   if (!driver) {
     return (
@@ -352,6 +362,7 @@ export default function AdminDriverStatementsCenter({
       </header>
 
       {message ? <p className="rounded-2xl border border-brand-gold/25 bg-brand-gold/10 px-4 py-3 text-xs font-bold leading-6 text-brand-gold">{message}</p> : null}
+      {period.reversed ? <p className="rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-xs font-black text-amber-100">{isArabic ? `تم تصحيح الفترة تلقائيًا لأن تاريخ البداية كان بعد تاريخ النهاية: ${period.from} → ${period.to}` : `The period was corrected automatically because the start date was after the end date: ${period.from} → ${period.to}`}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Metric label={isArabic ? "إجمالي المسند" : "Assigned"} value={String(visibleOrders.length)} icon={PackageCheck} tone="gold" />
@@ -366,7 +377,7 @@ export default function AdminDriverStatementsCenter({
         <header className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-xl font-black text-white">{visibleOrders.length} {isArabic ? "طلبية مسندة للمندوب" : "assigned driver orders"}</h3>
-            <p className="mt-1 text-xs text-white/45">{dateFrom || "—"} → {dateTo || "—"}</p>
+            <p className="mt-1 text-xs text-white/45" dir="ltr">{period.from || "—"} → {period.to || "—"}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#071a33] px-3 py-2">
