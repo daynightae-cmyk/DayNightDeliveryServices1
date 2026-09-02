@@ -43,24 +43,91 @@ export function orderStatementPhone(order: Order) {
 
 export function orderStatementArea(order: Order, isArabic: boolean) {
   const row = order as Order & Record<string, unknown>;
-  const arabic = [
+
+  // Match the proven Driver Statements behavior first: prefer the real
+  // delivery area, then city, then the stored delivery address. Older DAY
+  // NIGHT orders do not all have a dedicated area column populated, so the
+  // address fallback is required instead of printing a misleading dash.
+  const arabicDelivery = [
     row.receiver_area_ar,
     row.delivery_area_ar,
-    row.receiver_city_ar,
-    row.delivery_city_ar,
-    row.destination_country_ar,
-  ];
-  const english = [
     row.receiver_area,
     row.delivery_area,
+    row.receiver_city_ar,
+    row.delivery_city_ar,
     row.receiver_city,
     row.delivery_city,
-    row.destination_country,
+    row.receiver_emirate_ar,
+    row.delivery_emirate_ar,
+    row.receiver_emirate,
+    row.delivery_emirate,
+    row.receiver_address_ar,
+    row.delivery_address_ar,
+    row.delivery_street_ar,
+    row.receiver_address,
+    row.delivery_address,
+    row.delivery_street,
+  ];
+  const englishDelivery = [
+    row.receiver_area,
+    row.delivery_area,
+    row.receiver_area_ar,
+    row.delivery_area_ar,
+    row.receiver_city,
+    row.delivery_city,
+    row.receiver_city_ar,
+    row.delivery_city_ar,
+    row.receiver_emirate,
+    row.delivery_emirate,
+    row.receiver_emirate_ar,
+    row.delivery_emirate_ar,
+    row.receiver_address,
+    row.delivery_address,
+    row.delivery_street,
+    row.receiver_address_ar,
+    row.delivery_address_ar,
+    row.delivery_street_ar,
   ];
   const pickupFallback = isArabic
-    ? [row.sender_area_ar, row.pickup_area_ar, row.sender_city_ar, row.pickup_city_ar]
-    : [row.sender_area, row.pickup_area, row.sender_city, row.pickup_city];
-  return clean([...(isArabic ? arabic : english), ...pickupFallback].find((value) => clean(value)) || "—");
+    ? [
+        row.sender_area_ar,
+        row.pickup_area_ar,
+        row.sender_area,
+        row.pickup_area,
+        row.sender_city_ar,
+        row.pickup_city_ar,
+        row.sender_city,
+        row.pickup_city,
+        row.sender_address_ar,
+        row.pickup_address_ar,
+        row.sender_address,
+        row.pickup_address,
+      ]
+    : [
+        row.sender_area,
+        row.pickup_area,
+        row.sender_area_ar,
+        row.pickup_area_ar,
+        row.sender_city,
+        row.pickup_city,
+        row.sender_city_ar,
+        row.pickup_city_ar,
+        row.sender_address,
+        row.pickup_address,
+        row.sender_address_ar,
+        row.pickup_address_ar,
+      ];
+  const internationalFallback = isArabic
+    ? [row.destination_country_ar, row.destination_country]
+    : [row.destination_country, row.destination_country_ar];
+
+  return clean(
+    [
+      ...(isArabic ? arabicDelivery : englishDelivery),
+      ...pickupFallback,
+      ...internationalFallback,
+    ].find((value) => clean(value)) || "—",
+  );
 }
 
 export function orderStatementPrice(order: Order) {
