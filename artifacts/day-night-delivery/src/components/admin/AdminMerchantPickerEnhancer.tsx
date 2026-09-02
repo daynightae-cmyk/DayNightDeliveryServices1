@@ -6,6 +6,12 @@ const OWNER_SELECTOR = 'select[data-admin-order-owner-select="true"]';
 
 type OptionModel = { value: string; label: string; disabled: boolean };
 type Anchor = { top: number; left: number; width: number; height: number };
+type OptionPresentation = {
+  title: string;
+  secondary: string;
+  tertiary: string;
+  personal: boolean;
+};
 
 function readOptions(select: HTMLSelectElement | null): OptionModel[] {
   if (!select) return [];
@@ -21,6 +27,44 @@ function anchorFor(select: HTMLSelectElement | null): Anchor | null {
   const rect = select.getBoundingClientRect();
   if (!rect.width || !rect.height) return null;
   return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+}
+
+function uniqueParts(label: string) {
+  const seen = new Set<string>();
+  return label
+    .split(/\s+—\s+/)
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const key = part.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function optionPresentation(option: OptionModel | null): OptionPresentation {
+  if (!option) return { title: "", secondary: "", tertiary: "", personal: false };
+  const personal = option.value.includes("personal_order");
+  if (personal) {
+    return {
+      title: option.label,
+      secondary: "",
+      tertiary: "",
+      personal: true,
+    };
+  }
+
+  // Native production options intentionally contain owner/store/code in one
+  // string for browser compatibility. Split that string visually so Arabic
+  // RTL rendering cannot scramble the names with em-dashes and codes.
+  const parts = uniqueParts(option.label);
+  return {
+    title: parts[0] || option.label,
+    secondary: parts[1] || "",
+    tertiary: parts.slice(2).join(" · "),
+    personal: false,
+  };
 }
 
 export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: boolean }) {
@@ -98,6 +142,7 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
   }, [select]);
 
   const selected = options.find((option) => option.value === value) || null;
+  const selectedPresentation = optionPresentation(selected);
   const visibleOptions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     return options.filter((option) => {
@@ -118,7 +163,6 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
     setQuery("");
   }
 
-  const personalSelected = selected?.value.includes("personal_order");
   const triggerStyle = {
     position: "fixed" as const,
     top: anchor.top,
@@ -138,11 +182,18 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
         aria-expanded={open}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand-gold/25 bg-brand-gold/10 text-brand-gold">
-          {personalSelected ? <UserRound className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+          {selectedPresentation.personal ? <UserRound className="h-4 w-4" /> : <Store className="h-4 w-4" />}
         </span>
         <span className="min-w-0 flex-1">
           <small className="block text-[9px] font-black text-brand-gold/80">{isArabic ? "التاجر / نوع الطلب" : "MERCHANT / ORDER TYPE"}</small>
-          <strong className="mt-0.5 block truncate text-sm font-black text-white">{selected?.label || (isArabic ? "اختر التاجر" : "Select merchant")}</strong>
+          <strong className="mt-0.5 block truncate text-sm font-black text-white" dir="auto">
+            {selectedPresentation.title || (isArabic ? "اختر التاجر" : "Select merchant")}
+          </strong>
+          {selectedPresentation.secondary && (
+            <small className="mt-0.5 block truncate text-[10px] font-bold text-white/45" dir="auto">
+              {selectedPresentation.secondary}{selectedPresentation.tertiary ? ` · ${selectedPresentation.tertiary}` : ""}
+            </small>
+          )}
         </span>
         <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition ${open ? "rotate-180 text-brand-gold" : ""}`} />
       </button>
@@ -165,7 +216,7 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
             <div className="max-h-[330px] space-y-2 overflow-y-auto p-3 [scrollbar-width:thin]">
               {visibleOptions.map((option) => {
                 const active = option.value === value;
-                const personal = option.value.includes("personal_order");
+                const presentation = optionPresentation(option);
                 return (
                   <button
                     type="button"
@@ -173,8 +224,31 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
                     onClick={() => choose(option.value)}
                     className={`group flex w-full items-center gap-3 rounded-xl border p-3 text-start transition duration-150 ${active ? "border-brand-gold/75 bg-brand-gold/15 shadow-[inset_0_0_0_1px_rgba(212,175,55,.16),0_0_26px_rgba(212,175,55,.18)]" : "border-white/10 bg-white/[.035] hover:-translate-y-px hover:border-brand-gold/65 hover:bg-brand-gold/10 hover:shadow-[0_0_28px_rgba(212,175,55,.16)] focus:border-brand-gold/70 focus:bg-brand-gold/10 focus:outline-none"}`}
                   >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-brand-gold group-hover:border-brand-gold/35">{personal ? <UserRound className="h-4 w-4" /> : <Store className="h-4 w-4" />}</span>
-                    <span className="min-w-0 flex-1"><strong className="block text-xs font-black leading-5 text-white">{option.label}</strong><small className="mt-1 block text-[9px] font-bold text-white/35">{personal ? (isArabic ? "طلب مستقل عن حسابات التجار" : "Independent from merchant accounting") : (isArabic ? "اضغط لاختيار هذا التاجر" : "Click to select this merchant")}</small></span>
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-brand-gold group-hover:border-brand-gold/35">
+                      {presentation.personal ? <UserRound className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-sm font-black leading-5 text-white" dir="auto">{presentation.title}</strong>
+                      {presentation.personal ? (
+                        <small className="mt-1 block text-[10px] font-bold text-white/40">{isArabic ? "طلب مستقل عن حسابات التجار" : "Independent from merchant accounting"}</small>
+                      ) : (
+                        <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-bold text-white/45">
+                          {presentation.secondary && (
+                            <span className="max-w-full truncate rounded-lg border border-white/10 bg-white/[.04] px-2 py-1" dir="auto">
+                              {isArabic ? "المتجر" : "Store"}: {presentation.secondary}
+                            </span>
+                          )}
+                          {presentation.tertiary && (
+                            <span className="max-w-full truncate rounded-lg border border-brand-gold/20 bg-brand-gold/[.06] px-2 py-1 text-brand-gold/80" dir="auto">
+                              {isArabic ? "الكود" : "Code"}: {presentation.tertiary}
+                            </span>
+                          )}
+                          {!presentation.secondary && !presentation.tertiary && (
+                            <span>{isArabic ? "اضغط لاختيار هذا التاجر" : "Click to select this merchant"}</span>
+                          )}
+                        </span>
+                      )}
+                    </span>
                     {active && <Check className="h-4 w-4 shrink-0 text-brand-gold" />}
                   </button>
                 );
