@@ -64,7 +64,7 @@ export function orderStatementArea(order: Order, isArabic: boolean) {
 }
 
 export function orderStatementPrice(order: Order) {
-  const candidates = [
+  const candidates: unknown[] = [
     order.customer_total,
     order.total_amount,
     order.total_price,
@@ -74,7 +74,8 @@ export function orderStatementPrice(order: Order) {
     order.delivery_price,
   ];
   for (const candidate of candidates) {
-    if (candidate === null || candidate === undefined || candidate === "") continue;
+    const text = clean(candidate);
+    if (!text) continue;
     const parsed = Number(candidate);
     if (Number.isFinite(parsed)) return parsed;
   }
