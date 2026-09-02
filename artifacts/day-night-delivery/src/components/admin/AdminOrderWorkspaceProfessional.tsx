@@ -32,6 +32,15 @@ import {
   normalizeAdminKey,
   normalizeOrderStatus,
 } from "../../lib/adminOrderLogic";
+import {
+  buildAdminMerchantLookup,
+  orderStatementArea,
+  orderStatementCoupon,
+  orderStatementCustomer,
+  orderStatementMerchant,
+  orderStatementPhone,
+  orderStatementPrice,
+} from "../../lib/adminOrderStatement";
 import { financialsFromOrder } from "../../lib/orderFinancials";
 import {
   localizedOrderDestination,
@@ -70,6 +79,7 @@ type ExtendedOrder = Order & {
 type SortMode = "newest" | "oldest" | "tracking" | "amount_desc";
 
 const REGISTER_PAGE_SIZE = 50;
+const SEARCH_CARD_LIMIT = 6;
 const ORDER_STATUS_OPTIONS = [
   ["pending", "قيد الانتظار", "Pending"],
   ["review", "قيد المراجعة", "Under review"],
@@ -161,33 +171,19 @@ function OrderMetric({
   return (
     <article className={`dn-order-pro-metric dn-order-pro-metric--${tone}`}>
       <span className="dn-order-pro-metric-icon"><Icon /></span>
-      <div>
-        <small>{label}</small>
-        <strong dir="ltr">{value}</strong>
-        <em>{hint}</em>
-      </div>
+      <div><small>{label}</small><strong dir="ltr">{value}</strong><em>{hint}</em></div>
     </article>
   );
 }
 
 type OrderEditorHandle = { open: (order: Order) => void; close: () => void };
-
-const IsolatedOrderEditor = forwardRef<
-  OrderEditorHandle,
-  { merchants: Merchant[]; isArabic: boolean }
->(function IsolatedOrderEditor({ merchants, isArabic }, ref) {
-  const [order, setOrder] = useState<Order | null>(null);
-  useImperativeHandle(ref, () => ({ open: setOrder, close: () => setOrder(null) }), []);
-  return (
-    <AdminOrderEditModal
-      order={order}
-      merchants={merchants}
-      isArabic={isArabic}
-      open={Boolean(order)}
-      onClose={() => setOrder(null)}
-    />
-  );
-});
+const IsolatedOrderEditor = forwardRef<OrderEditorHandle, { merchants: Merchant[]; isArabic: boolean }>(
+  function IsolatedOrderEditor({ merchants, isArabic }, ref) {
+    const [order, setOrder] = useState<Order | null>(null);
+    useImperativeHandle(ref, () => ({ open: setOrder, close: () => setOrder(null) }), []);
+    return <AdminOrderEditModal order={order} merchants={merchants} isArabic={isArabic} open={Boolean(order)} onClose={() => setOrder(null)} />;
+  },
+);
 
 export default function AdminOrderWorkspaceProfessional({
   id,
@@ -220,35 +216,21 @@ export default function AdminOrderWorkspaceProfessional({
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    setQuery("");
-    setDateFrom("");
-    setDateTo("");
-    setStatusFilter("all");
-    setSortMode("newest");
-    setPage(0);
-    setSelected([]);
-    setStatusDrafts({});
-    setStatusBusy("");
-    setNotice("");
-    editorRef.current?.close();
-    setDeleteOrder(null);
-    setAssignOrder(null);
+    setQuery(""); setDateFrom(""); setDateTo(""); setStatusFilter("all"); setSortMode("newest");
+    setPage(0); setSelected([]); setStatusDrafts({}); setStatusBusy(""); setNotice("");
+    editorRef.current?.close(); setDeleteOrder(null); setAssignOrder(null);
   }, [id]);
 
+  const merchantLookup = useMemo(() => buildAdminMerchantLookup(merchants), [merchants]);
   const sourceOrders = allOrders ?? orders;
   const liveOrders = useMemo(
-    () =>
-      sourceOrders.map((order) => {
-        const override = statusOverrides[rowKey(order)];
-        return override && canonicalStatus(order.status) !== override ? { ...order, status: override } : order;
-      }),
+    () => sourceOrders.map((order) => {
+      const override = statusOverrides[rowKey(order)];
+      return override && canonicalStatus(order.status) !== override ? { ...order, status: override } : order;
+    }),
     [sourceOrders, statusOverrides],
   );
-
-  const sectionRows = useMemo(
-    () => liveOrders.filter((order) => matchesAdminSection(order, id)),
-    [id, liveOrders],
-  );
+  const sectionRows = useMemo(() => liveOrders.filter((order) => matchesAdminSection(order, id)), [id, liveOrders]);
 
   const visibleRows = useMemo(() => {
     const normalizedQuery = cleanAdminText(query);
@@ -266,64 +248,34 @@ export default function AdminOrderWorkspaceProfessional({
       const rightTime = new Date(right.created_at || right.updated_at || 0).getTime();
       return sortMode === "oldest" ? leftTime - rightTime : rightTime - leftTime;
     });
-  }, [dateFrom, dateTo, id, isArabic, query, searchManaged, sectionRows, sortMode, statusFilter]);
+  }, [dateFrom, dateTo, isArabic, query, searchManaged, sectionRows, sortMode, statusFilter]);
 
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / REGISTER_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
-  const pageRows = useMemo(
-    () => visibleRows.slice(safePage * REGISTER_PAGE_SIZE, (safePage + 1) * REGISTER_PAGE_SIZE),
-    [safePage, visibleRows],
-  );
-
-  useEffect(() => {
-    if (page !== safePage) setPage(safePage);
-  }, [page, safePage]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [dateFrom, dateTo, query, sortMode, statusFilter]);
-
+  const pageRows = useMemo(() => visibleRows.slice(safePage * REGISTER_PAGE_SIZE, (safePage + 1) * REGISTER_PAGE_SIZE), [safePage, visibleRows]);
+  useEffect(() => { if (page !== safePage) setPage(safePage); }, [page, safePage]);
+  useEffect(() => { setPage(0); }, [dateFrom, dateTo, query, sortMode, statusFilter]);
   useEffect(() => {
     const visible = new Set(visibleRows.map(rowKey));
     setSelected((current) => current.filter((key) => visible.has(key)));
   }, [visibleRows]);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const selectedRows = useMemo(
-    () => visibleRows.filter((order) => selectedSet.has(rowKey(order))),
-    [selectedSet, visibleRows],
-  );
+  const selectedRows = useMemo(() => visibleRows.filter((order) => selectedSet.has(rowKey(order))), [selectedSet, visibleRows]);
   const exportRows = selectedRows.length ? selectedRows : visibleRows;
   const allPageSelected = pageRows.length > 0 && pageRows.every((order) => selectedSet.has(rowKey(order)));
 
-  const sectionTotals = useMemo(() => {
-    return sectionRows.reduce(
-      (acc, order) => {
-        const financial = financialsFromOrder(order as Order & Record<string, unknown>);
-        acc.customer += financial.customerTotal;
-        acc.company += financial.companyRevenue;
-        acc.cod += Number(order.cod_amount || 0);
-        if (canonicalStatus(order.status) === "delivered") acc.delivered += 1;
-        if (["assigned", "picked_up", "in_transit", "confirmed"].includes(canonicalStatus(order.status))) acc.active += 1;
-        return acc;
-      },
-      { customer: 0, company: 0, cod: 0, delivered: 0, active: 0 },
-    );
-  }, [sectionRows]);
+  const sectionTotals = useMemo(() => sectionRows.reduce((acc, order) => {
+    const financial = financialsFromOrder(order as Order & Record<string, unknown>);
+    acc.customer += financial.customerTotal;
+    acc.company += financial.companyRevenue;
+    acc.cod += Number(order.cod_amount || 0);
+    if (canonicalStatus(order.status) === "delivered") acc.delivered += 1;
+    if (["assigned", "picked_up", "in_transit", "confirmed"].includes(canonicalStatus(order.status))) acc.active += 1;
+    return acc;
+  }, { customer: 0, company: 0, cod: 0, delivered: 0, active: 0 }), [sectionRows]);
 
-  const exportTotals = useMemo(() => {
-    return exportRows.reduce(
-      (acc, order) => {
-        const financial = financialsFromOrder(order as Order & Record<string, unknown>);
-        acc.customer += financial.customerTotal;
-        acc.company += financial.companyRevenue;
-        acc.cod += Number(order.cod_amount || 0);
-        return acc;
-      },
-      { customer: 0, company: 0, cod: 0 },
-    );
-  }, [exportRows]);
-
+  const exportValue = useMemo(() => exportRows.reduce((sum, order) => sum + orderStatementPrice(order), 0), [exportRows]);
   const title = isArabic ? config.titleAr : config.titleEn;
   const subtitle = isArabic ? config.subtitleAr : config.subtitleEn;
   const filterSummary = [
@@ -334,44 +286,34 @@ export default function AdminOrderWorkspaceProfessional({
     selectedRows.length ? `${isArabic ? "محدد" : "Selected"}: ${selectedRows.length}` : "",
   ].filter(Boolean).join(" · ") || (isArabic ? "كل السجلات الظاهرة" : "All visible records");
 
+  // Operational order sections intentionally use the same compact portrait
+  // statement used by Driver Statements. Merchant/accounting statements retain
+  // their own accounting-specific exports and are not routed through this view.
   const pdfPayload: AdminPdfPayload = {
     language: isArabic ? "ar" : "en",
     sectionTitle: `DAY NIGHT · ${title}`,
     filters: filterSummary,
     totals: {
-      [isArabic ? "عدد السجلات" : "Rows"]: exportRows.length,
-      [isArabic ? "إجمالي العميل" : "Customer total"]: money(exportTotals.customer, isArabic),
-      [isArabic ? "إجمالي COD" : "COD total"]: money(exportTotals.cod, isArabic),
-      [isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"]: money(exportTotals.company, isArabic),
+      [isArabic ? "عدد الطلبيات" : "Orders"]: exportRows.length,
+      [isArabic ? "إجمالي قيمة الطلبيات" : "Total order value"]: money(exportValue, isArabic),
     },
     columns: [
-      { key: "tracking", label: isArabic ? "التتبع" : "Tracking" },
-      { key: "date", label: isArabic ? "التاريخ" : "Date" },
-      { key: "coupon", label: isArabic ? "الكوبون" : "Coupon" },
-      { key: "merchant", label: isArabic ? "التاجر / المرسل" : "Merchant / sender" },
-      { key: "recipient", label: isArabic ? "المستلم" : "Recipient" },
-      { key: "route", label: isArabic ? "المسار" : "Route" },
-      { key: "customerTotal", label: isArabic ? "إجمالي العميل" : "Customer total" },
-      { key: "cod", label: "COD" },
-      { key: "status", label: isArabic ? "الحالة" : "Status" },
-      { key: "driver", label: isArabic ? "المندوب" : "Driver" },
+      { key: "coupon", label: isArabic ? "رقم الكوبون" : "Coupon number" },
+      { key: "merchant", label: isArabic ? "اسم التاجر" : "Merchant name" },
+      { key: "customer", label: isArabic ? "اسم العميل" : "Customer name" },
+      { key: "phone", label: isArabic ? "رقم تليفون العميل" : "Customer phone" },
+      { key: "area", label: isArabic ? "المنطقة" : "Area" },
+      { key: "price", label: isArabic ? "سعر الطلبية" : "Order price" },
     ],
-    rows: exportRows.map((order) => {
-      const financial = financialsFromOrder(order as Order & Record<string, unknown>);
-      return {
-        tracking: tracking(order),
-        date: orderDate(order) || "—",
-        coupon: order.coupon_number || "—",
-        merchant: order.merchant_name || order.sender_name || "—",
-        recipient: `${order.receiver_name || order.customer_name || "—"}${order.receiver_phone ? ` · ${order.receiver_phone}` : ""}`,
-        route: route(order, isArabic),
-        customerTotal: money(financial.customerTotal, isArabic),
-        cod: money(order.cod_amount || 0, isArabic),
-        status: statusText(order.status, isArabic),
-        driver: order.driver_name || order.driver_code || "—",
-      };
-    }),
-    orientation: "landscape",
+    rows: exportRows.map((order) => ({
+      coupon: orderStatementCoupon(order),
+      merchant: orderStatementMerchant(order, merchantLookup),
+      customer: orderStatementCustomer(order),
+      phone: orderStatementPhone(order),
+      area: orderStatementArea(order, isArabic),
+      price: money(orderStatementPrice(order), isArabic),
+    })),
+    orientation: "portrait",
   };
 
   async function changeOrderStatus(order: Order) {
@@ -379,24 +321,16 @@ export default function AdminOrderWorkspaceProfessional({
     const current = selectableStatus(order.status);
     const next = selectableStatus(statusDrafts[key] || current);
     if (!order.id || next === current) return;
-    setStatusBusy(key);
-    setNotice("");
+    setStatusBusy(key); setNotice("");
     try {
-      const ok = await updateExistingOrderStatus(
-        order.id,
-        next,
-        isArabic ? `تحديث من سجل ${title}` : `Updated from ${title}`,
-      );
+      const ok = await updateExistingOrderStatus(order.id, next, isArabic ? `تحديث من سجل ${title}` : `Updated from ${title}`);
       if (!ok) throw new Error("status_update_failed");
       setStatusOverrides((previous) => ({ ...previous, [key]: next }));
       playAdminAudioEvent(next === "delivered" ? "success" : "notification");
       addAdminNotification({
-        type: "success",
-        sectionId: id,
-        priority: "low",
+        type: "success", sectionId: id, priority: "low",
         dedupeKey: `order-pro:${order.id}:${next}`,
-        titleAr: "تم تحديث الطلبية",
-        titleEn: "Order updated",
+        titleAr: "تم تحديث الطلبية", titleEn: "Order updated",
         bodyAr: `${tracking(order)} ← ${statusText(next, true)}`,
         bodyEn: `${tracking(order)} → ${statusText(next, false)}`,
       });
@@ -406,16 +340,13 @@ export default function AdminOrderWorkspaceProfessional({
     } catch (cause) {
       console.error(cause);
       setNotice(isArabic ? "تعذر تحديث الحالة. راجع صلاحيات الإدارة واتصال Supabase." : "Could not update status. Check Admin permissions and Supabase connectivity.");
-    } finally {
-      setStatusBusy("");
-    }
+    } finally { setStatusBusy(""); }
   }
 
   function toggleRow(order: Order) {
     const key = rowKey(order);
     setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
   }
-
   function togglePage() {
     const pageKeys = pageRows.map(rowKey);
     setSelected((current) => {
@@ -435,25 +366,19 @@ export default function AdminOrderWorkspaceProfessional({
       <header className="dn-order-pro-hero">
         <div className="dn-order-pro-hero-copy">
           <span className="dn-order-pro-eyebrow"><PackageCheck /> DAY NIGHT ORDER CONTROL</span>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-          {id === "abu_dhabi" && (
-            <span className="dn-order-pro-region-chip"><MapPin />{isArabic ? "أبوظبي · مصفح · خليفة · محمد بن زايد · بني ياس · الشهامة · العين" : "Abu Dhabi · Mussafah · Khalifa · MBZ · Baniyas · Shahama · Al Ain"}</span>
-          )}
+          <h1>{title}</h1><p>{subtitle}</p>
+          {id === "abu_dhabi" && <span className="dn-order-pro-region-chip"><MapPin />{isArabic ? "أبوظبي · مصفح · خليفة · محمد بن زايد · بني ياس · الشهامة · العين" : "Abu Dhabi · Mussafah · Khalifa · MBZ · Baniyas · Shahama · Al Ain"}</span>}
         </div>
         <div className="dn-order-pro-hero-actions">
           <button type="button" onClick={() => void refresh()}><RefreshCw />{isArabic ? "تحديث مباشر" : "Live refresh"}</button>
-          <AdminPdfExportButton
-            payload={pdfPayload}
-            label={selectedRows.length ? (isArabic ? `تصدير المحدد (${selectedRows.length})` : `Export selected (${selectedRows.length})`) : (isArabic ? "تصدير السجل" : "Export register")}
-          />
+          <AdminPdfExportButton payload={pdfPayload} label={selectedRows.length ? (isArabic ? `تصدير المحدد (${selectedRows.length})` : `Export selected (${selectedRows.length})`) : (isArabic ? "تصدير السجل" : "Export register")} />
         </div>
       </header>
 
       <div className="dn-order-pro-metrics">
         <OrderMetric label={isArabic ? "إجمالي القسم" : "Section total"} value={String(sectionRows.length)} hint={isArabic ? "كل السجلات المطابقة" : "All matching records"} icon={PackageCheck} tone="gold" />
         <OrderMetric label={isArabic ? "الظاهر الآن" : "Visible now"} value={String(visibleRows.length)} hint={isArabic ? "بعد البحث والفلاتر" : "After filters"} icon={Filter} tone="sky" />
-        <OrderMetric label={isArabic ? "قيد التنفيذ" : "Active"} value={String(sectionTotals.active)} hint={isArabic ? "تشغيل حي" : "Live workflow"} icon={Truck} tone="normal" />
+        <OrderMetric label={isArabic ? "قيد التنفيذ" : "Active"} value={String(sectionTotals.active)} hint={isArabic ? "تشغيل حي" : "Live workflow"} icon={Truck} />
         <OrderMetric label={isArabic ? "تم التسليم" : "Delivered"} value={String(sectionTotals.delivered)} hint={isArabic ? "داخل هذا القسم" : "In this section"} icon={CheckCircle2} tone="success" />
         <OrderMetric label={isArabic ? "إجمالي COD" : "COD total"} value={money(sectionTotals.cod, isArabic)} hint={isArabic ? "قيمة التحصيل" : "Collection value"} icon={WalletCards} tone="gold" />
         <OrderMetric label={isArabic ? "دخل داي نايت" : "DAY NIGHT revenue"} value={money(sectionTotals.company, isArabic)} hint={isArabic ? "رسوم التوصيل" : "Delivery revenue"} icon={CircleDollarSign} tone="sky" />
@@ -461,9 +386,8 @@ export default function AdminOrderWorkspaceProfessional({
 
       <section className="dn-order-pro-toolbar">
         {!searchManaged && (
-          <label className="dn-order-pro-search">
-            <Search />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "ابحث بالتتبع، الكوبون، الهاتف، التاجر، العنوان، المندوب..." : "Search tracking, coupon, phone, merchant, address, driver..."} />
+          <label className="dn-order-pro-search"><Search />
+            <input data-admin-order-search="true" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isArabic ? "ابحث بالتتبع، الكوبون، الهاتف، التاجر، العنوان، المندوب..." : "Search tracking, coupon, phone, merchant, address, driver..."} />
           </label>
         )}
         <label><span><CalendarDays />{isArabic ? "من" : "From"}</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
@@ -473,85 +397,81 @@ export default function AdminOrderWorkspaceProfessional({
         {hasFilters && <button type="button" className="dn-order-pro-clear" onClick={() => { setQuery(""); setDateFrom(""); setDateTo(""); setStatusFilter("all"); }}><XCircle />{isArabic ? "مسح الفلاتر" : "Clear filters"}</button>}
       </section>
 
+      {!searchManaged && query.trim() && visibleRows.length > 0 && (
+        <section className="mt-4 rounded-[1.6rem] border border-brand-gold/25 bg-[linear-gradient(135deg,rgba(212,175,55,.08),rgba(3,18,38,.96)_38%,rgba(11,95,255,.08))] p-4 shadow-[0_22px_60px_rgba(0,0,0,.22)]" data-admin-order-search-cards="true">
+          <header className="mb-3 flex items-center justify-between gap-3">
+            <div><span className="text-[10px] font-black text-brand-gold">{isArabic ? "نتائج البحث المباشرة" : "LIVE SEARCH RESULTS"}</span><h3 className="mt-1 text-lg font-black text-white">{visibleRows.length} {isArabic ? "طلبية مطابقة" : "matching orders"}</h3></div>
+            <Search className="h-5 w-5 text-brand-sky" />
+          </header>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {visibleRows.slice(0, SEARCH_CARD_LIMIT).map((order) => (
+              <article key={`search:${rowKey(order)}`} className="group rounded-[1.25rem] border border-white/10 bg-[#06172c]/90 p-4 transition duration-200 hover:-translate-y-0.5 hover:border-brand-gold/55 hover:bg-brand-gold/[.07] hover:shadow-[0_0_32px_rgba(212,175,55,.14)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><small className="text-[9px] font-black text-white/35">{isArabic ? "رقم الكوبون" : "Coupon"}</small><strong className="block truncate text-base font-black text-brand-gold" dir="ltr">{orderStatementCoupon(order)}</strong></div>
+                  <span className={`dn-order-pro-status dn-order-pro-status--${canonicalStatus(order.status)}`}>{statusText(order.status, isArabic)}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "التاجر" : "Merchant"}</small><b className="mt-1 block truncate text-xs text-white">{orderStatementMerchant(order, merchantLookup)}</b></span>
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "العميل" : "Customer"}</small><b className="mt-1 block truncate text-xs text-white">{orderStatementCustomer(order)}</b></span>
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "الهاتف" : "Phone"}</small><b className="mt-1 block truncate text-xs text-white" dir="ltr">{orderStatementPhone(order)}</b></span>
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "المنطقة" : "Area"}</small><b className="mt-1 block truncate text-xs text-white">{orderStatementArea(order, isArabic)}</b></span>
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "سعر الطلبية" : "Order price"}</small><b className="mt-1 block text-xs text-brand-gold" dir="ltr">{money(orderStatementPrice(order), isArabic)}</b></span>
+                  <span><small className="block text-[9px] font-bold text-white/35">{isArabic ? "التتبع" : "Tracking"}</small><b className="mt-1 block truncate text-[10px] text-brand-sky" dir="ltr">{tracking(order)}</b></span>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/8 pt-3">
+                  <button type="button" onClick={() => editorRef.current?.open(order)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black text-white hover:border-brand-gold/40 hover:text-brand-gold"><Pencil className="h-3.5 w-3.5" />{isArabic ? "فتح الطلبية" : "Open order"}</button>
+                  <a href={`/tracking?code=${encodeURIComponent(tracking(order))}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-brand-sky/25 bg-brand-sky/10 px-3 py-2 text-[10px] font-black text-brand-sky"><ExternalLink className="h-3.5 w-3.5" />{isArabic ? "تتبع" : "Track"}</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {notice && <p className="dn-order-pro-notice">{notice}</p>}
 
       <section className="dn-order-pro-register">
         <header className="dn-order-pro-register-head">
-          <div>
-            <span>{isArabic ? "سجل الطلبيات التشغيلي" : "Operational orders register"}</span>
-            <h2>{visibleRows.length} {isArabic ? "طلبية مرتبة" : "organized orders"}</h2>
-          </div>
+          <div><span>{isArabic ? "سجل الطلبيات التشغيلي" : "Operational orders register"}</span><h2>{visibleRows.length} {isArabic ? "طلبية مرتبة" : "organized orders"}</h2></div>
           <div className="dn-order-pro-selection-actions">
-            <button type="button" onClick={togglePage} disabled={!pageRows.length}>
-              <span className={`dn-order-pro-check ${allPageSelected ? "is-checked" : ""}`}>{allPageSelected ? "✓" : ""}</span>
-              {allPageSelected ? (isArabic ? "إلغاء تحديد الصفحة" : "Clear page") : (isArabic ? "تحديد هذه الصفحة" : "Select this page")}
-            </button>
+            <button type="button" onClick={togglePage} disabled={!pageRows.length}><span className={`dn-order-pro-check ${allPageSelected ? "is-checked" : ""}`}>{allPageSelected ? "✓" : ""}</span>{allPageSelected ? (isArabic ? "إلغاء تحديد الصفحة" : "Clear page") : (isArabic ? "تحديد هذه الصفحة" : "Select this page")}</button>
             {selectedRows.length > 0 && <button type="button" onClick={() => setSelected([])}>{isArabic ? "إلغاء التحديد" : "Clear selection"}</button>}
           </div>
         </header>
-
         <div className="dn-order-pro-table-wrap">
           <table className="dn-order-pro-table">
-            <thead>
-              <tr>
-                <th className="dn-order-pro-select-cell">✓</th>
-                <th>{isArabic ? "الطلب" : "Order"}</th>
-                <th>{isArabic ? "التاريخ" : "Date"}</th>
-                <th>{isArabic ? "التاجر / المرسل" : "Merchant / sender"}</th>
-                <th>{isArabic ? "المستلم" : "Recipient"}</th>
-                <th>{isArabic ? "المسار" : "Route"}</th>
-                <th>{isArabic ? "الحساب" : "Financials"}</th>
-                <th>{isArabic ? "الحالة" : "Status"}</th>
-                <th>{isArabic ? "المندوب" : "Driver"}</th>
-                <th>{isArabic ? "الإجراءات" : "Actions"}</th>
-                <th>{isArabic ? "تحديث الحالة" : "Status update"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((order) => {
-                const key = rowKey(order);
-                const financial = financialsFromOrder(order as Order & Record<string, unknown>);
-                const selectedRow = selectedSet.has(key);
-                const current = selectableStatus(order.status);
-                const draft = statusDrafts[key] || current;
-                const busy = statusBusy === key;
-                const extended = order as ExtendedOrder;
-                const assigned = extended.assigned_driver_id || extended.driver_id || order.driver_name || order.driver_code;
-                return (
-                  <tr key={key} className={selectedRow ? "is-selected" : ""}>
-                    <td className="dn-order-pro-select-cell"><input type="checkbox" checked={selectedRow} onChange={() => toggleRow(order)} aria-label={`${isArabic ? "تحديد" : "Select"} ${tracking(order)}`} /></td>
-                    <td><strong className="dn-order-pro-track" dir="ltr">{tracking(order)}</strong><small dir="ltr">{order.coupon_number || order.invoice_number || "—"}</small></td>
-                    <td><span dir="ltr">{orderDate(order) || "—"}</span><small>{order.service_type || order.order_type || "—"}</small></td>
-                    <td><strong>{order.merchant_name || order.sender_name || "—"}</strong><small dir="ltr">{order.sender_phone || order.merchant_code || "—"}</small></td>
-                    <td><strong>{order.receiver_name || order.customer_name || "—"}</strong><small dir="ltr">{order.receiver_phone || "—"}</small></td>
-                    <td title={routeTooltip(order, isArabic)}><strong className="dn-order-pro-route">{route(order, isArabic)}</strong><small>{order.receiver_area || order.sender_area || order.destination_country || "—"}</small></td>
-                    <td><div className="dn-order-pro-money"><span>{isArabic ? "العميل" : "Total"}<b dir="ltr">{money(financial.customerTotal, isArabic)}</b></span><span>{isArabic ? "التوصيل" : "Delivery"}<b dir="ltr">{money(financial.deliveryFee, isArabic)}</b></span><span>COD<b dir="ltr">{money(order.cod_amount || 0, isArabic)}</b></span></div></td>
-                    <td><span className={`dn-order-pro-status dn-order-pro-status--${canonicalStatus(order.status)}`}>{statusText(order.status, isArabic)}</span></td>
-                    <td><span className="dn-order-pro-driver"><UserRound />{order.driver_name || order.driver_code || (assigned ? (isArabic ? "مسند" : "Assigned") : (isArabic ? "غير مسند" : "Unassigned"))}</span></td>
-                    <td><div className="dn-order-pro-row-actions"><button type="button" onClick={() => editorRef.current?.open(order)} title={isArabic ? "تعديل" : "Edit"}><Pencil /></button><button type="button" onClick={() => setAssignOrder(order)} title={isArabic ? "إسناد مندوب" : "Assign driver"}><Truck /></button><a href={`/tracking?code=${encodeURIComponent(tracking(order))}`} target="_blank" rel="noreferrer" title={isArabic ? "متابعة" : "Track"}><ExternalLink /></a><button type="button" className="danger" onClick={() => setDeleteOrder(order)} title={isArabic ? "حذف" : "Delete"}><Trash2 /></button></div></td>
-                    <td><div className="dn-order-pro-status-editor"><select value={draft} onChange={(event) => setStatusDrafts((currentDrafts) => ({ ...currentDrafts, [key]: event.target.value }))} disabled={busy}>{ORDER_STATUS_OPTIONS.map(([value, ar, en]) => <option key={value} value={value}>{isArabic ? ar : en}</option>)}</select><button type="button" disabled={busy || draft === current} onClick={() => void changeOrderStatus(order)}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{isArabic ? "حفظ" : "Save"}</button></div></td>
-                  </tr>
-                );
-              })}
-            </tbody>
+            <thead><tr><th className="dn-order-pro-select-cell">✓</th><th>{isArabic ? "الطلب" : "Order"}</th><th>{isArabic ? "التاريخ" : "Date"}</th><th>{isArabic ? "التاجر / المرسل" : "Merchant / sender"}</th><th>{isArabic ? "المستلم" : "Recipient"}</th><th>{isArabic ? "المسار" : "Route"}</th><th>{isArabic ? "الحساب" : "Financials"}</th><th>{isArabic ? "الحالة" : "Status"}</th><th>{isArabic ? "المندوب" : "Driver"}</th><th>{isArabic ? "الإجراءات" : "Actions"}</th><th>{isArabic ? "تحديث الحالة" : "Status update"}</th></tr></thead>
+            <tbody>{pageRows.map((order) => {
+              const key = rowKey(order);
+              const financial = financialsFromOrder(order as Order & Record<string, unknown>);
+              const selectedRow = selectedSet.has(key);
+              const current = selectableStatus(order.status);
+              const draft = statusDrafts[key] || current;
+              const busy = statusBusy === key;
+              const extended = order as ExtendedOrder;
+              const assigned = extended.assigned_driver_id || extended.driver_id || order.driver_name || order.driver_code;
+              return <tr key={key} className={selectedRow ? "is-selected" : ""}>
+                <td className="dn-order-pro-select-cell"><input type="checkbox" checked={selectedRow} onChange={() => toggleRow(order)} aria-label={`${isArabic ? "تحديد" : "Select"} ${tracking(order)}`} /></td>
+                <td><strong className="dn-order-pro-track" dir="ltr">{tracking(order)}</strong><small dir="ltr">{orderStatementCoupon(order)}</small></td>
+                <td><span dir="ltr">{orderDate(order) || "—"}</span><small>{order.service_type || order.order_type || "—"}</small></td>
+                <td><strong>{orderStatementMerchant(order, merchantLookup)}</strong><small dir="ltr">{order.sender_phone || order.merchant_code || "—"}</small></td>
+                <td><strong>{orderStatementCustomer(order)}</strong><small dir="ltr">{orderStatementPhone(order)}</small></td>
+                <td title={routeTooltip(order, isArabic)}><strong className="dn-order-pro-route">{route(order, isArabic)}</strong><small>{orderStatementArea(order, isArabic)}</small></td>
+                <td><div className="dn-order-pro-money"><span>{isArabic ? "العميل" : "Total"}<b dir="ltr">{money(financial.customerTotal, isArabic)}</b></span><span>{isArabic ? "التوصيل" : "Delivery"}<b dir="ltr">{money(financial.deliveryFee, isArabic)}</b></span><span>COD<b dir="ltr">{money(order.cod_amount || 0, isArabic)}</b></span></div></td>
+                <td><span className={`dn-order-pro-status dn-order-pro-status--${canonicalStatus(order.status)}`}>{statusText(order.status, isArabic)}</span></td>
+                <td><span className="dn-order-pro-driver"><UserRound />{order.driver_name || order.driver_code || (assigned ? (isArabic ? "مسند" : "Assigned") : (isArabic ? "غير مسند" : "Unassigned"))}</span></td>
+                <td><div className="dn-order-pro-row-actions"><button type="button" onClick={() => editorRef.current?.open(order)} title={isArabic ? "تعديل" : "Edit"}><Pencil /></button><button type="button" onClick={() => setAssignOrder(order)} title={isArabic ? "إسناد مندوب" : "Assign driver"}><Truck /></button><a href={`/tracking?code=${encodeURIComponent(tracking(order))}`} target="_blank" rel="noreferrer" title={isArabic ? "متابعة" : "Track"}><ExternalLink /></a><button type="button" className="danger" onClick={() => setDeleteOrder(order)} title={isArabic ? "حذف" : "Delete"}><Trash2 /></button></div></td>
+                <td><div className="dn-order-pro-status-editor"><select value={draft} onChange={(event) => setStatusDrafts((currentDrafts) => ({ ...currentDrafts, [key]: event.target.value }))} disabled={busy}>{ORDER_STATUS_OPTIONS.map(([value, ar, en]) => <option key={value} value={value}>{isArabic ? ar : en}</option>)}</select><button type="button" disabled={busy || draft === current} onClick={() => void changeOrderStatus(order)}>{busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{isArabic ? "حفظ" : "Save"}</button></div></td>
+              </tr>;
+            })}</tbody>
           </table>
           {!visibleRows.length && <div className="dn-order-pro-empty"><PackageCheck /><strong>{isArabic ? "لا توجد طلبيات مطابقة" : "No matching orders"}</strong><p>{id === "abu_dhabi" ? (isArabic ? "تم فحص المدينة والإمارة والمنطقة والعنوان والبيانات العربية. غيّر الفترة أو البحث إذا لزم." : "City, emirate, area, address, and Arabic location fields were checked. Adjust filters if needed.") : (isArabic ? "غيّر البحث أو الفلاتر، أو حدّث البيانات مباشرة." : "Change the filters or refresh live data.")}</p><button type="button" onClick={() => void refresh()}><RefreshCw />{isArabic ? "تحديث" : "Refresh"}</button></div>}
         </div>
-
-        {visibleRows.length > REGISTER_PAGE_SIZE && (
-          <div className="dn-admin-order-pagination" dir={isArabic ? "rtl" : "ltr"}>
-            <span>{isArabic ? "عرض" : "Showing"} {rangeStart}–{rangeEnd} / {visibleRows.length}</span>
-            <div>
-              <button type="button" disabled={safePage === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{isArabic ? "السابق" : "Previous"}</button>
-              <strong>{safePage + 1} / {pageCount}</strong>
-              <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}>{isArabic ? "التالي" : "Next"}</button>
-            </div>
-          </div>
-        )}
+        {visibleRows.length > REGISTER_PAGE_SIZE && <div className="dn-admin-order-pagination" dir={isArabic ? "rtl" : "ltr"}><span>{isArabic ? "عرض" : "Showing"} {rangeStart}–{rangeEnd} / {visibleRows.length}</span><div><button type="button" disabled={safePage === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{isArabic ? "السابق" : "Previous"}</button><strong>{safePage + 1} / {pageCount}</strong><button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}>{isArabic ? "التالي" : "Next"}</button></div></div>}
       </section>
 
       <aside className={`dn-order-pro-export-bar ${selectedRows.length ? "has-selection" : ""}`}>
-        <div><strong>{selectedRows.length ? `${selectedRows.length} ${isArabic ? "طلبية محددة" : "orders selected"}` : `${visibleRows.length} ${isArabic ? "طلبية ظاهرة" : "orders visible"}`}</strong><span>{isArabic ? "PDF · CSV · Word — نفس السجلات بالضبط بدون قص صامت" : "PDF · CSV · Word — exactly these records, with no silent row truncation"}</span></div>
+        <div><strong>{selectedRows.length ? `${selectedRows.length} ${isArabic ? "طلبية محددة" : "orders selected"}` : `${visibleRows.length} ${isArabic ? "طلبية ظاهرة" : "orders visible"}`}</strong><span>{isArabic ? "PDF · CSV · Word — رقم الكوبون، التاجر، العميل، الهاتف، المنطقة، سعر الطلبية" : "PDF · CSV · Word — coupon, merchant, customer, phone, area, order price"}</span></div>
         <AdminPdfExportButton payload={pdfPayload} label={selectedRows.length ? (isArabic ? "تصدير الطلبيات المحددة" : "Export selected orders") : (isArabic ? "تصدير الطلبيات الظاهرة" : "Export visible orders")} />
       </aside>
 
