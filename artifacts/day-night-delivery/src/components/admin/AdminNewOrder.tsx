@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { useAppContext } from "../../lib/AppContext";
+import "../../styles/dn-admin-new-order-spacing.css";
 import AdminMerchantPickerEnhancer from "./AdminMerchantPickerEnhancer";
 import AdminNewOrderCouponGuard from "./AdminNewOrderCouponGuard";
 
