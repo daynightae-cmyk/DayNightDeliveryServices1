@@ -85,21 +85,42 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
           const rect = node.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
         }) || candidates[0] || null;
+
         setSelect((current) => current === next ? current : next);
         setAnchor(anchorFor(next));
         setOptions(readOptions(next));
         setValue(next?.value || "");
       });
     };
+
     sync();
+
+    // React updates a controlled <select> through the DOM value property.
+    // Property writes do not reliably create MutationObserver records, which
+    // previously allowed the visual enhancer to fall back to an empty label
+    // even though the real merchant selection was still set. Listen to native
+    // value events and also run a very small safety sync while this form exists.
     const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["value", "class", "style"] });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["value", "selected", "class", "style"],
+    });
+    const poll = window.setInterval(sync, 250);
+
+    document.addEventListener("input", sync, true);
+    document.addEventListener("change", sync, true);
     window.addEventListener("resize", sync);
     window.addEventListener("scroll", sync, true);
     window.addEventListener("dn-admin-order-owner-picker-sync", sync);
+
     return () => {
       cancelAnimationFrame(frame);
+      window.clearInterval(poll);
       observer.disconnect();
+      document.removeEventListener("input", sync, true);
+      document.removeEventListener("change", sync, true);
       window.removeEventListener("resize", sync);
       window.removeEventListener("scroll", sync, true);
       window.removeEventListener("dn-admin-order-owner-picker-sync", sync);
@@ -108,14 +129,19 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
 
   useEffect(() => {
     if (!select) return;
-    const onChange = () => {
+    const onValueChange = () => {
       setValue(select.value);
       setOptions(readOptions(select));
+      setAnchor(anchorFor(select));
       setOpen(false);
       setQuery("");
     };
-    select.addEventListener("change", onChange);
-    return () => select.removeEventListener("change", onChange);
+    select.addEventListener("input", onValueChange);
+    select.addEventListener("change", onValueChange);
+    return () => {
+      select.removeEventListener("input", onValueChange);
+      select.removeEventListener("change", onValueChange);
+    };
   }, [select]);
 
   useEffect(() => {
@@ -141,7 +167,15 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
     };
   }, [select]);
 
-  const selected = options.find((option) => option.value === value) || null;
+  const selected =
+    options.find((option) => option.value === value) ||
+    (value
+      ? {
+          value,
+          label: select?.selectedOptions?.[0]?.textContent?.trim() || value,
+          disabled: false,
+        }
+      : null);
   const selectedPresentation = optionPresentation(selected);
   const visibleOptions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -157,10 +191,22 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
     if (!select) return;
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     setter?.call(select, nextValue);
+
+    // Keep both the native select and the React-controlled form in sync.
+    // The immediate local state prevents any visual blanking while React
+    // commits the controlled value; the next animation frame verifies it.
+    select.dispatchEvent(new Event("input", { bubbles: true }));
     select.dispatchEvent(new Event("change", { bubbles: true }));
     setValue(nextValue);
+    setOptions(readOptions(select));
     setOpen(false);
     setQuery("");
+
+    requestAnimationFrame(() => {
+      setValue(select.value || nextValue);
+      setOptions(readOptions(select));
+      setAnchor(anchorFor(select));
+    });
   }
 
   const triggerStyle = {
@@ -180,6 +226,7 @@ export default function AdminMerchantPickerEnhancer({ isArabic }: { isArabic: bo
         onClick={() => setOpen((current) => !current)}
         className="pointer-events-auto group flex items-center gap-3 rounded-2xl border border-brand-gold/35 bg-[#071a33]/[0.985] px-4 py-3 text-start shadow-[0_14px_40px_rgba(0,0,0,.32),0_0_24px_rgba(212,175,55,.08)] backdrop-blur-xl transition hover:border-brand-gold/70 hover:bg-[#0b2444] hover:shadow-[0_16px_48px_rgba(0,0,0,.36),0_0_30px_rgba(212,175,55,.18)] focus:outline-none focus:ring-2 focus:ring-brand-gold/30"
         aria-expanded={open}
+        data-selected-value={value}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand-gold/25 bg-brand-gold/10 text-brand-gold">
           {selectedPresentation.personal ? <UserRound className="h-4 w-4" /> : <Store className="h-4 w-4" />}
