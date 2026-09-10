@@ -1,0 +1,17 @@
+/*
+ * Admin New Order — merchant picker / coupon spacing
+ * Keep the coupon field visually separated from the merchant selector.
+ * The merchant picker enhancer is rendered as a fixed overlay on top of the
+ * native select, so the spacing belongs on the coupon field itself.
+ */
+
+[data-admin-new-order-form="merchant"] [data-admin-next-order-focus="true"] {
+  display: block;
+  margin-top: 1.75rem !important;
+}
+
+@media (max-width: 767px) {
+  [data-admin-new-order-form="merchant"] [data-admin-next-order-focus="true"] {
+    margin-top: 1.25rem !important;
+  }
+}
