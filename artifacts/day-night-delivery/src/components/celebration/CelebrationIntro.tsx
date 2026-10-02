@@ -35,7 +35,7 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
         <h2 className="kb-name">خليفة</h2>
       </div>
       <div className="kb-hero-caption"><p>ظبي الإمارات الصغير</p><p className="kb-crown">ولي عهد <span dir="ltr">Day Night</span></p><span className="kb-first" dir="ltr">FIRST BIRTHDAY</span></div>
-    </> : <h2 className="kb-story">{moment.text}</h2>}
+    </> : <h2 className="kb-story kb-story-animated">{moment.text}</h2>}
     <span className="kb-gold-rule" aria-hidden="true" />
   </div>;
   return <section className="kb-intro" data-kb-moment={m?.kind || "opening"} aria-label="احتفال أول عيد ميلاد لخليفة">
