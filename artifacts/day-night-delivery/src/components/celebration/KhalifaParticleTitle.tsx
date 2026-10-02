@@ -15,7 +15,9 @@ export default function KhalifaParticleTitle({ mobile }: { mobile: boolean }) {
     canvas.width = width * dpr; canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
     const fontSize = mobile ? 112 : Math.min(210, width * .31);
-    const font = `700 ${fontSize}px Cairo, sans-serif`;
+    const heading = canvas.parentElement?.querySelector(".kb-name");
+    const typography = heading ? getComputedStyle(heading) : null;
+    const font = typography ? `${typography.fontWeight} ${typography.fontSize} ${typography.fontFamily}` : `600 ${fontSize}px Cairo, sans-serif`;
     const start = async () => {
       // Bound font readiness so an unavailable external font cannot stall the reveal.
       let fontTimer = 0;
@@ -24,11 +26,18 @@ export default function KhalifaParticleTitle({ mobile }: { mobile: boolean }) {
       if (cancelled) return;
       const mask = document.createElement("canvas"); mask.width = Math.ceil(width); mask.height = Math.ceil(height);
       const mc = mask.getContext("2d"); if (!mc) return;
-      mc.font = font; mc.textAlign = "center"; mc.textBaseline = "middle"; mc.direction = "rtl";
-      mc.fillText("خليفة", width / 2, height / 2);
+      mc.font = font; mc.textAlign = "center"; mc.textBaseline = "alphabetic"; mc.direction = "rtl";
+      const metrics = mc.measureText("خليفة");
+      const ascent = metrics.fontBoundingBoxAscent || fontSize;
+      const descent = metrics.fontBoundingBoxDescent || fontSize * .3;
+      mc.fillText("خليفة", width / 2, height / 2 + (ascent - descent) / 2);
       const data = mc.getImageData(0, 0, mask.width, mask.height).data;
       const candidates: { x: number; y: number }[] = [];
-      for (let y = 0; y < mask.height; y += 3) for (let x = 0; x < mask.width; x += 3) if (data[(y * mask.width + x) * 4 + 3] > 160) candidates.push({ x, y });
+      const alpha = (x: number, y: number) => x < 0 || y < 0 || x >= mask.width || y >= mask.height ? 0 : data[(y * mask.width + x) * 4 + 3];
+      // Sample glyph contours rather than their filled area, preserving readable Arabic geometry.
+      for (let y = 0; y < mask.height; y += 2) for (let x = 0; x < mask.width; x += 2) {
+        if (alpha(x, y) > 160 && [alpha(x - 3, y), alpha(x + 3, y), alpha(x, y - 3), alpha(x, y + 3)].some(a => a < 120)) candidates.push({ x, y });
+      }
       const cap = mobile ? 240 : 440;
       const particles = Array.from({ length: Math.min(cap, candidates.length) }, (_, i) => {
         const target = candidates[Math.floor(i * candidates.length / Math.min(cap, candidates.length))];
@@ -38,10 +47,11 @@ export default function KhalifaParticleTitle({ mobile }: { mobile: boolean }) {
       const started = performance.now();
       const render = (now: number) => {
         if (cancelled) return;
-        const t = Math.min((now - started) / 1350, 1);
+        const elapsed = now - started;
+        const t = Math.min(elapsed / 1100, 1);
         const ease = 1 - Math.pow(1 - t, 3);
         ctx.clearRect(0, 0, width, height);
-        ctx.globalAlpha = Math.min(t * 4, 1) * (t > .92 ? Math.max(0, 1 - (t - .92) / .08) : 1);
+        ctx.globalAlpha = Math.min(t * 4, 1) * (elapsed > 1300 ? Math.max(0, 1 - (elapsed - 1300) / 300) : 1);
         for (let i = 0; i < particles.length; i++) {
           const p = particles[i];
           const x = p.sx + (p.x - p.sx) * ease + Math.sin(t * Math.PI) * p.bend;
@@ -49,7 +59,7 @@ export default function KhalifaParticleTitle({ mobile }: { mobile: boolean }) {
           ctx.fillStyle = i % 5 === 0 ? "#fff8df" : "#e6c579";
           ctx.beginPath(); ctx.arc(x, y, p.radius, 0, Math.PI * 2); ctx.fill();
         }
-        if (t < 1) frame = requestAnimationFrame(render);
+        if (elapsed < 1600) frame = requestAnimationFrame(render);
         else ctx.clearRect(0, 0, width, height);
       };
       frame = requestAnimationFrame(render);

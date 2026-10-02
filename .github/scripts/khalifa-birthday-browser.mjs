@@ -10,7 +10,15 @@ const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4173';
 const report = { sha: process.env.GITHUB_HEAD_SHA, checks: [], admin: 'BLOCKED: authenticated operations not exercised', errors: [] };
 async function context(width=1440, reduced='no-preference', storage=false) {
  const c = await browser.newContext({ viewport: { width, height: width===390 ? 844 : width===768 ? 1024 : 900 }, reducedMotion: reduced, locale: 'ar-AE' });
- if(storage) await c.addInitScript(() => { Object.defineProperty(window,'sessionStorage',{get(){throw new Error('storage blocked for test');}}); });
+ if(storage) await c.addInitScript(() => {
+  for (const method of ['getItem','setItem']) {
+   const original=Storage.prototype[method];
+   Storage.prototype[method]=function(key,...args) {
+    if(key==='daynight_khalifa_birthday_seen') throw new Error('birthday storage blocked for test');
+    return original.call(this,key,...args);
+   };
+  }
+ });
  const p=await c.newPage(); p.on('pageerror', e=>report.errors.push(e.message));
  return [c,p];
 }

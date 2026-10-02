@@ -38,6 +38,7 @@ export default function CelebrationDecor({ mobile, intro }: { mobile: boolean; i
     <div className="kb-cluster kb-cluster-right"><Balloon tone="gold" index={3} /><Balloon tone="glass" index={4} />{!mobile && <Balloon tone="navy" index={5} />}</div>
     {Array.from({ length: mobile ? 3 : 6 }, (_, i) => <i key={`glass-${i}`} className={`kb-bubble kb-bubble-${i}`} style={{ "--kb-drift": `${14 + i * 3}s` } as CSSProperties} />)}
     <div className="kb-dust">{Array.from({ length: mobile ? 12 : 28 }, (_, i) => <i key={i} style={{ left: `${(i * 37 + 7) % 100}%`, top: `${(i * 23 + 14) % 100}%`, animationDelay: `${-i * .7}s`, animationDuration: `${6 + i % 5}s` }} />)}</div>
+    {!intro && <div className="kb-petals">{Array.from({ length: mobile ? 3 : 6 }, (_, i) => <i key={i} style={{ left: `${9 + i * (mobile ? 39 : 16)}%`, animationDelay: `${-i * 4.3}s`, animationDuration: `${21 + i * 2}s` }} />)}</div>}
     {intro && <><div className="kb-activation" /><div className="kb-flare kb-flare-left" /><div className="kb-flare kb-flare-right" /></>}
   </div>;
 }
