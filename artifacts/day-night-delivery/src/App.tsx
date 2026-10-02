@@ -341,7 +341,7 @@ export default function App() {
       <DNOfficialCursor />
       {showSplash && <Splash onComplete={() => setShowSplash(false)} />}
       <AppContent />
-      <KhalifaBirthdayCelebration />
+      {isKhalifaBirthdayCampaignActive() && <KhalifaBirthdayCelebration />}
     </BrowserRouter>
   );
 }

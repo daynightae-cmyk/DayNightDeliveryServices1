@@ -1,5 +1,5 @@
 /* Isolated event layer. Nothing outside kb-root is selected or mutated. */
-.kb-root { position:fixed; inset:0; z-index:100000; pointer-events:none; color:#f8f1df; font-family:Cairo,Tajawal,sans-serif; overflow:hidden; isolation:isolate; --kb-gold:#d4af37; }
+.kb-root { position:fixed; inset:0; z-index:100000; pointer-events:none; color:#f8f1df; font-family:Cairo,Tajawal,sans-serif; overflow:hidden; isolation:isolate; }
 .kb-root *, .kb-root *::before, .kb-root *::after { box-sizing:border-box; }
 .kb-root .kb-control { pointer-events:auto; font:500 12px/1.5 Cairo,sans-serif; color:#f5e9cb; border:1px solid #dec98b55; background:#071426e8; cursor:pointer; display:flex; align-items:center; gap:12px; position:absolute; z-index:10; min-height:44px; transition:background .2s,border-color .2s; }
 .kb-root .kb-control:hover { background:#17283a; border-color:#ecd492; }
@@ -121,3 +121,13 @@
 .kb-reduced .kb-balloon-1,.kb-reduced .kb-balloon-2,.kb-reduced .kb-balloon-4,.kb-reduced .kb-balloon-5 { display:none; }
 .kb-reduced .kb-moment { animation:kb-veil-in .25s both; }.kb-reduced .kb-name,.kb-reduced .kb-hero-caption { animation:none; }.kb-reduced .kb-name::after { display:none; }.kb-reduced .kb-progress { display:none; }
 @media (prefers-reduced-motion:reduce) { .kb-root .kb-balloon,.kb-root .kb-bubble,.kb-root .kb-dust i { animation:none; } }
+
+.kb-stage > .kb-moment { grid-area:1/1; }
+.kb-moment.kb-moment-out { animation:kb-copy-out .35s ease both; }
+.kb-moment-out .kb-name,.kb-moment-out .kb-hero-caption { animation:none; }
+.kb-moment-out .kb-name::after { display:none; }
+@keyframes kb-copy-out { from { opacity:1; transform:translateY(0); filter:blur(0); } to { opacity:0; transform:translateY(-12px); filter:blur(5px); } }
+.kb-reduced .kb-moment.kb-moment-out { animation:kb-intro-exit .2s both; }
+.kb-cluster { transition:top 1s ease,opacity 1s ease,transform 1s ease; }
+.kb-lights { transition:height 1s ease,opacity 1s ease; }
+@media (prefers-reduced-motion:reduce) { .kb-root .kb-cluster,.kb-root .kb-lights { transition:none; } }

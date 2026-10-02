@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { getKhalifaAmbientMode, isKhalifaBirthdayCampaignActive, khalifaBirthdayConfig as cfg } from "../../config/khalifaBirthday";
 import CelebrationDecor from "./CelebrationDecor";
@@ -49,10 +50,10 @@ export default function KhalifaBirthdayCelebration() {
   }, [active, phase, finish]);
   if (!active || phase === "idle") return null;
   const mode = phase === "intro" ? "intro" : getKhalifaAmbientMode(pathname);
-  return <div className={`kb-root${reduced ? " kb-reduced" : ""}`} data-kb-phase={phase} data-kb-mode={mode} lang="ar" dir="rtl">
+  return createPortal(<div className={`kb-root${reduced ? " kb-reduced" : ""}`} data-kb-phase={phase} data-kb-mode={mode} lang="ar" dir="rtl">
     <CelebrationDecor key={run} mobile={mobile} intro={phase === "intro"} />
     {phase === "intro" && <CelebrationIntro key={`intro-${run}-${reduced}`} mobile={mobile} reduced={reduced} onDone={finish} />}
     {phase === "intro" ? <button className="kb-control kb-skip" onClick={finish}>متابعة للموقع <span aria-hidden="true">↗</span></button> :
       <button className="kb-control kb-replay" aria-label="إعادة عرض احتفال عيد ميلاد خليفة" onClick={() => { setRun(n => n + 1); setPhase("intro"); }}><span className="kb-seal" aria-hidden="true">01</span><span>خليفة</span><span aria-hidden="true">↻</span></button>}
-  </div>;
+  </div>, document.body);
 }
