@@ -20,13 +20,17 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
     const times = reduced ? [100, 650, 1200, 2500, 3200, 4200, 4900] : moments.map(m => m.at);
     const timers = times.flatMap((time, i) => [
       window.setTimeout(() => { setPrevious(i - 1); setIndex(i); }, time),
-      window.setTimeout(() => setPrevious(-1), time + (reduced ? 200 : 800)),
+      window.setTimeout(() => setPrevious(-1), time + (reduced ? 200 : 1200)),
     ]);
     timers.push(window.setTimeout(onDone, reduced ? cfg.reducedDurationMs : cfg.introDurationMs));
     return () => timers.forEach(window.clearTimeout);
   }, [reduced, onDone]);
   const m = moments[index];
-  const renderMoment = (moment: typeof moments[number], outgoing = false) => <div key={outgoing ? `old-${previous}` : index} className={`kb-moment kb-moment-${moment.kind}${outgoing ? " kb-moment-out" : ""}`} aria-hidden={outgoing || undefined}>
+  const renderMoment = (moment: typeof moments[number], outgoing = false) => <div 
+    key={outgoing ? `old-${previous}` : index} 
+    className={`kb-moment kb-moment-${moment.kind}${outgoing ? " kb-moment-out" : ""}`} 
+    aria-hidden={outgoing || undefined}
+  >
     <p className="kb-eyebrow" dir="ltr">{moment.label}</p>
     {moment.kind === "hero" ? <>
       <span className="kb-year" aria-hidden="true">01</span>
@@ -35,7 +39,7 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
         <h2 className="kb-name">خليفة</h2>
       </div>
       <div className="kb-hero-caption"><p>ظبي الإمارات الصغير</p><p className="kb-crown">ولي عهد <span dir="ltr">Day Night</span></p><span className="kb-first" dir="ltr">FIRST BIRTHDAY</span></div>
-    </> : <h2 className="kb-story kb-story-animated">{moment.text}</h2>}
+    </> : <h2 className={`kb-story kb-story-reveal${moment.kind === "wish" ? " kb-story-wish" : ""}`}>{moment.text}</h2>}
     <span className="kb-gold-rule" aria-hidden="true" />
   </div>;
   return <section className="kb-intro" data-kb-moment={m?.kind || "opening"} aria-label="احتفال أول عيد ميلاد لخليفة">
@@ -48,7 +52,7 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
       {previous >= 0 && renderMoment(moments[previous], true)}
       {m && renderMoment(m)}
     </div>
-    <div className="kb-editorial-footer" aria-hidden="true"><span>KHALIFA’S FIRST CHAPTER</span><span>WITH LOVE, DAY NIGHT</span></div>
+    <div className="kb-editorial-footer" aria-hidden="true"><span>KHALIFA'S FIRST CHAPTER</span><span>WITH LOVE, DAY NIGHT</span></div>
     <div className="kb-progress" aria-hidden="true" style={{ animationDuration: `${reduced ? cfg.reducedDurationMs : cfg.introDurationMs}ms` }} />
   </section>;
 }
