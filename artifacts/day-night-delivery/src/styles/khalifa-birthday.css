@@ -19,12 +19,12 @@
 .kb-editorial-header b { font-weight:300; margin-left:14px; color:#ffffff77; }
 .kb-editorial-footer { bottom:46px; font-size:8px; color:#a5a19a88; }
 .kb-stage { position:absolute; inset:0; display:grid; place-items:center; padding:140px 12vw 150px; text-align:center; }
-.kb-moment { position:relative; width:100%; max-width:980px; animation:kb-copy-in .65s cubic-bezier(.2,.65,.2,1) both; }
+.kb-moment { position:relative; width:100%; max-width:980px; animation:kb-copy-in 1s cubic-bezier(.2,.65,.2,1) both; }
 .kb-eyebrow { margin:0 0 28px; color:#d8bd7e; font:500 10px/1.6 Inter,sans-serif; letter-spacing:.35em; }
 .kb-story { margin:0; font:500 clamp(28px,3.4vw,51px)/1.9 Cairo,sans-serif; color:#f8f3e8; text-wrap:balance; text-shadow:0 3px 20px #0002; letter-spacing:0.02em; }
-.kb-story-reveal { animation:kb-story-smooth-reveal 3.2s cubic-bezier(0.34,1.56,0.64,1) both; }
+.kb-story-reveal { animation:kb-story-smooth-reveal 1.2s cubic-bezier(0.34,1.56,0.64,1) both; }
 .kb-moment-wish .kb-story { font-size:clamp(34px,4.5vw,65px); font-weight:600; background:linear-gradient(165deg,#fff9e9 20%,#efd296 80%); background-clip:text; color:transparent; }
-.kb-story-wish { animation:kb-story-wish-reveal 3.6s cubic-bezier(0.25,0.75,0.25,1) both!important; }
+.kb-story-wish { animation:kb-story-wish-reveal 1.4s cubic-bezier(0.25,0.75,0.25,1) both!important; }
 .kb-moment-signature .kb-story { font-size:clamp(24px,2.6vw,36px); color:#e2d5b7; }
 .kb-moment-playful .kb-story { font-size:clamp(22px,2.5vw,34px); font-weight:400; }
 .kb-gold-rule { display:block; height:1px; width:64px; margin:30px auto 0; background:linear-gradient(90deg,transparent,#d5b86f,transparent); }
@@ -123,7 +123,7 @@
 .kb-reduced .kb-activation,.kb-reduced .kb-flare,.kb-reduced .kb-dust,.kb-reduced .kb-bubble { display:none; }
 .kb-reduced .kb-cluster,.kb-reduced .kb-balloon,.kb-reduced .kb-bulb { animation:none; }
 .kb-reduced .kb-balloon-1,.kb-reduced .kb-balloon-2,.kb-reduced .kb-balloon-4,.kb-reduced .kb-balloon-5 { display:none; }
-.kb-reduced .kb-moment { animation:kb-veil-in .25s both; }.kb-reduced .kb-name,.kb-reduced .kb-hero-caption { animation:none; }.kb-reduced .kb-name::after { display:none; }.kb-reduced .kb-progress { display:none; }
+.kb-reduced .kb-moment { animation:kb-veil-in .25s both; }.kb-reduced .kb-name,.kb-reduced .kb-hero-caption,.kb-reduced .kb-story { animation:none!important; }.kb-reduced .kb-name::after { display:none; }.kb-reduced .kb-progress { display:none; }
 @media (prefers-reduced-motion:reduce) { .kb-root .kb-balloon,.kb-root .kb-bubble,.kb-root .kb-dust i { animation:none; } }
 
 .kb-stage > .kb-moment { grid-area:1/1; }

@@ -5,12 +5,12 @@ import CelebrationBurst from "./CelebrationBurst";
 
 const moments = [
   { at: 1400, label: "TONIGHT AT DAY NIGHT", text: "اليوم مش يوم عادي في Day Night...", kind: "story" },
-  { at: 2700, label: "A VERY SPECIAL LITTLE ONE", text: "النهارده عيد ميلاد خليفة", kind: "story" },
-  { at: 3700, label: "KHALIFA · 01", text: "خليفة", kind: "hero" },
-  { at: 6500, label: "ONE YEAR. A WORLD OF LOVE.", text: "أول عيد ميلاد لخليفة مع عائلة Day Night", kind: "story" },
-  { at: 7700, label: "OUR LITTLE LIGHT", text: "كل سنة وإنت منور دنيتنا يا خليفة", kind: "wish" },
-  { at: 9600, label: "DAY NIGHT FAMILY", text: "من عائلة داي نايت لخدمات التوصيل والشحن", kind: "signature" },
-  { at: 11000, label: "THE ONE & ONLY", text: "يلا يا بلد... مجبتش خليفة غيري 😎", kind: "playful" },
+  { at: 3000, label: "A VERY SPECIAL LITTLE ONE", text: "النهارده عيد ميلاد خليفة", kind: "story" },
+  { at: 4600, label: "KHALIFA · 01", text: "خليفة", kind: "hero" },
+  { at: 8000, label: "ONE YEAR. A WORLD OF LOVE.", text: "أول عيد ميلاد لخليفة مع عائلة Day Night", kind: "story" },
+  { at: 9600, label: "OUR LITTLE LIGHT", text: "كل سنة وإنت منور دنيتنا يا خليفة", kind: "wish" },
+  { at: 11600, label: "DAY NIGHT FAMILY", text: "من عائلة داي نايت لخدمات التوصيل والشحن", kind: "signature" },
+  { at: 13200, label: "THE ONE & ONLY", text: "يلا يا بلد... مجبتش خليفة غيري 😎", kind: "playful" },
 ] as const;
 
 export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: boolean; reduced: boolean; onDone: () => void }) {
@@ -18,12 +18,15 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
   const [previous, setPrevious] = useState(-1);
   useEffect(() => {
     const times = reduced ? [100, 650, 1200, 2500, 3200, 4200, 4900] : moments.map(m => m.at);
-    const timers = times.flatMap((time, i) => [
-      window.setTimeout(() => { setPrevious(i - 1); setIndex(i); }, time),
-      window.setTimeout(() => setPrevious(-1), time + (reduced ? 200 : 1400)),
-    ]);
+    let exitTimer: number | undefined;
+    const timers = times.map((time, i) => window.setTimeout(() => {
+      window.clearTimeout(exitTimer);
+      setPrevious(i - 1);
+      setIndex(i);
+      exitTimer = window.setTimeout(() => setPrevious(-1), reduced ? 200 : 1400);
+    }, time));
     timers.push(window.setTimeout(onDone, reduced ? cfg.reducedDurationMs : cfg.introDurationMs));
-    return () => timers.forEach(window.clearTimeout);
+    return () => { timers.forEach(window.clearTimeout); window.clearTimeout(exitTimer); };
   }, [reduced, onDone]);
   const m = moments[index];
   const renderMoment = (moment: typeof moments[number], outgoing = false) => <div 

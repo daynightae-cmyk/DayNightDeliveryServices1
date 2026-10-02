@@ -29,7 +29,7 @@ try {
   await p.locator('[data-kb-phase="intro"]').waitFor();
   const start=Date.now();
   assert.equal(await p.locator('.kb-root').count(),1);
-  const marks=[[900,'opening'],[2200,'story'],[4600,'formation'],[6000,'name'],[8500,'wish'],[12000,'exit'],[13000,'ambient']];
+  const marks=[[900,'opening'],[2200,'story'],[5400,'formation'],[7000,'name'],[10500,'wish'],[14300,'exit'],[15300,'ambient']];
   for(const [at,name] of marks) {
    const remaining=at-(Date.now()-start); if(remaining>0) await p.waitForTimeout(remaining);
    await p.screenshot({path:`${out}/${width}-${name}.png`});
@@ -55,6 +55,17 @@ try {
   await p.goto(`${base}/auth?lang=ar`,{waitUntil:'domcontentloaded'});
   await p.locator('[data-kb-mode="minimal"]').waitFor();
   await p.screenshot({path:`${out}/${width}-auth.png`});
+  const decor = await p.evaluate(() => {
+   const root=document.querySelector('.kb-root');
+   const balloons=[...root.querySelectorAll('.kb-balloon')].filter(e=>getComputedStyle(e).display!=='none').map(e=>{
+    const r=e.getBoundingClientRect();return {width:r.width,visibleWidth:Math.min(innerWidth,r.right)-Math.max(0,r.left),top:r.top};
+   });
+   return {overflow:document.documentElement.scrollWidth>innerWidth,balloons,petals:root.querySelectorAll('.kb-petals i').length,pointerEvents:getComputedStyle(root).pointerEvents};
+  });
+  assert.equal(decor.overflow,false); assert.equal(decor.pointerEvents,'none');
+  assert.ok(decor.balloons.length>=2 && decor.balloons.every(b=>b.visibleWidth>30 && b.top<80));
+  assert.equal(decor.petals,width===390?2:3);
+  report.checks.push({width,decor});
   assert.equal(await p.locator('.kb-root').count(),1);
   report.checks.push({width,autostart:true,ambient:true,refresh:true,replay:true,escape:true,skip:true,trackingInput:true,authAmbient:true});
   await c.close();
@@ -71,6 +82,8 @@ try {
  await rp.goto(base,{waitUntil:'domcontentloaded'});
  await rp.locator('[data-kb-phase="intro"]').waitFor();
  assert.equal(await rp.locator('canvas,.kb-bursts').count(),0);
+ await rp.locator('.kb-story').first().waitFor();
+ assert.equal(await rp.locator('.kb-story').first().evaluate(e=>getComputedStyle(e).animationName),'none');
  await rp.waitForTimeout(2200); await rp.screenshot({path:`${out}/390-reduced-name.png`});
  await rp.locator('[data-kb-phase="ambient"]').waitFor({timeout:6500});
  report.checks.push({reducedMotion:true}); await rc.close();

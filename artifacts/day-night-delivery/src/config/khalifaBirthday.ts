@@ -4,7 +4,7 @@ export const khalifaBirthdayConfig = {
   endDate: null as string | null,
   storageKey: "daynight_khalifa_birthday_seen",
   autoStartDelayMs: 450,
-  introDurationMs: 12500,
+  introDurationMs: 14800,
   reducedDurationMs: 5500,
 };
 
