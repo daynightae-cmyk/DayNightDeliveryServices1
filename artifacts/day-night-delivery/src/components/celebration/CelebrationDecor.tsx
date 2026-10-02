@@ -18,27 +18,27 @@ function Balloon({ tone, index }: { tone: "gold" | "navy" | "pearl" | "glass"; i
 }
 
 export default function CelebrationDecor({ mobile, intro }: { mobile: boolean; intro: boolean }) {
-  const bulbs = Array.from({ length: mobile ? 13 : 23 }, (_, i) => {
-    const x = 20 + i * (960 / (mobile ? 12 : 22));
+  const bulbs = Array.from({ length: mobile ? 16 : 28 }, (_, i) => {
+    const x = 20 + i * (960 / (mobile ? 15 : 27));
     const y = 13 + 42 * Math.sin((x / 1000) * Math.PI);
     return { x, y, i };
   });
   return <div className="kb-decor" aria-hidden="true">
     <svg className="kb-lights" viewBox="0 0 1000 110" preserveAspectRatio="none">
-      <path d="M0 10 Q500 106 1000 10" fill="none" stroke="#ae915e" strokeOpacity=".42" strokeWidth=".7" />
+      <path d="M0 10 Q500 106 1000 10" fill="none" stroke="#ae915e" strokeOpacity=".65" strokeWidth="1.2" />
       {bulbs.map(({ x, y, i }) => <g key={i} className="kb-bulb" style={{ animationDelay: `${intro ? i * .045 + .08 : 0}s` }}>
-        <path d={`M${x} ${y}v9`} stroke="#ae915e" strokeWidth=".7" />
-        <ellipse cx={x} cy={y + 15} rx="9" ry="15" fill="#edbc57" opacity=".035" />
-        <ellipse cx={x} cy={y + 15} rx="4.4" ry="7" fill="#f4ce76" opacity=".12" />
-        <ellipse cx={x} cy={y + 15} rx="1.8" ry="3.8" fill="#ffedb5" />
+        <path d={`M${x} ${y}v9`} stroke="#ae915e" strokeWidth=".9" />
+        <ellipse cx={x} cy={y + 15} rx="9" ry="15" fill="#edbc57" opacity=".08" />
+        <ellipse cx={x} cy={y + 15} rx="4.4" ry="7" fill="#f4ce76" opacity=".2" />
+        <ellipse cx={x} cy={y + 15} rx="1.8" ry="3.8" fill="#ffedb5" opacity="0.85" />
         <circle cx={x - .5} cy={y + 13} r=".7" fill="#fffef1" />
       </g>)}
     </svg>
     <div className="kb-cluster kb-cluster-left"><Balloon tone="navy" index={0} /><Balloon tone="pearl" index={1} />{!mobile && <Balloon tone="gold" index={2} />}</div>
     <div className="kb-cluster kb-cluster-right"><Balloon tone="gold" index={3} /><Balloon tone="glass" index={4} />{!mobile && <Balloon tone="navy" index={5} />}</div>
-    {Array.from({ length: mobile ? 3 : 6 }, (_, i) => <i key={`glass-${i}`} className={`kb-bubble kb-bubble-${i}`} style={{ "--kb-drift": `${14 + i * 3}s` } as CSSProperties} />)}
-    <div className="kb-dust">{Array.from({ length: mobile ? 12 : 28 }, (_, i) => <i key={i} style={{ left: `${(i * 37 + 7) % 100}%`, top: `${(i * 23 + 14) % 100}%`, animationDelay: `${-i * .7}s`, animationDuration: `${6 + i % 5}s` }} />)}</div>
-    {!intro && <div className="kb-petals">{Array.from({ length: mobile ? 3 : 6 }, (_, i) => <i key={i} style={{ left: `${9 + i * (mobile ? 39 : 16)}%`, animationDelay: `${-i * 4.3}s`, animationDuration: `${21 + i * 2}s` }} />)}</div>}
+    {Array.from({ length: mobile ? 4 : 7 }, (_, i) => <i key={`glass-${i}`} className={`kb-bubble kb-bubble-${i}`} style={{ "--kb-drift": `${14 + i * 3}s` } as CSSProperties} />)}
+    <div className="kb-dust">{Array.from({ length: mobile ? 16 : 32 }, (_, i) => <i key={i} style={{ left: `${(i * 37 + 7) % 100}%`, top: `${(i * 23 + 14) % 100}%`, animationDelay: `${-i * .7}s`, animationDuration: `${6 + i % 5}s` }} />)}</div>
+    {!intro && <div className="kb-petals">{Array.from({ length: mobile ? 2 : 3 }, (_, i) => <i key={i} style={{ left: `${15 + i * 35}%`, animationDelay: `${-i * 8}s`, animationDuration: `${28 + i * 3}s` }} />)}</div>}
     {intro && <><div className="kb-activation" /><div className="kb-flare kb-flare-left" /><div className="kb-flare kb-flare-right" /></>}
   </div>;
 }
