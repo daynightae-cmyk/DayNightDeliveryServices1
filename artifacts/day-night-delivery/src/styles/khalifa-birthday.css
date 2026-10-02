@@ -752,7 +752,7 @@
   }
 
   .kb-balloon {
-    width: calc(var(--kb-balloon-size) * 0.76);
+    width: min(var(--kb-balloon-size), 44px);
   }
 
   .kb-story-line {
