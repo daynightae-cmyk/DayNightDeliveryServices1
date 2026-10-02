@@ -147,3 +147,9 @@
 @media (prefers-reduced-motion:reduce) { .kb-root .kb-petals { display:none; } }
 .kb-root[data-kb-mode="quiet"] .kb-cluster-left,.kb-root[data-kb-mode="minimal"] .kb-cluster-left { left:-12px; }
 .kb-root[data-kb-mode="quiet"] .kb-cluster-right,.kb-root[data-kb-mode="minimal"] .kb-cluster-right { right:-12px; }
+/* Keep the balloon bodies visible above portal chrome, rather than clipping them at the viewport edge. */
+.kb-root[data-kb-phase="ambient"] .kb-cluster { top:8px; }
+.kb-root[data-kb-mode="minimal"] .kb-cluster { opacity:.38; transform:scale(.32); }
+.kb-root[data-kb-mode="quiet"] .kb-cluster { opacity:.45; }
+.kb-root[data-kb-mode="minimal"] .kb-lights { opacity:.42; height:43px; }
+.kb-root[data-kb-mode="quiet"] .kb-lights { opacity:.5; height:43px; }
