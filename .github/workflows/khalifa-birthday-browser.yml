@@ -1,0 +1,59 @@
+name: Khalifa Birthday Browser Evidence
+on:
+  pull_request:
+    paths:
+      - 'artifacts/day-night-delivery/src/components/celebration/**'
+      - 'artifacts/day-night-delivery/src/config/khalifaBirthday.ts'
+      - 'artifacts/day-night-delivery/src/styles/khalifa-birthday.css'
+      - '.github/scripts/khalifa-birthday-browser.mjs'
+      - '.github/workflows/khalifa-birthday-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: khalifa-browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  birthday:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TEST_BASE_URL: http://127.0.0.1:4173
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run web:typecheck && pnpm run web:build
+      - name: Serve exact build and install isolated browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p khalifa-browser-evidence
+          cp artifacts/day-night-delivery/dist/public/version.json khalifa-browser-evidence/version.json
+          nohup pnpm --dir artifacts/day-night-delivery exec vite preview --host 127.0.0.1 --port 4173 --strictPort > khalifa-browser-evidence/server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$TEST_BASE_URL" >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS "$TEST_BASE_URL" >/dev/null
+          mkdir -p "$RUNNER_TEMP/khalifa-playwright"
+          npm install --prefix "$RUNNER_TEMP/khalifa-playwright" --ignore-scripts playwright@1.56.1
+          "$RUNNER_TEMP/khalifa-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          echo "PLAYWRIGHT_NODE_PATH=$RUNNER_TEMP/khalifa-playwright/node_modules" >> "$GITHUB_ENV"
+      - name: Capture story and check session, controls and route entry
+        run: node .github/scripts/khalifa-birthday-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: khalifa-birthday-${{ github.event.pull_request.head.sha || github.sha }}
+          path: khalifa-browser-evidence

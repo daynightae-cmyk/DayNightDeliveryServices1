@@ -29,6 +29,8 @@ import NotFound from "./components/NotFound";
 import Auth from "./components/Auth";
 import ThemeToggle from "./components/ThemeToggle";
 import Splash from "./components/Splash";
+import KhalifaBirthdayCelebration from "./components/celebration/KhalifaBirthdayCelebration";
+import { isKhalifaBirthdayCampaignActive } from "./config/khalifaBirthday";
 import Footer from "./components/Footer";
 import { DNOfficialCursor } from "./components/ui/DNOfficialCursor";
 import { DNRouteErrorBoundary } from "./components/ui/DNRouteErrorBoundary";
@@ -329,7 +331,7 @@ function AppContent() {
 }
 
 export default function App() {
-  const skipSplash =
+  const skipSplash = isKhalifaBirthdayCampaignActive() ||
     typeof window !== "undefined" &&
     (window.location.pathname === "/auth" || new URLSearchParams(window.location.search).has("nosplash"));
   const [showSplash, setShowSplash] = useState(!skipSplash);
@@ -339,6 +341,7 @@ export default function App() {
       <DNOfficialCursor />
       {showSplash && <Splash onComplete={() => setShowSplash(false)} />}
       <AppContent />
+      {isKhalifaBirthdayCampaignActive() && <KhalifaBirthdayCelebration />}
     </BrowserRouter>
   );
 }
