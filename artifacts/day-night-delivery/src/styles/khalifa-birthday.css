@@ -7,7 +7,7 @@
 .kb-root .kb-skip { bottom:max(52px,env(safe-area-inset-bottom)); right:50%; transform:translateX(50%); border-radius:0; border:0; border-bottom:1px solid #cfb46d66; padding:6px 16px; background:transparent; }
 .kb-root .kb-replay { left:max(20px,env(safe-area-inset-left)); bottom:max(90px,env(safe-area-inset-bottom)); border-radius:32px; padding:5px 12px 5px 5px; flex-direction:row-reverse; box-shadow:0 5px 22px #02091430; }
 .kb-seal { display:grid; place-items:center; width:32px; height:32px; border:1px solid #dfc58288; border-radius:50%; font:300 15px/1 Inter,sans-serif; }
-.kb-intro { position:absolute; inset:0; z-index:2; animation:kb-intro-exit .8s 11.7s both; }
+.kb-intro { position:absolute; inset:0; z-index:2; animation:kb-intro-exit 1.4s both; }
 .kb-veil { position:absolute; inset:0; background:linear-gradient(180deg,#020914b8,#061224e6 34%,#041024ec 70%,#020914da); animation:kb-veil-in 1.1s both; }
 .kb-halo { position:absolute; inset:0; background:radial-gradient(ellipse at 50% 51%,#b88c3022,transparent 42%),radial-gradient(ellipse at 10% 0%,#16315366,transparent 42%),radial-gradient(ellipse at 91% 0%,#b58b2917,transparent 40%); }
 .kb-intro[data-kb-moment="wish"] .kb-halo { background:radial-gradient(ellipse at 50% 51%,#c69c3933,transparent 57%); transition:background 1s; }
@@ -151,9 +151,16 @@
 @media (prefers-reduced-motion:reduce) { .kb-root .kb-petals { display:none; } }
 .kb-root[data-kb-mode="quiet"] .kb-cluster-left,.kb-root[data-kb-mode="minimal"] .kb-cluster-left { left:-9px; }
 .kb-root[data-kb-mode="quiet"] .kb-cluster-right,.kb-root[data-kb-mode="minimal"] .kb-cluster-right { right:-9px; }
-/* Keep the balloon bodies visible above portal chrome, consistent across all pages. */
-.kb-root[data-kb-phase="ambient"] .kb-cluster { top:3px; }
-.kb-root[data-kb-mode="minimal"] .kb-cluster { opacity:0.64; transform:scale(0.58); }
-.kb-root[data-kb-mode="quiet"] .kb-cluster { opacity:0.68; }
-.kb-root[data-kb-mode="minimal"] .kb-lights { opacity:0.62; height:60px; }
-.kb-root[data-kb-mode="quiet"] .kb-lights { opacity:0.76; height:66px; }
+/* Keep balloon bodies visible below navigation, with quieter operational ambience. */
+.kb-root[data-kb-phase="ambient"] .kb-cluster { top:220px; }
+.kb-root[data-kb-mode="minimal"] .kb-cluster { top:72px; opacity:.38; transform:scale(.44); }
+.kb-root[data-kb-mode="quiet"] .kb-cluster { opacity:.46; transform:scale(.46); }
+.kb-root[data-kb-phase="ambient"] .kb-lights { height:43px; opacity:.65; }
+.kb-root[data-kb-mode="minimal"] .kb-lights { opacity:.42; }
+.kb-root[data-kb-mode="quiet"] .kb-lights { opacity:.5; }
+.kb-root[data-kb-mode="minimal"] .kb-petals,.kb-root[data-kb-mode="quiet"] .kb-petals { opacity:.55; }
+@media (max-width:600px) {
+ .kb-root[data-kb-phase="ambient"] .kb-cluster { top:156px; }
+ .kb-root[data-kb-mode="quiet"] .kb-cluster { transform:scale(.4); }
+ .kb-root[data-kb-mode="minimal"] .kb-cluster { top:72px; transform:scale(.4); }
+}

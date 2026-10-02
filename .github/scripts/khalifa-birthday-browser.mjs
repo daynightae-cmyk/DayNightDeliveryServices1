@@ -32,6 +32,11 @@ try {
   const marks=[[900,'opening'],[2200,'story'],[5400,'formation'],[7000,'name'],[10500,'wish'],[14300,'exit'],[15300,'ambient']];
   for(const [at,name] of marks) {
    const remaining=at-(Date.now()-start); if(remaining>0) await p.waitForTimeout(remaining);
+   if(name==='wish') assert.equal(await p.locator('.kb-intro').evaluate(e=>Number(getComputedStyle(e).opacity)),1);
+   if(name==='exit') {
+    const opacity=await p.locator('.kb-intro').evaluate(e=>Number(getComputedStyle(e).opacity));
+    assert.ok(opacity>0 && opacity<1,'final story must fade throughout the configured final interval');
+   }
    await p.screenshot({path:`${out}/${width}-${name}.png`});
   }
   assert.equal(await p.locator('.kb-root').getAttribute('data-kb-phase'),'ambient');
@@ -62,10 +67,10 @@ try {
    });
    return {overflow:document.documentElement.scrollWidth>innerWidth,balloons,petals:root.querySelectorAll('.kb-petals i').length,pointerEvents:getComputedStyle(root).pointerEvents};
   });
-  assert.equal(decor.overflow,false); assert.equal(decor.pointerEvents,'none');
-  assert.ok(decor.balloons.length>=2 && decor.balloons.every(b=>b.visibleWidth>30 && b.top<80));
-  assert.equal(decor.petals,width===390?2:3);
   report.checks.push({width,decor});
+  assert.equal(decor.overflow,false); assert.equal(decor.pointerEvents,'none');
+  assert.ok(decor.balloons.length>=2 && decor.balloons.every(b=>b.visibleWidth>30 && b.top<300));
+  assert.equal(decor.petals,width===390?2:3);
   assert.equal(await p.locator('.kb-root').count(),1);
   report.checks.push({width,autostart:true,ambient:true,refresh:true,replay:true,escape:true,skip:true,trackingInput:true,authAmbient:true});
   await c.close();

@@ -45,7 +45,7 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
     </> : <h2 className={`kb-story kb-story-reveal${moment.kind === "wish" ? " kb-story-wish" : ""}`}>{moment.text}</h2>}
     <span className="kb-gold-rule" aria-hidden="true" />
   </div>;
-  return <section className="kb-intro" data-kb-moment={m?.kind || "opening"} aria-label="احتفال أول عيد ميلاد لخليفة">
+  return <section className="kb-intro" data-kb-moment={m?.kind || "opening"} style={{ animationDelay: `${cfg.introDurationMs - 1400}ms` }} aria-label="احتفال أول عيد ميلاد لخليفة">
     <div className="kb-veil" aria-hidden="true" />
     <div className="kb-halo" aria-hidden="true" />
     <div className="kb-editorial-header" aria-hidden="true"><span>DAY NIGHT <b>AFTER DARK</b></span><span>02 OCTOBER 2026</span></div>
