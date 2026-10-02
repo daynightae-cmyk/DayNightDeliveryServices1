@@ -128,7 +128,7 @@
 
 .kb-stage > .kb-moment { grid-area:1/1; }
 .kb-moment.kb-moment-out { animation:kb-copy-out 1.4s ease both; }
-.kb-moment-out .kb-name,.kb-moment-out .kb-hero-caption { animation:none; }
+.kb-moment-out .kb-name,.kb-moment-out .kb-hero-caption,.kb-moment-out .kb-story { animation:none!important; }
 .kb-moment-out .kb-name::after { display:none; }
 @keyframes kb-copy-out { from { opacity:1; transform:translateY(0); filter:blur(0); } to { opacity:0; transform:translateY(-10px); filter:blur(8px); } }
 .kb-reduced .kb-moment.kb-moment-out { animation:kb-intro-exit .2s both; }

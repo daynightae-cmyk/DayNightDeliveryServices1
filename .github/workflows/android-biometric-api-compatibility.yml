@@ -26,7 +26,9 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
       - name: Install Android SDK
         shell: bash
         run: |
@@ -85,7 +87,9 @@ jobs:
         api: [24, 28, 30, 33, 35, 36]
     steps:
       - uses: actions/checkout@v4
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
       - name: Install API ${{ matrix.api }} emulator
         shell: bash
         run: |

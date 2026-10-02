@@ -20,7 +20,7 @@ export default function CelebrationIntro({ mobile, reduced, onDone }: { mobile: 
     const times = reduced ? [100, 650, 1200, 2500, 3200, 4200, 4900] : moments.map(m => m.at);
     const timers = times.flatMap((time, i) => [
       window.setTimeout(() => { setPrevious(i - 1); setIndex(i); }, time),
-      window.setTimeout(() => setPrevious(-1), time + (reduced ? 200 : 1200)),
+      window.setTimeout(() => setPrevious(-1), time + (reduced ? 200 : 1400)),
     ]);
     timers.push(window.setTimeout(onDone, reduced ? cfg.reducedDurationMs : cfg.introDurationMs));
     return () => timers.forEach(window.clearTimeout);
